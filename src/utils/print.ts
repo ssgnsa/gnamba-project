@@ -287,39 +287,41 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
   <style>
     @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Cinzel:wght@400;500;600;700&display=swap');
 
-    @page { size: A4 portrait; margin: 0; }
+    @page { size: A4 portrait; margin: 20mm; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      width: 210mm; height: 297mm;
+      width: 210mm; min-height: 297mm;
       margin: 0; padding: 0;
       font-family: 'EB Garamond', 'Times New Roman', Times, serif;
       font-size: 11.5pt;
       color: #1a1a1a;
-      background: #fff;
+      background: #FAFAFA;
       overflow: hidden;
     }
 
     .page {
-      width: 210mm; height: 297mm;
+      width: 210mm; min-height: 297mm;
       position: relative;
-      padding: 12mm 18mm 14mm 18mm;
+      padding: 20mm;
+      margin: 0 auto;
       background: #fff;
+      box-shadow: inset 0 0 0 1px rgba(184, 134, 11, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.05);
     }
 
-    /* ——— DOUBLE BORDURE AVEC ORNEMENTS ——— */
+    /* ——— DOUBLE BORDURE ORNEMENTALE ——— */
     .page::before {
       content: '';
       position: absolute;
-      top: 5mm; left: 5mm; right: 5mm; bottom: 5mm;
-      border: 2px solid #b8860b;
+      top: 12px; left: 12px; right: 12px; bottom: 12px;
+      border: 1px solid rgba(184, 134, 11, 0.95);
       pointer-events: none;
     }
     .page::after {
       content: '';
       position: absolute;
-      top: 7mm; left: 7mm; right: 7mm; bottom: 7mm;
-      border: 0.75px solid #8a8a8a;
+      top: 22px; left: 22px; right: 22px; bottom: 22px;
+      border: 1px dotted rgba(0, 0, 0, 0.14);
       pointer-events: none;
     }
 
@@ -417,52 +419,64 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
     /* ——— TITRE ——— */
     .title-section {
       text-align: center;
-      margin: 6px 0 6px;
+      margin: 8px 0 18px;
     }
     .title {
       font-family: 'Cinzel', serif;
-      font-size: 17.5pt;
+      font-size: 24.5pt;
       font-weight: 700;
-      letter-spacing: 3px;
+      letter-spacing: 5px;
       text-transform: uppercase;
-      color: #006b3f;
-      padding: 4px 20px 6px;
+      color: #0b4b2f;
+      padding: 10px 28px 12px;
       display: inline-block;
       position: relative;
+      line-height: 1.05;
+      background: rgba(0, 107, 63, 0.03);
+      border-radius: 8px;
     }
     .title::before {
       content: '';
       position: absolute;
-      top: 0; left: 50%; transform: translateX(-50%);
-      width: 80px; height: 2px;
+      top: 6px; left: 50%; transform: translateX(-50%);
+      width: 120px; height: 2px;
       background: #b8860b;
     }
     .title::after {
       content: '';
       position: absolute;
-      bottom: 0; left: 50%; transform: translateX(-50%);
-      width: 80px; height: 2px;
+      bottom: 6px; left: 50%; transform: translateX(-50%);
+      width: 120px; height: 2px;
       background: #b8860b;
     }
 
     /* ——— RÉFÉRENCE ——— */
     .ref-line {
       text-align: center;
-      margin: 4px 0 6px;
+      margin: 6px 0 12px;
       display: flex;
       justify-content: center;
       align-items: center;
-      gap: 12px;
+      gap: 16px;
+      flex-wrap: wrap;
     }
     .ref-box {
       font-family: 'Cinzel', serif;
-      font-size: 12pt;
-      font-weight: 600;
+      font-size: 12.5pt;
+      font-weight: 700;
       color: #b8860b;
-      letter-spacing: 0.8px;
-      padding: 2px 16px;
+      letter-spacing: 0.9px;
+      padding: 6px 20px;
       border: 1px solid #b8860b;
-      background: rgba(184, 134, 11, 0.04);
+      background: rgba(184, 134, 11, 0.08);
+      border-radius: 10px;
+    }
+    .ref-meta {
+      font-size: 10pt;
+      font-weight: 600;
+      letter-spacing: 0.8px;
+      color: #444;
+      text-transform: uppercase;
     }
     .original-badge {
       font-size: 8pt;
@@ -480,35 +494,37 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
       font-size: 8.5pt;
       text-align: center;
       color: #555;
-      margin: 4px 0 6px;
-      line-height: 1.5;
-      padding: 3px 20px;
+      margin: 6px 0 10px;
+      line-height: 1.6;
+      padding: 4px 22px;
       border-top: 0.5px solid #e0e0e0;
       border-bottom: 0.5px solid #e0e0e0;
-      background: rgba(0, 107, 63, 0.02);
+      background: rgba(0, 107, 63, 0.03);
     }
 
     /* ——— DÉCLARATION ——— */
     .declaration {
-      font-size: 11.5pt;
-      line-height: 1.7;
+      font-size: 12pt;
+      line-height: 1.85;
       text-align: justify;
-      margin: 6px 0;
-      padding: 4px 0 4px 10px;
-      border-left: 2.5px solid #006b3f;
-      color: #2a2a2a;
+      margin: 12px 0;
+      padding: 8px 0 8px 12px;
+      border-left: 3px solid #006b3f;
+      color: #222;
+      background: rgba(0, 107, 63, 0.03);
+      border-radius: 6px;
     }
 
     /* ——— TABLEAUX DE CHAMPS ——— */
     .section {
-      margin: 5px 0;
+      margin: 14px 0;
     }
     .section-header {
       display: flex;
       align-items: center;
-      gap: 6px;
-      margin-bottom: 3px;
-      padding-bottom: 2px;
+      gap: 8px;
+      margin-bottom: 6px;
+      padding-bottom: 4px;
       border-bottom: 1px solid #006b3f;
     }
     .section-numeral {
@@ -533,7 +549,7 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
       font-size: 11pt;
     }
     .data-table td {
-      padding: 3px 6px;
+      padding: 8px 10px;
       vertical-align: middle;
     }
     .data-table .label {
@@ -626,16 +642,16 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
 
     /* ——— PIED DE PAGE SÉCURITÉ ——— */
     .security-footer {
-      position: absolute;
-      bottom: 14mm;
-      left: 18mm; right: 18mm;
-      border: 0.5px solid #d4d4d4;
-      padding: 4px 6px;
-      background: rgba(0, 107, 63, 0.015);
+      position: relative;
+      margin-top: 18px;
+      border: 0.75px solid #d4d4d4;
+      padding: 10px 12px;
+      background: rgba(0, 107, 63, 0.04);
       display: grid;
       grid-template-columns: 1fr auto;
-      gap: 8px;
+      gap: 10px;
       align-items: center;
+      border-radius: 8px;
     }
     .sec-left {
       display: flex;
@@ -686,15 +702,14 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
 
     /* ——— MENTIONS LÉGALES ——— */
     .legal-notice {
-      position: absolute;
-      bottom: 10mm;
-      left: 18mm; right: 18mm;
+      position: relative;
+      margin-top: 14px;
       font-size: 7.5pt;
-      color: #888;
+      color: #777;
       text-align: center;
       font-style: italic;
-      letter-spacing: 0.2px;
-      line-height: 1.3;
+      letter-spacing: 0.22px;
+      line-height: 1.35;
     }
 
     @media print {
