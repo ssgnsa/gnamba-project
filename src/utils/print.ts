@@ -575,24 +575,27 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
     }
     .barcode-section svg { height: 30px; }
 
-    /* ——— ZONE DE SIGNATURE ENCADRÉE — 3 COLONNES ——— */
+    /* ——— ZONE DE SIGNATURE UNIQUE ——— */
     .signature-zone {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1.2fr;
-      gap: 4px;
-      margin: 3px 0;
+      display: flex;
+      justify-content: center;
+      gap: 0;
+      margin: 2px 0;
     }
     .sig-frame {
       border: 0.75px solid #b8860b;
-      padding: 3px 4px;
+      padding: 3px 6px;
       background: rgba(184, 134, 11, 0.01);
-      min-height: 38px;
+      min-height: 32px;
+      min-width: 120px;
       display: flex;
       flex-direction: column;
+      align-items: center;
+      text-align: center;
     }
     .sig-frame-title {
       font-family: 'Cinzel', serif;
-      font-size: 6.5pt;
+      font-size: 6pt;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.25px;
@@ -600,108 +603,28 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
       margin-bottom: 1px;
       padding-bottom: 0.5px;
       border-bottom: 0.5px solid #e0d5b5;
-      flex-shrink: 0;
+      width: 100%;
     }
     .sig-frame-name {
-      font-size: 7.5pt;
+      font-size: 7pt;
       font-weight: 600;
       color: #006b3f;
       text-transform: uppercase;
       margin-bottom: 1px;
       flex-shrink: 0;
       line-height: 1.1;
+      width: 100%;
     }
     .sig-frame-line {
       border-top: 0.5px solid #999;
       margin-top: auto;
       padding-top: 1px;
-      font-size: 5.5pt;
+      font-size: 5pt;
       color: #888;
       text-transform: uppercase;
       letter-spacing: 0.15px;
       flex-shrink: 0;
-    }
-
-    .date-frame {
-      border: 0.75px solid #8a8a8a;
-      padding: 3px 4px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-    }
-    .date-frame-label {
-      font-size: 6pt;
-      color: #555;
-      text-transform: uppercase;
-      letter-spacing: 0.15px;
-      flex-shrink: 0;
-    }
-    .date-frame-value {
-      font-size: 8pt;
-      font-weight: 600;
-      color: #1a1a1a;
-      flex-shrink: 0;
-    }
-    .date-frame-mention {
-      font-size: 6pt;
-      color: #888;
-      font-style: italic;
-      margin-top: 1px;
-      line-height: 1.15;
-      flex-shrink: 0;
-    }
-
-    /* ——— VALIDATION ADMINISTRATIVE ——— */
-    .validation-section {
-      margin: 3px 0 2px;
-      padding: 3px 4px;
-      background: rgba(0, 107, 63, 0.05);
-      border: 0.75px solid rgba(0, 107, 63, 0.3);
-      border-radius: 3px;
-    }
-    .validation-section-header {
-      display: flex;
-      align-items: center;
-      gap: 3px;
-      margin-bottom: 1px;
-      padding-bottom: 1px;
-      border-bottom: 0.75px solid #006b3f;
-    }
-    .validation-numeral {
-      font-family: 'Cinzel', serif;
-      font-size: 7pt;
-      font-weight: 700;
-      color: #b8860b;
-    }
-    .validation-title {
-      font-family: 'Cinzel', serif;
-      font-size: 7.5pt;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.3px;
-      color: #006b3f;
-    }
-    .validation-table {
       width: 100%;
-      border-collapse: collapse;
-      font-size: 8.5pt;
-    }
-    .validation-table td {
-      padding: 2px 3px;
-      vertical-align: middle;
-    }
-    .validation-table .label {
-      font-weight: 600;
-      color: #333;
-      white-space: nowrap;
-      width: 30%;
-      border: 0.5px solid #d4d4d4;
-      background: rgba(0, 107, 63, 0.05);
-    }
-    .validation-table .value {
-      color: #111;
-      border: 0.5px solid #d4d4d4;
-      border-left: none;
     }
 
     /* ——— BANDE DE SÉCURITÉ NUMÉRIQUE ——— */
@@ -962,43 +885,14 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
       </div>
       <div class="signature-zone">
         <div class="sig-frame">
-          <div class="sig-frame-title">${isCession ? 'Le Cédant' : 'Chef du Village'}</div>
-          <div class="sig-frame-name">${isCession
-            ? (cedantPrenom && cedantNom ? `${cedantPrenom} ${cedantNom}` : '—')
-            : (chefNom || '—')}</div>
-          <div class="sig-frame-line">Signature</div>
-        </div>
-        <div class="sig-frame">
-          <div class="sig-frame-title">Acquéreur ${isCession ? '(le cas échéant)' : ''}</div>
-          <div class="sig-frame-name">${proprietairePrenom} ${proprietaireNom}</div>
-          <div class="sig-frame-line">Signature</div>
-        </div>
-        <div class="sig-frame">
-          <div class="sig-frame-title">Signature & Lieu-Date</div>
-          <div style="flex:1;"></div>
-          <div class="sig-frame-name">${data.lieu_signature || villageNom}</div>
-          <div style="font-size:7.5pt; color:#666;">${data.date_etablissement || '—'}</div>
+          <div class="sig-frame-title">Chef du Village</div>
+          <div class="sig-frame-name">${chefNom || '—'}</div>
+          <div class="sig-frame-line">Signature & Cachet</div>
         </div>
       </div>
     </div>
 
   </div><!-- fin .content -->
-
-  <!-- V. ENREGISTREMENT & VALIDATION ADMINISTRATIVE -->
-  <div class="validation-section">
-    <div class="validation-section-header">
-      <span class="validation-numeral">V.</span>
-      <span class="validation-title">Enregistrement Administratif</span>
-    </div>
-    <table class="validation-table">
-      <tr>
-        <td class="label">Registre</td>
-        <td class="value">Vol. ${registreVolume || '—'}${registrePage ? ` — Page ${registrePage}` : ''}${registreLigne ? ` — Ligne ${registreLigne}` : ''}</td>
-        <td class="label" style="width:25%;">Agent</td>
-        <td class="value">${data.validation_agent_nom || '—'}</td>
-      </tr>
-    </table>
-  </div>
 
   <!-- BANDE DE SÉCURITÉ NUMÉRIQUE -->
   <div class="security-footer">
