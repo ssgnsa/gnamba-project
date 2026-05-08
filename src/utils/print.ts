@@ -420,6 +420,11 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
     .title-section {
       text-align: center;
       margin: 8px 0 18px;
+      display: inline-block;
+      padding: 12px 18px;
+      border: 1.5px solid rgba(184, 134, 11, 0.95);
+      border-radius: 16px;
+      background: rgba(250, 240, 220, 0.35);
     }
     .title {
       font-family: 'Cinzel', serif;
@@ -432,8 +437,9 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
       display: inline-block;
       position: relative;
       line-height: 1.05;
-      background: rgba(0, 107, 63, 0.03);
-      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
     }
     .title::before {
       content: '';
