@@ -287,7 +287,7 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
   <style>
     @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Cinzel:wght@400;500;600;700&display=swap');
 
-    @page { size: A4 portrait; margin: 20mm; }
+    @page { size: A4 portrait; margin: 0; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
@@ -303,10 +303,12 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
     .page {
       width: 210mm; min-height: 297mm;
       position: relative;
-      padding: 20mm;
+      padding: 18mm 20mm;
       margin: 0 auto;
       background: #fff;
       box-shadow: inset 0 0 0 1px rgba(184, 134, 11, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.05);
+      display: flex;
+      flex-direction: column;
     }
 
     /* ——— DOUBLE BORDURE ORNEMENTALE ——— */
@@ -485,14 +487,7 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
       text-transform: uppercase;
     }
     .original-badge {
-      font-size: 8pt;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      padding: 1px 6px;
-      border: 1px solid #006b3f;
-      color: #006b3f;
-      background: rgba(0, 107, 63, 0.05);
+      display: none;
     }
 
     /* ——— BASE LÉGALE ——— */
@@ -649,73 +644,78 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
     /* ——— PIED DE PAGE SÉCURITÉ ——— */
     .security-footer {
       position: relative;
-      margin-top: 18px;
+      margin-top: auto;
+      margin-bottom: 0;
       border: 0.75px solid #d4d4d4;
-      padding: 10px 12px;
-      background: rgba(0, 107, 63, 0.04);
+      padding: 12px 14px;
+      background: rgba(0, 107, 63, 0.05);
       display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 10px;
-      align-items: center;
-      border-radius: 8px;
+      grid-template-columns: 90px 1fr;
+      gap: 14px;
+      align-items: flex-start;
+      border-radius: 6px;
     }
+    .sec-qr {
+      width: 88px; height: 88px;
+      border: 1px solid #ccc;
+      padding: 3px;
+      background: #fff;
+      border-radius: 4px;
+    }
+    .sec-qr img { width: 100%; height: 100%; object-fit: contain; }
     .sec-left {
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: 4px;
     }
     .sec-control {
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 6px;
     }
     .sec-control-label {
-      font-size: 7.5pt;
+      font-size: 7pt;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.3px;
       color: #006b3f;
+      min-width: 60px;
     }
     .sec-control-value {
       font-family: 'Courier New', monospace;
-      font-size: 9pt;
+      font-size: 8pt;
       font-weight: 700;
       color: #006b3f;
-      letter-spacing: 0.6px;
+      letter-spacing: 0.5px;
     }
     .sec-hash {
-      font-size: 6.5pt;
-      color: #999;
+      font-size: 6pt;
+      color: #666;
       font-family: 'Courier New', monospace;
       word-break: break-all;
-      line-height: 1.3;
+      line-height: 1.25;
+      margin-top: 2px;
     }
     .sec-url {
-      font-size: 7pt;
+      font-size: 6.5pt;
       color: #006b3f;
+      margin-top: 2px;
     }
     .sec-url a {
       color: #006b3f;
       text-decoration: none;
     }
-    .sec-qr {
-      width: 52px; height: 52px;
-      border: 1px solid #ccc;
-      padding: 2px;
-      background: #fafafa;
-    }
-    .sec-qr img { width: 100%; height: 100%; object-fit: contain; }
 
     /* ——— MENTIONS LÉGALES ——— */
     .legal-notice {
       position: relative;
-      margin-top: 14px;
-      font-size: 7.5pt;
+      margin-top: 8px;
+      font-size: 6.5pt;
       color: #777;
       text-align: center;
       font-style: italic;
-      letter-spacing: 0.22px;
-      line-height: 1.35;
+      letter-spacing: 0.2px;
+      line-height: 1.3;
     }
 
     @media print {
