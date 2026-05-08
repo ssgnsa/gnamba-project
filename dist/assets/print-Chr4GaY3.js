@@ -32,7 +32,7 @@ function J(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
       width: 210mm; height: 297mm;
       margin: 0; padding: 0;
       font-family: 'EB Garamond', 'Times New Roman', Times, serif;
-      font-size: 10pt;
+      font-size: 11.5pt;
       color: #1a1a1a;
       background: #fff;
       overflow: hidden;
@@ -125,7 +125,7 @@ function J(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
     }
     .hdr {
       font-family: 'EB Garamond', serif;
-      font-size: 9pt;
+      font-size: 10.5pt;
       font-weight: 600;
       text-transform: uppercase;
       line-height: 1.6;
@@ -159,7 +159,7 @@ function J(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
     }
     .title {
       font-family: 'Cinzel', serif;
-      font-size: 15pt;
+      font-size: 17.5pt;
       font-weight: 700;
       letter-spacing: 3px;
       text-transform: uppercase;
@@ -194,7 +194,7 @@ function J(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
     }
     .ref-box {
       font-family: 'Cinzel', serif;
-      font-size: 10.5pt;
+      font-size: 12pt;
       font-weight: 600;
       color: #b8860b;
       letter-spacing: 0.8px;
@@ -203,7 +203,7 @@ function J(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
       background: rgba(184, 134, 11, 0.04);
     }
     .original-badge {
-      font-size: 7pt;
+      font-size: 8pt;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.5px;
@@ -215,7 +215,7 @@ function J(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
 
     /* ——— BASE LÉGALE ——— */
     .legal {
-      font-size: 7.5pt;
+      font-size: 8.5pt;
       text-align: center;
       color: #555;
       margin: 4px 0 6px;
@@ -228,7 +228,7 @@ function J(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
 
     /* ——— DÉCLARATION ——— */
     .declaration {
-      font-size: 10pt;
+      font-size: 11.5pt;
       line-height: 1.7;
       text-align: justify;
       margin: 6px 0;
@@ -251,13 +251,13 @@ function J(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
     }
     .section-numeral {
       font-family: 'Cinzel', serif;
-      font-size: 8pt;
+      font-size: 9pt;
       font-weight: 700;
       color: #b8860b;
     }
     .section-title {
       font-family: 'Cinzel', serif;
-      font-size: 8.5pt;
+      font-size: 10pt;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.6px;
@@ -268,7 +268,7 @@ function J(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
     .data-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 9.5pt;
+      font-size: 11pt;
     }
     .data-table td {
       padding: 3px 6px;
@@ -310,7 +310,7 @@ function J(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
     }
     .sig-frame-title {
       font-family: 'Cinzel', serif;
-      font-size: 7.5pt;
+      font-size: 8.5pt;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.5px;
@@ -320,7 +320,7 @@ function J(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
       border-bottom: 0.5px solid #e0d5b5;
     }
     .sig-frame-name {
-      font-size: 9.5pt;
+      font-size: 11pt;
       font-weight: 600;
       color: #006b3f;
       text-transform: uppercase;
@@ -330,7 +330,7 @@ function J(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
       border-top: 0.5px solid #999;
       margin-top: 28px;
       padding-top: 2px;
-      font-size: 6.5pt;
+      font-size: 7.5pt;
       color: #888;
       text-transform: uppercase;
       letter-spacing: 0.3px;
@@ -344,18 +344,18 @@ function J(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
       justify-content: space-between;
     }
     .date-frame-label {
-      font-size: 7.5pt;
+      font-size: 8.5pt;
       color: #555;
       text-transform: uppercase;
       letter-spacing: 0.3px;
     }
     .date-frame-value {
-      font-size: 10pt;
+      font-size: 11.5pt;
       font-weight: 600;
       color: #1a1a1a;
     }
     .date-frame-mention {
-      font-size: 7pt;
+      font-size: 8pt;
       color: #888;
       font-style: italic;
       margin-top: 4px;
@@ -386,7 +386,7 @@ function J(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
       gap: 4px;
     }
     .sec-control-label {
-      font-size: 6.5pt;
+      font-size: 7.5pt;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.3px;
@@ -394,20 +394,20 @@ function J(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
     }
     .sec-control-value {
       font-family: 'Courier New', monospace;
-      font-size: 8pt;
+      font-size: 9pt;
       font-weight: 700;
       color: #006b3f;
       letter-spacing: 0.6px;
     }
     .sec-hash {
-      font-size: 5.5pt;
+      font-size: 6.5pt;
       color: #999;
       font-family: 'Courier New', monospace;
       word-break: break-all;
       line-height: 1.3;
     }
     .sec-url {
-      font-size: 6pt;
+      font-size: 7pt;
       color: #006b3f;
     }
     .sec-url a {
@@ -427,7 +427,7 @@ function J(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
       position: absolute;
       bottom: 10mm;
       left: 18mm; right: 18mm;
-      font-size: 6.5pt;
+      font-size: 7.5pt;
       color: #888;
       text-align: center;
       font-style: italic;
@@ -843,24 +843,24 @@ function J(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
   <title>Quittance de Loyer – ${o}</title>
   ${$}
   <style>
-    body { font-family: Arial, sans-serif; font-size: 9pt; }
+    body { font-family: Arial, sans-serif; font-size: 10.5pt; }
     .page { width: 150mm; min-height: 80mm; margin: 0 auto; padding: 5mm; border: 2px solid #1e40af; }
     .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; border-bottom: 2px solid #1e40af; padding-bottom: 6px; }
-    .company-name { font-size: 12pt; font-weight: bold; color: #1e40af; }
-    .company-sub { font-size: 7pt; color: #555; margin-top: 1px; }
-    .ref-date { text-align: right; font-size: 8pt; color: #555; }
-    .doc-title { font-size: 12pt; font-weight: bold; text-transform: uppercase; background: #1e40af; color: #fff; padding: 4px 8px; margin: 6px 0; letter-spacing: 1px; }
+    .company-name { font-size: 13.5pt; font-weight: bold; color: #1e40af; }
+    .company-sub { font-size: 8pt; color: #555; margin-top: 1px; }
+    .ref-date { text-align: right; font-size: 9pt; color: #555; }
+    .doc-title { font-size: 13.5pt; font-weight: bold; text-transform: uppercase; background: #1e40af; color: #fff; padding: 4px 8px; margin: 6px 0; letter-spacing: 1px; }
     .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: 6px 0; }
     .info-box { border: 1px solid #e2e8f0; border-radius: 3px; padding: 4px 6px; }
-    .info-box .label { font-size: 6pt; text-transform: uppercase; color: #888; font-weight: bold; margin-bottom: 2px; }
-    .info-box .value { font-size: 8pt; font-weight: bold; color: #222; }
+    .info-box .label { font-size: 7pt; text-transform: uppercase; color: #888; font-weight: bold; margin-bottom: 2px; }
+    .info-box .value { font-size: 9pt; font-weight: bold; color: #222; }
     .amount-box { background: #f0fdf4; border: 2px solid #16a34a; border-radius: 3px; padding: 6px 10px; text-align: center; margin: 6px 0; }
-    .amount-label { font-size: 7pt; color: #555; text-transform: uppercase; }
-    .amount-value { font-size: 14pt; font-weight: bold; color: #16a34a; margin: 2px 0; }
-    .footer-text { font-size: 7pt; color: #555; text-align: center; margin-top: 8px; font-style: italic; }
+    .amount-label { font-size: 8pt; color: #555; text-transform: uppercase; }
+    .amount-value { font-size: 16pt; font-weight: bold; color: #16a34a; margin: 2px 0; }
+    .footer-text { font-size: 8pt; color: #555; text-align: center; margin-top: 8px; font-style: italic; }
     .signature-zone { display: flex; justify-content: space-between; margin-top: 10px; }
     .sig-block { text-align: center; width: 80px; }
-    .sig-block .line { border-top: 1px solid #000; margin-top: 20px; padding-top: 3px; font-size: 7pt; }
+    .sig-block .line { border-top: 1px solid #000; margin-top: 20px; padding-top: 3px; font-size: 8pt; }
   </style>
 </head>
 <body>
@@ -930,24 +930,24 @@ function J(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
   <title>Reçu de Paiement de Loyer – ${o}</title>
   ${$}
   <style>
-    body { font-family: Arial, sans-serif; font-size: 10pt; }
+    body { font-family: Arial, sans-serif; font-size: 11.5pt; }
     .page { width: 150mm; min-height: 90mm; margin: 0 auto; padding: 6mm; border: 2px solid #334155; }
     .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; border-bottom: 2px solid #334155; padding-bottom: 6px; }
-    .company-name { font-size: 12pt; font-weight: bold; color: #334155; }
-    .company-sub { font-size: 7pt; color: #555; margin-top: 1px; }
-    .ref-date { text-align: right; font-size: 8pt; color: #555; }
-    .doc-title { font-size: 12pt; font-weight: bold; text-transform: uppercase; background: #334155; color: #fff; padding: 4px 8px; margin: 6px 0; letter-spacing: 1px; }
+    .company-name { font-size: 13.5pt; font-weight: bold; color: #334155; }
+    .company-sub { font-size: 8pt; color: #555; margin-top: 1px; }
+    .ref-date { text-align: right; font-size: 9pt; color: #555; }
+    .doc-title { font-size: 13.5pt; font-weight: bold; text-transform: uppercase; background: #334155; color: #fff; padding: 4px 8px; margin: 6px 0; letter-spacing: 1px; }
     .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: 6px 0; }
     .info-box { border: 1px solid #e2e8f0; border-radius: 3px; padding: 4px 6px; }
-    .info-box .label { font-size: 6pt; text-transform: uppercase; color: #888; font-weight: bold; margin-bottom: 2px; }
-    .info-box .value { font-size: 8pt; font-weight: bold; color: #222; }
+    .info-box .label { font-size: 7pt; text-transform: uppercase; color: #888; font-weight: bold; margin-bottom: 2px; }
+    .info-box .value { font-size: 9pt; font-weight: bold; color: #222; }
     .amount-box { background: #f8fafc; border: 2px solid #334155; border-radius: 3px; padding: 6px 10px; text-align: center; margin: 6px 0; }
-    .amount-label { font-size: 7pt; color: #555; text-transform: uppercase; }
-    .amount-value { font-size: 14pt; font-weight: bold; color: #334155; margin: 2px 0; }
-    .footer-text { font-size: 7pt; color: #555; text-align: center; margin-top: 8px; font-style: italic; }
+    .amount-label { font-size: 8pt; color: #555; text-transform: uppercase; }
+    .amount-value { font-size: 16pt; font-weight: bold; color: #334155; margin: 2px 0; }
+    .footer-text { font-size: 8pt; color: #555; text-align: center; margin-top: 8px; font-style: italic; }
     .signature-zone { display: flex; justify-content: flex-end; margin-top: 12px; }
     .sig-block { text-align: center; width: 110px; }
-    .sig-block .line { border-top: 1px solid #000; margin-top: 20px; padding-top: 3px; font-size: 7pt; }
+    .sig-block .line { border-top: 1px solid #000; margin-top: 20px; padding-top: 3px; font-size: 8pt; }
   </style>
 </head>
 <body>
@@ -1012,23 +1012,23 @@ function J(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
   <title>Reçu de Paiement – ${o}</title>
   ${$}
   <style>
-    body { font-family: Arial, sans-serif; font-size: 11pt; }
+    body { font-family: Arial, sans-serif; font-size: 12.5pt; }
     .page { width: 148mm; min-height: 100mm; margin: 0 auto; padding: 8mm 10mm; border: 2px solid #334155; }
     .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 2px solid #334155; }
-    .company-name { font-size: 14pt; font-weight: bold; color: #334155; }
-    .company-sub { font-size: 8pt; color: #666; }
-    .doc-title { text-align: center; font-size: 14pt; font-weight: bold; text-transform: uppercase; border: 1px solid #334155; padding: 5px 20px; margin: 8px auto; width: fit-content; letter-spacing: 2px; }
-    .ref-line { display: flex; justify-content: space-between; font-size: 9pt; color: #555; margin: 6px 0; }
+    .company-name { font-size: 16pt; font-weight: bold; color: #334155; }
+    .company-sub { font-size: 9pt; color: #666; }
+    .doc-title { text-align: center; font-size: 16pt; font-weight: bold; text-transform: uppercase; border: 1px solid #334155; padding: 5px 20px; margin: 8px auto; width: fit-content; letter-spacing: 2px; }
+    .ref-line { display: flex; justify-content: space-between; font-size: 10.5pt; color: #555; margin: 6px 0; }
     .info-row { display: flex; gap: 8px; margin: 6px 0; }
-    .info-label { font-size: 9pt; color: #666; min-width: 100px; }
-    .info-value { font-size: 9pt; font-weight: bold; color: #222; }
+    .info-label { font-size: 10.5pt; color: #666; min-width: 100px; }
+    .info-value { font-size: 10.5pt; font-weight: bold; color: #222; }
     .amount-row { background: #f8fafc; border: 1px solid #94a3b8; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; margin: 10px 0; }
-    .amount-label { font-size: 10pt; font-weight: bold; }
-    .amount-value { font-size: 16pt; font-weight: bold; color: #1e40af; }
-    .footer { font-size: 8pt; color: #888; text-align: center; margin-top: 12px; border-top: 1px solid #e2e8f0; padding-top: 6px; }
+    .amount-label { font-size: 11.5pt; font-weight: bold; }
+    .amount-value { font-size: 18.5pt; font-weight: bold; color: #1e40af; }
+    .footer { font-size: 9pt; color: #888; text-align: center; margin-top: 12px; border-top: 1px solid #e2e8f0; padding-top: 6px; }
     .sig-row { display: flex; justify-content: flex-end; margin-top: 15px; }
     .sig-block { text-align: center; width: 100px; }
-    .sig-line { border-top: 1px solid #333; margin-top: 30px; padding-top: 3px; font-size: 7pt; }
+    .sig-line { border-top: 1px solid #333; margin-top: 30px; padding-top: 3px; font-size: 8pt; }
   </style>
 </head>
 <body>
