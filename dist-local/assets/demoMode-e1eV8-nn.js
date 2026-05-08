@@ -1,0 +1,15 @@
+var o = "demo@gnambaservices.ci";
+function t() {
+  const e = "".toLowerCase().trim();
+  return e === "1" || e === "true" || e === "demo" || e === "yes";
+}
+function r(e, n) {
+  return (n?.email || e?.email || "").toLowerCase().trim() === o;
+}
+function s(e, n) {
+  return t() || r(e, n);
+}
+function i() {
+  return "Action désactivée dans l’environnement de démonstration pour préserver les données.";
+}
+export { s as n, i as t };

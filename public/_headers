@@ -1,0 +1,60 @@
+# ============================================
+# Cloudflare Pages Security Headers
+# ============================================
+# These headers apply to all routes when deployed on Cloudflare Pages
+# Reference: https://developers.cloudflare.com/pages/platform/headers/
+
+/*
+  # Security Headers - OWASP Recommended
+  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+  X-Frame-Options: SAMEORIGIN
+  X-Content-Type-Options: nosniff
+  X-XSS-Protection: 1; mode=block
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=(), usb=()
+  
+  # Content Security Policy
+  # Note: 'unsafe-inline' for styles is required for some third-party components
+  # Consider migrating to hashed inline styles in production for stricter security
+  # Updated 2026-03-30: Added r2cdn.perplexity.ai for fonts
+  # Updated 2026-04-01: Added hash for Cloudflare-injected inline script
+  # Updated 2026-04-05: Added localhost:11434 for Ollama AI integration
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; form-action 'self' https:; object-src 'none'; frame-ancestors 'self'; script-src 'self' 'wasm-unsafe-eval' 'sha256-J1QHVAri1VFjAOQCfOmU4cl/lY1GThN9D/8RbXrPDyQ=' https://static.cloudflareinsights.com; script-src-elem 'self' 'wasm-unsafe-eval' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com https://r2cdn.perplexity.ai; img-src 'self' data: blob: https:; connect-src 'self' https://thykrnoqgylrbfupophs.supabase.co wss://thykrnoqgylrbfupophs.supabase.co https://thykrnoqgylrbfupophs.supabase.co http://localhost:11434 https://cloudflareinsights.com;
+  
+  # Cross-Origin Policies
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+  Cross-Origin-Resource-Policy: same-origin
+  
+  # Cache Control for HTML (no cache)
+  Cache-Control: no-cache, no-store, must-revalidate
+  Pragma: no-cache
+  Expires: 0
+
+# Static Assets - Long-term caching with immutable
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+  Access-Control-Allow-Origin: *
+
+# Images and Media
+/images/*
+  Cache-Control: public, max-age=2592000
+  Access-Control-Allow-Origin: *
+
+# Fonts - Long cache
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable
+  Access-Control-Allow-Origin: *
+
+# Service Worker - No cache (must be fresh)
+/sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
+
+# Verification pages - No cache (security-sensitive)
+/verification-attestation/*
+  Cache-Control: no-store, no-cache, must-revalidate, private
+
+# API routes handled by Supabase (not applicable for static Pages)
+# These are here for documentation
+# /api/*
+#   Cache-Control: no-cache

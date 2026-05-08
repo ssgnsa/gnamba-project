@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+if [ "${1:-}" = "pull" ] && [ "${2:-}" = "public.ecr.aws/supabase/postgres:17.6.1.063" ]; then
+  if /usr/bin/docker image inspect public.ecr.aws/supabase/postgres:17.6.1.063 >/dev/null 2>&1; then
+    echo "docker-wrapper: using local image $2" >&2
+    exit 0
+  fi
+fi
+exec /usr/bin/docker "$@"

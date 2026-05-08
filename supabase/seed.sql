@@ -1,0 +1,2 @@
+-- Intentionally empty.
+-- EGS production data lives in Supabase Cloud and should not be reseeded automatically.

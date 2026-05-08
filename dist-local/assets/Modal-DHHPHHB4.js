@@ -1,0 +1,135 @@
+import { r as w, xn as E } from "./icons-vendor-BfPGE0aO.js";
+import { i as _, n as j } from "./react-vendor-Dj4gTxeL.js";
+var t = E(),
+  k = _(),
+  o = j();
+function T({ isOpen: s, onClose: l, title: v, children: y, size: h = "md" }) {
+  const n = (0, t.useRef)(null),
+    i = (0, t.useId)(),
+    d = (0, t.useRef)(null),
+    m = (0, t.useRef)(l),
+    a = (0, t.useRef)(!1),
+    u = (0, t.useRef)(""),
+    c = (0, t.useCallback)(
+      () =>
+        Array.from(
+          n.current?.querySelectorAll(
+            'button:not([disabled]), [href], input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+          ) || [],
+        ),
+      [],
+    ),
+    f = (0, t.useCallback)(() => {
+      if (!n.current) return null;
+      const e = n.current.querySelector('[data-autofocus="true"]');
+      if (e && !e.hasAttribute("disabled")) return e;
+      const r = n.current.querySelector(
+        'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled])',
+      );
+      return r || c()[0] || null;
+    }, [c]);
+  if (
+    ((0, t.useEffect)(() => {
+      m.current = l;
+    }, [l]),
+    (0, t.useEffect)(() => {
+      if (!s) return;
+      ((d.current = document.activeElement), (a.current = !0));
+      const e = window.setTimeout(() => {
+        const r = document.activeElement;
+        (r && n.current?.contains(r)) || f()?.focus();
+      }, 0);
+      return () => {
+        window.clearTimeout(e);
+      };
+    }, [f, s]),
+    (0, t.useEffect)(() => {
+      s || !a.current || ((a.current = !1), d.current?.focus?.());
+    }, [s]),
+    (0, t.useEffect)(
+      () => (
+        s
+          ? ((u.current = document.body.style.overflow),
+            (document.body.style.overflow = "hidden"))
+          : (document.body.style.overflow = u.current),
+        () => {
+          document.body.style.overflow = u.current;
+        }
+      ),
+      [s],
+    ),
+    !s || typeof document > "u")
+  )
+    return null;
+  const p = {
+      sm: "max-w-md",
+      md: "max-w-lg",
+      lg: "max-w-2xl",
+      xl: "max-w-4xl",
+    },
+    g = (e) => {
+      if (e.key === "Escape") {
+        (e.preventDefault(), m.current());
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const r = c();
+      if (r.length === 0) return;
+      const b = r[0],
+        x = r[r.length - 1];
+      if (e.shiftKey) {
+        (document.activeElement === b ||
+          document.activeElement === n.current) &&
+          (e.preventDefault(), x.focus());
+        return;
+      }
+      document.activeElement === x && (e.preventDefault(), b.focus());
+    };
+  return (0, k.createPortal)(
+    (0, o.jsxs)("div", {
+      className:
+        "fixed inset-0 z-50 flex items-end justify-center sm:items-center",
+      children: [
+        (0, o.jsx)("div", {
+          className: "absolute inset-0 bg-slate-900/55 backdrop-blur-sm",
+          onClick: l,
+        }),
+        (0, o.jsxs)("div", {
+          ref: n,
+          role: "dialog",
+          "aria-modal": "true",
+          "aria-labelledby": i,
+          tabIndex: -1,
+          onKeyDown: g,
+          className: `relative bg-white rounded-t-3xl sm:rounded-2xl shadow-[0_24px_64px_rgba(15,23,42,0.24)] w-full mx-0 sm:mx-4 ${p[h]} max-h-[min(92vh,calc(100dvh-0.75rem))] sm:max-h-[90vh] flex flex-col border border-slate-200/80`,
+          style: { paddingBottom: "max(0px, var(--sab))" },
+          children: [
+            (0, o.jsx)("div", {
+              className:
+                "px-4 sm:px-6 py-4 pr-16 border-b border-slate-100 sticky top-0 bg-white/95 backdrop-blur rounded-t-3xl sm:rounded-t-2xl z-10",
+              children: (0, o.jsx)("h2", {
+                id: i,
+                className: "text-lg font-semibold text-slate-800",
+                children: v,
+              }),
+            }),
+            (0, o.jsx)("div", {
+              className: "flex-1 overflow-y-auto p-4 sm:p-6",
+              children: y,
+            }),
+            (0, o.jsx)("button", {
+              type: "button",
+              "aria-label": "Fermer le formulaire",
+              onClick: l,
+              className:
+                "absolute right-4 sm:right-6 top-4 p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-[var(--color-primary-300)] transition-colors",
+              children: (0, o.jsx)(w, { size: 18 }),
+            }),
+          ],
+        }),
+      ],
+    }),
+    document.body,
+  );
+}
+export { T as t };

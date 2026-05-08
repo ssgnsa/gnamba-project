@@ -1,0 +1,416 @@
+{
+  "name": "EGS Lead Capture & Multi-Channel Bot",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "webhook-lead",
+      "name": "Webhook: Nouveau Lead",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 400],
+      "webhookId": "lead-capture-webhook",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-capture",
+        "responseMode": "lastNode",
+        "responseData": "allEntries"
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.body.phone}}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "id": "validate-phone",
+      "name": "Valider Téléphone",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [460, 400]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "tableId": "leads",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "phone": "={{ $json.body.phone }}",
+            "first_name": "={{ $json.body.first_name }}",
+            "last_name": "={{ $json.body.last_name }}",
+            "email": "={{ $json.body.email }}",
+            "source": "={{ $json.body.source }}",
+            "source_form": "={{ $json.body.source_form }}",
+            "consent_text": "={{ $json.body.consent_text }}",
+            "channels_optin": "={{ $json.body.channels_optin }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "store-lead",
+      "name": "Stocker Lead (Supabase)",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [680, 300],
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabase-egs-cred",
+          "name": "EGS Supabase"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.channels_optin.sms }}",
+              "operation": "isTrue"
+            }
+          ]
+        }
+      },
+      "id": "check-sms-optin",
+      "name": "SMS Opt-in?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {
+        "from": "+16626861667",
+        "to": "={{ $json.phone }}",
+        "body": "Bienvenue chez Gnamba Services{{ $json.first_name ? ', ' + $json.first_name : '' }}! Nous vous contacterons bientôt. 🏗️"
+      },
+      "id": "send-welcome-sms",
+      "name": "Envoyer SMS Bienvenue",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [1120, 100],
+      "credentials": {
+        "twilioApi": {
+          "id": "twilio-cred",
+          "name": "Twilio EGS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.channels_optin.whatsapp }}",
+              "operation": "isTrue"
+            }
+          ]
+        }
+      },
+      "id": "check-wa-optin",
+      "name": "WhatsApp Opt-in?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [900, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v18.0/{{ $env.WHATSAPP_PHONE_NUMBER_ID }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $env.WHATSAPP_ACCESS_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "messaging_product",
+              "value": "whatsapp"
+            },
+            {
+              "name": "to",
+              "value": "={{ $json.phone.replace(/[^0-9]/g, '') }}"
+            },
+            {
+              "name": "type",
+              "value": "template"
+            },
+            {
+              "name": "template",
+              "value": "{\"name\":\"gnamba_welcome\",\"language\":{\"code\":\"fr\"},\"components\":[{\"type\":\"body\",\"parameters\":[{\"type\":\"text\",\"text\":\"{{ $json.first_name || 'Client' }}\"}]}]}"
+            }
+          ]
+        }
+      },
+      "id": "send-welcome-wa",
+      "name": "Envoyer WhatsApp Bienvenue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [1120, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "wa-auth-cred",
+          "name": "WhatsApp Cloud API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "tableId": "lead_interactions",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "lead_id": "={{ $json.id }}",
+            "channel": "sms",
+            "type": "outbound",
+            "content": "Bienvenue chez Gnamba Services!",
+            "status": "sent",
+            "metadata": "{\"workflow\":\"welcome_sequence\",\"n8n\":true}"
+          }
+        }
+      },
+      "id": "log-interaction",
+      "name": "Logger Interaction",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1340, 200],
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabase-egs-cred",
+          "name": "EGS Supabase"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyDay",
+              "hour": 9,
+              "minute": 0
+            }
+          ]
+        }
+      },
+      "id": "schedule-daily",
+      "name": "Schedule: Daily 9h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [240, 700]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "leads",
+        "returnAll": true,
+        "options": {
+          "filter": "status=eq.active.and.last_interaction_at=lt.{{ $today.minus(30, 'days').toISO() }}"
+        }
+      },
+      "id": "fetch-inactive-leads",
+      "name": "Fetch Leads Inactifs (30j)",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [460, 700],
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabase-egs-cred",
+          "name": "EGS Supabase"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "from": "+16626861667",
+        "to": "={{ $json.phone }}",
+        "body": "Bonjour {{ $json.first_name || 'Cher client' }}, cela fait un moment! Gnamba Services a de nouvelles offres pour vous en BTP, Immobilier et Foncier. Contactez-nous: www.gnambaservices.ci"
+      },
+      "id": "send-reactivation",
+      "name": "Envoyer SMS Réactivation",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [680, 700],
+      "credentials": {
+        "twilioApi": {
+          "id": "twilio-cred",
+          "name": "Twilio EGS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        }
+      },
+      "id": "schedule-every-minute",
+      "name": "Schedule: Every Minute",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [240, 1000]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "{{ $env.EGS_INTERNAL_URL }}/api/process-scheduled-posts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "process-social-posts",
+      "name": "Process Publications Réseaux Sociaux",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [460, 1000]
+    }
+  ],
+  "connections": {
+    "Webhook: Nouveau Lead": {
+      "main": [
+        [
+          {
+            "node": "Valider Téléphone",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valider Téléphone": {
+      "main": [
+        [
+          {
+            "node": "Stocker Lead (Supabase)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stocker Lead (Supabase)": {
+      "main": [
+        [
+          {
+            "node": "SMS Opt-in?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "WhatsApp Opt-in?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SMS Opt-in?": {
+      "main": [
+        [
+          {
+            "node": "Envoyer SMS Bienvenue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Opt-in?": {
+      "main": [
+        [
+          {
+            "node": "Envoyer WhatsApp Bienvenue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Envoyer SMS Bienvenue": {
+      "main": [
+        [
+          {
+            "node": "Logger Interaction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Envoyer WhatsApp Bienvenue": {
+      "main": [
+        [
+          {
+            "node": "Logger Interaction",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule: Daily 9h": {
+      "main": [
+        [
+          {
+            "node": "Fetch Leads Inactifs (30j)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Leads Inactifs (30j)": {
+      "main": [
+        [
+          {
+            "node": "Envoyer SMS Réactivation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule: Every Minute": {
+      "main": [
+        [
+          {
+            "node": "Process Publications Réseaux Sociaux",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "callerPolicy": "workflowsFromSameOwner",
+    "timezone": "Africa/Abidjan"
+  },
+  "tags": ["egs", "lead-capture", "multi-channel", "autonomous-bot"]
+}

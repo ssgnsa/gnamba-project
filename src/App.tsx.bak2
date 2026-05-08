@@ -1,0 +1,286 @@
+import { useEffect, useState } from 'react';
+import { SettingsProvider, useSettings } from './context/SettingsContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { useServiceWorker } from './lib/useServiceWorker';
+import Layout from './components/Layout';
+import PublicLayout from './components/public/PublicLayout';
+import type { Page } from './components/Sidebar';
+import type { PublicPage } from './components/public/PublicNavbar';
+
+import Dashboard from './pages/Dashboard';
+import Clients from './pages/Clients';
+import Projets from './pages/Projets';
+import Immobilier from './pages/Immobilier';
+import Foncier from './pages/Foncier';
+import Fournitures from './pages/Fournitures';
+import Finances from './pages/Finances';
+import Employes from './pages/Employes';
+import Utilisateurs from './pages/Utilisateurs';
+import Fournisseurs from './pages/Fournisseurs';
+import Documents from './pages/Documents';
+import Taches from './pages/Taches';
+import Statistiques from './pages/Statistiques';
+import Parametres from './pages/Parametres';
+import SiteEditor from './pages/admin/SiteEditor';
+import Media from './pages/Media';
+
+import PublicHome from './pages/public/PublicHome';
+import PublicAbout from './pages/public/PublicAbout';
+import PublicServices from './pages/public/PublicServices';
+import PublicRealisations from './pages/public/PublicRealisations';
+import PublicContact from './pages/public/PublicContact';
+import LoginPage from './pages/public/LoginPage';
+import PublicVerification from './pages/public/PublicVerification';
+import AccueilEmploye from './pages/AccueilEmploye';
+import RegistreVisiteur from './pages/RegistreVisiteur';
+
+const dashboardPages: Record<Page, React.ComponentType> = {
+  dashboard: Dashboard,
+  clients: Clients,
+  projets: Projets,
+  immobilier: Immobilier,
+  foncier: Foncier,
+  fournitures: Fournitures,
+  finances: Finances,
+  employes: Employes,
+  utilisateurs: Utilisateurs,
+  fournisseurs: Fournisseurs,
+  documents: Documents,
+  taches: Taches,
+  statistiques: Statistiques,
+  parametres: Parametres,
+  'site-editor': SiteEditor,
+  media: Media,
+};
+
+type AppView = 'public' | 'dashboard';
+
+function AppContent() {
+  const { loading: settingsLoading, settings } = useSettings();
+  const { user, profile, loading: authLoading } = useAuth();
+  const sw = useServiceWorker();
+  const [view, setView] = useState<AppView>('public');
+  const [publicPage, setPublicPage] = useState<PublicPage>('home');
+  const [dashPage, setDashPage] = useState<Page>('dashboard');
+  // État pour page d'accueil employé
+  // Initialisé à true pour afficher la page d'accueil par défaut après connexion
+  const [showAccueil, setShowAccueil] = useState(true);
+  const LAST_VIEW_KEY = 'egs:last_view';
+
+  const setLastView = (value: 'public' | 'dashboard') => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(LAST_VIEW_KEY, value);
+  };
+
+  const getLastView = () => {
+    if (typeof window === 'undefined') return null;
+    return window.localStorage.getItem(LAST_VIEW_KEY);
+  };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const canonicalFromEnv = import.meta.env.VITE_CANONICAL_ORIGIN;
+    const canonicalKey = 'egs:canonical_origin';
+    const normalizeOrigin = (value: string | null) => {
+      if (!value) return null;
+      try {
+        return new URL(value).origin;
+      } catch {
+        return null;
+      }
+    };
+    const stored = normalizeOrigin(window.localStorage.getItem(canonicalKey));
+    const envOrigin = normalizeOrigin(canonicalFromEnv);
+    const currentOrigin = window.location.origin;
+    const hostname = window.location.hostname;
+    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
+
+    let canonical = envOrigin || stored;
+    if (!canonical && !isLocalhost) {
+      canonical = currentOrigin;
+    }
+
+    if (!envOrigin && canonical && canonical === currentOrigin && !stored) {
+      window.localStorage.setItem(canonicalKey, canonical);
+    }
+
+    if (canonical && currentOrigin !== canonical) {
+      const target = `${canonical}${window.location.pathname}${window.location.search}${window.location.hash}`;
+      window.location.replace(target);
+    }
+  }, []);
+
+  const isLoading = settingsLoading || authLoading;
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      if (typeof detail !== 'string') return;
+      if (!(detail in dashboardPages)) return;
+      setView('dashboard');
+      setDashPage(detail as Page);
+      setShowAccueil(false); // On quitte la page d'accueil
+    };
+    window.addEventListener('egs:navigate', handler as EventListener);
+    return () => window.removeEventListener('egs:navigate', handler as EventListener);
+  }, []);
+
+  useEffect(() => {
+    const path = window.location.pathname;
+    if (path.startsWith('/verification-attestation')) {
+      setView('public');
+      setPublicPage('verification');
+      setShowAccueil(false);
+    } else if (path.startsWith('/registre')) {
+      if (user) {
+        setView('dashboard');
+      }
+      setShowAccueil(false);
+    }
+    // NOTE: Ne pas modifier showAccueil ici pour user
+    // C'est handleLoginSuccess qui gère ça
+  }, [user]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4" style={{ borderColor: '#1e40af' }} />
+          <p className="text-gray-500 text-sm">Chargement de EGS...</p>
+          {!sw.online && (
+            <div className="mt-4 px-4 py-2 bg-orange-100 text-orange-700 rounded-lg text-xs inline-flex items-center gap-2">
+              <span>📡</span> Mode hors ligne activé
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const handlePublicNav = (page: PublicPage) => {
+    if (page === 'login') {
+      setPublicPage('login');
+    } else {
+      setPublicPage(page);
+    }
+  };
+
+  const handleLoginSuccess = () => {
+    console.log('🔴 [APP.TSX] handleLoginSuccess APPELÉ !');
+    console.log('🔴 [APP.TSX] Avant : showAccueil = true');
+    setView('dashboard');
+    setDashPage('dashboard');
+    setShowAccueil(true); // ← FORCE showAccueil à TRUE
+    setLastView('accueil');
+    console.log('🔴 [APP.TSX] Après : showAccueil = true, view = dashboard');
+    
+    // Debug : vérifier l'état après 100ms
+    setTimeout(() => {
+      console.log('🔴 [APP.TSX] Vérification 100ms après login');
+    }, 100);
+  };
+
+  const handleDashNav = (page: Page) => {
+    setDashPage(page);
+  };
+
+  const goToPublic = () => {
+    setView('public');
+    setPublicPage('home');
+    setLastView('public');
+  };
+
+  // Déterminer si l'utilisateur est admin/gestionnaire
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'gestionnaire';
+
+  if (view === 'dashboard' && user) {
+    // Page Registre Visiteur
+    if (window.location.pathname.startsWith('/registre')) {
+      return (
+        <>
+          <style>{`
+            :root {
+              --color-primary: ${settings.primary_color};
+              --color-secondary: ${settings.secondary_color};
+            }
+          `}</style>
+          <RegistreVisiteur />
+        </>
+      );
+    }
+
+    // TOUS les utilisateurs (admin, gestionnaire, employé) -> Page d'accueil employé en premier
+    if (showAccueil) {
+      return (
+        <>
+          <style>{`
+            :root {
+              --color-primary: ${settings.primary_color};
+              --color-secondary: ${settings.secondary_color};
+            }
+          `}</style>
+          <AccueilEmploye />
+        </>
+      );
+    }
+
+    // Ensuite, afficher le Dashboard avec Layout
+    const PageComponent = dashboardPages[dashPage];
+    return (
+      <>
+        <style>{`
+          :root {
+            --color-primary: ${settings.primary_color};
+            --color-secondary: ${settings.secondary_color};
+          }
+        `}</style>
+        <Layout
+          activePage={dashPage}
+          onNavigate={handleDashNav}
+          onGoPublic={goToPublic}
+        >
+          <PageComponent />
+        </Layout>
+      </>
+    );
+  }
+
+  if (publicPage === 'login') {
+    if (user) {
+      setView('dashboard');
+      return null;
+    }
+    return (
+      <LoginPage
+        onSuccess={handleLoginSuccess}
+      />
+    );
+  }
+
+  const publicPages: Record<string, React.ComponentType<{ onNavigate: (page: PublicPage) => void }>> = {
+    home: PublicHome,
+    about: () => <PublicAbout />,
+    services: PublicServices,
+    realisations: () => <PublicRealisations />,
+    contact: () => <PublicContact />,
+    verification: () => <PublicVerification />,
+  };
+
+  const PublicPageComponent = publicPages[publicPage] || PublicHome;
+
+  return (
+    <PublicLayout activePage={publicPage} onNavigate={handlePublicNav}>
+      <PublicPageComponent onNavigate={handlePublicNav} />
+    </PublicLayout>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <SettingsProvider>
+        <AppContent />
+      </SettingsProvider>
+    </AuthProvider>
+  );
+}

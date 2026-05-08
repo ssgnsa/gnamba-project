@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://portal.gnambaservices.ci/</loc>
+  </url>
+  <url>
+    <loc>https://portal.gnambaservices.ci/about</loc>
+  </url>
+  <url>
+    <loc>https://portal.gnambaservices.ci/services</loc>
+  </url>
+  <url>
+    <loc>https://portal.gnambaservices.ci/realisations</loc>
+  </url>
+  <url>
+    <loc>https://portal.gnambaservices.ci/contact</loc>
+  </url>
+  <url>
+    <loc>https://portal.gnambaservices.ci/login</loc>
+  </url>
+  <url>
+    <loc>https://portal.gnambaservices.ci/verification-attestation</loc>
+  </url>
+</urlset>

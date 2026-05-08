@@ -1,0 +1,213 @@
+╔════════════════════════════════════════╗
+║   AUDIT CAPACITÉS - GNAMBA SERVER      ║
+╚════════════════════════════════════════╝
+Date: jeu. 30 avril 2026 15:39:01 UTC
+Hôte: gnamba-server
+Utilisateur: soma
+
+🔹 SYSTÈME
+Distributor ID:	Ubuntu
+Description:	Ubuntu 24.04.4 LTS
+Release:	24.04
+Codename:	noble
+Noyau: 6.8.0-110-generic
+Architecture: x86_64
+Uptime: up 8 hours, 28 minutes
+
+🔹 CPU
+CPU(s):                                  4
+On-line CPU(s) list:                     0-3
+Vendor ID:                               GenuineIntel
+Model name:                              Intel(R) Core(TM) i3-2120 CPU @ 3.30GHz
+Thread(s) per core:                      2
+Core(s) per socket:                      2
+Socket(s):                               1
+CPU(s) scaling MHz:                      62%
+NUMA node0 CPU(s):                       0-3
+
+🔹 MÉMOIRE
+               total        used        free      shared  buff/cache   available
+Mem:           7,7Gi       2,8Gi       3,1Gi        57Mi       2,1Gi       4,9Gi
+Swap:          4,0Gi       851Mi       3,2Gi
+
+🔹 DISQUES PHYSIQUES
+NAME                           SIZE TYPE MOUNTPOINT        FSTYPE
+sda                          465,8G disk                   
+├─sda1                           1G part /boot/efi         vfat
+├─sda2                           2G part /boot             ext4
+└─sda3                       462,7G part                   LVM2_member
+  └─ubuntu--vg--1-ubuntu--lv   100G lvm  /                 ext4
+sdb                          931,5G disk                   
+├─sdb1                           1G part                   vfat
+├─sdb2                           2G part /mnt/partage_sdc2 ext4
+└─sdb3                       928,5G part                   LVM2_member
+  └─ubuntu--vg-ubuntu--lv      100G lvm  /mnt/partage_sdc3 ext4
+sdc                          931,5G disk                   
+├─sdc1                       293,9G part /mnt/partage_sdd1 ext4
+└─sdc2                       637,6G part /mnt/partage_sdd2 ntfs
+sdd                              0B disk                   
+
+🔹 ESPACE UTILISÉ PAR POINT DE MONTAGE
+Filesystem                            Size  Used Avail Use% Mounted on
+/dev/mapper/ubuntu--vg--1-ubuntu--lv   98G   72G   22G  77% /
+tmpfs                                 3,9G     0  3,9G   0% /dev/shm
+/dev/mapper/ubuntu--vg-ubuntu--lv      98G  6,5G   87G   7% /mnt/partage_sdc3
+/dev/sdb2                             2,0G  101M  1,7G   6% /mnt/partage_sdc2
+/dev/sda2                             2,0G  297M  1,5G  17% /boot
+/dev/sda1                             1,1G  6,2M  1,1G   1% /boot/efi
+/dev/sdc1                             289G   28K  274G   1% /mnt/partage_sdd1
+/dev/sdc2                             638G  376G  263G  59% /mnt/partage_sdd2
+
+🔹 INTERFACES RÉSEAU
+lo               UNKNOWN        127.0.0.1/8 ::1/128 
+eno1             UP             192.168.1.58/24 fde2:b550:5f68:1400:ea39:35ff:fe5b:fe4c/64 fe80::ea39:35ff:fe5b:fe4c/64 
+enx344b50000000  DOWN           
+tailscale0       UNKNOWN        100.119.16.94/32 fd7a:115c:a1e0::ab01:1096/128 fe80::32b9:b3c5:3145:59cd/64 
+br-b97aea2a2808  UP             172.19.0.1/16 fe80::bc94:a4ff:fe02:7e4a/64 
+br-d7f5d31f2bc4  UP             172.20.0.1/16 fe80::980b:9eff:feb4:591b/64 
+br-df325a6cdb49  DOWN           172.18.0.1/16 
+br-ff10ffde2785  DOWN           172.21.0.1/16 fe80::407d:62ff:fef0:dfac/64 
+docker0          UP             172.17.0.1/16 fe80::605c:92ff:fedc:80f9/64 
+br-47fd8bd5c528  DOWN           172.22.0.1/16 
+br-5602840a845f  UP             172.23.0.1/16 fe80::a0e4:baff:fed1:d636/64 
+vethfaea7cd@if2  UP             fe80::3014:4bff:fe44:e1b6/64 
+veth8a72fff@if2  UP             fe80::7884:bdff:fe0f:568d/64 
+veth3317812@if2  UP             fe80::d047:edff:fecf:f2ad/64 
+veth4ca7dc5@if2  UP             fe80::c04f:d4ff:fe95:8675/64 
+veth326b1a6@if2  UP             fe80::383c:2eff:fe58:29bd/64 
+vetheae440b@if2  UP             fe80::c88b:3eff:fe7a:a084/64 
+veth3383769@if2  UP             fe80::f0bb:d0ff:fe4f:73fb/64 
+veth588ca72@if2  UP             fe80::206e:57ff:feec:9c5d/64 
+veth27a3dca@if2  UP             fe80::4429:6eff:fe82:b847/64 
+veth6f4b289@if2  UP             fe80::dcd1:d6ff:fed8:84c4/64 
+veth3097cad@if2  UP             fe80::7880:69ff:fe1f:222d/64 
+vethbffec07@if2  UP             fe80::f0c7:cbff:fe65:689/64 
+vethcd3903e@if2  UP             fe80::10e7:bdff:fe3f:3bc5/64 
+vethcbc5637@if2  UP             fe80::a48a:a9ff:fe65:25c4/64 
+
+🔹 PORTS ÉCOUTANT
+Netid State  Recv-Q Send-Q                    Local Address:Port  Peer Address:PortProcess                                     
+udp   UNCONN 0      0                            127.0.0.54:53         0.0.0.0:*                                               
+udp   UNCONN 0      0                         127.0.0.53%lo:53         0.0.0.0:*                                               
+udp   UNCONN 0      0                               0.0.0.0:41641      0.0.0.0:*                                               
+udp   UNCONN 0      0                                     *:55363            *:*    users:(("cloudflared",pid=1255,fd=8))      
+udp   UNCONN 0      0                                     *:35820            *:*    users:(("cloudflared",pid=1255,fd=7))      
+udp   UNCONN 0      0                                     *:36373            *:*    users:(("cloudflared",pid=1255,fd=6))      
+udp   UNCONN 0      0      [fe80::ea39:35ff:fe5b:fe4c]%eno1:546           [::]:*                                               
+udp   UNCONN 0      0                                  [::]:41641         [::]:*                                               
+tcp   LISTEN 0      4096                            0.0.0.0:54327      0.0.0.0:*                                               
+tcp   LISTEN 0      4096                      100.119.16.94:51557      0.0.0.0:*                                               
+tcp   LISTEN 0      511                           127.0.0.1:42767      0.0.0.0:*    users:(("node",pid=771806,fd=76))          
+tcp   LISTEN 0      4096                         127.0.0.54:53         0.0.0.0:*                                               
+tcp   LISTEN 0      511                           127.0.0.1:46381      0.0.0.0:*    users:(("node",pid=771806,fd=67))          
+tcp   LISTEN 0      511                           127.0.0.1:51825      0.0.0.0:*    users:(("node",pid=771806,fd=75))          
+tcp   LISTEN 0      4096                            0.0.0.0:8080       0.0.0.0:*                                               
+tcp   LISTEN 0      4096                            0.0.0.0:8081       0.0.0.0:*                                               
+tcp   LISTEN 0      4096                            0.0.0.0:8082       0.0.0.0:*                                               
+tcp   LISTEN 0      4096                          127.0.0.1:20241      0.0.0.0:*    users:(("cloudflared",pid=1255,fd=3))      
+tcp   LISTEN 0      4096                          127.0.0.1:20242      0.0.0.0:*    users:(("cloudflared",pid=771044,fd=6))    
+
+🔹 PASSERELLE & DNS
+default via 192.168.1.1 dev eno1 proto static 
+nameserver 127.0.0.53
+
+🔹 SERVICES SYSTEMD (actifs)
+  UNIT                        LOAD   ACTIVE SUB     DESCRIPTION
+  apache2.service             loaded active running GNAMBA managed service
+  cloudflared.service         loaded active running Cloudflare Tunnel - EGS Services
+  containerd.service          loaded active running containerd container runtime
+  cron.service                loaded active running Regular background program processing daemon
+  dbus.service                loaded active running D-Bus System Message Bus
+  docker.service              loaded active running GNAMBA managed service
+  fail2ban.service            loaded active running Fail2Ban Service
+  fwupd.service               loaded active running Firmware update daemon
+  getty@tty1.service          loaded active running Getty on tty1
+  mariadb.service             loaded active running GNAMBA managed service
+  multipathd.service          loaded active running Device-Mapper Multipath Device Controller
+  NetworkManager.service      loaded active running Network Manager
+  ollama.service              loaded active running Ollama Service
+  polkit.service              loaded active running Authorization Manager
+  rsyslog.service             loaded active running System Logging Service
+  ssh.service                 loaded active running OpenBSD Secure Shell server
+  systemd-journald.service    loaded active running Journal Service
+  systemd-logind.service      loaded active running User Login Management
+  systemd-networkd.service    loaded active running Network Configuration
+  systemd-resolved.service    loaded active running Network Name Resolution
+  systemd-timesyncd.service   loaded active running Network Time Synchronization
+  systemd-udevd.service       loaded active running Rule-based Manager for Device Events and Files
+  tailscaled.service          loaded active running Tailscale node agent
+  thermald.service            loaded active running Thermal Daemon Service
+
+🔹 DOCKER
+Docker: Docker version 29.4.1, build 055a478
+Conteneurs actifs:
+NAMES                            STATUS                 PORTS
+egs-web                          Up 8 hours (healthy)   0.0.0.0:8080->80/tcp, [::]:8080->80/tcp
+filebrowser                      Up 8 hours (healthy)   0.0.0.0:8081->80/tcp, [::]:8081->80/tcp
+somagro-web                      Up 8 hours (healthy)   0.0.0.0:8082->3000/tcp, [::]:8082->3000/tcp
+supabase_studio_somagro-erp      Up 8 hours (healthy)   0.0.0.0:55323->3000/tcp, [::]:55323->3000/tcp
+supabase_pg_meta_somagro-erp     Up 8 hours (healthy)   8080/tcp
+supabase_storage_somagro-erp     Up 8 hours (healthy)   5000/tcp
+supabase_rest_somagro-erp        Up 8 hours             3000/tcp
+supabase_realtime_somagro-erp    Up 8 hours (healthy)   4000/tcp
+supabase_inbucket_somagro-erp    Up 8 hours (healthy)   1025/tcp, 1110/tcp, 0.0.0.0:55324->8025/tcp, [::]:55324->8025/tcp
+supabase_auth_somagro-erp        Up 8 hours (healthy)   9999/tcp
+supabase_kong_somagro-erp        Up 8 hours (healthy)   8001/tcp, 8088/tcp, 8443-8444/tcp, 0.0.0.0:55321->8000/tcp, [::]:55321->8000/tcp
+supabase_vector_somagro-erp      Up 8 hours (healthy)   
+supabase_analytics_somagro-erp   Up 8 hours (healthy)   0.0.0.0:54327->4000/tcp, [::]:54327->4000/tcp
+supabase_db_somagro-erp          Up 8 hours (healthy)   0.0.0.0:55322->5432/tcp, [::]:55322->5432/tcp
+
+🔹 LOGICIELS INSTALLÉS
+✓ nginx : 1.24.0-2ubuntu7.6
+✓ apache2 : 2.4.58-1ubuntu8.11
+✓ php : 2:8.3+93ubuntu2
+✓ python3 : 3.12.3-0ubuntu2.1
+✓ git : 1:2.43.0-1ubuntu7.3
+✓ curl : 8.5.0-2ubuntu10.8
+✓ wget : 1.21.4-1ubuntu4.1
+
+🔹 SSH
+Port 2222
+
+🔹 UTILISATEURS AVEC SHELL
+root:/bin/bash
+soma:/bin/bash
+
+🔹 VIRTUALISATION
+none
+Détection VM indisponible
+
+🔹 SUPPORT HARDWARE
+GPU:  Intel Corporation 2nd Generation Core Processor Family Integrated Graphics Controller (rev 09)
+USB: 7 périphériques détectés
+
+🔹 MODULES NOYAU CHARGÉS (sélection)
+veth                   45056  0
+nft_chain_nat          12288  32
+nf_nat                 61440  3 xt_nat,nft_chain_nat,xt_MASQUERADE
+overlay               212992  14
+ipt_REJECT             12288  1
+nf_reject_ipv4         12288  1 ipt_REJECT
+nft_limit              16384  13
+nft_compat             20480  215
+nf_tables             376832  1807 nft_compat,nft_chain_nat,nft_limit
+nfnetlink              20480  7 nft_compat,nf_conntrack_netlink,nf_tables,ip_set
+
+🔹 CHARGE SYSTÈME
+ 15:39:05 up  8:28,  2 users,  load average: 0,23, 0,26, 0,23
+
+🔹 PROCESSUS TOP (CPU)
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root        6634  2.5  2.5 4608064 208896 ?      Sl   07:12  12:58 /opt/app/rel/logflare/erts-15.2.7.4/bin/beam.smp -sbwt none -sbwtdcpu none -sbwtdio none -sub true -swt very_low -swtdcpu very_low -swtdio very_low -zdbbl 1028000 -P 8000000 -t 32000000 -Mdai max -- -root /opt/app/rel/logflare -bindir /opt/app/rel/logflare/erts-15.2.7.4/bin -progname erl -- -home /root -- -noshell -s elixir start_cli -mode embedded -setcookie cookie -name logflare@127.0.0.1 -config /opt/app/rel/logflare/releases/1.34.14/sys -boot /opt/app/rel/logflare/releases/1.34.14/start -boot_var RELEASE_LIB /opt/app/rel/logflare/lib -kernel prevent_overlapping_partitions false -kernel net_ticktime 45 -- -- -- -extra --no-halt
+soma      771806  2.4 13.1 76263256 1060208 ?    Rl   15:04   0:50 /home/soma/.vscode-server/cli/servers/Stable-10c8e557c8b9f9ed0a87f61f1c9a44bde731c409/server/node --dns-result-order=ipv4first /home/soma/.vscode-server/cli/servers/Stable-10c8e557c8b9f9ed0a87f61f1c9a44bde731c409/server/out/bootstrap-fork --type=extensionHost --transformURIs --useHostProxy=false
+root        1578  1.1  0.8 4027056 64936 ?       Ssl  07:11   5:55 /usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock
+soma      772059  0.9  0.9 332904 75884 ?        Sl   15:04   0:20 /home/soma/.vscode-server/extensions/openai.chatgpt-26.422.71525-linux-x64/bin/linux-x86_64/codex app-server --analytics-default-enabled
+root        1267  0.8  0.5 2402984 46396 ?       Ssl  07:10   4:31 /usr/bin/containerd
+soma      828674  0.5  0.0   7344  3676 pts/0    S+   15:39   0:00 bash audit-complet.sh
+root        7733  0.5  0.7 2719412 63044 ?       Sl   07:13   2:35 /app/erts-15.2.3/bin/beam.smp -hmax 312500000 -zdbbl 100000 -sbwt none -sbwtdio none -sbwtdcpu none -- -root /app -bindir /app/erts-15.2.3/bin -progname erl -- -home /root -- -proto_dist inet_tcp -- -noshell -s elixir start_cli -mode embedded -setcookie MHDZGAWLBCIHNBO42KHHPPDFI6PN2YDWQYLKYUMTZKJWVUPIJDWA==== -name realtime@127.0.0.1 -config /app/releases/2.78.18/sys -boot /app/releases/2.78.18/start -boot_var RELEASE_LIB /app/lib -- -- -- -extra --no-halt
+soma      771730  0.4  1.5 11845920 122872 ?     Sl   15:04   0:09 /home/soma/.vscode-server/cli/servers/Stable-10c8e557c8b9f9ed0a87f61f1c9a44bde731c409/server/node /home/soma/.vscode-server/cli/servers/Stable-10c8e557c8b9f9ed0a87f61f1c9a44bde731c409/server/out/server-main.js --connection-token=remotessh --accept-server-license-terms --start-server --enable-remote-auto-shutdown --socket-path=/tmp/code-a870d3f1-66ce-453d-b853-43286a77b16e
+root        2708  0.4  1.1 22647596 93560 ?      Ssl  07:11   2:09 node dist/server/server.js
+
+╔════════════════════════════════════════╗
+║           AUDIT TERMINÉ                ║
+╚════════════════════════════════════════╝

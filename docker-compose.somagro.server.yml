@@ -1,0 +1,31 @@
+services:
+  somagro-web:
+    build:
+      context: ./somagro-erp
+      dockerfile: Dockerfile
+    image: somagro-erp:latest
+    container_name: somagro-web
+    restart: unless-stopped
+    ports:
+      - "${SOMAGRO_PORT:-8082}:3000"
+    env_file:
+      - ./somagro-erp/.env.server
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "const os=require('os');const host=os.hostname();require('http').get('http://' + host + ':3000/api/health', res => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1));",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - gnamba-network
+
+networks:
+  gnamba-network:
+    name: gnamba-network
+    driver: bridge
