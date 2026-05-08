@@ -31,7 +31,7 @@ RETURNS TABLE (
   nom_lotissement TEXT,
   village TEXT,
   superficie NUMERIC,
-  prix NUMERIC,
+  prix_cession NUMERIC,
   statut TEXT,
   proprietaire_nom TEXT,
   proprietaire_prenom TEXT,
@@ -48,7 +48,7 @@ BEGIN
   -- Check if current user is admin (bypass village access control)
   v_is_admin := EXISTS (
     SELECT 1 FROM public.user_profiles
-    WHERE id = auth.uid() AND role = 'admin'
+    WHERE public.user_profiles.id = auth.uid() AND role = 'admin'
   );
 
   v_offset := (p_page - 1) * p_limit;
@@ -109,7 +109,7 @@ BEGIN
       fl.nom_lotissement,
       fl.village,
       fl.superficie,
-      fl.prix,
+      fl.prix_cession,
       fl.statut,
       fl.proprietaire_nom,
       fl.proprietaire_prenom,
@@ -140,7 +140,7 @@ BEGIN
   -- Check if current user is admin
   v_is_admin := EXISTS (
     SELECT 1 FROM public.user_profiles
-    WHERE id = auth.uid() AND role = 'admin'
+    WHERE public.user_profiles.id = auth.uid() AND role = 'admin'
   );
 
   RETURN QUERY
@@ -198,7 +198,7 @@ CREATE POLICY "user_village_access_select" ON public.user_village_access
     auth.uid() = user_id
     OR EXISTS (
       SELECT 1 FROM public.user_profiles
-      WHERE id = auth.uid() AND role = 'admin'
+      WHERE public.user_profiles.id = auth.uid() AND role = 'admin'
     )
   );
 
@@ -207,7 +207,7 @@ CREATE POLICY "user_village_access_insert" ON public.user_village_access
   WITH CHECK (
     EXISTS (
       SELECT 1 FROM public.user_profiles
-      WHERE id = auth.uid() AND role = 'admin'
+      WHERE public.user_profiles.id = auth.uid() AND role = 'admin'
     )
   );
 
@@ -216,13 +216,13 @@ CREATE POLICY "user_village_access_update" ON public.user_village_access
   USING (
     EXISTS (
       SELECT 1 FROM public.user_profiles
-      WHERE id = auth.uid() AND role = 'admin'
+      WHERE public.user_profiles.id = auth.uid() AND role = 'admin'
     )
   )
   WITH CHECK (
     EXISTS (
       SELECT 1 FROM public.user_profiles
-      WHERE id = auth.uid() AND role = 'admin'
+      WHERE public.user_profiles.id = auth.uid() AND role = 'admin'
     )
   );
 
@@ -231,7 +231,7 @@ CREATE POLICY "user_village_access_delete" ON public.user_village_access
   USING (
     EXISTS (
       SELECT 1 FROM public.user_profiles
-      WHERE id = auth.uid() AND role = 'admin'
+      WHERE public.user_profiles.id = auth.uid() AND role = 'admin'
     )
   );
 
