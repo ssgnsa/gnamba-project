@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Attestation Villageoise Premium</title>
+  <style>
+    @page { size: A4; margin: 0; }
+    @font-face {
+      font-family: 'EB Garamond';
+      src: url("./assets/fonts/eb-garamond-2/EBGaramond-Regular.ttf") format('truetype');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'EB Garamond';
+      src: url("./assets/fonts/eb-garamond-2/EBGaramond-Bold.ttf") format('truetype');
+      font-weight: 700;
+      font-style: normal;
+    }
+
+    :root {
+      color-scheme: light;
+      --bg: #f7f2e8;
+      --paper: #fffdf8;
+      --ink: #1d1d18;
+      --accent: #0f4d2e;
+      --accent-soft: #d4b48b;
+      --border: rgba(15, 77, 46, 0.18);
+      --muted: #5a5a51;
+      --panel: #f2ede4;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      font-family: 'EB Garamond', Georgia, serif;
+      font-size: 11pt;
+      background: var(--bg);
+      color: var(--ink);
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10mm;
+    }
+
+    .sheet {
+      width: 210mm;
+      height: 297mm;
+      position: relative;
+      box-sizing: border-box;
+      padding: 16mm;
+      background: var(--paper);
+      border: 1px solid rgba(15, 77, 46, 0.12);
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.03);
+      overflow: hidden;
+    }
+
+    .sheet::before {
+      content: 'ATTESTATION VILLAGEOISE';
+      position: absolute;
+      top: 46%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-35deg);
+      font-size: 70pt;
+      font-weight: 700;
+      letter-spacing: 10px;
+      color: rgba(15, 77, 46, 0.06);
+      white-space: nowrap;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .rule {
+      height: 2px;
+      width: 100%;
+      background: linear-gradient(90deg, transparent 0%, var(--accent) 14%, var(--accent) 86%, transparent 100%);
+      margin: 0 0 12px 0;
+    }
+
+    .header {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 10mm;
+      align-items: start;
+      margin-bottom: 12px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .government {
+      font-size: 8.5pt;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      line-height: 1.5;
+      max-width: 60mm;
+    }
+
+    .government strong {
+      display: block;
+      margin-top: 4px;
+      color: var(--accent);
+      font-size: 10pt;
+      letter-spacing: 1.2px;
+    }
+
+    .title-block {
+      text-align: center;
+      padding: 8px 0;
+    }
+
+    .title-main {
+      font-size: 24pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--accent);
+    }
+
+    .title-sub {
+      font-size: 11pt;
+      margin-top: 2px;
+      color: var(--ink);
+      letter-spacing: 0.8px;
+    }
+
+    .seal-band {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin: 10px auto 0;
+      padding: 4px 10px;
+      border: 1px solid var(--accent);
+      border-radius: 999px;
+      background: rgba(15, 77, 46, 0.06);
+      font-size: 8.5pt;
+      letter-spacing: 1px;
+      color: var(--accent);
+      text-transform: uppercase;
+      width: max-content;
+    }
+
+    .reference-card {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      padding: 10px 12px;
+      min-width: 58mm;
+      align-self: start;
+      font-size: 9pt;
+      line-height: 1.5;
+      letter-spacing: 0.2px;
+    }
+
+    .reference-card strong {
+      display: block;
+      margin-bottom: 3px;
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .reference-line {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .reference-box {
+      border: 1px solid var(--border);
+      background: #fff;
+      padding: 8px 10px;
+      font-size: 8.5pt;
+      letter-spacing: 0.4px;
+    }
+
+    .section {
+      position: relative;
+      z-index: 1;
+      margin: 10px 0 0;
+    }
+
+    .section-title {
+      font-size: 10pt;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .copy {
+      font-size: 10pt;
+      line-height: 1.8;
+      color: var(--muted);
+      margin-bottom: 9px;
+      text-align: justify;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10mm;
+    }
+
+    .panel {
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      background: var(--panel);
+      min-height: 76px;
+      display: grid;
+      gap: 6px;
+    }
+
+    .field-label {
+      font-size: 8.5pt;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--muted);
+    }
+
+    .field-value {
+      font-size: 10.5pt;
+      font-weight: 700;
+      color: var(--ink);
+      line-height: 1.4;
+    }
+
+    .auth-block {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10mm;
+      margin-top: 8mm;
+      align-items: center;
+    }
+
+    .auth-card {
+      border: 1px solid var(--border);
+      padding: 12px 14px;
+      background: #fff;
+    }
+
+    .auth-card p {
+      margin: 0;
+      font-size: 9.5pt;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .qr-box {
+      width: 48mm;
+      padding: 10px;
+      border: 1px solid var(--border);
+      background: #fff;
+      display: grid;
+      gap: 8px;
+      justify-items: center;
+      align-items: center;
+    }
+
+    .qr-box img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .qr-caption {
+      font-size: 8.5pt;
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.4;
+    }
+
+    .signature-panel {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10mm;
+      margin-top: 15mm;
+      align-items: end;
+    }
+
+    .signature-sheet {
+      border: 1px solid var(--border);
+      padding: 12px 14px;
+      background: var(--panel);
+    }
+
+    .signature-label {
+      font-size: 8.5pt;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .signature-name {
+      font-size: 11pt;
+      font-weight: 700;
+      color: var(--accent);
+      text-transform: uppercase;
+      line-height: 1.2;
+    }
+
+    .signature-date {
+      margin-top: 8px;
+      font-size: 9pt;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .footer {
+      position: absolute;
+      left: 16mm;
+      right: 16mm;
+      bottom: 16mm;
+      padding: 10px 12px;
+      border-top: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10mm;
+      font-size: 8.5pt;
+      color: var(--muted);
+      line-height: 1.5;
+      background: rgba(247, 242, 232, 0.98);
+    }
+
+    .footer-left,
+    .footer-right {
+      display: grid;
+      gap: 4px;
+    }
+
+    .footer-right {
+      text-align: right;
+    }
+
+    .footer strong {
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .verify-url {
+      font-size: 8pt;
+      color: var(--accent);
+      word-break: break-word;
+    }
+
+    @media print {
+      body { margin: 0; padding: 0; }
+      .sheet { box-shadow: none; border-color: transparent; }
+      .footer { background: transparent; }
+    }
+  </style>
+</head>
+<body>
+  <div class="sheet">
+    <div class="header">
+      <div class="government">
+        République de Côte d'Ivoire<br>
+        Union - Discipline - Travail
+        <strong>Attestation de Propriété Villageoise</strong>
+      </div>
+
+      <div class="title-block">
+        <div class="title-main">ATTESTATION DE PROPRIÉTÉ VILLAGEOISE</div>
+        <div class="title-sub">Document officiel sécurisé — villageoise premium</div>
+        <div class="seal-band">VÉRITABLE DOCUMENT DE TERRITOIRE</div>
+      </div>
+
+      <div class="reference-card">
+        <strong>IDENTIFIANTS</strong>
+        Référence : {{ref}}<br>
+        Contrôle : {{controle}}<br>
+        Enregistrement : {{numero}}<br>
+        Registre : {{registre}}
+      </div>
+    </div>
+
+    <div class="rule"></div>
+
+    <div class="section">
+      <div class="copy">Nous attestons que le détenteur ci-dessous est reconnu comme propriétaire coutumier de la parcelle villageoise identifiée dans ce document. Ce certificat est sécurisé par un code QR, un hash cryptographique et un numéro de contrôle officiel.</div>
+    </div>
+
+    <div class="section grid-2">
+      <div class="panel">
+        <div class="section-title">1. Identité du détenteur</div>
+        <div>
+          <div class="field-label">Nom et Prénoms</div>
+          <div class="field-value">{{nom}}</div>
+        </div>
+        <div>
+          <div class="field-label">Né(e) le / à</div>
+          <div class="field-value">{{naissance}}</div>
+        </div>
+        <div>
+          <div class="field-label">Profession</div>
+          <div class="field-value">{{profession}}</div>
+        </div>
+        <div>
+          <div class="field-label">Téléphone</div>
+          <div class="field-value">{{telephone}}</div>
+        </div>
+        <div>
+          <div class="field-label">CNI</div>
+          <div class="field-value">{{cni}}</div>
+        </div>
+        <div>
+          <div class="field-label">Domicile</div>
+          <div class="field-value">{{domicile}}</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="section-title">2. Parcelle et origine</div>
+        <div>
+          <div class="field-label">Lot / Référence</div>
+          <div class="field-value">{{lot}}</div>
+        </div>
+        <div>
+          <div class="field-label">Superficie</div>
+          <div class="field-value">{{superficie}}</div>
+        </div>
+        <div>
+          <div class="field-label">Village / Quartier</div>
+          <div class="field-value">{{village}} / {{quartier}}</div>
+        </div>
+        <div>
+          <div class="field-label">Mode d'acquisition</div>
+          <div class="field-value">{{mode}}</div>
+        </div>
+        <div>
+          <div class="field-label">Historique</div>
+          <div class="field-value">{{historique}}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="auth-block">
+      <div class="auth-card">
+        <div class="section-title">3. Authentification</div>
+        <p>Ce document est protégé par un hash SHA-256 interne et par un numéro de contrôle. Toute copie non autorisée entraîne la nullité de l'attestation.</p>
+        <p class="verify-url">Vérification : {{verify_url}}</p>
+        <p class="field-label">Hash complet</p>
+        <p class="field-value" style="font-size: 8.5pt; font-family: monospace; word-break: break-all;">{{hash}}</p>
+      </div>
+      <div class="qr-box">
+        <img src="{{qr}}" alt="QR Code de vérification" />
+        <div class="qr-caption">Scanner pour vérifier l’authenticité du document.</div>
+      </div>
+    </div>
+
+    <div class="signature-panel">
+      <div class="signature-sheet">
+        <div class="signature-label">Chef du village</div>
+        <div class="signature-name">{{chef}}</div>
+        <div class="signature-date">Fait à {{village}}, le {{date}}</div>
+      </div>
+      <div class="signature-sheet" style="min-width: 72mm;">
+        <div class="signature-label">Mention de validité</div>
+        <div class="field-value">Authenticité vérifiée au moment de l’émission.</div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div class="footer-left">
+        Document imprimé selon le standard premium villageoise.<br>
+        Ce certificat est destiné à l’usage officiel et coutumier.
+      </div>
+      <div class="footer-right">
+        <strong>Contrôle</strong> : {{controle}}<br>
+        <strong>Hash abrégé</strong> : {{hash_short}}<br>
+        <span class="verify-url">{{verify_url}}</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

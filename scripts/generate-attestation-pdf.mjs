@@ -9,7 +9,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const templatesDir = path.resolve(__dirname, "../templates");
 const assetsDir = path.join(templatesDir, "assets");
-const templateFile = path.join(templatesDir, "attestation_ministere.html");
+const templateFile = path.join(templatesDir, "attestation_villageoise_premium.html");
 
 const defaultDataPath = path.resolve(__dirname, "attestation-data.example.json");
 
@@ -34,6 +34,10 @@ function ensureMimetype(filePath) {
       return "image/jpeg";
     case ".woff2":
       return "font/woff2";
+    case ".ttf":
+      return "font/ttf";
+    case ".otf":
+      return "font/otf";
     default:
       return "application/octet-stream";
   }
@@ -99,12 +103,6 @@ async function buildTemplateWithAssets(data) {
   html = await inlineFonts(html);
 
   const placeholders = {
-    filigrane: await resolveAsset(data.filigrane, path.join(assetsDir, "filigrane.png")),
-    texture: await resolveAsset(data.texture, path.join(assetsDir, "texture.png")),
-    carte: await resolveAsset(data.carte, path.join(assetsDir, "carte.png")),
-    blason: await resolveAsset(data.blason, path.join(assetsDir, "blason.png")),
-    signature: await resolveAsset(data.signature, path.join(assetsDir, "signature.png")),
-    cachet: await resolveAsset(data.cachet, path.join(assetsDir, "cachet.png")),
     // leave qr, hash, verify_url for later
     qr: "__QR_PLACEHOLDER__",
     village: escapeHtml(data.village),
@@ -116,7 +114,6 @@ async function buildTemplateWithAssets(data) {
     domicile: escapeHtml(data.domicile),
     lot: escapeHtml(data.lot),
     superficie: escapeHtml(data.superficie),
-    localisation: escapeHtml(data.localisation),
     quartier: escapeHtml(data.quartier),
     mode: escapeHtml(data.mode),
     historique: escapeHtml(data.historique),
@@ -193,12 +190,6 @@ async function run() {
 
   // Final placeholders
   const finalPlaceholders = {
-    filigrane: await resolveAsset(data.filigrane, path.join(assetsDir, "filigrane.png")),
-    texture: await resolveAsset(data.texture, path.join(assetsDir, "texture.png")),
-    carte: await resolveAsset(data.carte, path.join(assetsDir, "carte.png")),
-    blason: await resolveAsset(data.blason, path.join(assetsDir, "blason.png")),
-    signature: await resolveAsset(data.signature, path.join(assetsDir, "signature.png")),
-    cachet: await resolveAsset(data.cachet, path.join(assetsDir, "cachet.png")),
     qr: qrDataUrl,
     village: escapeHtml(data.village),
     nom: escapeHtml(data.nom),

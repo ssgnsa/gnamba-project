@@ -19,11 +19,5 @@
   "registre": "Volume 3, Page 27, Ligne 14",
   "controle": "CTRL-6572",
   "hash": "3A1B5F7C9D8E4A2B3C4D5E6F7A8B9C0D",
-  "verify_url": "https://verification.gnamba.ci/attestation?ref=ATTEST-2026-000123",
-  "filigrane": "templates/assets/filigrane.png",
-  "texture": "templates/assets/texture.png",
-  "carte": "templates/assets/carte.png",
-  "blason": "templates/assets/blason.png",
-  "signature": "templates/assets/signature.png",
-  "cachet": "templates/assets/cachet.png"
+  "verify_url": "https://verification.gnamba.ci/attestation?ref=ATTEST-2026-000123"
 }

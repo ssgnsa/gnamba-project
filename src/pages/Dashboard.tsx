@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   TrendingUp,
   TrendingDown,
@@ -164,7 +164,16 @@ export default function Dashboard() {
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
-  const [services, setServices] = useState<ServiceLink[]>(SERVICES_LINKS);
+  const isProduction = !import.meta.env.DEV;
+  const serviceLinks = useMemo(() => {
+    if (!isProduction) return SERVICES_LINKS;
+    return SERVICES_LINKS.filter(
+      (service) =>
+        !service.url.startsWith("http://localhost") &&
+        !service.url.startsWith("http://127.0.0.1"),
+    );
+  }, [isProduction]);
+  const [services, setServices] = useState<ServiceLink[]>(serviceLinks);
 
   // Vérifier les droits d'accès aux finances
   const canViewFinances =
@@ -175,7 +184,7 @@ export default function Dashboard() {
 
   const checkServicesStatus = useCallback(async () => {
     const updatedServices = await Promise.all(
-      SERVICES_LINKS.map(async (service) => {
+      serviceLinks.map(async (service) => {
         try {
           // For web services, try to fetch with a timeout
           if (service.url.startsWith("http")) {
