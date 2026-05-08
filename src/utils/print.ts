@@ -301,14 +301,15 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
     }
 
     .page {
-      width: 210mm; min-height: 297mm;
+      width: 210mm; height: 297mm;
       position: relative;
-      padding: 18mm 20mm;
+      padding: 12mm 14mm;
       margin: 0 auto;
       background: #fff;
       box-shadow: inset 0 0 0 1px rgba(184, 134, 11, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.05);
       display: flex;
       flex-direction: column;
+      overflow: hidden;
     }
 
     /* ——— DOUBLE BORDURE ORNEMENTALE ——— */
@@ -383,20 +384,20 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
     /* ——— EN-TÊTE ——— */
     .header {
       display: grid;
-      grid-template-columns: 1fr 60px 1fr;
+      grid-template-columns: 1fr 50px 1fr;
       align-items: center;
-      gap: 8px;
-      margin-bottom: 4px;
-      padding-bottom: 4px;
+      gap: 6px;
+      margin-bottom: 2px;
+      padding-bottom: 2px;
     }
     .hdr {
       font-family: 'EB Garamond', serif;
-      font-size: 10.5pt;
+      font-size: 9.5pt;
       font-weight: 600;
       text-transform: uppercase;
-      line-height: 1.6;
+      line-height: 1.4;
       color: #2a2a2a;
-      letter-spacing: 0.3px;
+      letter-spacing: 0.2px;
     }
     .hdr .accent {
       color: #006b3f;
@@ -413,71 +414,71 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
 
     /* ——— FILET SOUS EN-TÊTE ——— */
     .header-rule {
-      height: 1px;
+      height: 0.5px;
       background: linear-gradient(90deg, transparent 0%, #b8860b 15%, #b8860b 85%, transparent 100%);
-      margin-bottom: 4px;
+      margin-bottom: 2px;
     }
 
     /* ——— TITRE ——— */
     .title-section {
       text-align: center;
-      margin: 8px 0 18px;
+      margin: 2px 0 6px;
       display: inline-block;
-      padding: 12px 18px;
-      border: 1.5px solid rgba(184, 134, 11, 0.95);
-      border-radius: 16px;
-      background: rgba(250, 240, 220, 0.35);
+      padding: 6px 12px;
+      border: 1px solid rgba(184, 134, 11, 0.9);
+      border-radius: 12px;
+      background: rgba(250, 240, 220, 0.25);
     }
     .title {
       font-family: 'Cinzel', serif;
-      font-size: 24.5pt;
+      font-size: 18pt;
       font-weight: 700;
-      letter-spacing: 5px;
+      letter-spacing: 3px;
       text-transform: uppercase;
       color: #0b4b2f;
-      padding: 10px 28px 12px;
+      padding: 4px 16px 5px;
       display: inline-block;
       position: relative;
-      line-height: 1.05;
-      background: rgba(255, 255, 255, 0.95);
-      border-radius: 10px;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+      line-height: 1.0;
+      background: rgba(255, 255, 255, 0.98);
+      border-radius: 8px;
+      box-shadow: 0 1px 5px rgba(0, 0, 0, 0.02);
     }
     .title::before {
       content: '';
       position: absolute;
-      top: 6px; left: 50%; transform: translateX(-50%);
-      width: 120px; height: 2px;
+      top: 3px; left: 50%; transform: translateX(-50%);
+      width: 80px; height: 1px;
       background: #b8860b;
     }
     .title::after {
       content: '';
       position: absolute;
-      bottom: 6px; left: 50%; transform: translateX(-50%);
-      width: 120px; height: 2px;
+      bottom: 3px; left: 50%; transform: translateX(-50%);
+      width: 80px; height: 1px;
       background: #b8860b;
     }
 
     /* ——— RÉFÉRENCE ——— */
     .ref-line {
       text-align: center;
-      margin: 6px 0 12px;
+      margin: 3px 0 6px;
       display: flex;
       justify-content: center;
       align-items: center;
-      gap: 16px;
+      gap: 8px;
       flex-wrap: wrap;
     }
     .ref-box {
       font-family: 'Cinzel', serif;
-      font-size: 12.5pt;
+      font-size: 10pt;
       font-weight: 700;
       color: #b8860b;
-      letter-spacing: 0.9px;
-      padding: 6px 20px;
-      border: 1px solid #b8860b;
-      background: rgba(184, 134, 11, 0.08);
-      border-radius: 10px;
+      letter-spacing: 0.6px;
+      padding: 3px 12px;
+      border: 0.75px solid #b8860b;
+      background: rgba(184, 134, 11, 0.06);
+      border-radius: 6px;
     }
     .ref-meta {
       font-size: 10pt;
@@ -492,54 +493,54 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
 
     /* ——— BASE LÉGALE ——— */
     .legal {
-      font-size: 8.5pt;
+      font-size: 7.5pt;
       text-align: center;
       color: #555;
-      margin: 6px 0 10px;
-      line-height: 1.6;
-      padding: 4px 22px;
+      margin: 2px 0 4px;
+      line-height: 1.3;
+      padding: 2px 12px;
       border-top: 0.5px solid #e0e0e0;
       border-bottom: 0.5px solid #e0e0e0;
-      background: rgba(0, 107, 63, 0.03);
+      background: rgba(0, 107, 63, 0.02);
     }
 
     /* ——— DÉCLARATION ——— */
     .declaration {
-      font-size: 12pt;
-      line-height: 1.85;
+      font-size: 10pt;
+      line-height: 1.5;
       text-align: justify;
-      margin: 12px 0;
-      padding: 8px 0 8px 12px;
-      border-left: 3px solid #006b3f;
+      margin: 4px 0;
+      padding: 4px 0 4px 8px;
+      border-left: 2px solid #006b3f;
       color: #222;
-      background: rgba(0, 107, 63, 0.03);
-      border-radius: 6px;
+      background: rgba(0, 107, 63, 0.02);
+      border-radius: 4px;
     }
 
     /* ——— TABLEAUX DE CHAMPS ——— */
     .section {
-      margin: 14px 0;
+      margin: 5px 0;
     }
     .section-header {
       display: flex;
       align-items: center;
-      gap: 8px;
-      margin-bottom: 6px;
-      padding-bottom: 4px;
-      border-bottom: 1px solid #006b3f;
+      gap: 4px;
+      margin-bottom: 2px;
+      padding-bottom: 2px;
+      border-bottom: 0.75px solid #006b3f;
     }
     .section-numeral {
       font-family: 'Cinzel', serif;
-      font-size: 9pt;
+      font-size: 8pt;
       font-weight: 700;
       color: #b8860b;
     }
     .section-title {
       font-family: 'Cinzel', serif;
-      font-size: 10pt;
+      font-size: 8.5pt;
       font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.6px;
+      letter-spacing: 0.4px;
       color: #006b3f;
     }
 
@@ -547,10 +548,10 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
     .data-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 11pt;
+      font-size: 9.5pt;
     }
     .data-table td {
-      padding: 8px 10px;
+      padding: 3px 4px;
       vertical-align: middle;
     }
     .data-table .label {
@@ -578,67 +579,67 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
     .signature-zone {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin: 8px 0 6px;
+      gap: 6px;
+      margin: 4px 0;
     }
     .sig-frame {
-      border: 1px solid #b8860b;
-      padding: 6px 8px;
-      background: rgba(184, 134, 11, 0.02);
-      min-height: 70px;
+      border: 0.75px solid #b8860b;
+      padding: 4px 6px;
+      background: rgba(184, 134, 11, 0.01);
+      min-height: 50px;
     }
     .sig-frame-title {
       font-family: 'Cinzel', serif;
-      font-size: 8.5pt;
+      font-size: 7pt;
       font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.3px;
       color: #b8860b;
-      margin-bottom: 4px;
-      padding-bottom: 2px;
+      margin-bottom: 2px;
+      padding-bottom: 1px;
       border-bottom: 0.5px solid #e0d5b5;
     }
     .sig-frame-name {
-      font-size: 11pt;
+      font-size: 8.5pt;
       font-weight: 600;
       color: #006b3f;
       text-transform: uppercase;
-      margin-bottom: 2px;
+      margin-bottom: 1px;
     }
     .sig-frame-line {
       border-top: 0.5px solid #999;
-      margin-top: 28px;
-      padding-top: 2px;
-      font-size: 7.5pt;
+      margin-top: 20px;
+      padding-top: 1px;
+      font-size: 6pt;
       color: #888;
       text-transform: uppercase;
-      letter-spacing: 0.3px;
+      letter-spacing: 0.2px;
     }
 
     .date-frame {
-      border: 1px solid #8a8a8a;
-      padding: 6px 8px;
+      border: 0.75px solid #8a8a8a;
+      padding: 4px 6px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
     }
     .date-frame-label {
-      font-size: 8.5pt;
+      font-size: 6.5pt;
       color: #555;
       text-transform: uppercase;
-      letter-spacing: 0.3px;
+      letter-spacing: 0.2px;
     }
     .date-frame-value {
-      font-size: 11.5pt;
+      font-size: 9pt;
       font-weight: 600;
       color: #1a1a1a;
     }
     .date-frame-mention {
-      font-size: 8pt;
+      font-size: 6.5pt;
       color: #888;
       font-style: italic;
-      margin-top: 4px;
-      line-height: 1.4;
+      margin-top: 2px;
+      line-height: 1.2;
     }
 
     /* ——— PIED DE PAGE SÉCURITÉ ——— */
@@ -647,59 +648,60 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
       margin-top: auto;
       margin-bottom: 0;
       border: 0.75px solid #d4d4d4;
-      padding: 12px 14px;
-      background: rgba(0, 107, 63, 0.05);
+      padding: 6px 8px;
+      background: rgba(0, 107, 63, 0.04);
       display: grid;
-      grid-template-columns: 90px 1fr;
-      gap: 14px;
+      grid-template-columns: 80px 1fr;
+      gap: 8px;
       align-items: flex-start;
-      border-radius: 6px;
+      border-radius: 4px;
+      font-size: 9pt;
     }
     .sec-qr {
-      width: 88px; height: 88px;
-      border: 1px solid #ccc;
-      padding: 3px;
+      width: 80px; height: 80px;
+      border: 0.75px solid #ccc;
+      padding: 2px;
       background: #fff;
-      border-radius: 4px;
+      border-radius: 3px;
     }
     .sec-qr img { width: 100%; height: 100%; object-fit: contain; }
     .sec-left {
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 2px;
     }
     .sec-control {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 4px;
     }
     .sec-control-label {
-      font-size: 7pt;
+      font-size: 6pt;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.3px;
+      letter-spacing: 0.25px;
       color: #006b3f;
-      min-width: 60px;
+      min-width: 50px;
     }
     .sec-control-value {
       font-family: 'Courier New', monospace;
-      font-size: 8pt;
+      font-size: 7pt;
       font-weight: 700;
       color: #006b3f;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.4px;
     }
     .sec-hash {
-      font-size: 6pt;
+      font-size: 5.5pt;
       color: #666;
       font-family: 'Courier New', monospace;
       word-break: break-all;
-      line-height: 1.25;
-      margin-top: 2px;
+      line-height: 1.2;
+      margin-top: 1px;
     }
     .sec-url {
-      font-size: 6.5pt;
+      font-size: 5.5pt;
       color: #006b3f;
-      margin-top: 2px;
+      margin-top: 1px;
     }
     .sec-url a {
       color: #006b3f;
@@ -709,13 +711,13 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
     /* ——— MENTIONS LÉGALES ——— */
     .legal-notice {
       position: relative;
-      margin-top: 8px;
-      font-size: 6.5pt;
+      margin-top: 3px;
+      font-size: 6pt;
       color: #777;
       text-align: center;
       font-style: italic;
       letter-spacing: 0.2px;
-      line-height: 1.3;
+      line-height: 1.25;
     }
 
     @media print {
