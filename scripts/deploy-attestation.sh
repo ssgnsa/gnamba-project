@@ -17,7 +17,7 @@ if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
 else
   if ! git diff --quiet || ! git diff --staged --quiet; then
     echo "Repository has uncommitted changes. Commit or stash before deploying."
-    git status --short templates/attestation_ministere.html || true
+    git status --short templates/attestation_villageoise_premium.html || true
     exit 1
   fi
 fi

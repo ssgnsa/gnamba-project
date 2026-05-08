@@ -116,8 +116,13 @@ CREATE OR REPLACE FUNCTION search_foncier_lots(
   p_search TEXT DEFAULT '',
   p_statut TEXT DEFAULT '',
   p_village TEXT DEFAULT '',
+  p_quartier TEXT DEFAULT '',
+  p_lotissement TEXT DEFAULT '',
+  p_sort TEXT DEFAULT 'created_at',
+  p_dir TEXT DEFAULT 'desc',
+  p_page INT DEFAULT 1,
   p_limit INT DEFAULT 20,
-  p_offset INT DEFAULT 0
+  p_include_archived BOOLEAN DEFAULT FALSE
 )
 RETURNS TABLE (
   id UUID,
@@ -135,63 +140,98 @@ RETURNS TABLE (
   created_at TIMESTAMPTZ,
   total_count BIGINT
 ) AS $$
+DECLARE
+  v_offset INT;
+  v_order_by TEXT;
+  v_where_conditions TEXT := '';
 BEGIN
-  RETURN QUERY
-  SELECT
-    fl.id,
-    fl.reference,
-    fl.numero_lot,
-    fl.numero_ilot,
-    fl.nom_lotissement,
-    fl.village,
-    fl.superficie,
-    fl.prix,
-    fl.statut,
-    fl.proprietaire_nom,
-    fl.proprietaire_prenom,
-    fl.proprietaire_telephone,
-    fl.created_at,
-    COUNT(*) OVER () as total_count
-  FROM foncier_lots fl
-  WHERE (p_search = '' OR
-    fl.reference ILIKE '%' || p_search || '%' OR
-    fl.numero_lot ILIKE '%' || p_search || '%' OR
-    fl.nom_lotissement ILIKE '%' || p_search || '%' OR
-    fl.village ILIKE '%' || p_search || '%' OR
-    fl.proprietaire_nom ILIKE '%' || p_search || '%' OR
-    fl.proprietaire_prenom ILIKE '%' || p_search || '%')
-  AND (p_statut = '' OR fl.statut = p_statut)
-  AND (p_village = '' OR fl.village = p_village)
-  ORDER BY fl.created_at DESC
-  LIMIT p_limit
-  OFFSET p_offset;
+  v_offset := (p_page - 1) * p_limit;
+
+  -- Build ORDER BY clause
+  IF p_sort = 'created_at' THEN
+    v_order_by := 'fl.created_at';
+  ELSIF p_sort = 'reference' THEN
+    v_order_by := 'fl.reference';
+  ELSIF p_sort = 'superficie' THEN
+    v_order_by := 'fl.superficie';
+  ELSE
+    v_order_by := 'fl.created_at';
+  END IF;
+
+  IF p_dir = 'asc' THEN
+    v_order_by := v_order_by || ' ASC';
+  ELSE
+    v_order_by := v_order_by || ' DESC';
+  END IF;
+
+  -- Build WHERE conditions
+  IF p_search != '' THEN
+    v_where_conditions := v_where_conditions || ' AND (fl.reference ILIKE ''%' || p_search || '%'' OR fl.numero_lot ILIKE ''%' || p_search || '%'' OR fl.nom_lotissement ILIKE ''%' || p_search || '%'' OR fl.village ILIKE ''%' || p_search || '%'' OR fl.proprietaire_nom ILIKE ''%' || p_search || '%'' OR fl.proprietaire_prenom ILIKE ''%' || p_search || '%'')';
+  END IF;
+
+  IF p_statut != '' THEN
+    v_where_conditions := v_where_conditions || ' AND fl.statut = ''' || p_statut || '''';
+  END IF;
+
+  IF p_village != '' THEN
+    v_where_conditions := v_where_conditions || ' AND fl.village = ''' || p_village || '''';
+  END IF;
+
+  IF p_quartier != '' THEN
+    v_where_conditions := v_where_conditions || ' AND fl.quartier ILIKE ''%' || p_quartier || '%''';
+  END IF;
+
+  IF p_lotissement != '' THEN
+    v_where_conditions := v_where_conditions || ' AND fl.nom_lotissement ILIKE ''%' || p_lotissement || '%''';
+  END IF;
+
+  IF NOT p_include_archived THEN
+    v_where_conditions := v_where_conditions || ' AND fl.deleted_at IS NULL';
+  END IF;
+
+  -- Execute query with dynamic conditions
+  RETURN QUERY EXECUTE '
+    SELECT
+      fl.id,
+      fl.reference,
+      fl.numero_lot,
+      fl.numero_ilot,
+      fl.nom_lotissement,
+      fl.village,
+      fl.superficie,
+      fl.prix,
+      fl.statut,
+      fl.proprietaire_nom,
+      fl.proprietaire_prenom,
+      fl.proprietaire_telephone,
+      fl.created_at,
+      COUNT(*) OVER () as total_count
+    FROM foncier_lots fl
+    WHERE 1=1' || v_where_conditions || '
+    ORDER BY ' || v_order_by || '
+    LIMIT ' || p_limit || ' OFFSET ' || v_offset;
 END;
 $$ LANGUAGE plpgsql;
 
 -- ============================================
 -- 6. RPC FUNCTION: foncier_stats_by_village
 -- ============================================
-CREATE OR REPLACE FUNCTION foncier_stats_by_village()
+CREATE OR REPLACE FUNCTION foncier_stats_by_village(p_include_archived BOOLEAN DEFAULT FALSE)
 RETURNS TABLE (
   village TEXT,
-  total_lots BIGINT,
-  lots_actifs BIGINT,
-  lots_vendus BIGINT,
-  lots_litiges BIGINT,
-  superficie_totale NUMERIC
+  total_superficie NUMERIC,
+  lots_count BIGINT
 ) AS $$
 BEGIN
   RETURN QUERY
   SELECT
     fl.village,
-    COUNT(*) as total_lots,
-    COUNT(*) FILTER (WHERE fl.statut = 'actif') as lots_actifs,
-    COUNT(*) FILTER (WHERE fl.statut = 'vendu') as lots_vendus,
-    COUNT(*) FILTER (WHERE fl.statut = 'litige') as lots_litiges,
-    COALESCE(SUM(fl.superficie), 0) as superficie_totale
+    COALESCE(SUM(fl.superficie), 0) as total_superficie,
+    COUNT(*) as lots_count
   FROM foncier_lots fl
+  WHERE (p_include_archived OR fl.deleted_at IS NULL)
   GROUP BY fl.village
-  ORDER BY total_lots DESC;
+  ORDER BY total_superficie DESC;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -203,8 +243,8 @@ RETURNS VOID AS $$
 BEGIN
   UPDATE foncier_lots
   SET
-    statut = 'archive',
-    archived_at = NOW(),
+    deleted_at = NOW(),
+    deleted_by = auth.uid(),
     updated_at = NOW()
   WHERE id = p_lot_id;
 
@@ -221,8 +261,8 @@ RETURNS VOID AS $$
 BEGIN
   UPDATE foncier_lots
   SET
-    statut = 'actif',
-    archived_at = NULL,
+    deleted_at = NULL,
+    deleted_by = NULL,
     updated_at = NOW()
   WHERE id = p_lot_id;
 
@@ -321,18 +361,52 @@ ALTER TABLE foncier_audit ENABLE ROW LEVEL SECURITY;
 ALTER TABLE foncier_villages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_village_access ENABLE ROW LEVEL SECURITY;
 
--- Foncier lots: role-based access
+-- Foncier lots: role-based access with village restrictions
 CREATE POLICY "foncier_lots_select" ON foncier_lots
-  FOR SELECT TO authenticated USING (true);
+  FOR SELECT TO authenticated
+  USING (
+    current_user_role() = 'admin'
+    OR EXISTS (
+      SELECT 1 FROM public.user_village_access uva
+      WHERE uva.village = foncier_lots.village AND uva.user_id = auth.uid()
+    )
+  );
 
 CREATE POLICY "foncier_lots_insert" ON foncier_lots
   FOR INSERT TO authenticated
-  WITH CHECK (current_user_role() IN ('admin', 'gestionnaire', 'gerant'));
+  WITH CHECK (
+    current_user_role() IN ('admin', 'gestionnaire')
+    AND (
+      current_user_role() = 'admin'
+      OR EXISTS (
+        SELECT 1 FROM public.user_village_access uva
+        WHERE uva.village = foncier_lots.village AND uva.user_id = auth.uid()
+      )
+    )
+  );
 
 CREATE POLICY "foncier_lots_update" ON foncier_lots
   FOR UPDATE TO authenticated
-  USING (current_user_role() IN ('admin', 'gestionnaire', 'gerant'))
-  WITH CHECK (current_user_role() IN ('admin', 'gestionnaire', 'gerant'));
+  USING (
+    current_user_role() IN ('admin', 'gestionnaire')
+    AND (
+      current_user_role() = 'admin'
+      OR EXISTS (
+        SELECT 1 FROM public.user_village_access uva
+        WHERE uva.village = foncier_lots.village AND uva.user_id = auth.uid()
+      )
+    )
+  )
+  WITH CHECK (
+    current_user_role() IN ('admin', 'gestionnaire')
+    AND (
+      current_user_role() = 'admin'
+      OR EXISTS (
+        SELECT 1 FROM public.user_village_access uva
+        WHERE uva.village = foncier_lots.village AND uva.user_id = auth.uid()
+      )
+    )
+  );
 
 CREATE POLICY "foncier_lots_delete" ON foncier_lots
   FOR DELETE TO authenticated

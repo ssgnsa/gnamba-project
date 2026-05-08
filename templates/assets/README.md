@@ -1,18 +1,9 @@
-# Assets for templates/attestation_ministere.html
+# Assets for templates/attestation_villageoise_premium.html
 
-This folder should contain the secure assets required by the ministry-level attestation template.
-
-Required files:
-- `filigrane.png` — light watermark image (elephant/emblem style)
-- `texture.png` — fine paper texture for background
-- `carte.png` — silhouette of Côte d'Ivoire
-- `blason.png` — official coat of arms
-- `signature.png` — transparent signature image
-- `cachet.png` — transparent round seal image
+This folder contains local fonts used by the premium villageoise attestation template.
 
 Required fonts:
-- `fonts/EBGaramond-Regular.woff2`
-- `fonts/EBGaramond-Bold.woff2`
-- `fonts/LibreBaskerville-Regular.woff2`
+- `fonts/eb-garamond-2/EBGaramond-Regular.ttf`
+- `fonts/eb-garamond-2/EBGaramond-Bold.ttf`
 
-Place the assets in this directory before generating the PDF with the script.
+The premium layout is intentionally self-contained and does not require external background images or seal assets. The PDF generator in `scripts/generate-attestation-pdf.mjs` will inline the required font files automatically.

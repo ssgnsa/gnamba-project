@@ -39,6 +39,7 @@ COMMENT ON SEQUENCE public.attestation_seq IS
 COMMENT ON COLUMN public.foncier_attestations.reference_sequence IS
   'Valeur séquentielle officielle utilisée pour générer la référence de l''attestation';
 
+-- Function 1: attestation_luhn_check_digit
 CREATE OR REPLACE FUNCTION public.attestation_luhn_check_digit(p_digits text)
 RETURNS integer
 LANGUAGE plpgsql
@@ -70,6 +71,7 @@ BEGIN
 END;
 $$;
 
+-- Function 2: generate_attestation_reference
 CREATE OR REPLACE FUNCTION public.generate_attestation_reference(
   p_sequence bigint,
   p_prefix text DEFAULT 'APV'
@@ -87,6 +89,7 @@ BEGIN
 END;
 $$;
 
+-- Function 3: generate_attestation_control_number
 CREATE OR REPLACE FUNCTION public.generate_attestation_control_number(p_sequence bigint)
 RETURNS text
 LANGUAGE plpgsql

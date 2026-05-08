@@ -1,9 +1,9 @@
-# Font assets for ministry attestation template
+# Font assets for premium villageoise attestation
 
-Copy the following local font files into this folder:
+The premium attestation template uses local EB Garamond fonts for stable PDF generation.
 
-- `EBGaramond-Regular.woff2`
-- `EBGaramond-Bold.woff2`
-- `LibreBaskerville-Regular.woff2`
+Required files:
+- `fonts/eb-garamond-2/EBGaramond-Regular.ttf`
+- `fonts/eb-garamond-2/EBGaramond-Bold.ttf`
 
-These fonts must be present for stable PDF generation with the official ministry layout.
+These fonts are inlined directly by `scripts/generate-attestation-pdf.mjs`.

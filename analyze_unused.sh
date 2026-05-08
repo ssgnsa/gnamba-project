@@ -10,7 +10,7 @@ FILES="
 ./test-attestation-debug.ts
 ./test-real-attestation.html
 ./test-real-attestation.ts
-./templates/attestation_ministere.html
+./templates/attestation_villageoise_premium.html
 "
 
 for file in $FILES; do
