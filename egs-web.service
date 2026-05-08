@@ -1,0 +1,20 @@
+[Unit]
+Description=EGS ERP Frontend (egs-web)
+Requires=docker.service
+After=docker.service
+Wants=docker.socket
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/home/soma/gnamba-project
+ExecStart=/bin/bash -c 'docker compose -f docker-compose.server.yml up -d egs-web 2>/dev/null || docker start egs-web'
+ExecStop=/usr/bin/docker stop egs-web
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=egs-web
+
+[Install]
+WantedBy=multi-user.target

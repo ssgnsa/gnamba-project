@@ -1,0 +1,13 @@
+node_modules
+dist
+.git
+.github
+.vscode
+.idea
+.DS_Store
+*.log
+*.local
+.bolt
+.env
+.env.*
+!.env.server.example

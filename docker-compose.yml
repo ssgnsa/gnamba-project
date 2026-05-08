@@ -1,0 +1,18 @@
+services:
+  # EGS frontend only.
+  # Local Supabase services are managed by `supabase start`, not by docker-compose.
+  egs-frontend:
+    image: egs-frontend:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_SUPABASE_MODE: ${VITE_SUPABASE_MODE:-cloud}
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-}
+        VITE_SUPABASE_LOCAL_URL: ${VITE_SUPABASE_LOCAL_URL:-}
+        VITE_SUPABASE_LOCAL_ANON_KEY: ${VITE_SUPABASE_LOCAL_ANON_KEY:-}
+    container_name: egs-frontend
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-5173}:80"

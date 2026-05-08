@@ -1,0 +1,104 @@
+# Content-Security-Policy - EGS Reference
+# Dernière mise à jour : 2026-04-01
+# 
+# Cette chaîne CSP doit être utilisée dans TOUS les endroits suivants :
+# 1. nginx.conf (add_header)
+# 2. worker-security-headers.js (Cloudflare Worker)
+# 3. docker-compose.prod.yml (si Transform Rules)
+#
+# Pour copier : sélectionner toute la ligne ci-dessous
+
+Content-Security-Policy: default-src 'self'; base-uri 'self'; form-action 'self' https:; object-src 'none'; frame-ancestors 'self'; script-src 'self' 'wasm-unsafe-eval' 'sha256-J1QHVAri1VFjAOQCfOmU4cl/lY1GThN9D/8RbXrPDyQ=' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com https://r2cdn.perplexity.ai; img-src 'self' data: blob: https:; connect-src 'self' https://thykrnoqgylrbfupophs.supabase.co wss://thykrnoqgylrbfupophs.supabase.co https://thykrnoqgylrbfupophs.supabase.co;
+
+# =============================================================================
+# COMPOSANTS CSP
+# =============================================================================
+
+# 1. default-src 'self'
+#    → Autorise uniquement les ressources provenant du même domaine
+
+# 2. base-uri 'self'
+#    → Empêche la modification de la balise <base> pour le phishing
+
+# 3. form-action 'self' https:
+#    → Autorise les soumissions de formulaires vers le même domaine ou HTTPS
+
+# 4. object-src 'none'
+#    → Bloque les objets <object>, <embed>, <applet> (vecteurs d'attaque)
+
+# 5. frame-ancestors 'self'
+#    → Empêche le clickjacking en bloquant l'incorporation dans des iframes
+
+# 6. script-src 'self' 'wasm-unsafe-eval' 'sha256-J1QHVAri1VFjAOQCfOmU4cl/lY1GThN9D/8RbXrPDyQ=' https://static.cloudflareinsights.com
+#    → 'self' : Scripts locaux
+#    → 'wasm-unsafe-eval' : Requis pour WebAssembly (Vite/React)
+#    → 'sha256-J1QHVAri1VFjAOQCfOmU4cl/lY1GThN9D/8RbXrPDyQ=' : Script inline Cloudflare
+#    → https://static.cloudflareinsights.com : Analytics Cloudflare
+
+# 7. style-src 'self' 'unsafe-inline' https://fonts.googleapis.com
+#    → 'self' : Styles locaux
+#    → 'unsafe-inline' : Requis pour les styles inline (React inline styles)
+#    → https://fonts.googleapis.com : Google Fonts CSS
+
+# 8. font-src 'self' data: https://fonts.gstatic.com https://r2cdn.perplexity.ai
+#    → 'self' : Polices locales
+#    → data: : Polices en base64
+#    → https://fonts.gstatic.com : Google Fonts
+#    → https://r2cdn.perplexity.ai : Polices externes (si utilisé)
+
+# 9. img-src 'self' data: blob: https:
+#    → 'self' : Images locales
+#    → data: : Images en base64
+#    → blob: : URLs blob (object URL)
+#    → https: : Images HTTPS externes (Supabase Storage)
+
+# 10. connect-src 'self' https://thykrnoqgylrbfupophs.supabase.co wss://thykrnoqgylrbfupophs.supabase.co https://thykrnoqgylrbfupophs.supabase.co
+#     → 'self' : API locales
+#     → https://thykrnoqgylrbfupophs.supabase.co : API Supabase Cloud
+#     → wss://thykrnoqgylrbfupophs.supabase.co : WebSockets Supabase (Realtime)
+
+# =============================================================================
+# AUTRES HEADERS DE SÉCURITÉ
+# =============================================================================
+
+# HSTS - Force HTTPS
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+
+# X-Frame-Options - Protection clickjacking
+X-Frame-Options: SAMEORIGIN
+
+# X-Content-Type-Options - Empêche MIME sniffing
+X-Content-Type-Options: nosniff
+
+# X-XSS-Protection - Filtre XSS (anciens navigateurs)
+X-XSS-Protection: 1; mode=block
+
+# Referrer-Policy - Contrôle les informations de referer
+Referrer-Policy: strict-origin-when-cross-origin
+
+# Permissions-Policy - Contrôle les fonctionnalités navigateur
+Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=(), usb=()
+
+# Cross-Origin-Opener-Policy - Isolation des fenêtres
+Cross-Origin-Opener-Policy: same-origin
+
+# Cross-Origin-Embedder-Policy - IMPORTANT: unsafe-none (pas require-corp)
+# require-corp bloquerait les images Supabase Storage
+Cross-Origin-Embedder-Policy: unsafe-none
+
+# Cross-Origin-Resource-Policy - Protection des ressources
+Cross-Origin-Resource-Policy: same-origin
+
+# =============================================================================
+# VÉRIFICATION
+# =============================================================================
+
+# Tester l'origine (localhost:8080)
+curl -I http://localhost:8080 | grep -i content-security-policy
+
+# Tester Cloudflare edge
+curl -I https://portal.gnambaservices.ci | grep -i content-security-policy
+
+# Les deux doivent retourner le MÊME CSP avec :
+# ✅ sha256-J1QHVAri1VFjAOQCfOmU4cl/lY1GThN9D/8RbXrPDyQ=
+# ✅ https://static.cloudflareinsights.com

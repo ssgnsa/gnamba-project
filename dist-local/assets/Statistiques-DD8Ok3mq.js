@@ -1,0 +1,420 @@
+import {
+  Q as T,
+  Tt as P,
+  an as B,
+  c as x,
+  v as E,
+  xn as q,
+  y as A,
+} from "./icons-vendor-BfPGE0aO.js";
+import { n as H } from "./react-vendor-Dj4gTxeL.js";
+import { t as l } from "./supabase-Cm30VQRU.js";
+import { n as U } from "./SettingsContext-CMQ2j17o.js";
+var n = q(),
+  e = H();
+function O() {
+  const { settings: i } = U(),
+    [p, v] = (0, n.useState)([]),
+    [f, N] = (0, n.useState)([]),
+    [a, R] = (0, n.useState)({
+      clients: 0,
+      projects: 0,
+      properties: 0,
+      products: 0,
+      totalRecettes: 0,
+      totalDepenses: 0,
+      employees: 0,
+      suppliers: 0,
+    }),
+    [w, h] = (0, n.useState)(!0);
+  (0, n.useEffect)(() => {
+    S();
+  }, []);
+  const S = async () => {
+      h(!0);
+      try {
+        const [s, o, d, D, C, F, k, L] = await Promise.all([
+            l.from("clients").select("id", { count: "exact", head: !0 }),
+            l.from("projects").select("id", { count: "exact", head: !0 }),
+            l.from("properties").select("id", { count: "exact", head: !0 }),
+            l.from("products").select("id", { count: "exact", head: !0 }),
+            l
+              .from("finances")
+              .select("montant, type_transaction, date_transaction"),
+            l.from("employees").select("id", { count: "exact", head: !0 }),
+            l.from("suppliers").select("id", { count: "exact", head: !0 }),
+            l.from("projects").select("statut"),
+          ]),
+          u = C.data || [],
+          M = u
+            .filter((t) => t.type_transaction === "recette")
+            .reduce((t, r) => t + Number(r.montant || 0), 0),
+          $ = u
+            .filter((t) => t.type_transaction === "depense")
+            .reduce((t, r) => t + Number(r.montant || 0), 0);
+        R({
+          clients: s.count || 0,
+          projects: o.count || 0,
+          properties: d.count || 0,
+          products: D.count || 0,
+          totalRecettes: M,
+          totalDepenses: $,
+          employees: F.count || 0,
+          suppliers: k.count || 0,
+        });
+        const c = {},
+          b = [];
+        for (let t = 5; t >= 0; t--) {
+          const r = new Date();
+          r.setMonth(r.getMonth() - t);
+          const y = `${r.getFullYear()}-${String(r.getMonth() + 1).padStart(2, "0")}`;
+          (b.push(y), (c[y] = { recettes: 0, depenses: 0 }));
+        }
+        (u.forEach((t) => {
+          const r = t.date_transaction?.substring(0, 7);
+          r &&
+            c[r] &&
+            (t.type_transaction === "recette"
+              ? (c[r].recettes += Number(t.montant || 0))
+              : (c[r].depenses += Number(t.montant || 0)));
+        }),
+          v(
+            b.map((t) => ({
+              month: new Date(t + "-01").toLocaleDateString("fr-FR", {
+                month: "short",
+                year: "2-digit",
+              }),
+              recettes: c[t].recettes,
+              depenses: c[t].depenses,
+            })),
+          ));
+        const m = {};
+        ((L.data || []).forEach((t) => {
+          m[t.statut] = (m[t.statut] || 0) + 1;
+        }),
+          N(Object.entries(m).map(([t, r]) => ({ statut: t, count: r }))));
+      } finally {
+        h(!1);
+      }
+    },
+    g = Math.max(...p.flatMap((s) => [s.recettes, s.depenses]), 1),
+    _ = {
+      devis: "Devis",
+      valide: "Validé",
+      en_cours: "En Cours",
+      termine: "Terminé",
+      facture: "Facturé",
+    },
+    j = {
+      devis: "#94a3b8",
+      valide: "#3b82f6",
+      en_cours: "#f59e0b",
+      termine: "#22c55e",
+      facture: "#a855f7",
+    };
+  return w
+    ? (0, e.jsx)("div", {
+        className: "flex items-center justify-center h-64",
+        children: (0, e.jsx)("div", {
+          className: "animate-spin rounded-full h-10 w-10 border-b-2",
+          style: { borderColor: i.primary_color },
+        }),
+      })
+    : (0, e.jsxs)("div", {
+        className: "space-y-6",
+        children: [
+          (0, e.jsx)("div", {
+            className: "grid grid-cols-2 md:grid-cols-4 gap-4",
+            children: [
+              {
+                label: "Clients",
+                value: a.clients,
+                icon: x,
+                color: i.primary_color,
+              },
+              {
+                label: "Projets",
+                value: a.projects,
+                icon: P,
+                color: "#0891b2",
+              },
+              {
+                label: "Biens",
+                value: a.properties,
+                icon: B,
+                color: "#7c3aed",
+              },
+              {
+                label: "Produits",
+                value: a.products,
+                icon: T,
+                color: "#ea580c",
+              },
+              {
+                label: "Employés",
+                value: a.employees,
+                icon: x,
+                color: "#16a34a",
+              },
+              {
+                label: "Fournisseurs",
+                value: a.suppliers,
+                icon: x,
+                color: "#0284c7",
+              },
+              {
+                label: "Total Recettes",
+                value: `${a.totalRecettes.toLocaleString("fr-FR")}`,
+                icon: E,
+                color: "#16a34a",
+              },
+              {
+                label: "Total Dépenses",
+                value: `${a.totalDepenses.toLocaleString("fr-FR")}`,
+                icon: A,
+                color: "#dc2626",
+              },
+            ].map((s, o) => {
+              const d = s.icon;
+              return (0, e.jsxs)(
+                "div",
+                {
+                  className:
+                    "bg-white rounded-2xl shadow-sm border border-gray-100 p-4",
+                  children: [
+                    (0, e.jsxs)("div", {
+                      className: "flex items-center gap-3 mb-2",
+                      children: [
+                        (0, e.jsx)("div", {
+                          className: "p-2 rounded-lg",
+                          style: { backgroundColor: s.color + "15" },
+                          children: (0, e.jsx)(d, {
+                            size: 16,
+                            style: { color: s.color },
+                          }),
+                        }),
+                        (0, e.jsx)("span", {
+                          className: "text-xs text-gray-500",
+                          children: s.label,
+                        }),
+                      ],
+                    }),
+                    (0, e.jsx)("div", {
+                      className: "text-xl font-bold text-gray-800",
+                      children: s.value,
+                    }),
+                  ],
+                },
+                o,
+              );
+            }),
+          }),
+          (0, e.jsxs)("div", {
+            className: "grid grid-cols-1 lg:grid-cols-2 gap-6",
+            children: [
+              (0, e.jsxs)("div", {
+                className:
+                  "bg-white rounded-2xl shadow-sm border border-gray-100 p-6",
+                children: [
+                  (0, e.jsx)("h3", {
+                    className: "font-semibold text-gray-800 mb-4",
+                    children: "Évolution Financière (6 mois)",
+                  }),
+                  (0, e.jsxs)("div", {
+                    className: "space-y-3",
+                    children: [
+                      p.map((s, o) =>
+                        (0, e.jsxs)(
+                          "div",
+                          {
+                            className: "space-y-1",
+                            children: [
+                              (0, e.jsxs)("div", {
+                                className:
+                                  "flex justify-between text-xs text-gray-500",
+                                children: [
+                                  (0, e.jsx)("span", { children: s.month }),
+                                  (0, e.jsxs)("span", {
+                                    className: "text-green-600",
+                                    children: [
+                                      "+",
+                                      s.recettes.toLocaleString("fr-FR"),
+                                    ],
+                                  }),
+                                ],
+                              }),
+                              (0, e.jsxs)("div", {
+                                className:
+                                  "relative h-6 bg-gray-100 rounded-full overflow-hidden",
+                                children: [
+                                  (0, e.jsx)("div", {
+                                    className:
+                                      "absolute left-0 top-0 h-full rounded-full transition-all",
+                                    style: {
+                                      width: `${(s.recettes / g) * 100}%`,
+                                      backgroundColor: i.secondary_color + "cc",
+                                    },
+                                  }),
+                                  (0, e.jsx)("div", {
+                                    className:
+                                      "absolute left-0 top-0 h-full rounded-full opacity-60 transition-all",
+                                    style: {
+                                      width: `${(s.depenses / g) * 100}%`,
+                                      backgroundColor: "#ef4444cc",
+                                    },
+                                  }),
+                                ],
+                              }),
+                              (0, e.jsxs)("div", {
+                                className:
+                                  "flex justify-end text-xs text-red-400",
+                                children: [
+                                  "-",
+                                  s.depenses.toLocaleString("fr-FR"),
+                                ],
+                              }),
+                            ],
+                          },
+                          o,
+                        ),
+                      ),
+                      (0, e.jsxs)("div", {
+                        className:
+                          "flex gap-4 mt-2 pt-2 border-t border-gray-100",
+                        children: [
+                          (0, e.jsxs)("div", {
+                            className:
+                              "flex items-center gap-1.5 text-xs text-gray-500",
+                            children: [
+                              (0, e.jsx)("div", {
+                                className: "w-3 h-3 rounded-full",
+                                style: { backgroundColor: i.secondary_color },
+                              }),
+                              "Recettes",
+                            ],
+                          }),
+                          (0, e.jsxs)("div", {
+                            className:
+                              "flex items-center gap-1.5 text-xs text-gray-500",
+                            children: [
+                              (0, e.jsx)("div", {
+                                className: "w-3 h-3 rounded-full bg-red-400",
+                              }),
+                              "Dépenses",
+                            ],
+                          }),
+                        ],
+                      }),
+                    ],
+                  }),
+                ],
+              }),
+              (0, e.jsxs)("div", {
+                className:
+                  "bg-white rounded-2xl shadow-sm border border-gray-100 p-6",
+                children: [
+                  (0, e.jsx)("h3", {
+                    className: "font-semibold text-gray-800 mb-4",
+                    children: "Projets par Statut",
+                  }),
+                  f.length === 0
+                    ? (0, e.jsx)("div", {
+                        className:
+                          "flex items-center justify-center h-40 text-gray-400 text-sm",
+                        children: "Aucun projet enregistré",
+                      })
+                    : (0, e.jsx)("div", {
+                        className: "space-y-3",
+                        children: f.map((s, o) =>
+                          (0, e.jsxs)(
+                            "div",
+                            {
+                              className: "flex items-center gap-3",
+                              children: [
+                                (0, e.jsx)("div", {
+                                  className:
+                                    "w-3 h-3 rounded-full flex-shrink-0",
+                                  style: {
+                                    backgroundColor: j[s.statut] || "#94a3b8",
+                                  },
+                                }),
+                                (0, e.jsxs)("div", {
+                                  className: "flex-1",
+                                  children: [
+                                    (0, e.jsxs)("div", {
+                                      className:
+                                        "flex justify-between text-sm mb-1",
+                                      children: [
+                                        (0, e.jsx)("span", {
+                                          className: "text-gray-700",
+                                          children: _[s.statut] || s.statut,
+                                        }),
+                                        (0, e.jsx)("span", {
+                                          className:
+                                            "font-medium text-gray-800",
+                                          children: s.count,
+                                        }),
+                                      ],
+                                    }),
+                                    (0, e.jsx)("div", {
+                                      className: "h-2 bg-gray-100 rounded-full",
+                                      children: (0, e.jsx)("div", {
+                                        className:
+                                          "h-2 rounded-full transition-all",
+                                        style: {
+                                          width: `${(s.count / a.projects) * 100}%`,
+                                          backgroundColor:
+                                            j[s.statut] || "#94a3b8",
+                                        },
+                                      }),
+                                    }),
+                                  ],
+                                }),
+                              ],
+                            },
+                            o,
+                          ),
+                        ),
+                      }),
+                  (0, e.jsxs)("div", {
+                    className: "mt-6 pt-4 border-t border-gray-100",
+                    children: [
+                      (0, e.jsx)("h4", {
+                        className: "text-sm font-semibold text-gray-700 mb-3",
+                        children: "Santé Financière",
+                      }),
+                      (0, e.jsxs)("div", {
+                        className:
+                          "flex items-center justify-between p-3 rounded-xl",
+                        style: {
+                          backgroundColor:
+                            a.totalRecettes - a.totalDepenses >= 0
+                              ? "#f0fdf4"
+                              : "#fef2f2",
+                        },
+                        children: [
+                          (0, e.jsx)("span", {
+                            className: "text-sm text-gray-600",
+                            children: "Bilan Global",
+                          }),
+                          (0, e.jsxs)("span", {
+                            className: `font-bold ${a.totalRecettes - a.totalDepenses >= 0 ? "text-green-600" : "text-red-600"}`,
+                            children: [
+                              (
+                                a.totalRecettes - a.totalDepenses
+                              ).toLocaleString("fr-FR"),
+                              " FCFA",
+                            ],
+                          }),
+                        ],
+                      }),
+                    ],
+                  }),
+                ],
+              }),
+            ],
+          }),
+        ],
+      });
+}
+export { O as default };

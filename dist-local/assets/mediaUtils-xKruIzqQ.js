@@ -1,0 +1,200 @@
+import { t } from "./supabase-Cm30VQRU.js";
+async function p(a) {
+  const { data: e } = await t
+    .from("media_usage")
+    .select("*")
+    .eq("media_id", a)
+    .order("created_at", { ascending: !1 });
+  return e || [];
+}
+async function g(a, e, s, r, i) {
+  let n = t
+    .from("media_usage")
+    .select("id")
+    .eq("entity_type", e)
+    .eq("usage_type", r);
+  s ? (n = n.eq("entity_id", s)) : (n = n.is("entity_id", null));
+  const o = await n;
+  if (o.data && o.data.length > 0) {
+    const { error: d } = await t
+      .from("media_usage")
+      .update({ media_id: a, label: i || "" })
+      .eq("id", o.data[0].id);
+    return { error: d?.message || null };
+  }
+  const { error: l } = await t
+    .from("media_usage")
+    .insert({
+      media_id: a,
+      entity_type: e,
+      entity_id: s,
+      usage_type: r,
+      label: i || "",
+    });
+  return { error: l?.message || null };
+}
+async function y(a) {
+  await t.from("media_usage").delete().eq("id", a);
+}
+async function b(a) {
+  const { data: e } = await t
+    .from("media_files")
+    .select("*")
+    .eq("is_brand_asset", !0)
+    .eq("brand_asset_type", a)
+    .order("updated_at", { ascending: !1 })
+    .limit(1)
+    .maybeSingle();
+  return e || null;
+}
+async function w(a, e, s) {
+  const r = {
+    logo_principal: "logo_url",
+    logo_secondaire: "brand_logo_dark",
+    favicon: "brand_favicon_url",
+    watermark: "brand_watermark_url",
+  };
+  await t
+    .from("media_files")
+    .update({ is_brand_asset: !1, brand_asset_type: null })
+    .eq("brand_asset_type", e);
+  const { error: i } = await t
+    .from("media_files")
+    .update({
+      is_brand_asset: !0,
+      brand_asset_type: e,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", a);
+  if (i) return { error: i.message };
+  const { data: n } = await t
+      .from("media_files")
+      .select("url")
+      .eq("id", a)
+      .maybeSingle(),
+    o = r[e];
+  return (
+    n &&
+      o &&
+      (await t
+        .from("app_settings")
+        .upsert({ key: o, value: n.url }, { onConflict: "key" })),
+    await g(a, "brand", null, e, e.replace("_", " ")),
+    { error: null }
+  );
+}
+async function v(a, e, s) {
+  let r = t
+    .from("media_usage")
+    .select("media_id, media_files!inner(*)")
+    .eq("entity_type", a)
+    .eq("usage_type", s);
+  e ? (r = r.eq("entity_id", e)) : (r = r.is("entity_id", null));
+  const { data: i } = await r.maybeSingle();
+  return (i && i.media_files) || null;
+}
+async function q(a) {
+  const { data: e } = await t
+    .from("media_versions")
+    .select("*")
+    .eq("media_id", a)
+    .order("replaced_at", { ascending: !1 });
+  return e || [];
+}
+async function S(a, e, s) {
+  const { data: r } = await t
+    .from("media_files")
+    .select("*")
+    .eq("id", a)
+    .maybeSingle();
+  if (!r) return { data: null, error: "Media not found" };
+  const { data: i } = await t
+      .from("media_versions")
+      .select("version_number")
+      .eq("media_id", a)
+      .order("version_number", { ascending: !1 })
+      .limit(1)
+      .maybeSingle(),
+    n = (i?.version_number || 0) + 1;
+  await t
+    .from("media_versions")
+    .insert({
+      media_id: a,
+      version_number: n,
+      old_url: r.url,
+      old_filename: r.filename,
+      replaced_by: s,
+    });
+  const o = e.name.split(".").pop(),
+    l = `${r.category}/${Date.now()}_${Math.random().toString(36).slice(2)}.${o}`,
+    { error: d } = await t.storage
+      .from("media")
+      .upload(l, e, { cacheControl: "3600", upsert: !1 });
+  if (d) return { data: null, error: d.message };
+  const {
+      data: { publicUrl: _ },
+    } = t.storage.from("media").getPublicUrl(l),
+    { data: m, error: c } = await t
+      .from("media_files")
+      .update({
+        filename: l,
+        url: _,
+        size: e.size,
+        type: e.type,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", a)
+      .select()
+      .single();
+  if (c) return { data: null, error: c.message };
+  if (r.brand_asset_type) {
+    const u = {
+      logo_principal: "logo_url",
+      logo_secondaire: "brand_logo_dark",
+      favicon: "brand_favicon_url",
+      watermark: "brand_watermark_url",
+    }[r.brand_asset_type];
+    u &&
+      (await t
+        .from("app_settings")
+        .upsert({ key: u, value: _ }, { onConflict: "key" }));
+  }
+  return { data: m, error: null };
+}
+var k = {
+    logo_principal: "Logo principal",
+    logo_secondaire: "Logo secondaire",
+    favicon: "Favicon",
+    watermark: "Filigrane",
+    hero_background: "Fond hero",
+    hero_image: "Image hero",
+    about_image: "Image À propos",
+    service_image: "Image service",
+    realisation_image: "Image réalisation",
+    cover: "Image de couverture",
+    photo: "Photo",
+    gallery: "Galerie",
+    attestation_scan: "Scan attestation",
+  },
+  h = {
+    brand: "Actifs de marque",
+    site_section: "Site Vitrine",
+    project: "Projet BTP",
+    property: "Bien immobilier",
+    employee: "Employé",
+    product: "Produit",
+    realisation: "Réalisation",
+    foncier_attestation: "Attestation foncière",
+  };
+export {
+  p as a,
+  y as c,
+  b as i,
+  S as l,
+  k as n,
+  q as o,
+  g as r,
+  v as s,
+  h as t,
+  w as u,
+};

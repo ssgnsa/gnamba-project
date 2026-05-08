@@ -1,0 +1,4 @@
+_archive/
+.secrets/
+*.log
+.env*

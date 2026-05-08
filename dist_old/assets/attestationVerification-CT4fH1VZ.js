@@ -1,0 +1,1 @@
+async function e(e){let t=`https://thykrnoqgylrbfupophs.supabase.co/functions/v1/attestation-verify?ref=${encodeURIComponent(e)}`,n=await fetch(t);if(!n.ok){let e=null;try{e=await n.json()}catch{e=null}throw Error(e?.error||`Attestation introuvable.`)}return await n.json()}export{e as t};

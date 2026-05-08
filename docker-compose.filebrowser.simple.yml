@@ -1,0 +1,17 @@
+services:
+  filebrowser:
+    image: filebrowser/filebrowser:latest
+    container_name: filebrowser
+    restart: unless-stopped
+    ports:
+      - "${FILEBROWSER_PORT:-8081}:80"
+    volumes:
+      # Répertoire de fichiers partagés (local)
+      - /home/soma/partage:/srv
+      # Database Filebrowser
+      - filebrowser_data:/database
+    environment:
+      - FB_DATABASE=/database/filebrowser.db
+
+volumes:
+  filebrowser_data:

@@ -1,0 +1,19 @@
+[Unit]
+Description=SomAgro ERP Frontend (somagro-web)
+Requires=docker.service
+After=docker.service
+Wants=docker.socket
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/home/soma/gnamba-project
+ExecStart=/bin/bash -c 'docker compose -f docker-compose.somagro.server.yml up -d somagro-web 2>/dev/null || docker start somagro-web'
+ExecStop=/usr/bin/docker stop somagro-web
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=somagro-web
+
+[Install]
+WantedBy=multi-user.target
