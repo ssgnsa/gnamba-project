@@ -1,0 +1,78 @@
+{
+  // === Éditeur de base ===
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.inlineSuggest.enabled": true,
+  "editor.quickSuggestions": {
+    "other": "on",
+    "comments": "off",
+    "strings": "off"
+  },
+  "editor.suggestOnTriggerCharacters": true,
+  "editor.fontSize": 14,
+  "editor.fontFamily": "'Droid Sans Mono', 'Courier New', monospace",
+
+  // === Sauvegarde et fichiers ===
+  "files.autoSave": "onFocusChange",
+  "files.exclude": {
+    "**/.git": true,
+    "**/.venv": true,
+    "**/node_modules": true,
+    "**/__pycache__": true,
+    "**/*.pyc": true,
+    "**/.DS_Store": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/.venv": true,
+    "**/dist": true,
+    "**/build": true,
+    "**/out": true
+  },
+
+  // === Python ===
+  "python.defaultInterpreterPath": "~/.local/bin/python3",
+  "python.terminal.activateEnvironment": true,
+  "python.terminal.shellIntegration.enabled": true,
+
+  // === Terminal intégré ===
+  "terminal.integrated.defaultProfile.linux": "bash",
+  "terminal.integrated.fontSize": 14,
+  "terminal.integrated.fontFamily": "'Droid Sans Mono', monospace",
+  "terminal.integrated.shellIntegration.enabled": true,
+
+  // === Continue.dev optimisé pour Ollama local ===
+  "continue.enableTabAutocomplete": true,
+  "continue.enableNextEdit": false,
+  "continue.pauseTabAutocompleteOnBattery": true,
+  "continue.showInlineTip": true,
+  "continue.telemetryEnabled": false,
+
+  // === Apparence ===
+  "workbench.colorTheme": "Dark Modern",
+  "window.titleBarStyle": "custom",
+  "workbench.statusBar.visible": true,
+
+  // === Confidentialité et mises à jour ===
+  "telemetry.telemetryLevel": "off",
+  "update.mode": "manual",
+  "extensions.autoUpdate": false,
+
+  // === Remote SSH ===
+  "remote.SSH.defaultForwardedPorts": [],
+  "remote.SSH.enableDynamicForwarding": true,
+  "remote.SSH.useLocalServer": true,
+
+  // === Git ===
+  "git.autofetch": true,
+  "git.confirmSync": false,
+  "git.enabled": true,
+
+  // === Performance pour CPU ancien ===
+  "editor.maxTokenizationLineLength": 2000,
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/node_modules/**": true,
+    "**/.venv/**": true
+  }
+}
