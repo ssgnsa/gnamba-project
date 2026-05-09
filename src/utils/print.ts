@@ -352,41 +352,41 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
       z-index: 2;
     }
 
-    /* Contenu principal — ajusté pour une page A4 */
+    /* Contenu principal — zones agrandies pour une page A4 */
     .content {
       position: relative;
       z-index: 1;
       display: flex;
       flex-direction: column;
       height: 100%;
-      gap: 8px;
-      padding: 2mm 0;
+      gap: 6px;
+      padding: 1mm 0;
     }
     .content-top {
       display: flex;
       flex-direction: column;
-      gap: 6px;
-      margin-bottom: 6px;
+      gap: 4px;
+      margin-bottom: 4px;
     }
     .sections-group {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 10px;
+      gap: 8px;
       flex: 1;
       align-items: start;
-      max-height: 110mm;
+      max-height: 125mm;
     }
     .section-full { 
       grid-column: 1 / -1;
-      margin: 4px 0;
+      margin: 3px 0;
     }
     .bottom-row {
       display: grid;
-      grid-template-columns: 1fr 110px;
-      gap: 10px;
+      grid-template-columns: 1fr 120px;
+      gap: 8px;
       align-items: start;
-      margin-top: 6px;
-      max-height: 35mm;
+      margin-top: 4px;
+      max-height: 40mm;
     }
 
     /* ——— EN-TÊTE ÉQUILIBRÉ ——— */
@@ -522,10 +522,10 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
       box-shadow: 0 1px 4px rgba(0,0,0,0.03);
     }
 
-    /* ——— TABLEAUX DE CHAMPS ——— */
+    /* ——— TABLEAUX DE CHAMPS AGRANDIS ——— */
     .section {
       margin: 0;
-      padding: 8px 8px 10px;
+      padding: 12px 12px 14px;
       border: 0.5px solid #e5e7eb;
       border-radius: 10px;
       background: #fcfcfb;
@@ -534,34 +534,34 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
     .section-header {
       display: flex;
       align-items: center;
-      gap: 6px;
-      margin-bottom: 8px;
-      padding-bottom: 2px;
+      gap: 8px;
+      margin-bottom: 10px;
+      padding-bottom: 3px;
       border-bottom: 0.75px solid #006b3f;
     }
     .section-numeral {
       font-family: 'Cinzel', serif;
-      font-size: 8pt;
+      font-size: 9pt;
       font-weight: 700;
       color: #b8860b;
     }
     .section-title {
       font-family: 'Cinzel', serif;
-      font-size: 8.5pt;
+      font-size: 9.5pt;
       font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.4px;
+      letter-spacing: 0.5px;
       color: #006b3f;
     }
 
-    /* Tableau structuré */
+    /* Tableau structuré agrandi */
     .data-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 9.5pt;
+      font-size: 10pt;
     }
     .data-table td {
-      padding: 2.5px 4px;
+      padding: 4px 6px;
       vertical-align: middle;
     }
     .data-table .label {
@@ -590,15 +590,15 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
       display: flex;
       justify-content: center;
       align-items: stretch;
-      gap: 8px;
+      gap: 10px;
       margin: 0;
-      min-height: 100px;
+      min-height: 120px;
     }
     .sig-frame {
       border: 1.5px solid #b8860b;
-      padding: 10px 10px 12px;
+      padding: 14px 14px 18px;
       background: rgba(184, 134, 11, 0.08);
-      min-width: 160px;
+      min-width: 180px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -651,24 +651,24 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
       position: relative;
       margin: 0;
       border: 1.5px solid #d4d4d4;
-      padding: 8px 8px 8px;
+      padding: 12px 12px 12px;
       background: rgba(0, 107, 63, 0.06);
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 8px;
       align-items: center;
       border-radius: 8px;
-      font-size: 7pt;
-      min-height: 100px;
+      font-size: 8pt;
+      min-height: 120px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.05);
     }
     .sec-qr {
-      width: 80px; height: 80px;
+      width: 90px; height: 90px;
       border: 2px solid #ccc;
-      padding: 3px;
+      padding: 4px;
       background: #fff;
       border-radius: 4px;
-      margin-bottom: 4px;
+      margin-bottom: 6px;
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     .sec-qr img { width: 100%; height: 100%; object-fit: contain; }
