@@ -286,11 +286,11 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
   <style>
     @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Cinzel:wght@400;500;600;700&display=swap');
 
-    @page { size: A4 portrait; margin: 6mm; }
+    @page { size: A4 portrait; margin: 5mm; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      width: 198mm; min-height: 285mm;
+      width: 200mm; height: 287mm;
       margin: 0; padding: 0;
       font-family: 'EB Garamond', 'Times New Roman', Times, serif;
       font-size: 11pt;
@@ -302,7 +302,7 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
     .page {
       width: 100%; height: 100%;
       position: relative;
-      padding: 8mm 10mm;
+      padding: 6mm 8mm;
       margin: 0;
       background: #fff;
       display: flex;
@@ -352,41 +352,41 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
       z-index: 2;
     }
 
-    /* Contenu principal — réparti sur toute la hauteur */
+    /* Contenu principal — ajusté pour une page A4 */
     .content {
       position: relative;
       z-index: 1;
       display: flex;
       flex-direction: column;
       height: 100%;
-      gap: 12px;
-      padding: 4mm 0;
+      gap: 8px;
+      padding: 2mm 0;
     }
     .content-top {
       display: flex;
       flex-direction: column;
-      gap: 8px;
-      margin-bottom: 8px;
+      gap: 6px;
+      margin-bottom: 6px;
     }
     .sections-group {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 12px;
+      gap: 10px;
       flex: 1;
       align-items: start;
-      min-height: 120mm;
+      max-height: 110mm;
     }
     .section-full { 
       grid-column: 1 / -1;
-      margin: 8px 0;
+      margin: 4px 0;
     }
     .bottom-row {
       display: grid;
-      grid-template-columns: 1fr 120px;
-      gap: 12px;
+      grid-template-columns: 1fr 110px;
+      gap: 10px;
       align-items: start;
-      margin-top: 8px;
-      min-height: 40mm;
+      margin-top: 6px;
+      max-height: 35mm;
     }
 
     /* ——— EN-TÊTE ÉQUILIBRÉ ——— */
@@ -430,17 +430,17 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
     /* ——— TITRE PRÉPONDÉRANT ——— */
     .title-section {
       text-align: center;
-      margin: 8px 0 12px;
-      padding: 8px 0;
+      margin: 6px 0 8px;
+      padding: 6px 0;
     }
     .title {
       font-family: 'Cinzel', serif;
-      font-size: 20pt;
+      font-size: 18pt;
       font-weight: 700;
-      letter-spacing: 3px;
+      letter-spacing: 2.5px;
       text-transform: uppercase;
       color: #0b4b2f;
-      padding: 8px 20px 10px;
+      padding: 6px 16px 8px;
       display: inline-block;
       position: relative;
       line-height: 1.2;
@@ -452,56 +452,56 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
     .title::before {
       content: '';
       position: absolute;
-      top: 4px; left: 50%; transform: translateX(-50%);
-      width: 100px; height: 1px;
+      top: 3px; left: 50%; transform: translateX(-50%);
+      width: 80px; height: 1px;
       background: #b8860b;
     }
     .title::after {
       content: '';
       position: absolute;
-      bottom: 4px; left: 50%; transform: translateX(-50%);
-      width: 100px; height: 1px;
+      bottom: 3px; left: 50%; transform: translateX(-50%);
+      width: 80px; height: 1px;
       background: #b8860b;
     }
 
     /* ——— RÉFÉRENCE CENTRÉE ——— */
     .ref-line {
       text-align: center;
-      margin: 6px 0 10px;
+      margin: 4px 0 6px;
       display: flex;
       justify-content: center;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
       flex-wrap: wrap;
     }
     .ref-box {
       font-family: 'Cinzel', serif;
-      font-size: 14pt;
+      font-size: 12pt;
       font-weight: 700;
       color: #b8860b;
-      letter-spacing: 1px;
-      padding: 6px 16px;
+      letter-spacing: 0.8px;
+      padding: 4px 12px;
       border: 1.5px solid #b8860b;
       background: rgba(184, 134, 11, 0.1);
       border-radius: 6px;
       box-shadow: 0 1px 4px rgba(184, 134, 11, 0.2);
     }
     .ref-meta {
-      font-size: 10pt;
+      font-size: 9pt;
       font-weight: 600;
-      letter-spacing: 0.8px;
+      letter-spacing: 0.6px;
       color: #555;
       text-transform: uppercase;
     }
 
     /* ——— BASE LÉGALE AGRANDIE ——— */
     .legal {
-      font-size: 9pt;
+      font-size: 8pt;
       text-align: center;
       color: #555;
-      margin: 6px 0 10px;
-      line-height: 1.4;
-      padding: 6px 16px;
+      margin: 4px 0 6px;
+      line-height: 1.3;
+      padding: 4px 12px;
       border-top: 1px solid #e0e0e0;
       border-bottom: 1px solid #e0e0e0;
       background: rgba(0, 107, 63, 0.03);
@@ -510,11 +510,11 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
 
     /* ——— DÉCLARATION AGRANDIE ——— */
     .declaration {
-      font-size: 12pt;
-      line-height: 1.6;
+      font-size: 11pt;
+      line-height: 1.5;
       text-align: justify;
-      margin: 8px 0 12px;
-      padding: 12px 12px 12px 16px;
+      margin: 6px 0 8px;
+      padding: 8px 8px 8px 12px;
       border-left: 3px solid #006b3f;
       color: #222;
       background: rgba(0, 107, 63, 0.03);
@@ -525,7 +525,7 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
     /* ——— TABLEAUX DE CHAMPS ——— */
     .section {
       margin: 0;
-      padding: 10px 10px 12px;
+      padding: 8px 8px 10px;
       border: 0.5px solid #e5e7eb;
       border-radius: 10px;
       background: #fcfcfb;
@@ -590,15 +590,15 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
       display: flex;
       justify-content: center;
       align-items: stretch;
-      gap: 10px;
+      gap: 8px;
       margin: 0;
-      min-height: 120px;
+      min-height: 100px;
     }
     .sig-frame {
       border: 1.5px solid #b8860b;
-      padding: 12px 12px 16px;
+      padding: 10px 10px 12px;
       background: rgba(184, 134, 11, 0.08);
-      min-width: 180px;
+      min-width: 160px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -651,24 +651,24 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
       position: relative;
       margin: 0;
       border: 1.5px solid #d4d4d4;
-      padding: 12px 12px 12px;
+      padding: 8px 8px 8px;
       background: rgba(0, 107, 63, 0.06);
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 6px;
       align-items: center;
       border-radius: 8px;
-      font-size: 8pt;
-      min-height: 120px;
+      font-size: 7pt;
+      min-height: 100px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.05);
     }
     .sec-qr {
-      width: 90px; height: 90px;
+      width: 80px; height: 80px;
       border: 2px solid #ccc;
-      padding: 4px;
+      padding: 3px;
       background: #fff;
       border-radius: 4px;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     .sec-qr img { width: 100%; height: 100%; object-fit: contain; }
@@ -721,14 +721,14 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
     /* ——— MENTIONS LÉGALES ——— */
     .legal-notice {
       position: relative;
-      margin-top: 8px;
-      font-size: 8pt;
+      margin-top: 4px;
+      font-size: 7pt;
       color: #777;
       text-align: center;
       font-style: italic;
-      letter-spacing: 0.3px;
-      line-height: 1.3;
-      padding: 6px 12px;
+      letter-spacing: 0.2px;
+      line-height: 1.2;
+      padding: 4px 8px;
       border-top: 1px solid #eee;
       background: rgba(0,0,0,0.01);
     }
