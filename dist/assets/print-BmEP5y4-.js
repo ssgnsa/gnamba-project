@@ -169,8 +169,8 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
     /* ——— TITRE PRÉPONDÉRANT ——— */
     .title-section {
       text-align: center;
-      margin: 6px 0 8px;
-      padding: 6px 0;
+      margin: 12px 0 16px;
+      padding: 12px 0;
     }
     .title {
       font-family: 'Cinzel', serif;
@@ -179,10 +179,10 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
       letter-spacing: 2.5px;
       text-transform: uppercase;
       color: #0b4b2f;
-      padding: 6px 16px 8px;
+      padding: 12px 24px 16px;
       display: inline-block;
       position: relative;
-      line-height: 1.2;
+      line-height: 1.3;
       background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(250,240,220,0.85));
       border: 1.5px solid rgba(184, 134, 11, 0.6);
       border-radius: 8px;
@@ -191,22 +191,22 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
     .title::before {
       content: '';
       position: absolute;
-      top: 3px; left: 50%; transform: translateX(-50%);
-      width: 80px; height: 1px;
+      top: 6px; left: 50%; transform: translateX(-50%);
+      width: 100px; height: 1px;
       background: #b8860b;
     }
     .title::after {
       content: '';
       position: absolute;
-      bottom: 3px; left: 50%; transform: translateX(-50%);
-      width: 80px; height: 1px;
+      bottom: 6px; left: 50%; transform: translateX(-50%);
+      width: 100px; height: 1px;
       background: #b8860b;
     }
 
     /* ——— RÉFÉRENCE CENTRÉE ——— */
     .ref-line {
       text-align: center;
-      margin: 4px 0 6px;
+      margin: 8px 0 10px;
       display: flex;
       justify-content: center;
       align-items: center;
@@ -238,7 +238,7 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
       font-size: 8pt;
       text-align: center;
       color: #555;
-      margin: 4px 0 6px;
+      margin: 6px 0 8px;
       line-height: 1.3;
       padding: 4px 12px;
       border-top: 1px solid #e0e0e0;
