@@ -16,11 +16,11 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
       body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
     }
   </style>
-`,F=e=>e.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"),t=e=>F(String(e??"")),v=e=>F(String(e??"").toUpperCase()),h=e=>{if(!e)return"";try{const i=typeof window<"u"&&window.location?window.location.origin:"http://localhost",o=new URL(e,i);if(o.protocol==="data:")return e.trim().toLowerCase().startsWith("data:image/")?e:"";if(["http:","https:"].includes(o.protocol))return o.toString()}catch{return""}return""},P={0:"nnwwn",1:"wnnnw",2:"nwnnw",3:"wwnnn",4:"nnwnw",5:"wnwnn",6:"nwwnn",7:"nnnww",8:"wnnwn",9:"nwnwn"},q=e=>{const i=String(e||"").replace(/\D/g,"");if(!i)return"";const o=i.length%2===0?i:`0${i}`,r=2,d=6,n=46;let a=0;const l=[],f=s=>{l.push(`<rect x="${a}" y="0" width="${s}" height="${n}" />`),a+=s},p=s=>{a+=s},g=s=>s==="w"?d:r;["n","n","n","n"].forEach((s,x)=>{const u=g(s);x%2===0?f(u):p(u)});for(let s=0;s<o.length;s+=2){const x=P[o[s]],u=P[o[s+1]];for(let c=0;c<5;c+=1)f(g(x[c])),p(g(u[c]))}["w","n","n"].forEach((s,x)=>{const u=g(s);x%2===0?f(u):p(u)});const b=a;return`<svg class="barcode-svg" xmlns="http://www.w3.org/2000/svg" width="${b}" height="${n}" viewBox="0 0 ${b} ${n}" role="img" aria-label="Code barre">${l.join("")}</svg>`};function Y(e){const i=t(e.reference),o=t(e.region),r=t(e.departement),d=t(e.commune),n=t(e.village).replace(/^(VILLAGE\s+DE\s+|VILLAGE\s+)/i,"").trim(),a=t(e.quartier),l=t(e.lotissement),f=t(e.numero_lot),p=t(Number.isFinite(e.superficie_m2)?e.superficie_m2:0),g=v(e.proprietaire_nom),b=v(e.proprietaire_prenom),s=t(e.proprietaire_naissance_date),x=t(e.proprietaire_naissance_lieu),u=t(e.proprietaire_domicile),c=t(e.proprietaire_profession),w=t(e.proprietaire_cni_numero),m=t(e.proprietaire_cni_date),E=t(e.proprietaire_cni_lieu),C=t(e.proprietaire_telephone),N=v(e.chef_nom||e.validation_chef_nom||e.chef_village),_=h(e.logoUrl),L=h(e.village_logo_url),j=String(e.attestation_type||"").toLowerCase(),M=typeof e.prix_cession=="number"&&Number.isFinite(e.prix_cession)&&e.prix_cession>0,O=!!(e.cedant_nom||e.cedant_prenom||e.cedant_cni_numero),B=!!e.date_cession||M,z=j==="cession"||O||B,T=z?"ATTESTATION DE CESSION DE DROITS COUTUMIERS":"ATTESTATION DE PROPRIÉTÉ VILLAGEOISE",G=v(e.cedant_nom||""),V=v(e.cedant_prenom||""),I=t(e.cedant_cni_numero||""),D=t(e.date_cession||""),R=e.code_barre?q(String(e.code_barre).replace(/\s/g,"").toUpperCase()):"",A=h(e.qrDataUrl),S=t(e.hash_sha256),k=t(e.control_number),U=t(e.verification_url);return t(e.registre_volume),e.registre_page!=null&&String(e.registre_page),e.registre_ligne!=null&&String(e.registre_ligne),`<!DOCTYPE html>
+`,F=e=>e.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"),t=e=>F(String(e??"")),v=e=>F(String(e??"").toUpperCase()),h=e=>{if(!e)return"";try{const i=typeof window<"u"&&window.location?window.location.origin:"http://localhost",o=new URL(e,i);if(o.protocol==="data:")return e.trim().toLowerCase().startsWith("data:image/")?e:"";if(["http:","https:"].includes(o.protocol))return o.toString()}catch{return""}return""},P={0:"nnwwn",1:"wnnnw",2:"nwnnw",3:"wwnnn",4:"nnwnw",5:"wnwnn",6:"nwwnn",7:"nnnww",8:"wnnwn",9:"nwnwn"},q=e=>{const i=String(e||"").replace(/\D/g,"");if(!i)return"";const o=i.length%2===0?i:`0${i}`,r=2,d=6,n=46;let a=0;const l=[],f=s=>{l.push(`<rect x="${a}" y="0" width="${s}" height="${n}" />`),a+=s},p=s=>{a+=s},g=s=>s==="w"?d:r;["n","n","n","n"].forEach((s,x)=>{const u=g(s);x%2===0?f(u):p(u)});for(let s=0;s<o.length;s+=2){const x=P[o[s]],u=P[o[s+1]];for(let c=0;c<5;c+=1)f(g(x[c])),p(g(u[c]))}["w","n","n"].forEach((s,x)=>{const u=g(s);x%2===0?f(u):p(u)});const b=a;return`<svg class="barcode-svg" xmlns="http://www.w3.org/2000/svg" width="${b}" height="${n}" viewBox="0 0 ${b} ${n}" role="img" aria-label="Code barre">${l.join("")}</svg>`};function Y(e){const i=t(e.reference),o=t(e.region),r=t(e.departement),d=t(e.commune),n=t(e.village).replace(/^(VILLAGE\s+DE\s+|VILLAGE\s+)/i,"").trim(),a=t(e.quartier),l=t(e.lotissement),f=t(e.numero_lot),p=t(Number.isFinite(e.superficie_m2)?e.superficie_m2:0),g=v(e.proprietaire_nom),b=v(e.proprietaire_prenom),s=t(e.proprietaire_naissance_date),x=t(e.proprietaire_naissance_lieu),u=t(e.proprietaire_domicile),c=t(e.proprietaire_profession),w=t(e.proprietaire_cni_numero),m=t(e.proprietaire_cni_date),E=t(e.proprietaire_cni_lieu),C=t(e.proprietaire_telephone),T=v(e.chef_nom||e.validation_chef_nom||e.chef_village),N=h(e.logoUrl),_=h(e.village_logo_url),j=String(e.attestation_type||"").toLowerCase(),M=typeof e.prix_cession=="number"&&Number.isFinite(e.prix_cession)&&e.prix_cession>0,O=!!(e.cedant_nom||e.cedant_prenom||e.cedant_cni_numero),B=!!e.date_cession||M,z=j==="cession"||O||B,L=z?"ATTESTATION DE CESSION DE DROITS COUTUMIERS":"ATTESTATION DE PROPRIÉTÉ VILLAGEOISE",G=v(e.cedant_nom||""),V=v(e.cedant_prenom||""),I=t(e.cedant_cni_numero||""),D=t(e.date_cession||""),R=e.code_barre?q(String(e.code_barre).replace(/\s/g,"").toUpperCase()):"",S=h(e.qrDataUrl),A=t(e.hash_sha256),k=t(e.control_number),U=t(e.verification_url);return t(e.registre_volume),e.registre_page!=null&&String(e.registre_page),e.registre_ligne!=null&&String(e.registre_ligne),`<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>${T} – ${i}</title>
+  <title>${L} – ${i}</title>
   ${y}
   <style>
     @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Cinzel:wght@400;500;600;700&display=swap');
@@ -91,41 +91,41 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
       z-index: 2;
     }
 
-    /* Contenu principal — zones agrandies pour une page A4 */
+    /* Contenu principal — zones très agrandies pour une page A4 */
     .content {
       position: relative;
       z-index: 1;
       display: flex;
       flex-direction: column;
       height: 100%;
-      gap: 6px;
-      padding: 1mm 0;
+      gap: 4px;
+      padding: 0;
     }
     .content-top {
       display: flex;
       flex-direction: column;
-      gap: 4px;
-      margin-bottom: 4px;
+      gap: 3px;
+      margin-bottom: 3px;
     }
     .sections-group {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 8px;
+      gap: 6px;
       flex: 1;
       align-items: start;
-      max-height: 125mm;
+      max-height: 135mm;
     }
     .section-full { 
       grid-column: 1 / -1;
-      margin: 3px 0;
+      margin: 2px 0;
     }
     .bottom-row {
       display: grid;
-      grid-template-columns: 1fr 120px;
-      gap: 8px;
+      grid-template-columns: 1fr 130px;
+      gap: 6px;
       align-items: start;
-      margin-top: 4px;
-      max-height: 40mm;
+      margin-top: 3px;
+      max-height: 45mm;
     }
 
     /* ——— EN-TÊTE ÉQUILIBRÉ ——— */
@@ -261,10 +261,10 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
       box-shadow: 0 1px 4px rgba(0,0,0,0.03);
     }
 
-    /* ——— TABLEAUX DE CHAMPS AGRANDIS ——— */
+    /* ——— TABLEAUX DE CHAMPS TRÈS AGRANDIS ——— */
     .section {
       margin: 0;
-      padding: 12px 12px 14px;
+      padding: 16px 16px 20px;
       border: 0.5px solid #e5e7eb;
       border-radius: 10px;
       background: #fcfcfb;
@@ -273,34 +273,34 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
     .section-header {
       display: flex;
       align-items: center;
-      gap: 8px;
-      margin-bottom: 10px;
-      padding-bottom: 3px;
+      gap: 10px;
+      margin-bottom: 12px;
+      padding-bottom: 4px;
       border-bottom: 0.75px solid #006b3f;
     }
     .section-numeral {
       font-family: 'Cinzel', serif;
-      font-size: 9pt;
+      font-size: 10pt;
       font-weight: 700;
       color: #b8860b;
     }
     .section-title {
       font-family: 'Cinzel', serif;
-      font-size: 9.5pt;
+      font-size: 10.5pt;
       font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.6px;
       color: #006b3f;
     }
 
-    /* Tableau structuré agrandi */
+    /* Tableau structuré très agrandi */
     .data-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 10pt;
+      font-size: 11pt;
     }
     .data-table td {
-      padding: 4px 6px;
+      padding: 6px 8px;
       vertical-align: middle;
     }
     .data-table .label {
@@ -324,20 +324,20 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
     }
     .barcode-section svg { height: 30px; }
 
-    /* ——— ZONE DE SIGNATURE AGRANDIE ——— */
+    /* ——— ZONE DE SIGNATURE TRÈS AGRANDIE ——— */
     .signature-zone {
       display: flex;
       justify-content: center;
       align-items: stretch;
-      gap: 10px;
+      gap: 12px;
       margin: 0;
-      min-height: 120px;
+      min-height: 140px;
     }
     .sig-frame {
       border: 1.5px solid #b8860b;
-      padding: 14px 14px 18px;
+      padding: 18px 18px 22px;
       background: rgba(184, 134, 11, 0.08);
-      min-width: 180px;
+      min-width: 200px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -381,7 +381,7 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
       width: 100%;
     }
 
-    /* ——— ZONE DE SÉCURITÉ AGRANDIE ——— */
+    /* ——— ZONE DE SÉCURITÉ TRÈS AGRANDIE ——— */
     .validation-area {
       display: block;
       margin: 0;
@@ -390,24 +390,24 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
       position: relative;
       margin: 0;
       border: 1.5px solid #d4d4d4;
-      padding: 12px 12px 12px;
+      padding: 16px 16px 16px;
       background: rgba(0, 107, 63, 0.06);
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 10px;
       align-items: center;
       border-radius: 8px;
-      font-size: 8pt;
-      min-height: 120px;
+      font-size: 9pt;
+      min-height: 140px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.05);
     }
     .sec-qr {
-      width: 90px; height: 90px;
+      width: 100px; height: 100px;
       border: 2px solid #ccc;
-      padding: 4px;
+      padding: 5px;
       background: #fff;
       border-radius: 4px;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     .sec-qr img { width: 100%; height: 100%; object-fit: contain; }
@@ -505,7 +505,7 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
         <strong>VILLAGE ${n.toUpperCase()}</strong>
       </div>
       <div class="emblem-wrap">
-        ${L?`<img src="${L}" alt="" style="width:100%;height:100%;object-fit:contain;" />`:_?`<img src="${_}" alt="" style="width:100%;height:100%;object-fit:contain;" />`:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+        ${_?`<img src="${_}" alt="" style="width:100%;height:100%;object-fit:contain;" />`:N?`<img src="${N}" alt="" style="width:100%;height:100%;object-fit:contain;" />`:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
                 <circle cx="50" cy="50" r="45" fill="none" stroke="#b8860b" stroke-width="2"/>
                 <rect x="15" y="20" width="22" height="35" fill="#f77f00" rx="1"/>
                 <rect x="39" y="20" width="22" height="35" fill="#fff" rx="1"/>
@@ -524,7 +524,7 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
 
     <!-- TITRE -->
     <div class="title-section">
-      <div class="title">${T}</div>
+      <div class="title">${L}</div>
     </div>
 
     <!-- RÉFÉRENCE -->
@@ -540,7 +540,7 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
 
     <!-- DÉCLARATION -->
     <div class="declaration">
-      Nous, soussigné, <strong>${N}</strong>, Chef Coutumier du Village de <strong>${n.toUpperCase()}</strong>,
+      Nous, soussigné, <strong>${T}</strong>, Chef Coutumier du Village de <strong>${n.toUpperCase()}</strong>,
       attestons solennellement que les droits fonciers coutumiers afférents à la parcelle désignée ci-après sont détenus par :
     </div>
 
@@ -646,20 +646,20 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
         <div class="signature-zone">
           <div class="sig-frame">
             <div class="sig-frame-title">Chef du Village</div>
-            <div class="sig-frame-name">${N||"—"}</div>
+            <div class="sig-frame-name">${T||"—"}</div>
             <div class="sig-frame-line">Signature & Cachet</div>
           </div>
         </div>
       </div>
 
       <div class="security-footer">
-        ${A?`<div class="sec-qr"><img src="${A}" alt="QR Code de vérification" /></div>`:""}
+        ${S?`<div class="sec-qr"><img src="${S}" alt="QR Code de vérification" /></div>`:""}
         <div class="sec-left">
           ${k?`<div class="sec-control">
             <span class="sec-control-label">N°</span>
             <span class="sec-control-value">${k}</span>
           </div>`:""}
-          ${S?`<div class="sec-hash">${S.substring(0,24)}...</div>`:""}
+          ${A?`<div class="sec-hash">${A.substring(0,24)}...</div>`:""}
           ${U?`<div class="sec-url"><a href="${U}">Vérifier en ligne</a></div>`:""}
         </div>
       </div>
