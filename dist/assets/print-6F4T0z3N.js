@@ -1,4 +1,4 @@
-function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth()+1).padStart(2,"0")}${String(i.getDate()).padStart(2,"0")}-${Math.floor(1e3+Math.random()*9e3)}`}function H(){const e=new Date;return`FONC-${e.getFullYear()}-${String(e.getMonth()+1).padStart(2,"0")}-${String(e.getDate()).padStart(2,"0")}-${Math.floor(1e4+Math.random()*9e4)}`}function X(e){return e?new Date(e).toLocaleDateString("fr-FR",{day:"2-digit",month:"2-digit",year:"numeric"}):""}function W(e){return e?new Date(e).toLocaleDateString("fr-FR",{day:"2-digit",month:"long",year:"numeric"}):new Date().toLocaleDateString("fr-FR",{day:"2-digit",month:"long",year:"numeric"})}function Z(e){return e.toLocaleString("fr-FR")}function J(e){const i=e.trim();if(!i)return!0;const n=/^(\d{2})\s*\/\s*(\d{2})\s*\/\s*(\d{4})$/.exec(i);if(!n)return!1;const[,r,d,o]=n,a=`${o}-${d}-${r}`,l=new Date(a);return Number.isNaN(l.getTime())?!1:l.getUTCFullYear()===Number(o)&&l.getUTCMonth()+1===Number(d)&&l.getUTCDate()===Number(r)}function K(e){const i=e.replace(/\s/g,"").replace(",",".");if(!i)return null;const n=Number(i);return Number.isFinite(n)?n:null}function ee(e){return e.trim()}function te(){if(typeof crypto<"u"&&"randomUUID"in crypto)try{return crypto.randomUUID()}catch{}const e="0123456789abcdef";let i="";for(let n=0;n<36;n++)n===8||n===13||n===18||n===23?i+="-":n===14?i+="4":n===19?i+=e[Math.floor(Math.random()*4)+8]:i+=e[Math.floor(Math.random()*16)];return i}async function ie(e){if(typeof crypto>"u"||!crypto.subtle)return"";const i=new TextEncoder().encode(e),n=await crypto.subtle.digest("SHA-256",i);return Array.from(new Uint8Array(n)).map(r=>r.toString(16).padStart(2,"0")).join("")}var w=`
+function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth()+1).padStart(2,"0")}${String(i.getDate()).padStart(2,"0")}-${Math.floor(1e3+Math.random()*9e3)}`}function H(){const e=new Date;return`FONC-${e.getFullYear()}-${String(e.getMonth()+1).padStart(2,"0")}-${String(e.getDate()).padStart(2,"0")}-${Math.floor(1e4+Math.random()*9e4)}`}function X(e){return e?new Date(e).toLocaleDateString("fr-FR",{day:"2-digit",month:"2-digit",year:"numeric"}):""}function W(e){return e?new Date(e).toLocaleDateString("fr-FR",{day:"2-digit",month:"long",year:"numeric"}):new Date().toLocaleDateString("fr-FR",{day:"2-digit",month:"long",year:"numeric"})}function Z(e){return e.toLocaleString("fr-FR")}function J(e){const i=e.trim();if(!i)return!0;const o=/^(\d{2})\s*\/\s*(\d{2})\s*\/\s*(\d{4})$/.exec(i);if(!o)return!1;const[,r,d,n]=o,a=`${n}-${d}-${r}`,l=new Date(a);return Number.isNaN(l.getTime())?!1:l.getUTCFullYear()===Number(n)&&l.getUTCMonth()+1===Number(d)&&l.getUTCDate()===Number(r)}function K(e){const i=e.replace(/\s/g,"").replace(",",".");if(!i)return null;const o=Number(i);return Number.isFinite(o)?o:null}function ee(e){return e.trim()}function te(){if(typeof crypto<"u"&&"randomUUID"in crypto)try{return crypto.randomUUID()}catch{}const e="0123456789abcdef";let i="";for(let o=0;o<36;o++)o===8||o===13||o===18||o===23?i+="-":o===14?i+="4":o===19?i+=e[Math.floor(Math.random()*4)+8]:i+=e[Math.floor(Math.random()*16)];return i}async function ie(e){if(typeof crypto>"u"||!crypto.subtle)return"";const i=new TextEncoder().encode(e),o=await crypto.subtle.digest("SHA-256",i);return Array.from(new Uint8Array(o)).map(r=>r.toString(16).padStart(2,"0")).join("")}var y=`
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Times+New+Roman:ital,wght@0,400;0,700;1,400&display=swap');
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -16,20 +16,20 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
       body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
     }
   </style>
-`,F=e=>e.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"),t=e=>F(String(e??"")),x=e=>F(String(e??"").toUpperCase()),h=e=>{if(!e)return"";try{const i=typeof window<"u"&&window.location?window.location.origin:"http://localhost",n=new URL(e,i);if(n.protocol==="data:")return e.trim().toLowerCase().startsWith("data:image/")?e:"";if(["http:","https:"].includes(n.protocol))return n.toString()}catch{return""}return""},P={0:"nnwwn",1:"wnnnw",2:"nwnnw",3:"wwnnn",4:"nnwnw",5:"wnwnn",6:"nwwnn",7:"nnnww",8:"wnnwn",9:"nwnwn"},q=e=>{const i=String(e||"").replace(/\D/g,"");if(!i)return"";const n=i.length%2===0?i:`0${i}`,r=2,d=6,o=46;let a=0;const l=[],f=s=>{l.push(`<rect x="${a}" y="0" width="${s}" height="${o}" />`),a+=s},p=s=>{a+=s},g=s=>s==="w"?d:r;["n","n","n","n"].forEach((s,v)=>{const u=g(s);v%2===0?f(u):p(u)});for(let s=0;s<n.length;s+=2){const v=P[n[s]],u=P[n[s+1]];for(let c=0;c<5;c+=1)f(g(v[c])),p(g(u[c]))}["w","n","n"].forEach((s,v)=>{const u=g(s);v%2===0?f(u):p(u)});const b=a;return`<svg class="barcode-svg" xmlns="http://www.w3.org/2000/svg" width="${b}" height="${o}" viewBox="0 0 ${b} ${o}" role="img" aria-label="Code barre">${l.join("")}</svg>`};function Y(e){const i=t(e.reference),n=t(e.region),r=t(e.departement),d=t(e.commune),o=t(e.village).replace(/^(VILLAGE\s+DE\s+|VILLAGE\s+)/i,"").trim(),a=t(e.quartier),l=t(e.lotissement),f=t(e.numero_lot),p=t(Number.isFinite(e.superficie_m2)?e.superficie_m2:0),g=x(e.proprietaire_nom),b=x(e.proprietaire_prenom),s=t(e.proprietaire_naissance_date),v=t(e.proprietaire_naissance_lieu),u=t(e.proprietaire_domicile),c=t(e.proprietaire_profession),y=t(e.proprietaire_cni_numero),m=t(e.proprietaire_cni_date),E=t(e.proprietaire_cni_lieu),z=t(e.proprietaire_telephone),T=x(e.chef_nom||e.validation_chef_nom||e.chef_village),_=h(e.logoUrl),L=h(e.village_logo_url),M=String(e.attestation_type||"").toLowerCase(),O=typeof e.prix_cession=="number"&&Number.isFinite(e.prix_cession)&&e.prix_cession>0,j=!!(e.cedant_nom||e.cedant_prenom||e.cedant_cni_numero),B=!!e.date_cession||O,C=M==="cession"||j||B,N=C?"ATTESTATION DE CESSION DE DROITS COUTUMIERS":"ATTESTATION DE PROPRIÉTÉ VILLAGEOISE",G=x(e.cedant_nom||""),V=x(e.cedant_prenom||""),I=t(e.cedant_cni_numero||""),D=t(e.date_cession||""),S=e.code_barre?q(String(e.code_barre).replace(/\s/g,"").toUpperCase()):"",R=h(e.qrDataUrl),A=t(e.hash_sha256),k=t(e.control_number),U=t(e.verification_url);return t(e.registre_volume),e.registre_page!=null&&String(e.registre_page),e.registre_ligne!=null&&String(e.registre_ligne),`<!DOCTYPE html>
+`,F=e=>e.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;"),t=e=>F(String(e??"")),v=e=>F(String(e??"").toUpperCase()),h=e=>{if(!e)return"";try{const i=typeof window<"u"&&window.location?window.location.origin:"http://localhost",o=new URL(e,i);if(o.protocol==="data:")return e.trim().toLowerCase().startsWith("data:image/")?e:"";if(["http:","https:"].includes(o.protocol))return o.toString()}catch{return""}return""},P={0:"nnwwn",1:"wnnnw",2:"nwnnw",3:"wwnnn",4:"nnwnw",5:"wnwnn",6:"nwwnn",7:"nnnww",8:"wnnwn",9:"nwnwn"},q=e=>{const i=String(e||"").replace(/\D/g,"");if(!i)return"";const o=i.length%2===0?i:`0${i}`,r=2,d=6,n=46;let a=0;const l=[],f=s=>{l.push(`<rect x="${a}" y="0" width="${s}" height="${n}" />`),a+=s},p=s=>{a+=s},g=s=>s==="w"?d:r;["n","n","n","n"].forEach((s,x)=>{const u=g(s);x%2===0?f(u):p(u)});for(let s=0;s<o.length;s+=2){const x=P[o[s]],u=P[o[s+1]];for(let c=0;c<5;c+=1)f(g(x[c])),p(g(u[c]))}["w","n","n"].forEach((s,x)=>{const u=g(s);x%2===0?f(u):p(u)});const b=a;return`<svg class="barcode-svg" xmlns="http://www.w3.org/2000/svg" width="${b}" height="${n}" viewBox="0 0 ${b} ${n}" role="img" aria-label="Code barre">${l.join("")}</svg>`};function Y(e){const i=t(e.reference),o=t(e.region),r=t(e.departement),d=t(e.commune),n=t(e.village).replace(/^(VILLAGE\s+DE\s+|VILLAGE\s+)/i,"").trim(),a=t(e.quartier),l=t(e.lotissement),f=t(e.numero_lot),p=t(Number.isFinite(e.superficie_m2)?e.superficie_m2:0),g=v(e.proprietaire_nom),b=v(e.proprietaire_prenom),s=t(e.proprietaire_naissance_date),x=t(e.proprietaire_naissance_lieu),u=t(e.proprietaire_domicile),c=t(e.proprietaire_profession),w=t(e.proprietaire_cni_numero),m=t(e.proprietaire_cni_date),E=t(e.proprietaire_cni_lieu),C=t(e.proprietaire_telephone),N=v(e.chef_nom||e.validation_chef_nom||e.chef_village),_=h(e.logoUrl),L=h(e.village_logo_url),j=String(e.attestation_type||"").toLowerCase(),M=typeof e.prix_cession=="number"&&Number.isFinite(e.prix_cession)&&e.prix_cession>0,O=!!(e.cedant_nom||e.cedant_prenom||e.cedant_cni_numero),B=!!e.date_cession||M,z=j==="cession"||O||B,T=z?"ATTESTATION DE CESSION DE DROITS COUTUMIERS":"ATTESTATION DE PROPRIÉTÉ VILLAGEOISE",G=v(e.cedant_nom||""),V=v(e.cedant_prenom||""),I=t(e.cedant_cni_numero||""),D=t(e.date_cession||""),R=e.code_barre?q(String(e.code_barre).replace(/\s/g,"").toUpperCase()):"",S=h(e.qrDataUrl),A=t(e.hash_sha256),k=t(e.control_number),U=t(e.verification_url);return t(e.registre_volume),e.registre_page!=null&&String(e.registre_page),e.registre_ligne!=null&&String(e.registre_ligne),`<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>${N} – ${i}</title>
-  ${w}
+  <title>${T} – ${i}</title>
+  ${y}
   <style>
     @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Cinzel:wght@400;500;600;700&display=swap');
 
-    @page { size: A4 portrait; margin: 8mm; }
+    @page { size: A4 portrait; margin: 6mm; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      width: 194mm; min-height: 281mm;
+      width: 198mm; min-height: 285mm;
       margin: 0; padding: 0;
       font-family: 'EB Garamond', 'Times New Roman', Times, serif;
       font-size: 11pt;
@@ -41,7 +41,7 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
     .page {
       width: 100%; height: 100%;
       position: relative;
-      padding: 6mm 8mm;
+      padding: 8mm 10mm;
       margin: 0;
       background: #fff;
       display: flex;
@@ -91,66 +91,69 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
       z-index: 2;
     }
 
-    /* Contenu principal — optimisé pour l'espace */
+    /* Contenu principal — réparti sur toute la hauteur */
     .content {
       position: relative;
       z-index: 1;
       display: flex;
       flex-direction: column;
-      flex: 1;
-      gap: 8px;
-      padding-top: 2mm;
+      height: 100%;
+      gap: 12px;
+      padding: 4mm 0;
     }
     .content-top {
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 8px;
+      margin-bottom: 8px;
     }
     .sections-group {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 8px;
+      gap: 12px;
       flex: 1;
       align-items: start;
+      min-height: 120mm;
     }
     .section-full { 
       grid-column: 1 / -1;
-      margin: 4px 0;
+      margin: 8px 0;
     }
     .bottom-row {
       display: grid;
-      grid-template-columns: 1fr 100px;
-      gap: 8px;
+      grid-template-columns: 1fr 120px;
+      gap: 12px;
       align-items: start;
-      margin-top: auto;
+      margin-top: 8px;
+      min-height: 40mm;
     }
 
-    /* ——— EN-TÊTE COMPACT ——— */
+    /* ——— EN-TÊTE ÉQUILIBRÉ ——— */
     .header {
       display: grid;
-      grid-template-columns: 1fr 40px 1fr;
+      grid-template-columns: 1fr 50px 1fr;
       align-items: center;
-      gap: 4px;
-      margin-bottom: 1px;
-      padding-bottom: 1px;
+      gap: 8px;
+      margin-bottom: 4px;
+      padding-bottom: 4px;
     }
     .hdr {
       font-family: 'EB Garamond', serif;
-      font-size: 9pt;
+      font-size: 10pt;
       font-weight: 600;
       text-transform: uppercase;
-      line-height: 1.3;
+      line-height: 1.4;
       color: #2a2a2a;
-      letter-spacing: 0.1px;
+      letter-spacing: 0.2px;
     }
     .hdr .accent {
       color: #006b3f;
-      font-size: 9.5pt;
-      letter-spacing: 0.4px;
+      font-size: 11pt;
+      letter-spacing: 0.5px;
     }
     .hdr-right { text-align: right; }
     .emblem-wrap {
-      width: 40px; height: 40px;
+      width: 50px; height: 50px;
       display: flex; align-items: center; justify-content: center;
       margin: 0 auto;
     }
@@ -163,78 +166,99 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
       margin-bottom: 2px;
     }
 
-    /* ——— TITRE ÉLÉGANT ——— */
+    /* ——— TITRE PRÉPONDÉRANT ——— */
     .title-section {
       text-align: center;
-      margin: 1px 0 3px;
+      margin: 8px 0 12px;
+      padding: 8px 0;
     }
     .title {
       font-family: 'Cinzel', serif;
-      font-size: 16pt;
-      font-weight: 600;
-      letter-spacing: 2px;
+      font-size: 20pt;
+      font-weight: 700;
+      letter-spacing: 3px;
       text-transform: uppercase;
       color: #0b4b2f;
-      padding: 2px 8px 3px;
+      padding: 8px 20px 10px;
       display: inline-block;
       position: relative;
-      line-height: 1.1;
-      border-bottom: 1px solid rgba(184, 134, 11, 0.3);
-      border-top: 1px solid rgba(184, 134, 11, 0.3);
+      line-height: 1.2;
+      background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(250,240,220,0.85));
+      border: 1.5px solid rgba(184, 134, 11, 0.6);
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .title::before {
+      content: '';
+      position: absolute;
+      top: 4px; left: 50%; transform: translateX(-50%);
+      width: 100px; height: 1px;
+      background: #b8860b;
+    }
+    .title::after {
+      content: '';
+      position: absolute;
+      bottom: 4px; left: 50%; transform: translateX(-50%);
+      width: 100px; height: 1px;
+      background: #b8860b;
     }
 
-    /* ——— RÉFÉRENCE PROÉMINENTE ——— */
+    /* ——— RÉFÉRENCE CENTRÉE ——— */
     .ref-line {
-      text-align: right;
-      margin: 1px 0 3px;
+      text-align: center;
+      margin: 6px 0 10px;
       display: flex;
-      justify-content: flex-end;
+      justify-content: center;
       align-items: center;
-      gap: 6px;
+      gap: 10px;
+      flex-wrap: wrap;
     }
     .ref-box {
       font-family: 'Cinzel', serif;
-      font-size: 11pt;
+      font-size: 14pt;
       font-weight: 700;
       color: #b8860b;
-      letter-spacing: 0.8px;
-      padding: 2px 8px;
-      border: 1px solid #b8860b;
-      background: rgba(184, 134, 11, 0.08);
-      border-radius: 4px;
+      letter-spacing: 1px;
+      padding: 6px 16px;
+      border: 1.5px solid #b8860b;
+      background: rgba(184, 134, 11, 0.1);
+      border-radius: 6px;
+      box-shadow: 0 1px 4px rgba(184, 134, 11, 0.2);
     }
     .ref-meta {
-      font-size: 9pt;
+      font-size: 10pt;
       font-weight: 600;
-      letter-spacing: 0.6px;
+      letter-spacing: 0.8px;
       color: #555;
       text-transform: uppercase;
     }
 
-    /* ——— BASE LÉGALE ——— */
+    /* ——— BASE LÉGALE AGRANDIE ——— */
     .legal {
-      font-size: 7.5pt;
+      font-size: 9pt;
       text-align: center;
       color: #555;
-      margin: 2px 0 4px;
-      line-height: 1.3;
-      padding: 2px 12px;
-      border-top: 0.5px solid #e0e0e0;
-      border-bottom: 0.5px solid #e0e0e0;
-      background: rgba(0, 107, 63, 0.02);
+      margin: 6px 0 10px;
+      line-height: 1.4;
+      padding: 6px 16px;
+      border-top: 1px solid #e0e0e0;
+      border-bottom: 1px solid #e0e0e0;
+      background: rgba(0, 107, 63, 0.03);
+      border-radius: 4px;
     }
 
-    /* ——— DÉCLARATION ——— */
+    /* ——— DÉCLARATION AGRANDIE ——— */
     .declaration {
-      font-size: 10pt;
-      line-height: 1.5;
+      font-size: 12pt;
+      line-height: 1.6;
       text-align: justify;
-      margin: 4px 0;
-      padding: 4px 0 4px 8px;
-      border-left: 2px solid #006b3f;
+      margin: 8px 0 12px;
+      padding: 12px 12px 12px 16px;
+      border-left: 3px solid #006b3f;
       color: #222;
-      background: rgba(0, 107, 63, 0.02);
-      border-radius: 4px;
+      background: rgba(0, 107, 63, 0.03);
+      border-radius: 6px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.03);
     }
 
     /* ——— TABLEAUX DE CHAMPS ——— */
@@ -300,62 +324,64 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
     }
     .barcode-section svg { height: 30px; }
 
-    /* ——— ZONE DE SIGNATURE COMPACTE ——— */
+    /* ——— ZONE DE SIGNATURE AGRANDIE ——— */
     .signature-zone {
       display: flex;
       justify-content: center;
       align-items: stretch;
-      gap: 6px;
+      gap: 10px;
       margin: 0;
-      min-height: 85px;
+      min-height: 120px;
     }
     .sig-frame {
-      border: 0.75px solid #b8860b;
-      padding: 8px 8px 10px;
-      background: rgba(184, 134, 11, 0.05);
-      min-width: 140px;
+      border: 1.5px solid #b8860b;
+      padding: 12px 12px 16px;
+      background: rgba(184, 134, 11, 0.08);
+      min-width: 180px;
       display: flex;
       flex-direction: column;
       align-items: center;
       text-align: center;
       justify-content: space-between;
       width: 100%;
+      border-radius: 6px;
+      box-shadow: 0 2px 6px rgba(184, 134, 11, 0.15);
     }
     .sig-frame-title {
       font-family: 'Cinzel', serif;
-      font-size: 5.5pt;
+      font-size: 7pt;
       font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.2px;
+      letter-spacing: 0.3px;
       color: #b8860b;
-      margin-bottom: 1px;
-      padding-bottom: 0.5px;
-      border-bottom: 0.5px solid #e0d5b5;
+      margin-bottom: 4px;
+      padding-bottom: 2px;
+      border-bottom: 1px solid #e0d5b5;
       width: 100%;
     }
     .sig-frame-name {
-      font-size: 7pt;
+      font-size: 9pt;
       font-weight: 600;
       color: #006b3f;
       text-transform: uppercase;
-      margin-bottom: 1px;
+      margin-bottom: 8px;
       flex-shrink: 0;
-      line-height: 1.1;
+      line-height: 1.2;
       width: 100%;
     }
     .sig-frame-line {
-      border-top: 0.5px solid #999;
+      border-top: 1px solid #999;
       margin-top: auto;
-      padding-top: 1px;
-      font-size: 5pt;
+      padding-top: 4px;
+      font-size: 6pt;
       color: #888;
       text-transform: uppercase;
-      letter-spacing: 0.15px;
+      letter-spacing: 0.2px;
       flex-shrink: 0;
       width: 100%;
     }
 
-    /* ——— ZONE DE SÉCURITÉ OPTIMISÉE ——— */
+    /* ——— ZONE DE SÉCURITÉ AGRANDIE ——— */
     .validation-area {
       display: block;
       margin: 0;
@@ -363,65 +389,68 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
     .security-footer {
       position: relative;
       margin: 0;
-      border: 0.75px solid #d4d4d4;
-      padding: 6px 6px 6px;
-      background: rgba(0, 107, 63, 0.04);
+      border: 1.5px solid #d4d4d4;
+      padding: 12px 12px 12px;
+      background: rgba(0, 107, 63, 0.06);
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 8px;
       align-items: center;
-      border-radius: 6px;
-      font-size: 7.5pt;
-      min-height: 90px;
+      border-radius: 8px;
+      font-size: 8pt;
+      min-height: 120px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
     }
     .sec-qr {
-      width: 60px; height: 60px;
-      border: 0.75px solid #ccc;
-      padding: 2px;
+      width: 90px; height: 90px;
+      border: 2px solid #ccc;
+      padding: 4px;
       background: #fff;
-      border-radius: 2px;
-      margin-bottom: 2px;
+      border-radius: 4px;
+      margin-bottom: 6px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     .sec-qr img { width: 100%; height: 100%; object-fit: contain; }
     .sec-left {
       display: flex;
       flex-direction: column;
-      gap: 1px;
+      gap: 3px;
       text-align: center;
+      width: 100%;
     }
     .sec-control {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 2px;
+      gap: 4px;
     }
     .sec-control-label {
-      font-size: 5pt;
+      font-size: 7pt;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.1px;
+      letter-spacing: 0.3px;
       color: #006b3f;
       flex-shrink: 0;
     }
     .sec-control-value {
       font-family: 'Courier New', monospace;
-      font-size: 6pt;
+      font-size: 8pt;
       font-weight: 700;
       color: #006b3f;
-      letter-spacing: 0.2px;
+      letter-spacing: 0.4px;
     }
     .sec-hash {
-      font-size: 4.5pt;
+      font-size: 6pt;
       color: #666;
       font-family: 'Courier New', monospace;
       word-break: break-all;
-      line-height: 1.1;
-      margin-top: 1px;
+      line-height: 1.2;
+      margin-top: 2px;
     }
     .sec-url {
-      font-size: 4.5pt;
+      font-size: 6pt;
       color: #006b3f;
-      margin-top: 1px;
+      margin-top: 2px;
     }
     .sec-url a {
       color: #006b3f;
@@ -431,13 +460,16 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
     /* ——— MENTIONS LÉGALES ——— */
     .legal-notice {
       position: relative;
-      margin-top: 3px;
-      font-size: 6.5pt;
+      margin-top: 8px;
+      font-size: 8pt;
       color: #777;
       text-align: center;
       font-style: italic;
-      letter-spacing: 0.2px;
-      line-height: 1.25;
+      letter-spacing: 0.3px;
+      line-height: 1.3;
+      padding: 6px 12px;
+      border-top: 1px solid #eee;
+      background: rgba(0,0,0,0.01);
     }
 
     @media print {
@@ -467,10 +499,10 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
     <!-- EN-TÊTE -->
     <div class="header">
       <div class="hdr">
-        ${n?`<span class="accent">RÉGION ${n.toUpperCase()}</span><br>`:"RÉGION<br>"}
+        ${o?`<span class="accent">RÉGION ${o.toUpperCase()}</span><br>`:"RÉGION<br>"}
         Département de ${r||"—"}<br>
         Commune de ${d||"—"}<br>
-        <strong>VILLAGE ${o.toUpperCase()}</strong>
+        <strong>VILLAGE ${n.toUpperCase()}</strong>
       </div>
       <div class="emblem-wrap">
         ${L?`<img src="${L}" alt="" style="width:100%;height:100%;object-fit:contain;" />`:_?`<img src="${_}" alt="" style="width:100%;height:100%;object-fit:contain;" />`:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
@@ -492,7 +524,7 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
 
     <!-- TITRE -->
     <div class="title-section">
-      <div class="title">${N}</div>
+      <div class="title">${T}</div>
     </div>
 
     <!-- RÉFÉRENCE -->
@@ -508,7 +540,7 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
 
     <!-- DÉCLARATION -->
     <div class="declaration">
-      Nous, soussigné, <strong>${T}</strong>, Chef Coutumier du Village de <strong>${o.toUpperCase()}</strong>,
+      Nous, soussigné, <strong>${N}</strong>, Chef Coutumier du Village de <strong>${n.toUpperCase()}</strong>,
       attestons solennellement que les droits fonciers coutumiers afférents à la parcelle désignée ci-après sont détenus par :
     </div>
 
@@ -529,7 +561,7 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
         </tr>
         <tr>
           <td class="label">Date & Lieu de naissance</td>
-          <td class="value">${s||"—"} à ${v||"—"}</td>
+          <td class="value">${s||"—"} à ${x||"—"}</td>
         </tr>
         ${c?`<tr>
           <td class="label">Profession</td>
@@ -537,21 +569,21 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
         </tr>`:""}
         <tr>
           <td class="label">CNI N°</td>
-          <td class="value">${y||"—"}${m?` — Délivrée le ${m} à ${E}`:""}</td>
+          <td class="value">${w||"—"}${m?` — Délivrée le ${m} à ${E}`:""}</td>
         </tr>
         <tr>
           <td class="label">Domicile</td>
           <td class="value">${u||"—"}</td>
         </tr>
-        ${z?`<tr>
+        ${C?`<tr>
           <td class="label">Téléphone</td>
-          <td class="value">${z}</td>
+          <td class="value">${C}</td>
         </tr>`:""}
       </table>
     </div>
 
     <!-- II. CESSION (si applicable) -->
-    ${C?`
+    ${z?`
     <div class="section section-full">
       <div class="section-header">
         <span class="section-numeral">II.</span>
@@ -573,7 +605,7 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
     <!-- III. DESCRIPTION DE LA PARCELLE -->
     <div class="section">
       <div class="section-header">
-        <span class="section-numeral">${C?"III":"II"}.</span>
+        <span class="section-numeral">${z?"III":"II"}.</span>
         <span class="section-title">Description de la parcelle</span>
       </div>
       <table class="data-table">
@@ -594,13 +626,13 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
         </tr>`}
         <tr>
           <td class="label">Village</td>
-          <td class="value" colspan="3">${o.toUpperCase()}</td>
+          <td class="value" colspan="3">${n.toUpperCase()}</td>
         </tr>
       </table>
     </div>
 
     <!-- CODE-BARRES -->
-    ${S?`<div class="barcode-section section-full">${S}</div>`:""}
+    ${R?`<div class="barcode-section section-full">${R}</div>`:""}
 
     </div><!-- fin .sections-group -->
 
@@ -608,20 +640,20 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
     <div class="bottom-row">
       <div class="section">
         <div class="section-header">
-          <span class="section-numeral">${C?"IV":"III"}.</span>
+          <span class="section-numeral">${z?"IV":"III"}.</span>
           <span class="section-title">Validation</span>
         </div>
         <div class="signature-zone">
           <div class="sig-frame">
             <div class="sig-frame-title">Chef du Village</div>
-            <div class="sig-frame-name">${T||"—"}</div>
+            <div class="sig-frame-name">${N||"—"}</div>
             <div class="sig-frame-line">Signature & Cachet</div>
           </div>
         </div>
       </div>
 
       <div class="security-footer">
-        ${R?`<div class="sec-qr"><img src="${R}" alt="QR Code de vérification" /></div>`:""}
+        ${S?`<div class="sec-qr"><img src="${S}" alt="QR Code de vérification" /></div>`:""}
         <div class="sec-left">
           ${k?`<div class="sec-control">
             <span class="sec-control-label">N°</span>
@@ -641,12 +673,12 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
   </div><!-- fin .content -->
 </div>
 </body>
-</html>`}function ne(e){$(Y(e))}function oe(e){const i=e.limites&&(e.limites.nord||e.limites.sud||e.limites.est||e.limites.ouest),n=e.coordonnees_gps&&(e.coordonnees_gps.lat!=null||e.coordonnees_gps.lng!=null),r=e.gps_points&&e.gps_points.length>0,d=(e.temoins||[]).filter(m=>m.nom||m.prenom),o=d.length>0;if(!i&&!n&&!r&&!o){alert("Aucune donnée technique (GPS, limites, témoins) disponible pour cette attestation.");return}const a=t(e.reference),l=t(e.numero_enregistrement),f=x(e.proprietaire_prenom),p=x(e.proprietaire_nom),g=t(e.village).replace(/^(VILLAGE\s+DE\s+|VILLAGE\s+)/i,"").trim(),b=t(e.numero_lot),s=t(e.lotissement),v=Number.isFinite(e.superficie_m2)?e.superficie_m2:0,u=t(e.date_etablissement),c=e.limites||{nord:"",sud:"",est:"",ouest:""},y=e.coordonnees_gps;$(`<!DOCTYPE html>
+</html>`}function oe(e){$(Y(e))}function ne(e){const i=e.limites&&(e.limites.nord||e.limites.sud||e.limites.est||e.limites.ouest),o=e.coordonnees_gps&&(e.coordonnees_gps.lat!=null||e.coordonnees_gps.lng!=null),r=e.gps_points&&e.gps_points.length>0,d=(e.temoins||[]).filter(m=>m.nom||m.prenom),n=d.length>0;if(!i&&!o&&!r&&!n){alert("Aucune donnée technique (GPS, limites, témoins) disponible pour cette attestation.");return}const a=t(e.reference),l=t(e.numero_enregistrement),f=v(e.proprietaire_prenom),p=v(e.proprietaire_nom),g=t(e.village).replace(/^(VILLAGE\s+DE\s+|VILLAGE\s+)/i,"").trim(),b=t(e.numero_lot),s=t(e.lotissement),x=Number.isFinite(e.superficie_m2)?e.superficie_m2:0,u=t(e.date_etablissement),c=e.limites||{nord:"",sud:"",est:"",ouest:""},w=e.coordonnees_gps;$(`<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
   <title>Annexe Technique – ${a}</title>
-  ${w}
+  ${y}
   <style>
     @page { size: A4; margin: 15mm; }
     body { font-family: "Times New Roman", Times, serif; font-size: 11pt; color: #000; background: #fff; }
@@ -737,7 +769,7 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
   </div>
   <div class="field-row">
     <span class="field-label">Parcelle :</span>
-    <span class="field-value">Lot ${b}, ${s||g} — ${v} m²</span>
+    <span class="field-value">Lot ${b}, ${s||g} — ${x} m²</span>
   </div>
 
   <!-- LIMITES -->
@@ -752,12 +784,12 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
   `:""}
 
   <!-- COORDONNÉES GPS -->
-  ${n?`
+  ${o?`
   <div class="section">
     <div class="section-title">Coordonnées GPS centrales</div>
-    <div class="field-row"><span class="field-label">Latitude :</span><span class="field-value">${y?.lat??"—"}</span></div>
-    <div class="field-row"><span class="field-label">Longitude :</span><span class="field-value">${y?.lng??"—"}</span></div>
-    ${y?.precision?`<div class="field-row"><span class="field-label">Précision :</span><span class="field-value">${y.precision} m</span></div>`:""}
+    <div class="field-row"><span class="field-label">Latitude :</span><span class="field-value">${w?.lat??"—"}</span></div>
+    <div class="field-row"><span class="field-label">Longitude :</span><span class="field-value">${w?.lng??"—"}</span></div>
+    ${w?.precision?`<div class="field-row"><span class="field-label">Précision :</span><span class="field-value">${w.precision} m</span></div>`:""}
   </div>
   `:""}
 
@@ -792,7 +824,7 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
   `:""}
 
   <!-- TÉMOINS -->
-  ${o?`
+  ${n?`
   <div class="section">
     <div class="section-title">Témoins (${d.length})</div>
     <table>
@@ -803,7 +835,7 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
         ${d.map((m,E)=>`
           <tr>
             <td>${E+1}</td>
-            <td>${x(m.prenom)} ${x(m.nom)}</td>
+            <td>${v(m.prenom)} ${v(m.nom)}</td>
             <td>${t(m.profession||"—")}</td>
             <td>${t(m.telephone||"—")}</td>
             <td>${t(m.cni||"—")}</td>
@@ -822,12 +854,12 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
 
 </div>
 </body>
-</html>`)}function se(e){const i={virement:"Virement bancaire",especes:"Espèces",mobile_money:"Mobile Money",cheque:"Chèque"},n=t(e.reference),r=t(e.appName),d=t(e.appCompany),o=h(e.logoUrl),a=t(e.locataire_prenom),l=t(e.locataire_nom),f=t(e.bien_adresse),p=t(e.mois_concerne),g=t(i[e.mode_paiement]||e.mode_paiement),b=t(e.date_paiement),s=t((Number.isFinite(e.montant)?e.montant:0).toLocaleString("fr-FR"));$(`<!DOCTYPE html>
+</html>`)}function se(e){const i={virement:"Virement bancaire",especes:"Espèces",mobile_money:"Mobile Money",cheque:"Chèque"},o=t(e.reference),r=t(e.appName),d=t(e.appCompany),n=h(e.logoUrl),a=t(e.locataire_prenom),l=t(e.locataire_nom),f=t(e.bien_adresse),p=t(e.mois_concerne),g=t(i[e.mode_paiement]||e.mode_paiement),b=t(e.date_paiement),s=t((Number.isFinite(e.montant)?e.montant:0).toLocaleString("fr-FR"));$(`<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Quittance de Loyer – ${n}</title>
-  ${w}
+  <title>Quittance de Loyer – ${o}</title>
+  ${y}
   <style>
     body { font-family: Arial, sans-serif; font-size: 10.5pt; }
     .page { width: 150mm; min-height: 80mm; margin: 0 auto; padding: 5mm; border: 2px solid #1e40af; }
@@ -853,14 +885,14 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
 <div class="page">
   <div class="header">
     <div style="display:flex;align-items:center;gap:6px;">
-      ${o?`<img src="${o}" style="width:32px;height:32px;object-fit:cover;border-radius:6px;flex-shrink:0;" onerror="this.style.display='none'" />`:`<img src="/default-logo.svg" style="width:32px;height:32px;object-fit:contain;border-radius:6px;flex-shrink:0;" onerror="this.style.display='none'" />`}
+      ${n?`<img src="${n}" style="width:32px;height:32px;object-fit:cover;border-radius:6px;flex-shrink:0;" onerror="this.style.display='none'" />`:`<img src="/default-logo.svg" style="width:32px;height:32px;object-fit:contain;border-radius:6px;flex-shrink:0;" onerror="this.style.display='none'" />`}
       <div>
         <div class="company-name">${r}</div>
         <div class="company-sub">${d}</div>
       </div>
     </div>
     <div class="ref-date">
-      <div>Réf: <strong>${n}</strong></div>
+      <div>Réf: <strong>${o}</strong></div>
       <div>Date: ${b}</div>
     </div>
   </div>
@@ -909,12 +941,12 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
   </div>
 </div>
 </body>
-</html>`)}function re(e){const i={virement:"Virement bancaire",especes:"Espèces",mobile_money:"Mobile Money",cheque:"Chèque"},n=t(e.reference),r=t(e.appName),d=t(e.appCompany),o=h(e.logoUrl),a=t(e.locataire_prenom),l=t(e.locataire_nom),f=t(e.bien_adresse),p=t(e.mois_concerne),g=t(i[e.mode_paiement]||e.mode_paiement),b=t(e.date_paiement),s=t((Number.isFinite(e.montant)?e.montant:0).toLocaleString("fr-FR"));$(`<!DOCTYPE html>
+</html>`)}function re(e){const i={virement:"Virement bancaire",especes:"Espèces",mobile_money:"Mobile Money",cheque:"Chèque"},o=t(e.reference),r=t(e.appName),d=t(e.appCompany),n=h(e.logoUrl),a=t(e.locataire_prenom),l=t(e.locataire_nom),f=t(e.bien_adresse),p=t(e.mois_concerne),g=t(i[e.mode_paiement]||e.mode_paiement),b=t(e.date_paiement),s=t((Number.isFinite(e.montant)?e.montant:0).toLocaleString("fr-FR"));$(`<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Reçu de Paiement de Loyer – ${n}</title>
-  ${w}
+  <title>Reçu de Paiement de Loyer – ${o}</title>
+  ${y}
   <style>
     body { font-family: Arial, sans-serif; font-size: 11.5pt; }
     .page { width: 150mm; min-height: 90mm; margin: 0 auto; padding: 6mm; border: 2px solid #334155; }
@@ -940,14 +972,14 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
 <div class="page">
   <div class="header">
     <div style="display:flex;align-items:center;gap:6px;">
-      ${o?`<img src="${o}" style="width:32px;height:32px;object-fit:cover;border-radius:6px;flex-shrink:0;" onerror="this.style.display='none'" />`:`<img src="/default-logo.svg" style="width:32px;height:32px;object-fit:contain;border-radius:6px;flex-shrink:0;" onerror="this.style.display='none'" />`}
+      ${n?`<img src="${n}" style="width:32px;height:32px;object-fit:cover;border-radius:6px;flex-shrink:0;" onerror="this.style.display='none'" />`:`<img src="/default-logo.svg" style="width:32px;height:32px;object-fit:contain;border-radius:6px;flex-shrink:0;" onerror="this.style.display='none'" />`}
       <div>
         <div class="company-name">${r}</div>
         <div class="company-sub">${d}</div>
       </div>
     </div>
     <div class="ref-date">
-      <div>Réf: <strong>${n}</strong></div>
+      <div>Réf: <strong>${o}</strong></div>
       <div>Date: ${b}</div>
     </div>
   </div>
@@ -991,12 +1023,12 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
   </div>
 </div>
 </body>
-</html>`)}function ae(e){const i={virement:"Virement bancaire",especes:"Espèces",mobile_money:"Mobile Money",cheque:"Chèque"},n=t(e.reference),r=t(e.appName),d=t(e.appCompany),o=h(e.logoUrl),a=t(e.date_transaction),l=t(e.client_nom),f=t(e.description||e.categorie),p=t(e.categorie),g=t(i[e.mode_paiement]||e.mode_paiement),b=t((Number.isFinite(e.montant)?e.montant:0).toLocaleString("fr-FR"));$(`<!DOCTYPE html>
+</html>`)}function ae(e){const i={virement:"Virement bancaire",especes:"Espèces",mobile_money:"Mobile Money",cheque:"Chèque"},o=t(e.reference),r=t(e.appName),d=t(e.appCompany),n=h(e.logoUrl),a=t(e.date_transaction),l=t(e.client_nom),f=t(e.description||e.categorie),p=t(e.categorie),g=t(i[e.mode_paiement]||e.mode_paiement),b=t((Number.isFinite(e.montant)?e.montant:0).toLocaleString("fr-FR"));$(`<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Reçu de Paiement – ${n}</title>
-  ${w}
+  <title>Reçu de Paiement – ${o}</title>
+  ${y}
   <style>
     body { font-family: Arial, sans-serif; font-size: 12.5pt; }
     .page { width: 148mm; min-height: 100mm; margin: 0 auto; padding: 8mm 10mm; border: 2px solid #334155; }
@@ -1021,7 +1053,7 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
 <div class="page">
   <div class="header">
     <div style="display:flex;align-items:center;gap:10px;">
-      ${o?`<img src="${o}" style="width:40px;height:40px;object-fit:cover;border-radius:6px;flex-shrink:0;" onerror="this.style.display='none'" />`:`<img src="/default-logo.svg" style="width:40px;height:40px;object-fit:contain;border-radius:6px;flex-shrink:0;" onerror="this.style.display='none'" />`}
+      ${n?`<img src="${n}" style="width:40px;height:40px;object-fit:cover;border-radius:6px;flex-shrink:0;" onerror="this.style.display='none'" />`:`<img src="/default-logo.svg" style="width:40px;height:40px;object-fit:contain;border-radius:6px;flex-shrink:0;" onerror="this.style.display='none'" />`}
       <div>
         <div class="company-name">${r}</div>
         <div class="company-sub">${d}</div>
@@ -1032,7 +1064,7 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
   <div style="text-align:center;"><div class="doc-title">Reçu de Paiement</div></div>
 
   <div class="ref-line">
-    <span>Réf: <strong>${n}</strong></span>
+    <span>Réf: <strong>${o}</strong></span>
     <span>Date: ${a}</span>
   </div>
 
@@ -1055,12 +1087,12 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
   <div class="footer">Ce reçu est généré automatiquement par ${r} – ${d}</div>
 </div>
 </body>
-</html>`)}function le(e){const i=t(e.title),n=t(e.generated_at),r=h(e.logoUrl),d=(e.rows||[]).map(o=>({date:t(o.date_action),action:t(o.action),user:t(o.utilisateur_nom),reference:t(o.parcelle_reference),village:t(o.village),details:t(o.details)}));$(`<!DOCTYPE html>
+</html>`)}function le(e){const i=t(e.title),o=t(e.generated_at),r=h(e.logoUrl),d=(e.rows||[]).map(n=>({date:t(n.date_action),action:t(n.action),user:t(n.utilisateur_nom),reference:t(n.parcelle_reference),village:t(n.village),details:t(n.details)}));$(`<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
   <title>${i}</title>
-  ${w}
+  ${y}
   <style>
     body { font-family: "Times New Roman", Times, serif; font-size: 10pt; }
     .page { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 12mm; }
@@ -1077,7 +1109,7 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
     <div class="header">
       <div>
         <div class="title">${i}</div>
-        <div class="meta">Généré le ${n}</div>
+        <div class="meta">Généré le ${o}</div>
       </div>
       ${r?`<img src="${r}" style="width:50px;height:50px;object-fit:contain;" />`:""}
     </div>
@@ -1093,18 +1125,18 @@ function Q(e){const i=new Date;return`${e}-${i.getFullYear()}${String(i.getMonth
         </tr>
       </thead>
       <tbody>
-        ${d.map(o=>`
+        ${d.map(n=>`
           <tr>
-            <td>${o.date}</td>
-            <td>${o.action}</td>
-            <td>${o.user}</td>
-            <td>${o.reference}</td>
-            <td>${o.village}</td>
-            <td>${o.details}</td>
+            <td>${n.date}</td>
+            <td>${n.action}</td>
+            <td>${n.user}</td>
+            <td>${n.reference}</td>
+            <td>${n.village}</td>
+            <td>${n.details}</td>
           </tr>
         `).join("")}
       </tbody>
     </table>
   </div>
 </body>
-</html>`)}function $(e){const i=window.open("","_blank","width=900,height=700");if(!i){alert("Veuillez autoriser les fenêtres popup pour imprimer.");return}i.document.write(e),i.document.close(),i.focus(),setTimeout(()=>{i.print()},800)}export{ae as a,X as c,H as d,Q as f,ie as g,K as h,se as i,W as l,J as m,ne as n,re as o,te as p,le as r,ee as s,oe as t,Z as u};
+</html>`)}function $(e){const i=window.open("","_blank","width=900,height=700");if(!i){alert("Veuillez autoriser les fenêtres popup pour imprimer.");return}i.document.write(e),i.document.close(),i.focus(),setTimeout(()=>{i.print()},800)}export{ae as a,X as c,H as d,Q as f,ie as g,K as h,se as i,W as l,J as m,oe as n,re as o,te as p,le as r,ee as s,ne as t,Z as u};
