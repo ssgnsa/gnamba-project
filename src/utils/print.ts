@@ -276,7 +276,6 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
   const registreVolume = safeText(data.registre_volume);
   const registrePage = data.registre_page != null ? String(data.registre_page) : '';
   const registreLigne = data.registre_ligne != null ? String(data.registre_ligne) : '';
-  const originalLabel = data.original ? 'ORIGINAL' : 'COPIE';
 
   const html = `<!DOCTYPE html>
 <html lang="fr">
@@ -287,126 +286,132 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
   <style>
     @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Cinzel:wght@400;500;600;700&display=swap');
 
-    @page { size: A4 portrait; margin: 0; }
+    @page { size: A4 portrait; margin: 8mm; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      width: 210mm; min-height: 297mm;
+      width: 194mm; min-height: 281mm;
       margin: 0; padding: 0;
       font-family: 'EB Garamond', 'Times New Roman', Times, serif;
-      font-size: 11.5pt;
+      font-size: 11pt;
       color: #1a1a1a;
-      background: #FAFAFA;
+      background: #fff;
       overflow: hidden;
     }
 
     .page {
-      width: 210mm; height: 297mm;
+      width: 100%; height: 100%;
       position: relative;
-      padding: 12mm 14mm;
-      margin: 0 auto;
+      padding: 6mm 8mm;
+      margin: 0;
       background: #fff;
-      box-shadow: inset 0 0 0 1px rgba(184, 134, 11, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.05);
       display: flex;
       flex-direction: column;
       overflow: hidden;
     }
 
-    /* ——— DOUBLE BORDURE ORNEMENTALE ——— */
+    /* ——— BORDURE SUBTILE ——— */
     .page::before {
       content: '';
       position: absolute;
-      top: 12px; left: 12px; right: 12px; bottom: 12px;
-      border: 1px solid rgba(184, 134, 11, 0.95);
-      pointer-events: none;
-    }
-    .page::after {
-      content: '';
-      position: absolute;
-      top: 22px; left: 22px; right: 22px; bottom: 22px;
-      border: 1px dotted rgba(0, 0, 0, 0.14);
+      top: 3px; left: 3px; right: 3px; bottom: 3px;
+      border: 0.5px solid rgba(184, 134, 11, 0.4);
       pointer-events: none;
     }
 
-    /* Coins ornements */
-    .corner { position: absolute; width: 12mm; height: 12mm; z-index: 1; }
+    /* Coins discrets */
+    .corner { position: absolute; width: 8mm; height: 8mm; z-index: 1; opacity: 0.6; }
     .corner svg { width: 100%; height: 100%; }
-    .corner-tl { top: 4mm; left: 4mm; }
-    .corner-tr { top: 4mm; right: 4mm; transform: scaleX(-1); }
-    .corner-bl { bottom: 4mm; left: 4mm; transform: scaleY(-1); }
-    .corner-br { bottom: 4mm; right: 4mm; transform: scale(-1, -1); }
+    .corner-tl { top: 2mm; left: 2mm; }
+    .corner-tr { top: 2mm; right: 2mm; transform: scaleX(-1); }
+    .corner-bl { bottom: 2mm; left: 2mm; transform: scaleY(-1); }
+    .corner-br { bottom: 2mm; right: 2mm; transform: scale(-1, -1); }
 
     /* ——— FILIGRANE ——— */
     .watermark {
       position: absolute;
       top: 50%; left: 50%;
-      transform: translate(-50%, -50%) rotate(-35deg);
+      transform: translate(-50%, -50%) rotate(-30deg);
       font-family: 'Cinzel', serif;
-      font-size: 72pt;
-      font-weight: 700;
-      color: rgba(180, 180, 180, 0.06);
-      letter-spacing: 8px;
+      font-size: 48pt;
+      font-weight: 600;
+      color: rgba(180, 180, 180, 0.04);
+      letter-spacing: 4px;
       white-space: nowrap;
       pointer-events: none;
       user-select: none;
       z-index: 0;
     }
 
-    /* ——— BARRE TRICOLORE HAUT ——— */
-    .tricolor-bar {
+    /* ——— BARRE D'IDENTIFICATION SUBTILE ——— */
+    .id-bar {
       position: absolute;
       top: 0; left: 0; right: 0;
-      height: 4mm;
-      display: flex;
+      height: 1.5mm;
+      background: linear-gradient(90deg, #f77f00 0%, #f77f00 33%, #009e60 33%, #009e60 66%, #b8860b 66%, #b8860b 100%);
       z-index: 2;
     }
-    .tricolor-bar .stripe { flex: 1; }
-    .tricolor-bar .orange { background: #f77f00; }
-    .tricolor-bar .white { background: #fff; }
-    .tricolor-bar .green { background: #009e60; }
 
-    /* ——— BARRE TRICOLORE BAS ——— */
-    .tricolor-bar-bottom {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      height: 3mm;
+    /* Contenu principal — optimisé pour l'espace */
+    .content {
+      position: relative;
+      z-index: 1;
       display: flex;
-      z-index: 2;
+      flex-direction: column;
+      flex: 1;
+      gap: 8px;
+      padding-top: 2mm;
     }
-    .tricolor-bar-bottom .stripe { flex: 1; }
-    .tricolor-bar-bottom .orange { background: #f77f00; }
-    .tricolor-bar-bottom .white { background: #fff; }
-    .tricolor-bar-bottom .green { background: #009e60; }
+    .content-top {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .sections-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      flex: 1;
+      align-items: start;
+    }
+    .section-full { 
+      grid-column: 1 / -1;
+      margin: 4px 0;
+    }
+    .bottom-row {
+      display: grid;
+      grid-template-columns: 1fr 100px;
+      gap: 8px;
+      align-items: start;
+      margin-top: auto;
+    }
 
-    /* Contenu principal — au-dessus du filigrane */
-    .content { position: relative; z-index: 1; }
-
-    /* ——— EN-TÊTE ——— */
+    /* ——— EN-TÊTE COMPACT ——— */
     .header {
       display: grid;
-      grid-template-columns: 1fr 50px 1fr;
+      grid-template-columns: 1fr 40px 1fr;
       align-items: center;
-      gap: 6px;
-      margin-bottom: 2px;
-      padding-bottom: 2px;
+      gap: 4px;
+      margin-bottom: 1px;
+      padding-bottom: 1px;
     }
     .hdr {
       font-family: 'EB Garamond', serif;
-      font-size: 9.5pt;
+      font-size: 9pt;
       font-weight: 600;
       text-transform: uppercase;
-      line-height: 1.4;
+      line-height: 1.3;
       color: #2a2a2a;
-      letter-spacing: 0.2px;
+      letter-spacing: 0.1px;
     }
     .hdr .accent {
       color: #006b3f;
-      font-size: 10pt;
-      letter-spacing: 0.6px;
+      font-size: 9.5pt;
+      letter-spacing: 0.4px;
     }
     .hdr-right { text-align: right; }
     .emblem-wrap {
-      width: 60px; height: 60px;
+      width: 40px; height: 40px;
       display: flex; align-items: center; justify-content: center;
       margin: 0 auto;
     }
@@ -419,76 +424,52 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
       margin-bottom: 2px;
     }
 
-    /* ——— TITRE ——— */
+    /* ——— TITRE ÉLÉGANT ——— */
     .title-section {
       text-align: center;
-      margin: 2px 0 6px;
-      display: inline-block;
-      padding: 6px 12px;
-      border: 1px solid rgba(184, 134, 11, 0.9);
-      border-radius: 12px;
-      background: rgba(250, 240, 220, 0.25);
+      margin: 1px 0 3px;
     }
     .title {
       font-family: 'Cinzel', serif;
-      font-size: 18pt;
-      font-weight: 700;
-      letter-spacing: 3px;
+      font-size: 16pt;
+      font-weight: 600;
+      letter-spacing: 2px;
       text-transform: uppercase;
       color: #0b4b2f;
-      padding: 4px 16px 5px;
+      padding: 2px 8px 3px;
       display: inline-block;
       position: relative;
-      line-height: 1.0;
-      background: rgba(255, 255, 255, 0.98);
-      border-radius: 8px;
-      box-shadow: 0 1px 5px rgba(0, 0, 0, 0.02);
-    }
-    .title::before {
-      content: '';
-      position: absolute;
-      top: 3px; left: 50%; transform: translateX(-50%);
-      width: 80px; height: 1px;
-      background: #b8860b;
-    }
-    .title::after {
-      content: '';
-      position: absolute;
-      bottom: 3px; left: 50%; transform: translateX(-50%);
-      width: 80px; height: 1px;
-      background: #b8860b;
+      line-height: 1.1;
+      border-bottom: 1px solid rgba(184, 134, 11, 0.3);
+      border-top: 1px solid rgba(184, 134, 11, 0.3);
     }
 
-    /* ——— RÉFÉRENCE ——— */
+    /* ——— RÉFÉRENCE PROÉMINENTE ——— */
     .ref-line {
-      text-align: center;
-      margin: 3px 0 6px;
+      text-align: right;
+      margin: 1px 0 3px;
       display: flex;
-      justify-content: center;
+      justify-content: flex-end;
       align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
+      gap: 6px;
     }
     .ref-box {
       font-family: 'Cinzel', serif;
-      font-size: 10pt;
+      font-size: 11pt;
       font-weight: 700;
       color: #b8860b;
-      letter-spacing: 0.6px;
-      padding: 3px 12px;
-      border: 0.75px solid #b8860b;
-      background: rgba(184, 134, 11, 0.06);
-      border-radius: 6px;
+      letter-spacing: 0.8px;
+      padding: 2px 8px;
+      border: 1px solid #b8860b;
+      background: rgba(184, 134, 11, 0.08);
+      border-radius: 4px;
     }
     .ref-meta {
-      font-size: 10pt;
+      font-size: 9pt;
       font-weight: 600;
-      letter-spacing: 0.8px;
-      color: #444;
+      letter-spacing: 0.6px;
+      color: #555;
       text-transform: uppercase;
-    }
-    .original-badge {
-      display: none;
     }
 
     /* ——— BASE LÉGALE ——— */
@@ -519,13 +500,18 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
 
     /* ——— TABLEAUX DE CHAMPS ——— */
     .section {
-      margin: 5px 0;
+      margin: 0;
+      padding: 10px 10px 12px;
+      border: 0.5px solid #e5e7eb;
+      border-radius: 10px;
+      background: #fcfcfb;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5);
     }
     .section-header {
       display: flex;
       align-items: center;
-      gap: 4px;
-      margin-bottom: 2px;
+      gap: 6px;
+      margin-bottom: 8px;
       padding-bottom: 2px;
       border-bottom: 0.75px solid #006b3f;
     }
@@ -551,7 +537,7 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
       font-size: 9.5pt;
     }
     .data-table td {
-      padding: 3px 4px;
+      padding: 2.5px 4px;
       vertical-align: middle;
     }
     .data-table .label {
@@ -571,34 +557,37 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
     /* ——— CODE-BARRES ——— */
     .barcode-section {
       text-align: center;
-      margin: 4px 0;
+      margin: 3px 0;
     }
     .barcode-section svg { height: 30px; }
 
-    /* ——— ZONE DE SIGNATURE UNIQUE ——— */
+    /* ——— ZONE DE SIGNATURE COMPACTE ——— */
     .signature-zone {
       display: flex;
       justify-content: center;
-      gap: 0;
-      margin: 2px 0;
+      align-items: stretch;
+      gap: 6px;
+      margin: 0;
+      min-height: 85px;
     }
     .sig-frame {
       border: 0.75px solid #b8860b;
-      padding: 3px 6px;
-      background: rgba(184, 134, 11, 0.01);
-      min-height: 32px;
-      min-width: 120px;
+      padding: 8px 8px 10px;
+      background: rgba(184, 134, 11, 0.05);
+      min-width: 140px;
       display: flex;
       flex-direction: column;
       align-items: center;
       text-align: center;
+      justify-content: space-between;
+      width: 100%;
     }
     .sig-frame-title {
       font-family: 'Cinzel', serif;
-      font-size: 6pt;
+      font-size: 5.5pt;
       font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.25px;
+      letter-spacing: 0.2px;
       color: #b8860b;
       margin-bottom: 1px;
       padding-bottom: 0.5px;
@@ -627,66 +616,73 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
       width: 100%;
     }
 
-    /* ——— BANDE DE SÉCURITÉ NUMÉRIQUE ——— */
+    /* ——— ZONE DE SÉCURITÉ OPTIMISÉE ——— */
+    .validation-area {
+      display: block;
+      margin: 0;
+    }
     .security-footer {
       position: relative;
-      margin: 2px 0 0;
+      margin: 0;
       border: 0.75px solid #d4d4d4;
-      padding: 4px 6px;
-      background: rgba(0, 107, 63, 0.03);
-      display: grid;
-      grid-template-columns: 70px 1fr;
-      gap: 6px;
-      align-items: flex-start;
-      border-radius: 3px;
-      font-size: 8.5pt;
+      padding: 6px 6px 6px;
+      background: rgba(0, 107, 63, 0.04);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      align-items: center;
+      border-radius: 6px;
+      font-size: 7.5pt;
+      min-height: 90px;
     }
     .sec-qr {
-      width: 70px; height: 70px;
+      width: 60px; height: 60px;
       border: 0.75px solid #ccc;
       padding: 2px;
       background: #fff;
       border-radius: 2px;
+      margin-bottom: 2px;
     }
     .sec-qr img { width: 100%; height: 100%; object-fit: contain; }
     .sec-left {
       display: flex;
       flex-direction: column;
       gap: 1px;
+      text-align: center;
     }
     .sec-control {
       display: flex;
       align-items: center;
-      gap: 3px;
+      justify-content: center;
+      gap: 2px;
     }
     .sec-control-label {
-      font-size: 5.5pt;
+      font-size: 5pt;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.2px;
+      letter-spacing: 0.1px;
       color: #006b3f;
-      min-width: 45px;
       flex-shrink: 0;
     }
     .sec-control-value {
       font-family: 'Courier New', monospace;
-      font-size: 6.5pt;
+      font-size: 6pt;
       font-weight: 700;
       color: #006b3f;
-      letter-spacing: 0.3px;
+      letter-spacing: 0.2px;
     }
     .sec-hash {
-      font-size: 5pt;
+      font-size: 4.5pt;
       color: #666;
       font-family: 'Courier New', monospace;
       word-break: break-all;
-      line-height: 1.15;
-      margin-top: 0.5px;
+      line-height: 1.1;
+      margin-top: 1px;
     }
     .sec-url {
-      font-size: 5pt;
+      font-size: 4.5pt;
       color: #006b3f;
-      margin-top: 0.5px;
+      margin-top: 1px;
     }
     .sec-url a {
       color: #006b3f;
@@ -697,7 +693,7 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
     .legal-notice {
       position: relative;
       margin-top: 3px;
-      font-size: 6pt;
+      font-size: 6.5pt;
       color: #777;
       text-align: center;
       font-style: italic;
@@ -713,29 +709,21 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
 <body>
 <div class="page">
 
-  <!-- Barres tricolores -->
-  <div class="tricolor-bar">
-    <div class="stripe orange"></div>
-    <div class="stripe white"></div>
-    <div class="stripe green"></div>
-  </div>
-  <div class="tricolor-bar-bottom">
-    <div class="stripe orange"></div>
-    <div class="stripe white"></div>
-    <div class="stripe green"></div>
-  </div>
+  <!-- Barre d'identification -->
+  <div class="id-bar"></div>
 
-  <!-- Coins ornements -->
-  <div class="corner corner-tl"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50"><path d="M5 45 L5 5 L45 5" stroke="#b8860b" stroke-width="2" fill="none"/><circle cx="5" cy="5" r="3" fill="#b8860b"/><path d="M10 40 L10 10 L40 10" stroke="#b8860b" stroke-width="0.75" fill="none" opacity="0.5"/></svg></div>
-  <div class="corner corner-tr"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50"><path d="M5 45 L5 5 L45 5" stroke="#b8860b" stroke-width="2" fill="none"/><circle cx="5" cy="5" r="3" fill="#b8860b"/><path d="M10 40 L10 10 L40 10" stroke="#b8860b" stroke-width="0.75" fill="none" opacity="0.5"/></svg></div>
-  <div class="corner corner-bl"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50"><path d="M5 45 L5 5 L45 5" stroke="#b8860b" stroke-width="2" fill="none"/><circle cx="5" cy="5" r="3" fill="#b8860b"/><path d="M10 40 L10 10 L40 10" stroke="#b8860b" stroke-width="0.75" fill="none" opacity="0.5"/></svg></div>
-  <div class="corner corner-br"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50"><path d="M5 45 L5 5 L45 5" stroke="#b8860b" stroke-width="2" fill="none"/><circle cx="5" cy="5" r="3" fill="#b8860b"/><path d="M10 40 L10 10 L40 10" stroke="#b8860b" stroke-width="0.75" fill="none" opacity="0.5"/></svg></div>
+  <!-- Coins discrets -->
+  <div class="corner corner-tl"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30"><path d="M3 27 L3 3 L27 3" stroke="#b8860b" stroke-width="1" fill="none" opacity="0.6"/><circle cx="3" cy="3" r="2" fill="#b8860b" opacity="0.6"/></svg></div>
+  <div class="corner corner-tr"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30"><path d="M3 27 L3 3 L27 3" stroke="#b8860b" stroke-width="1" fill="none" opacity="0.6"/><circle cx="3" cy="3" r="2" fill="#b8860b" opacity="0.6"/></svg></div>
+  <div class="corner corner-bl"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30"><path d="M3 27 L3 3 L27 3" stroke="#b8860b" stroke-width="1" fill="none" opacity="0.6"/><circle cx="3" cy="3" r="2" fill="#b8860b" opacity="0.6"/></svg></div>
+  <div class="corner corner-br"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30"><path d="M3 27 L3 3 L27 3" stroke="#b8860b" stroke-width="1" fill="none" opacity="0.6"/><circle cx="3" cy="3" r="2" fill="#b8860b" opacity="0.6"/></svg></div>
 
   <!-- Filigrane -->
   <div class="watermark">GNAMBA</div>
 
   <!-- Contenu principal -->
   <div class="content">
+    <div class="content-top">
 
     <!-- EN-TÊTE -->
     <div class="header">
@@ -776,7 +764,6 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
     <!-- RÉFÉRENCE -->
     <div class="ref-line">
       <span class="ref-box">N° ${reference}</span>
-      ${originalLabel === 'ORIGINAL' ? `<span class="original-badge">${originalLabel}</span>` : ''}
     </div>
 
     <!-- BASE LÉGALE -->
@@ -790,6 +777,10 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
       Nous, soussigné, <strong>${chefNom}</strong>, Chef Coutumier du Village de <strong>${villageNom.toUpperCase()}</strong>,
       attestons solennellement que les droits fonciers coutumiers afférents à la parcelle désignée ci-après sont détenus par :
     </div>
+
+    </div><!-- fin .content-top -->
+
+    <div class="sections-group">
 
     <!-- I. IDENTITÉ DU DÉTENTEUR -->
     <div class="section">
@@ -827,7 +818,7 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
 
     <!-- II. CESSION (si applicable) -->
     ${isCession ? `
-    <div class="section">
+    <div class="section section-full">
       <div class="section-header">
         <span class="section-numeral">II.</span>
         <span class="section-title">Informations de cession</span>
@@ -875,44 +866,45 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
     </div>
 
     <!-- CODE-BARRES -->
-    ${barcodeSvg ? `<div class="barcode-section">${barcodeSvg}</div>` : ''}
+    ${barcodeSvg ? `<div class="barcode-section section-full">${barcodeSvg}</div>` : ''}
+
+    </div><!-- fin .sections-group -->
 
     <!-- IV. SIGNATURE & DATE -->
-    <div class="section">
-      <div class="section-header">
-        <span class="section-numeral">${isCession ? 'IV' : 'III'}.</span>
-        <span class="section-title">Validation</span>
+    <div class="bottom-row">
+      <div class="section">
+        <div class="section-header">
+          <span class="section-numeral">${isCession ? 'IV' : 'III'}.</span>
+          <span class="section-title">Validation</span>
+        </div>
+        <div class="signature-zone">
+          <div class="sig-frame">
+            <div class="sig-frame-title">Chef du Village</div>
+            <div class="sig-frame-name">${chefNom || '—'}</div>
+            <div class="sig-frame-line">Signature & Cachet</div>
+          </div>
+        </div>
       </div>
-      <div class="signature-zone">
-        <div class="sig-frame">
-          <div class="sig-frame-title">Chef du Village</div>
-          <div class="sig-frame-name">${chefNom || '—'}</div>
-          <div class="sig-frame-line">Signature & Cachet</div>
+
+      <div class="security-footer">
+        ${qrDataUrl ? `<div class="sec-qr"><img src="${qrDataUrl}" alt="QR Code de vérification" /></div>` : ''}
+        <div class="sec-left">
+          ${controlNumber ? `<div class="sec-control">
+            <span class="sec-control-label">N°</span>
+            <span class="sec-control-value">${controlNumber}</span>
+          </div>` : ''}
+          ${hashSha256 ? `<div class="sec-hash">${hashSha256.substring(0, 24)}...</div>` : ''}
+          ${verificationUrl ? `<div class="sec-url"><a href="${verificationUrl}">Vérifier en ligne</a></div>` : ''}
         </div>
       </div>
     </div>
 
-  </div><!-- fin .content -->
-
-  <!-- BANDE DE SÉCURITÉ NUMÉRIQUE -->
-  <div class="security-footer">
-    <div class="sec-left">
-      ${controlNumber ? `<div class="sec-control">
-        <span class="sec-control-label">N° Contrôle :</span>
-        <span class="sec-control-value">${controlNumber}</span>
-      </div>` : ''}
-      ${hashSha256 ? `<div class="sec-hash">SHA-256 : ${hashSha256}</div>` : ''}
-      ${verificationUrl ? `<div class="sec-url">Vérification : <a href="${verificationUrl}">${verificationUrl}</a></div>` : ''}
+    <div class="legal-notice">
+      La présente attestation ne vaut pas titre de propriété foncier —
+      Elle constitue une présomption simple de possession coutumière
     </div>
-    ${qrDataUrl ? `<div class="sec-qr"><img src="${qrDataUrl}" alt="QR Code de vérification" /></div>` : ''}
-  </div>
 
-  <!-- MENTIONS LÉGALES -->
-  <div class="legal-notice">
-    La présente attestation ne vaut pas titre de propriété foncier —
-    Elle constitue une présomption simple de possession coutumière
-  </div>
-
+  </div><!-- fin .content -->
 </div>
 </body>
 </html>`;
