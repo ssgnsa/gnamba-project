@@ -19,12 +19,12 @@
   # Updated 2026-03-30: Added r2cdn.perplexity.ai for fonts
   # Updated 2026-04-01: Added hash for Cloudflare-injected inline script
   # Updated 2026-04-05: Added localhost:11434 for Ollama AI integration
-  Content-Security-Policy: default-src 'self'; base-uri 'self'; form-action 'self' https:; object-src 'none'; frame-ancestors 'self'; script-src 'self' 'wasm-unsafe-eval' 'sha256-J1QHVAri1VFjAOQCfOmU4cl/lY1GThN9D/8RbXrPDyQ=' https://static.cloudflareinsights.com https://cloudflareinsights.com; script-src-elem 'self' 'wasm-unsafe-eval' https://static.cloudflareinsights.com https://cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com https://r2cdn.perplexity.ai; img-src 'self' data: blob: https:; connect-src 'self' https://thykrnoqgylrbfupophs.supabase.co wss://thykrnoqgylrbfupophs.supabase.co https://thykrnoqgylrbfupophs.supabase.co https://cloudflareinsights.com https://static.cloudflareinsights.com http://localhost:11434;
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; form-action 'self' https:; object-src 'none'; frame-ancestors 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' 'unsafe-inline' 'sha256-J1QHVAri1VFjAOQCfOmU4cl/lY1GThN9D/8RbXrPDyQ=' https://static.cloudflareinsights.com https://cloudflareinsights.com; script-src-elem 'self' 'unsafe-eval' 'wasm-unsafe-eval' 'unsafe-inline' https://static.cloudflareinsights.com https://cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com https://r2cdn.perplexity.ai; img-src 'self' data: blob: https: https://*.supabase.co https://*.supabase.in https://gnambaservices.ci; connect-src 'self' https://thykrnoqgylrbfupophs.supabase.co wss://thykrnoqgylrbfupophs.supabase.co https://thykrnoqgylrbfupophs.supabase.co https://cloudflareinsights.com https://static.cloudflareinsights.com https://www.youtube.com https://www.youtube-nocookie.com http://localhost:11434; frame-src 'self' https://www.youtube-nocookie.com https://www.youtube.com;
   
   # Cross-Origin Policies
   Cross-Origin-Opener-Policy: same-origin
-  Cross-Origin-Embedder-Policy: require-corp
-  Cross-Origin-Resource-Policy: same-origin
+  # Cross-Origin-Embedder-Policy: require-corp
+  # Cross-Origin-Resource-Policy: same-origin
   
   # Cache Control for HTML (no cache)
   Cache-Control: no-cache, no-store, must-revalidate

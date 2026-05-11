@@ -3,7 +3,6 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/default-logo.svg" />
-    <link rel="preload" as="image" href="/default-logo.svg" />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
@@ -13,6 +12,24 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Gnamba Services" />
     <meta name="format-detection" content="telephone=no" />
+    
+    <!-- Content Security Policy -->
+      default-src 'self';
+      script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' 'unsafe-inline' 'sha256-J1QHVAri1VFjAOQCfOmU4cl/lY1GThN9D/8RbXrPDyQ=' https://static.cloudflareinsights.com https://cloudflareinsights.com;
+      script-src-elem 'self' 'unsafe-eval' 'wasm-unsafe-eval' 'unsafe-inline' https://static.cloudflareinsights.com https://cloudflareinsights.com;
+      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+      font-src 'self' data: https://fonts.gstatic.com https://r2cdn.perplexity.ai;
+      img-src 'self' data: blob: https: https://*.supabase.co https://*.supabase.in https://gnambaservices.ci;
+      connect-src 'self' https://thykrnoqgylrbfupophs.supabase.co wss://thykrnoqgylrbfupophs.supabase.co https://thykrnoqgylrbfupophs.supabase.co https://cloudflareinsights.com https://static.cloudflareinsights.com https://www.youtube.com https://www.youtube-nocookie.com http://localhost:11434;
+      frame-src 'self' https://www.youtube-nocookie.com https://www.youtube.com;
+      media-src 'self';
+      object-src 'none';
+      base-uri 'self';
+      form-action 'self';
+      frame-ancestors 'self';
+      upgrade-insecure-requests;
+    ">
+    
     <title>Gnamba Services - BTP, Immobilier & Foncier</title>
 
     <!-- SEO Meta Tags -->
@@ -62,13 +79,13 @@
       content="Gnamba Services - ERP complet pour la gestion BTP, immobilier, foncier et fournitures en Côte d'Ivoire."
     />
     <meta name="twitter:image" content="/og-image.png" />
-    <script type="module" crossorigin src="/assets/index-BLeQqmgV.js"></script>
+    <script type="module" crossorigin src="/assets/index-B8a7fqWV.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/rolldown-runtime-2JzG8er9.js">
     <link rel="modulepreload" crossorigin href="/assets/icons-vendor-BfPGE0aO.js">
     <link rel="modulepreload" crossorigin href="/assets/react-vendor-Dj4gTxeL.js">
     <link rel="modulepreload" crossorigin href="/assets/supabase-vendor-Edgr6ZxE.js">
-    <link rel="modulepreload" crossorigin href="/assets/supabase-Cm30VQRU.js">
-    <link rel="modulepreload" crossorigin href="/assets/SettingsContext-CMQ2j17o.js">
+    <link rel="modulepreload" crossorigin href="/assets/supabase-Cg7N-dMF.js">
+    <link rel="modulepreload" crossorigin href="/assets/SettingsContext-DH5ha9Ed.js">
     <link rel="stylesheet" crossorigin href="/assets/index-vyKxUl-P.css">
   </head>
   <body>
