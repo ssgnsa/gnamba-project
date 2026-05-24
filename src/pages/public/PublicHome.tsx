@@ -360,6 +360,7 @@ export default function PublicHome({ onNavigate }: Props) {
           <img
             src={heroBg}
             alt={`Vue d'ensemble des réalisations ${appCompany}`}
+            crossOrigin="anonymous"
             className="absolute inset-0 h-full w-full object-cover"
             loading="eager"
             fetchPriority="high"
@@ -516,6 +517,73 @@ export default function PublicHome({ onNavigate }: Props) {
         </div>
       </section>
 
+      {/* Promotions - Lots à Sikensi */}
+      {
+        (() => {
+          const raw = get("promotions", "lots_sikensi", "");
+          let promoLots: any[] = [];
+          try {
+            promoLots = raw ? JSON.parse(raw) : [];
+          } catch (e) {
+            promoLots = [];
+          }
+          return promoLots.length > 0 ? (
+            <section className="py-20 bg-white">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="text-center mb-10">
+                  <h2 className="text-2xl font-bold">Lots à vendre à Sikensi</h2>
+                  <p className="text-gray-500">Nous disposons de plusieurs lots à Sikensi. Réservez votre parcelle aujourd'hui — contactez-nous pour plus d'informations.</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {promoLots.map((lot, idx) => (
+                    <div key={lot.id || lot.numero_lot || idx} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+                      {lot.image_url ? (
+                        <img
+                          src={lot.image_url}
+                          alt={lot.title || `Lot ${lot.numero_lot || ''}`}
+                          className="h-48 w-full object-cover"
+                        />
+                      ) : (
+                        <div className="h-48 bg-slate-100 flex items-center justify-center text-sm text-slate-400">
+                          Image indisponible
+                        </div>
+                      )}
+
+                      <div className="p-5">
+                        <h3 className="font-bold text-gray-900 mb-1.5">{lot.title || `Lot ${lot.numero_lot || ''}`}</h3>
+                        <p className="text-sm text-gray-500 mb-3">{lot.subtitle || lot.description || ''}</p>
+
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm text-gray-700 font-semibold">{lot.superficie ? `${lot.superficie} m²` : ''}</div>
+                          <div className="text-sm text-gray-900 font-bold">{lot.prix ? `${lot.prix} FCFA` : ''}</div>
+                        </div>
+
+                        <div className="mt-4 flex gap-2">
+                          <button
+                            onClick={() => nav('contact')}
+                            className="px-4 py-2 rounded-xl text-white text-sm"
+                            style={{ backgroundColor: primaryColor }}
+                          >
+                            Contacter
+                          </button>
+                          <a
+                            href={`tel:${contactPhone}`}
+                            className="px-4 py-2 rounded-xl border border-gray-200 text-sm"
+                          >
+                            Appeler
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+          ) : null;
+        })()
+      }
+
       {/* Réalisations */}
       {realisations.length > 0 && (
         <section className="py-24 bg-gray-50">
@@ -564,6 +632,7 @@ export default function PublicHome({ onNavigate }: Props) {
                           <img
                             src={r.image_url}
                             alt={r.title}
+                            crossOrigin="anonymous"
                             className="absolute inset-0 w-full h-full object-cover"
                             loading="lazy"
                             decoding="async"
