@@ -1,0 +1,8 @@
+[functions.send-welcome-message]
+verify_jwt = true
+
+[functions.send-welcome-message.secrets]
+# TWILIO_ACCOUNT_SID = ""
+# TWILIO_AUTH_TOKEN = ""
+# TWILIO_PHONE_NUMBER = ""
+# TWILIO_WHATSAPP_NUMBER = ""

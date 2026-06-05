@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Star, Upload, Check, RefreshCw, Image } from "lucide-react";
 import { getBrandAsset, setBrandAsset } from "../../lib/mediaUtils";
 import { useAuth } from "../../context/AuthContext";
@@ -41,7 +41,7 @@ const BRAND_SLOTS: BrandSlot[] = [
 ];
 
 export default function BrandAssetsManager() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { refreshSettings } = useSettings();
   const [assets, setAssets] = useState<
     Record<BrandAssetType, MediaFile | null>
@@ -56,11 +56,8 @@ export default function BrandAssetsManager() {
   const [saving, setSaving] = useState<BrandAssetType | null>(null);
   const [saved, setSaved] = useState<BrandAssetType | null>(null);
 
-  useEffect(() => {
-    loadAssets();
-  }, []);
-
-  const loadAssets = async () => {
+  const loadAssets = useCallback(async () => {
+    if (authLoading || !user) return;
     setLoading(true);
     const [logo, fav, secondary, watermark] = await Promise.all([
       getBrandAsset("logo_principal"),
@@ -75,7 +72,16 @@ export default function BrandAssetsManager() {
       watermark: watermark,
     });
     setLoading(false);
-  };
+  }, [authLoading, user]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+    loadAssets();
+  }, [authLoading, user, loadAssets]);
 
   const handleAssign = async (type: BrandAssetType, file: MediaFile) => {
     if (!user) return;
@@ -90,6 +96,27 @@ export default function BrandAssetsManager() {
     setSaving(null);
     setPicking(null);
   };
+
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center">
+        <p className="text-sm font-semibold text-amber-900 mb-2">
+          Connexion requise
+        </p>
+        <p className="text-sm text-amber-700">
+          Vous devez être connecté pour accéder aux actifs de marque.
+        </p>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -149,6 +176,7 @@ export default function BrandAssetsManager() {
                     <img
                       src={current.url}
                       alt={slot.label}
+                      crossOrigin="anonymous"
                       className="w-full h-full object-contain p-1"
                     />
                   ) : (

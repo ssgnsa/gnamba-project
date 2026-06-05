@@ -128,40 +128,70 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user) await fetchProfile(user.id);
   };
 
+  const purgeCorruptedSession = () => {
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const k = window.localStorage.key(i);
+        if (k && (k.startsWith('sb-') || k.includes('supabase') || k === 'egs-supabase-auth')) keysToRemove.push(k);
+      }
+      keysToRemove.forEach(k => {
+        window.localStorage.removeItem(k);
+        window.sessionStorage.removeItem(k);
+      });
+    } catch { /* SSR */ }
+  };
+
   useEffect(() => {
     let cancelled = false;
-    supabase.auth
-      .getSession()
-      .then(({ data, error }) => {
-        if (cancelled) return;
-        if (error) {
-          setLoading(false);
+
+    const init = async () => {
+      try {
+        // getSession() est local (lit le storage) — pas de requête réseau
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+        if (sessionError || !session) {
+          // Pas de session en storage → pas de token, pas de call réseau
+          if (!cancelled) setLoading(false);
           return;
         }
-        const session = data?.session ?? null;
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          fetchProfile(session.user.id).finally(() => {
-            if (!cancelled) setLoading(false);
-          });
-        } else {
-          setLoading(false);
+
+        // Session présente → valider côté serveur via getUser()
+        const { data: { user: serverUser }, error: userError } = await supabase.auth.getUser();
+
+        if (userError) {
+          // Token invalide ou expiré → purger le storage corrompu
+          purgeCorruptedSession();
+          await supabase.auth.signOut({ scope: 'local' });
+          if (!cancelled) setLoading(false);
+          return;
         }
-      })
-      .catch(() => {
+
+        if (cancelled) return;
+        setSession(session);
+        setUser(serverUser ?? null);
+        if (serverUser) {
+          await fetchProfile(serverUser.id);
+        }
+      } catch {
+        // ignore
+      } finally {
         if (!cancelled) setLoading(false);
-      });
+      }
+    };
+
+    void init();
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || (event === 'TOKEN_REFRESHED' && !session)) {
+        purgeCorruptedSession();
+      }
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        (async () => {
-          await fetchProfile(session.user.id);
-        })();
+        void fetchProfile(session.user.id);
       } else {
         setProfile(null);
       }
@@ -182,7 +212,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email,
         password,
       });
-      if (error) return { error: error.message };
+      if (error) {
+        if (error.code === "email_not_confirmed") {
+          return {
+            error:
+              "EMAIL_NOT_CONFIRMED: Ce compte existe mais n'est pas encore confirmé.",
+          };
+        }
+        return { error: error.message };
+      }
       return { error: null };
     },
     [],
@@ -210,8 +248,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user || !IDLE_TIMEOUT_MS || IDLE_TIMEOUT_MS <= 0) return;
     if (typeof window === "undefined") return;
 
+    let lastWrite = 0;
+    const THROTTLE_MS = 5_000;
     const updateActivity = () => {
-      window.localStorage.setItem(LAST_ACTIVITY_KEY, String(Date.now()));
+      const now = Date.now();
+      if (now - lastWrite < THROTTLE_MS) return;
+      lastWrite = now;
+      window.localStorage.setItem(LAST_ACTIVITY_KEY, String(now));
     };
 
     const events: Array<keyof WindowEventMap> = [

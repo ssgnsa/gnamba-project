@@ -6,16 +6,19 @@ import {
   FileText,
   DollarSign,
   AlertCircle,
+  BarChart3,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import type { Property, Tenant, RentPayment, LeaseContract } from "../types";
 import { useSettings } from "../context/SettingsContext";
+import { useRealtimePayments } from "../hooks/useRealtimePayments";
 import PropertiesTab from "./immobilier/PropertiesTab";
 import TenantsTab from "./immobilier/TenantsTab";
 import ContractsTab from "./immobilier/ContractsTab";
 import PaymentsTab from "./immobilier/PaymentsTab";
+import PaymentReportsTab from "./immobilier/PaymentReportsTab";
 
-type Tab = "biens" | "locataires" | "contrats" | "paiements";
+type Tab = "biens" | "locataires" | "contrats" | "paiements" | "rapports";
 
 const tabs: {
   id: Tab;
@@ -26,6 +29,7 @@ const tabs: {
   { id: "locataires", label: "Locataires", icon: Users },
   { id: "contrats", label: "Contrats", icon: FileText },
   { id: "paiements", label: "Paiements", icon: DollarSign },
+  { id: "rapports", label: "Rapports", icon: BarChart3 },
 ];
 
 const isSchemaMismatchError = (
@@ -57,6 +61,9 @@ export default function Immobilier() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Activer les notifications en temps réel pour les paiements
+  useRealtimePayments();
 
   const [properties, setProperties] = useState<Property[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -215,6 +222,12 @@ export default function Immobilier() {
       p.statut === "partiel",
   ).length;
 
+  const totalProperties = properties.length;
+  const occupiedProperties = properties.filter((p) => p.statut === "loue").length;
+  const availableProperties = properties.filter(
+    (p) => p.statut === "disponible",
+  ).length;
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
@@ -258,6 +271,37 @@ export default function Immobilier() {
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-100)] focus:border-[var(--color-primary-400)] w-full sm:w-72"
           />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <p className="text-xs text-gray-500 uppercase tracking-[0.16em] mb-2">
+            Biens totaux
+          </p>
+          <p className="text-3xl font-semibold text-gray-900">{totalProperties}</p>
+          <p className="text-sm text-gray-500 mt-1">Inventaire global</p>
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <p className="text-xs text-gray-500 uppercase tracking-[0.16em] mb-2">
+            Biens loués
+          </p>
+          <p className="text-3xl font-semibold text-gray-900">{occupiedProperties}</p>
+          <p className="text-sm text-gray-500 mt-1">Locations actives</p>
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <p className="text-xs text-gray-500 uppercase tracking-[0.16em] mb-2">
+            Biens disponibles
+          </p>
+          <p className="text-3xl font-semibold text-gray-900">{availableProperties}</p>
+          <p className="text-sm text-gray-500 mt-1">Prêts à être loués</p>
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <p className="text-xs text-gray-500 uppercase tracking-[0.16em] mb-2">
+            Paiements urgents
+          </p>
+          <p className="text-3xl font-semibold text-gray-900">{urgentPayments}</p>
+          <p className="text-sm text-gray-500 mt-1">Retards et partiels</p>
         </div>
       </div>
 
@@ -319,6 +363,16 @@ export default function Immobilier() {
               tenants={tenants}
               properties={properties}
               search={search}
+              tenantIdColumn={tenantIdColumn}
+              onRefresh={fetchData}
+            />
+          )}
+          {activeTab === "rapports" && (
+            <PaymentReportsTab
+              payments={payments}
+              contracts={activeContracts}
+              tenants={tenants}
+              properties={properties}
               tenantIdColumn={tenantIdColumn}
               onRefresh={fetchData}
             />

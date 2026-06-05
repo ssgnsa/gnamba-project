@@ -165,7 +165,8 @@ export default function Employes() {
       return;
     }
     if (!confirm("Supprimer cet employé ?")) return;
-    await supabase.from("employees").delete().eq("id", id);
+    const { error } = await supabase.from("employees").delete().eq("id", id);
+    if (error) { setFormError(error.message); return; }
     fetchEmployees();
   };
 
@@ -305,6 +306,7 @@ export default function Employes() {
                         <img
                           src={e.photo_url}
                           alt={`${e.prenom} ${e.nom}`}
+                          crossOrigin="anonymous"
                           className="w-10 h-10 rounded-full object-cover"
                         />
                       ) : (
@@ -403,6 +405,7 @@ export default function Employes() {
                               <img
                                 src={e.photo_url}
                                 alt={`${e.prenom} ${e.nom}`}
+                                crossOrigin="anonymous"
                                 className="w-8 h-8 rounded-full object-cover flex-shrink-0"
                               />
                             ) : (
@@ -501,6 +504,7 @@ export default function Employes() {
                   <img
                     src={form.photo_url}
                     alt="Photo"
+                    crossOrigin="anonymous"
                     className="w-16 h-16 rounded-xl object-cover border-2 border-gray-200"
                   />
                   <button

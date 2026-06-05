@@ -278,10 +278,11 @@ const processQueueItemWithConflictResolution = async (item: OfflineQueueItem): P
     case "restore_lot":
       await supabase.rpc("restore_foncier_lot", { p_lot_id: item.payload.id });
       break;
-    case "audit_log":
+    case "audit_log": {
       const { logFoncierAudit } = await import("../lib/foncierAudit");
       await logFoncierAudit(supabase, item.payload);
       break;
+    }
     default:
       throw new Error(`Unknown operation: ${item.op}`);
   }

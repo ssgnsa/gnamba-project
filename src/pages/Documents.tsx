@@ -26,6 +26,7 @@ import Badge from "../components/ui/Badge";
 import { useSettings } from "../context/SettingsContext";
 import { useAuth } from "../context/AuthContext";
 import FileBrowserIntegration from "../components/filebrowser/FileBrowserIntegration";
+import DocumentForm from "../components/documents/DocumentForm";
 
 const typeConfig: Record<
   string,
@@ -87,7 +88,7 @@ const getDocumentHref = (rawValue: string) => {
 
 export default function Documents() {
   const { settings } = useSettings();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -113,11 +114,15 @@ export default function Documents() {
   >([]);
   const [loadingFiles, setLoadingFiles] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [showFileBrowserAdvanced, setShowFileBrowserAdvanced] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const urlInputRef = useRef<HTMLInputElement>(null);
   const fileBrowserUrl = import.meta.env.VITE_FILEBROWSER_URL || "";
+  
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   // Vérifier les droits
   const canEdit =
@@ -413,26 +418,44 @@ export default function Documents() {
       }
 
       setUploading(true);
+      setUploadProgress(0);
 
       try {
         // Nom unique avec timestamp
         const fileExt = file.name.split(".").pop();
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
-        // Upload vers Supabase Storage
+        // Upload vers Supabase Storage avec suivi de progression
         const { error } = await supabase.storage
           .from("documents")
           .upload(fileName, file, {
             cacheControl: "3600",
             upsert: false,
+            contentType: file.type,
           });
 
         if (error) throw error;
+
+        setUploadProgress(100);
 
         // Récupérer l'URL publique
         const { data: urlData } = supabase.storage
           .from("documents")
           .getPublicUrl(fileName);
+
+        // Indexer dans media_files pour traçabilité centralisée
+        await supabase.from("media_files").insert({
+          filename: fileName,
+          original_name: file.name,
+          url: urlData.publicUrl,
+          category: "documents",
+          uploaded_by: user?.id ?? null,
+          size: file.size,
+          type: file.type,
+          alt_text: "",
+          description: "",
+          tags: [],
+        });
 
         // Mettre à jour le formulaire
         setForm((prev) => ({ ...prev, url: urlData.publicUrl }));
@@ -446,9 +469,10 @@ export default function Documents() {
         setPageNotice(error.message || "❌ Échec de l'upload");
       } finally {
         setUploading(false);
+        setUploadProgress(0);
       }
     },
-    [openFilePicker],
+    [openFilePicker, user?.id],
   );
 
   const handleSave = async () => {
@@ -502,7 +526,8 @@ export default function Documents() {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Supprimer ce document ?")) return;
-    await supabase.from("documents").delete().eq("id", id);
+    const { error } = await supabase.from("documents").delete().eq("id", id);
+    if (error) { setPageNotice(error.message); return; }
     fetchData();
   };
 
@@ -513,6 +538,18 @@ export default function Documents() {
     const matchType = !filterType || d.type_document === filterType;
     return matchSearch && matchType;
   });
+
+  // Pagination logic
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const paginatedDocuments = filtered.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  // Reset to page 1 when search/filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, filterType]);
 
   return (
     <div className="space-y-4">
@@ -645,7 +682,7 @@ export default function Documents() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {filtered.map((d) => {
+                    {paginatedDocuments.map((d) => {
                       const tc = typeConfig[d.type_document];
                       const documentHref = getDocumentHref(d.url);
                       return (
@@ -760,192 +797,69 @@ export default function Documents() {
                 </table>
               </div>
             )}
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+                <div className="text-sm text-gray-600">
+                  Affichage de {(currentPage - 1) * itemsPerPage + 1} à {Math.min(currentPage * itemsPerPage, filtered.length)} sur {filtered.length} documents
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Précédent
+                  </button>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                          currentPage === page
+                            ? 'bg-blue-600 text-white'
+                            : 'border border-gray-200 text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Suivant
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
-          <Modal
-            isOpen={modalOpen}
-            onClose={handleCloseModal}
-            title="Ajouter un Document"
-          >
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Nom du Document *
-                </label>
-                <input
-                  data-autofocus="true"
-                  type="text"
-                  value={form.nom}
-                  onChange={(e) =>
-                    setForm((prev) => ({ ...prev, nom: e.target.value }))
-                  }
-                  className={sharedInputClass}
-                />
-                {formErrors.nom && (
-                  <p className="mt-1 text-xs text-red-600">{formErrors.nom}</p>
-                )}
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Type
-                </label>
-                <select
-                  value={form.type_document}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      type_document: e.target
-                        .value as Document["type_document"],
-                    }))
-                  }
-                  className={sharedInputClass}
-                >
-                  {Object.entries(typeConfig).map(([k, v]) => (
-                    <option key={k} value={k}>
-                      {v.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  URL / Lien du Document
-                </label>
-                <div className="flex flex-col gap-2">
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <input
-                      ref={urlInputRef}
-                      type="text"
-                      value={form.url}
-                      onChange={(e) =>
-                        setForm((prev) => ({ ...prev, url: e.target.value }))
-                      }
-                      placeholder="https://... ou sélectionnez depuis le stockage"
-                      className={sharedInputClass}
-                      readOnly={uploading}
-                    />
-                    <button
-                      type="button"
-                      onClick={openFilePicker}
-                      disabled={uploading}
-                      className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-blue-50 hover:border-blue-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-                      title="Choisir depuis le stockage"
-                    >
-                      <FolderOpen size={15} />
-                      <span className="hidden sm:inline">Choisir</span>
-                    </button>
-                  </div>
-
-                  {/* Upload de fichier */}
-                  <div className="flex items-center gap-2">
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      onChange={handleFileUpload}
-                      disabled={uploading}
-                      accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.txt"
-                      className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm disabled:opacity-50"
-                    />
-                    {uploading && (
-                      <div className="flex items-center gap-2 text-xs text-blue-600">
-                        <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                        <span>Upload...</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <p className="text-[11px] text-gray-500">
-                    Formats acceptés : PDF, Word, Excel, Images (JPG, PNG, GIF),
-                    Texte. Max 10 MB.
-                  </p>
-                  {formErrors.url && (
-                    <p className="text-xs text-red-600">{formErrors.url}</p>
-                  )}
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Client
-                  </label>
-                  <select
-                    value={form.client_id}
-                    onChange={(e) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        client_id: e.target.value,
-                      }))
-                    }
-                    className={sharedInputClass}
-                  >
-                    <option value="">Sélectionner...</option>
-                    {clients.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.prenom} {c.nom}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Projet
-                  </label>
-                  <select
-                    value={form.project_id}
-                    onChange={(e) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        project_id: e.target.value,
-                      }))
-                    }
-                    className={sharedInputClass}
-                  >
-                    <option value="">Sélectionner...</option>
-                    {projects.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.nom}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Description
-                </label>
-                <textarea
-                  value={form.description}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      description: e.target.value,
-                    }))
-                  }
-                  rows={2}
-                  className={`${sharedInputClass} resize-none`}
-                />
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={handleCloseModal}
-                  className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
-                >
-                  Annuler
-                </button>
-                <button
-                  onClick={handleSave}
-                  disabled={saving || !form.nom.trim()}
-                  className="flex-1 px-4 py-2.5 rounded-xl text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity"
-                  style={{
-                    backgroundColor: settings.primary_color,
-                    color: "var(--color-on-primary)",
-                  }}
-                >
-                  {saving ? "Enregistrement..." : "Enregistrer"}
-                </button>
-              </div>
-            </div>
-          </Modal>
+          {modalOpen && (
+            <DocumentForm
+              form={form}
+              setForm={setForm}
+              formErrors={formErrors}
+              saving={saving}
+              uploading={uploading}
+              uploadProgress={uploadProgress}
+              clients={clients}
+              projects={projects}
+              typeConfig={typeConfig}
+              sharedInputClass={sharedInputClass}
+              settings={settings}
+              fileInputRef={fileInputRef}
+              urlInputRef={urlInputRef}
+              onSave={handleSave}
+              onCancel={handleCloseModal}
+              onFileUpload={handleFileUpload}
+              onOpenFilePicker={openFilePicker}
+            />
+          )}
 
           {/* Modale de Partage */}
           <Modal
@@ -1160,69 +1074,61 @@ export default function Documents() {
         // Onglet Partage - FileBrowser
         <div className="space-y-4">
           <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
               <div>
                 <h3 className="text-base font-semibold text-gray-900">
-                  Filebrowser (intégration safe)
+                  Gestionnaire de Fichiers
                 </h3>
                 <p className="text-sm text-gray-500 mt-1">
-                  Ouvrez Filebrowser dans un nouvel onglet. Recommandé pour
-                  éviter tout souci d’iframe/CORS.
+                  Accédez à vos fichiers via FileBrowser avec authentification EGS
                 </p>
               </div>
-              <button
-                type="button"
-                disabled={!fileBrowserUrl}
-                onClick={() => {
-                  if (!fileBrowserUrl) return;
-                  window.open(fileBrowserUrl, "_blank", "noopener,noreferrer");
-                }}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white hover:opacity-90 transition-opacity disabled:opacity-50"
-                style={{
-                  backgroundColor: settings.primary_color,
-                  color: "var(--color-on-primary)",
-                }}
-              >
-                <ExternalLink size={16} />
-                Ouvrir Filebrowser
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={!fileBrowserUrl}
+                  onClick={() => {
+                    if (!fileBrowserUrl) return;
+                    window.open(fileBrowserUrl, "_blank", "noopener,noreferrer");
+                  }}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+                  style={{
+                    backgroundColor: settings.primary_color,
+                    color: "var(--color-on-primary)",
+                  }}
+                >
+                  <ExternalLink size={16} />
+                  Ouvrir Filebrowser
+                </button>
+              </div>
             </div>
 
             {fileBrowserUrl ? (
-              <p className="text-xs text-gray-500 mt-3">
+              <p className="text-xs text-gray-500">
                 URL configurée: {fileBrowserUrl}
               </p>
             ) : (
-              <div className="mt-3 p-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-xs">
+              <div className="p-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-xs">
                 Renseignez{" "}
                 <code className="font-mono">VITE_FILEBROWSER_URL</code> dans{" "}
-                <code className="font-mono">.env</code> pour activer le bouton.
+                <code className="font-mono">.env</code> pour activer FileBrowser.
               </div>
             )}
-
-            <div className="mt-4">
-              <button
-                type="button"
-                onClick={() => setShowFileBrowserAdvanced((value) => !value)}
-                className="text-xs text-gray-500 hover:text-gray-700 underline"
-              >
-                {showFileBrowserAdvanced ? "Masquer" : "Afficher"} le mode
-                avancé (API)
-              </button>
-            </div>
           </div>
 
-          {showFileBrowserAdvanced && (
-            <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-              <FileBrowserIntegration
-                onFileSelect={(file) => {
-                  if (import.meta.env.DEV)
-                    console.log("Fichier sélectionné:", file);
-                  // Vous pouvez ajouter une logique ici pour intégrer le fichier dans EGS
-                }}
-              />
-            </div>
-          )}
+          {/* Intégration FileBrowser avec authentification EGS */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
+            <FileBrowserIntegration
+              onFileSelect={(file) => {
+                // Intégrer le fichier sélectionné dans EGS
+                setForm((prev) => ({ ...prev, url: file.path }));
+                setActiveTab("documents");
+                setModalOpen(true);
+                setPageNotice(`✅ Fichier sélectionné : ${file.name}`);
+                setTimeout(() => setPageNotice(null), 3000);
+              }}
+            />
+          </div>
         </div>
       )}
     </div>

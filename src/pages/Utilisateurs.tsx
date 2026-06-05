@@ -10,6 +10,7 @@ import {
   Trash2,
   UserPlus,
   Users,
+  X,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import Modal from "../components/ui/Modal";
@@ -17,6 +18,7 @@ import Badge from "../components/ui/Badge";
 import { useSettings } from "../context/SettingsContext";
 import { ACCESS_LEVEL_LABELS, useAuth } from "../context/AuthContext";
 import type { AccessLevel, UserRole } from "../types";
+import MediaPicker from "../components/media/MediaPicker";
 
 interface UserProfileRow {
   id: string;
@@ -136,6 +138,7 @@ export default function Utilisateurs() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [creatingAccount, setCreatingAccount] = useState(false);
+  const [showAvatarPicker, setShowAvatarPicker] = useState<"create" | "edit" | null>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -302,8 +305,9 @@ export default function Utilisateurs() {
       };
     }
 
-    const canonicalOrigin = import.meta.env.VITE_CANONICAL_ORIGIN;
-    const redirectTo = canonicalOrigin || window.location.origin;
+    const canonicalOrigin =
+      import.meta.env.VITE_CANONICAL_ORIGIN || "https://gnambaservices.ci";
+    const redirectTo = canonicalOrigin;
 
     const { error: otpError } = await supabase.auth.signInWithOtp({
       email,
@@ -579,6 +583,7 @@ export default function Utilisateurs() {
                             <img
                               src={user.avatar_url}
                               alt={user.full_name}
+                              crossOrigin="anonymous"
                               className="w-8 h-8 rounded-full object-cover flex-shrink-0"
                             />
                           ) : (
@@ -767,16 +772,37 @@ export default function Utilisateurs() {
 
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
-              URL avatar (optionnel)
+              Photo de profil (optionnel)
             </label>
-            <input
-              type="url"
-              value={createForm.avatar_url}
-              onChange={(e) =>
-                setCreateForm({ ...createForm, avatar_url: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
-            />
+            <div className="flex items-center gap-3">
+              {createForm.avatar_url ? (
+                <div className="relative">
+                  <img
+                    src={createForm.avatar_url}
+                    alt="Avatar"
+                    className="w-12 h-12 rounded-full object-cover border-2 border-gray-200"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setCreateForm({ ...createForm, avatar_url: "" })}
+                    className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600"
+                  >
+                    <X size={9} />
+                  </button>
+                </div>
+              ) : (
+                <div className="w-12 h-12 rounded-full bg-gray-100 border-2 border-dashed border-gray-300 flex items-center justify-center">
+                  <Users size={16} className="text-gray-400" />
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowAvatarPicker("create")}
+                className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-medium rounded-lg transition-colors"
+              >
+                {createForm.avatar_url ? "Changer" : "Sélectionner"}
+              </button>
+            </div>
           </div>
 
           <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
@@ -939,14 +965,37 @@ export default function Utilisateurs() {
 
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
-              URL avatar (optionnel)
+              Photo de profil (optionnel)
             </label>
-            <input
-              type="url"
-              value={form.avatar_url}
-              onChange={(e) => setForm({ ...form, avatar_url: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
-            />
+            <div className="flex items-center gap-3">
+              {form.avatar_url ? (
+                <div className="relative">
+                  <img
+                    src={form.avatar_url}
+                    alt="Avatar"
+                    className="w-12 h-12 rounded-full object-cover border-2 border-gray-200"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, avatar_url: "" })}
+                    className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600"
+                  >
+                    <X size={9} />
+                  </button>
+                </div>
+              ) : (
+                <div className="w-12 h-12 rounded-full bg-gray-100 border-2 border-dashed border-gray-300 flex items-center justify-center">
+                  <Users size={16} className="text-gray-400" />
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowAvatarPicker("edit")}
+                className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-medium rounded-lg transition-colors"
+              >
+                {form.avatar_url ? "Changer" : "Sélectionner"}
+              </button>
+            </div>
           </div>
 
           <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
@@ -982,6 +1031,21 @@ export default function Utilisateurs() {
           </div>
         </div>
       </Modal>
+      {showAvatarPicker && (
+        <MediaPicker
+          defaultCategory="equipe"
+          title="Photo de profil utilisateur"
+          onSelect={(file) => {
+            if (showAvatarPicker === "create") {
+              setCreateForm((prev) => ({ ...prev, avatar_url: file.url }));
+            } else {
+              setForm((prev) => ({ ...prev, avatar_url: file.url }));
+            }
+            setShowAvatarPicker(null);
+          }}
+          onClose={() => setShowAvatarPicker(null)}
+        />
+      )}
     </div>
   );
 }

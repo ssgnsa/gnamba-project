@@ -44,6 +44,8 @@ import {
   validateSettings,
   ValidationError,
   calculateContrastRatio,
+  getFieldError,
+  hasFieldError,
 } from "../utils/validation";
 import {
   getDemoBlockMessage,
@@ -245,6 +247,16 @@ export default function Parametres() {
 
   const hasChanges = changedKeys.length > 0;
 
+  const getError = useCallback(
+    (field: keyof BrandSettings) => getFieldError(validationErrors, field),
+    [validationErrors],
+  );
+
+  const hasError = useCallback(
+    (field: keyof BrandSettings) => hasFieldError(validationErrors, field),
+    [validationErrors],
+  );
+
   // ============================================
   // AVERTISSEMENT DE MODIFICATIONS NON SAUVEGARDÉES
   // ============================================
@@ -335,8 +347,10 @@ export default function Parametres() {
   }, [activeTab, isAdmin, loadAuditLogs]);
 
   useEffect(() => {
-    setForm(settings);
-  }, [settings]);
+    if (!hasChanges) {
+      setForm(settings);
+    }
+  }, [settings, hasChanges]);
 
   const handleSave = async () => {
     if (!hasChanges) return;
@@ -503,6 +517,14 @@ export default function Parametres() {
             <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />{" "}
             Recharger
           </button>
+          {hasChanges && (
+            <button
+              onClick={() => setForm(settings)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-gray-600 text-sm font-medium border border-gray-200 hover:bg-gray-50 transition-colors"
+            >
+              <X size={16} /> Annuler
+            </button>
+          )}
           <button
             onClick={handleReset}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-gray-600 text-sm font-medium border border-gray-200 hover:bg-gray-50 transition-colors"
@@ -606,8 +628,17 @@ export default function Parametres() {
                     setForm({ ...form, app_title: e.target.value })
                   }
                   placeholder="EGS"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-colors"
+                  className={`w-full px-4 py-3 border rounded-xl text-sm focus:outline-none transition-colors ${
+                    hasError("app_title")
+                      ? "border-red-300 focus:ring-red-100 focus:border-red-400"
+                      : "border-gray-200 focus:ring-blue-100 focus:border-blue-400"
+                  }`}
                 />
+                {getError("app_title") && (
+                  <p className="text-xs text-red-600 mt-1">
+                    {getError("app_title")}
+                  </p>
+                )}
                 <p className="text-xs text-gray-400 mt-1">
                   Affiché dans la barre latérale et l'onglet du navigateur
                 </p>
@@ -642,8 +673,17 @@ export default function Parametres() {
                     setForm({ ...form, app_company: e.target.value })
                   }
                   placeholder="Gnamba Services"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-colors"
+                  className={`w-full px-4 py-3 border rounded-xl text-sm focus:outline-none transition-colors ${
+                    hasError("app_company")
+                      ? "border-red-300 focus:ring-red-100 focus:border-red-400"
+                      : "border-gray-200 focus:ring-blue-100 focus:border-blue-400"
+                  }`}
                 />
+                {getError("app_company") && (
+                  <p className="text-xs text-red-600 mt-1">
+                    {getError("app_company")}
+                  </p>
+                )}
                 <p className="text-xs text-gray-400 mt-1">
                   Affiché dans l'en-tête et les documents officiels
                 </p>
@@ -747,9 +787,18 @@ export default function Parametres() {
                         setForm({ ...form, primary_color: e.target.value })
                       }
                       placeholder="#1e40af"
-                      className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-colors"
+                      className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-mono focus:outline-none transition-colors ${
+                        hasError("primary_color")
+                          ? "border-red-300 focus:ring-red-100 focus:border-red-400"
+                          : "border border-gray-200 focus:ring-blue-100 focus:border-blue-400"
+                      }`}
                     />
                   </div>
+                  {getError("primary_color") && (
+                    <p className="text-xs text-red-600 mt-1">
+                      {getError("primary_color")}
+                    </p>
+                  )}
                   <div className="flex flex-wrap gap-2">
                     {PRESET_COLORS.map((c) => (
                       <button
@@ -789,9 +838,18 @@ export default function Parametres() {
                         setForm({ ...form, secondary_color: e.target.value })
                       }
                       placeholder="#16a34a"
-                      className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-colors"
+                      className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-mono focus:outline-none transition-colors ${
+                        hasError("secondary_color")
+                          ? "border-red-300 focus:ring-red-100 focus:border-red-400"
+                          : "border border-gray-200 focus:ring-blue-100 focus:border-blue-400"
+                      }`}
                     />
                   </div>
+                  {getError("secondary_color") && (
+                    <p className="text-xs text-red-600 mt-1">
+                      {getError("secondary_color")}
+                    </p>
+                  )}
                   <div className="flex flex-wrap gap-2">
                     {PRESET_SECONDARY.map((c) => (
                       <button
@@ -834,6 +892,7 @@ export default function Parametres() {
                         <img
                           src={form.logo_url}
                           alt="logo"
+                          crossOrigin="anonymous"
                           className="w-8 h-8 rounded-lg object-cover bg-white"
                         />
                       ) : (
@@ -971,8 +1030,17 @@ export default function Parametres() {
                     setForm({ ...form, contact_phone: e.target.value })
                   }
                   placeholder="+225 XX XX XX XX XX"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-colors"
+                  className={`w-full px-4 py-3 rounded-xl text-sm focus:outline-none transition-colors ${
+                    hasError("contact_phone")
+                      ? "border-red-300 focus:ring-red-100 focus:border-red-400"
+                      : "border border-gray-200 focus:ring-blue-100 focus:border-blue-400"
+                  }`}
                 />
+                {getError("contact_phone") && (
+                  <p className="text-xs text-red-600 mt-1">
+                    {getError("contact_phone")}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -987,8 +1055,17 @@ export default function Parametres() {
                     setForm({ ...form, contact_email: e.target.value })
                   }
                   placeholder="contact@gnambaservices.ci"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-colors"
+                  className={`w-full px-4 py-3 rounded-xl text-sm focus:outline-none transition-colors ${
+                    hasError("contact_email")
+                      ? "border-red-300 focus:ring-red-100 focus:border-red-400"
+                      : "border border-gray-200 focus:ring-blue-100 focus:border-blue-400"
+                  }`}
                 />
+                {getError("contact_email") && (
+                  <p className="text-xs text-red-600 mt-1">
+                    {getError("contact_email")}
+                  </p>
+                )}
               </div>
 
               <div className="md:col-span-2">
@@ -1068,8 +1145,17 @@ export default function Parametres() {
                       setForm({ ...form, [key]: e.target.value })
                     }
                     placeholder={placeholder}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-colors"
+                    className={`w-full px-4 py-3 rounded-xl text-sm focus:outline-none transition-colors ${
+                      hasError(key)
+                        ? "border-red-300 focus:ring-red-100 focus:border-red-400"
+                        : "border border-gray-200 focus:ring-blue-100 focus:border-blue-400"
+                    }`}
                   />
+                  {getError(key) && (
+                    <p className="text-xs text-red-600 mt-1">
+                      {getError(key)}
+                    </p>
+                  )}
                   {key === "social_youtube" && (
                     <p className="mt-1 text-xs text-gray-400">
                       Pour une mise à jour automatique fiable, privilégiez une
@@ -1102,8 +1188,17 @@ export default function Parametres() {
                   }
                   placeholder="Description de votre entreprise pour les moteurs de recherche"
                   rows={3}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-colors resize-none"
+                  className={`w-full px-4 py-3 rounded-xl text-sm focus:outline-none transition-colors resize-none ${
+                    hasError("seo_description")
+                      ? "border-red-300 focus:ring-red-100 focus:border-red-400"
+                      : "border border-gray-200 focus:ring-blue-100 focus:border-blue-400"
+                  }`}
                 />
+                {getError("seo_description") && (
+                  <p className="text-xs text-red-600 mt-1">
+                    {getError("seo_description")}
+                  </p>
+                )}
                 <p className="text-xs text-gray-400 mt-1">
                   {form.seo_description.length} caractères (recommandé: 150-160)
                 </p>

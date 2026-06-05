@@ -92,6 +92,39 @@ export default function RegistreVisiteur() {
     setTouchedFields((prev) => ({ ...prev, [field]: true }));
   }, []);
 
+  const [photoUploading, setPhotoUploading] = useState(false);
+
+  const uploadPhotoToStorage = async (file: File): Promise<string | null> => {
+    setPhotoUploading(true);
+    try {
+      const ext = file.name.split(".").pop() || "jpg";
+      const filename = `visiteurs/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from("media")
+        .upload(filename, file, { cacheControl: "3600", upsert: false, contentType: file.type });
+      if (uploadError) throw uploadError;
+      const { data: { publicUrl } } = supabase.storage.from("media").getPublicUrl(filename);
+      await supabase.from("media_files").insert({
+        filename,
+        original_name: file.name,
+        url: publicUrl,
+        category: "autre",
+        uploaded_by: user?.id ?? null,
+        size: file.size,
+        type: file.type,
+        alt_text: "",
+        description: "",
+        tags: [],
+      });
+      return publicUrl;
+    } catch (err) {
+      if (import.meta.env.DEV) console.error("Photo upload error:", err);
+      return null;
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
+
   // Formulaire visiteur
   const [visiteurForm, setVisiteurForm] = useState<VisiteurFormData>({
     nom_complet: "",
@@ -101,6 +134,7 @@ export default function RegistreVisiteur() {
     email: "",
     societe: "",
     photo_base64: null,
+    photo_url: null,
   });
 
   // Formulaire visite
@@ -218,9 +252,13 @@ export default function RegistreVisiteur() {
       const ctx = canvas.getContext("2d");
       if (ctx) {
         ctx.drawImage(video, 0, 0);
-        const photoBase64 = canvas.toDataURL("image/jpeg", 0.8);
-        setVisiteurForm((prev) => ({ ...prev, photo_base64: photoBase64 }));
         stopWebcam();
+        canvas.toBlob(async (blob) => {
+          if (!blob) return;
+          const file = new File([blob], `webcam-${Date.now()}.jpg`, { type: "image/jpeg" });
+          const url = await uploadPhotoToStorage(file);
+          if (url) setVisiteurForm((prev) => ({ ...prev, photo_url: url, photo_base64: null }));
+        }, "image/jpeg", 0.8);
       }
     }
   };
@@ -307,7 +345,7 @@ export default function RegistreVisiteur() {
             telephone: visiteurForm.telephone,
             email: visiteurForm.email || null,
             societe: visiteurForm.societe || null,
-            photo_base64: visiteurForm.photo_base64,
+            photo_url: visiteurForm.photo_url || null,
             created_by: user?.id,
           })
           .select()
@@ -353,6 +391,7 @@ export default function RegistreVisiteur() {
         email: "",
         societe: "",
         photo_base64: null,
+        photo_url: null,
       });
       setVisiteForm({
         visiteur_id: "",
@@ -688,18 +727,13 @@ export default function RegistreVisiteur() {
                 <FormulaireVisiteur
                   visitorForm={visiteurForm}
                   onFormChange={handleVisiteurFormChange}
+                  photoUploading={photoUploading}
                   onPhotoDelete={() =>
-                    setVisiteurForm((prev) => ({ ...prev, photo_base64: null }))
+                    setVisiteurForm((prev) => ({ ...prev, photo_url: null, photo_base64: null }))
                   }
-                  onPhotoUpload={(file: File) => {
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                      setVisiteurForm((prev) => ({
-                        ...prev,
-                        photo_base64: reader.result as string,
-                      }));
-                    };
-                    reader.readAsDataURL(file);
+                  onPhotoUpload={async (file: File) => {
+                    const url = await uploadPhotoToStorage(file);
+                    if (url) setVisiteurForm((prev) => ({ ...prev, photo_url: url, photo_base64: null }));
                   }}
                   onStartWebcam={startWebcam}
                   onNext={() => setEtape(2)}
@@ -1017,6 +1051,7 @@ export default function RegistreVisiteur() {
                             <img
                               src={photoUrl}
                               alt={visite.visiteurs?.nom_complet}
+                              crossOrigin="anonymous"
                               className="w-16 h-20 object-cover rounded-xl border-2 border-gray-200"
                             />
                           ) : (
@@ -1167,6 +1202,7 @@ export default function RegistreVisiteur() {
                                 <img
                                   src={photoUrl}
                                   alt=""
+                                  crossOrigin="anonymous"
                                   className="w-10 h-10 rounded-full object-cover"
                                 />
                               ) : (

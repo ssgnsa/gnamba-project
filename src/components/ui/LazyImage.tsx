@@ -75,6 +75,7 @@ export default function LazyImage({
         <img
           src={src}
           alt={alt}
+          crossOrigin="anonymous"
           className={`w-full h-full object-cover transition-opacity duration-300 ${
             loaded ? "opacity-100" : "opacity-0"
           }`}

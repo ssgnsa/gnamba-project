@@ -1,0 +1,14 @@
+default-src 'self';
+script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' 'unsafe-inline' 'sha256-J1QHVAri1VFjAOQCfOmU4cl/lY1GThN9D/8RbXrPDyQ=' https://static.cloudflareinsights.com https://cloudflareinsights.com;
+script-src-elem 'self' 'unsafe-eval' 'wasm-unsafe-eval' 'unsafe-inline' https://static.cloudflareinsights.com https://cloudflareinsights.com;
+style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+font-src 'self' data: https://fonts.gstatic.com https://r2cdn.perplexity.ai;
+img-src 'self' data: blob: https://*.supabase.co https://*.supabase.in https://*.supabase.co/storage/v1/object https://*.supabase.co/storage/v1/sign https://gnambaservices.ci;
+connect-src 'self' https://thykrnoqgylrbfupophs.supabase.co wss://thykrnoqgylrbfupophs.supabase.co https://cloudflareinsights.com https://static.cloudflareinsights.com https://www.youtube.com https://www.youtube-nocookie.com http://localhost:11434;
+frame-src 'self' https://www.youtube-nocookie.com https://www.youtube;
+media-src 'self';
+object-src 'none';
+base-uri 'self';
+form-action 'self';
+frame-ancestors 'self';
+upgrade-insecure-requests

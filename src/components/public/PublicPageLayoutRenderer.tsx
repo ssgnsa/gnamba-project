@@ -107,6 +107,7 @@ function HeroSection({
         <img
           src={props.bg_image_url}
           alt={props.title}
+          crossOrigin="anonymous"
           className="absolute inset-0 h-full w-full object-cover"
           loading="eager"
           fetchPriority="high"
@@ -220,6 +221,7 @@ function GallerySection({ props }: { props: GalleryProps }) {
                 <img
                   src={image.url}
                   alt={image.caption || `Galerie ${index + 1}`}
+                  crossOrigin="anonymous"
                   className="h-64 w-full object-cover"
                   loading="lazy"
                   decoding="async"
@@ -261,6 +263,7 @@ function TestimonialsSection({ props }: { props: TestimonialsProps }) {
                   <img
                     src={item.avatar_url}
                     alt={item.name}
+                    crossOrigin="anonymous"
                     className="h-12 w-12 rounded-full object-cover"
                     loading="lazy"
                     decoding="async"
@@ -516,6 +519,7 @@ function FooterSection({
                 <img
                   src={props.logo_url}
                   alt={`Logo ${settings.app_company || "Gnamba Services"} - BTP Immobilier Foncier`}
+                  crossOrigin="anonymous"
                   className="h-12 w-12 rounded-2xl object-cover bg-white"
                   loading="eager"
                   fetchPriority="high"

@@ -1,1 +1,0 @@
-Placeholder icons - replace with actual icons

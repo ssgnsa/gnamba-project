@@ -124,6 +124,52 @@ Fichiers d'exemple :
 - `.env.example`
 - `.env.local.example`
 - `.env.cloud`
+- `.env.template`
+
+## Configuration
+
+Ce projet utilise désormais `.env.template` comme source de vérité des variables d'environnement. Copiez ce fichier vers `.env` ou `.env.server` puis remplissez les valeurs secrètes avant de lancer l'application.
+
+Pour le développement local :
+
+- `VITE_SUPABASE_MODE=local`
+- `VITE_SUPABASE_LOCAL_URL=http://localhost:54321`
+- `VITE_SUPABASE_LOCAL_ANON_KEY` doit être défini
+- `POSTGRES_PASSWORD` et `JWT_SECRET` doivent exister
+
+Pour la production cloud :
+
+- `VITE_SUPABASE_MODE=cloud`
+- `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY` doivent être définis
+- `SUPABASE_DB_PASSWORD` ou `SUPABASE_SERVICE_ROLE_KEY` doivent être définis
+
+### Déploiement Supabase Edge Functions via GitHub Actions
+
+Le workflow [.github/workflows/deploy-supabase-functions.yml](/home/soma/gnamba-project/.github/workflows/deploy-supabase-functions.yml) déploie automatiquement `send-payment-notification` sur le projet Supabase quand la fonction change.
+
+Secrets GitHub requis :
+
+- `SUPABASE_ACCESS_TOKEN`
+- `SUPABASE_PROJECT_ID`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `ONESIGNAL_APP_ID`
+- `ONESIGNAL_API_KEY`
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+
+Le workflow synchronise ensuite ces valeurs comme secrets runtime Supabase avant de lancer `supabase functions deploy send-payment-notification --project-ref "$SUPABASE_PROJECT_ID"`.
+
+Pour démarrer Supabase localement :
+
+```bash
+supabase start
+```
+
+Pour vérifier `.env` :
+
+```bash
+bash scripts/validate-env.sh .env
+```
 
 ## Docker
 

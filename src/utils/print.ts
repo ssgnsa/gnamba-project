@@ -1,3 +1,5 @@
+import DOMPurify from 'dompurify';
+
 export interface AttestationCoutumiereData {
   reference: string;
   numero_enregistrement: string;
@@ -145,6 +147,27 @@ const escapeHtml = (value: string) =>
 const safeText = (value: unknown) => escapeHtml(String(value ?? ''));
 const safeUpper = (value: unknown) => escapeHtml(String(value ?? '').toUpperCase());
 
+async function fetchAsDataUrl(url: string): Promise<string> {
+  if (!url) return '';
+  if (url.startsWith('data:')) return url;
+  try {
+    const resp = await fetch(url, { cache: 'force-cache', mode: 'cors' });
+    console.log('[PRINT] fetch', url.substring(0, 80), '→ status', resp.status, resp.ok);
+    if (!resp.ok) return url;
+    const blob = await resp.blob();
+    console.log('[PRINT] blob type:', blob.type, 'size:', blob.size);
+    return await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => { console.error('[PRINT] FileReader error'); resolve(url); };
+      reader.readAsDataURL(blob);
+    });
+  } catch (e) {
+    console.error('[PRINT] fetchAsDataUrl error:', e);
+    return url;
+  }
+}
+
 const safeUrl = (value?: string | null) => {
   if (!value) return '';
   try {
@@ -251,7 +274,6 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
   const cniLieu = safeText(data.proprietaire_cni_lieu);
   const telephone = safeText(data.proprietaire_telephone);
   const chefNom = safeUpper(data.chef_nom || data.validation_chef_nom || data.chef_village);
-  const logoUrl = safeUrl(data.logoUrl);
   const villageLogoUrl = safeUrl(data.village_logo_url);
   const attestationType = String(data.attestation_type || '').toLowerCase();
   const hasCessionPrice = typeof data.prix_cession === 'number' && Number.isFinite(data.prix_cession) && data.prix_cession > 0;
@@ -272,671 +294,572 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
   const qrDataUrl = safeUrl(data.qrDataUrl);
   const hashSha256 = safeText(data.hash_sha256);
   const controlNumber = safeText(data.control_number);
-  const verificationUrl = safeText(data.verification_url);
-  const registreVolume = safeText(data.registre_volume);
-  const registrePage = data.registre_page != null ? String(data.registre_page) : '';
-  const registreLigne = data.registre_ligne != null ? String(data.registre_ligne) : '';
 
   const html = `<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>${documentTitle} – ${reference}</title>
-  ${printBase}
+  <title>${documentTitle}</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Cinzel:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap');
 
-    @page { size: A4 portrait; margin: 5mm; }
+    @page { size: A4 portrait; margin: 0; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
-    body {
-      width: 200mm; height: 287mm;
-      margin: 0; padding: 0;
-      font-family: 'EB Garamond', 'Times New Roman', Times, serif;
-      font-size: 11pt;
-      color: #1a1a1a;
-      background: #fff;
+    html, body {
+      width: 210mm; height: 297mm;
+      background: #FAFAF9;
+      color: #1A1A1A;
+      font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+      font-size: 10pt;
+      line-height: 1.4;
       overflow: hidden;
     }
+    @media print {
+      @page { size: A4 portrait; margin: 0; }
+      html, body { width: 210mm; height: 297mm; }
+      body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    }
 
+    /* ══ PAGE : occupe exactement 210×297mm ══ */
     .page {
-      width: 100%; height: 100%;
+      width: 210mm; height: 297mm;
       position: relative;
-      padding: 6mm 8mm;
-      margin: 0;
-      background: #fff;
+      background: #FAFAF9;
       display: flex;
       flex-direction: column;
-      overflow: hidden;
     }
 
-    /* ——— BORDURE SUBTILE ——— */
-    .page::before {
+    /* ══ BANDES LATÉRALES DÉCORATIVES (4mm chaque côté) ══ */
+    .page::before, .page::after {
       content: '';
       position: absolute;
-      top: 3px; left: 3px; right: 3px; bottom: 3px;
-      border: 0.5px solid rgba(184, 134, 11, 0.4);
+      top: 0; bottom: 0;
+      width: 4mm;
+      background: repeating-linear-gradient(
+        180deg,
+        rgba(197,164,103,0.18) 0px, rgba(197,164,103,0.18) 4px,
+        transparent 4px, transparent 9px,
+        rgba(197,164,103,0.08) 9px, rgba(197,164,103,0.08) 11px,
+        transparent 11px, transparent 18px
+      );
       pointer-events: none;
+      z-index: 2;
     }
+    .page::before { left: 0; }
+    .page::after  { right: 0; }
 
-    /* Coins discrets */
-    .corner { position: absolute; width: 8mm; height: 8mm; z-index: 1; opacity: 0.6; }
-    .corner svg { width: 100%; height: 100%; }
-    .corner-tl { top: 2mm; left: 2mm; }
-    .corner-tr { top: 2mm; right: 2mm; transform: scaleX(-1); }
-    .corner-bl { bottom: 2mm; left: 2mm; transform: scaleY(-1); }
-    .corner-br { bottom: 2mm; right: 2mm; transform: scale(-1, -1); }
-
-    /* ——— FILIGRANE ——— */
+    /* ══ FILIGRANE ══ */
     .watermark {
       position: absolute;
       top: 50%; left: 50%;
-      transform: translate(-50%, -50%) rotate(-30deg);
-      font-family: 'Cinzel', serif;
-      font-size: 48pt;
-      font-weight: 600;
-      color: rgba(180, 180, 180, 0.04);
-      letter-spacing: 4px;
+      transform: translate(-50%, -50%) rotate(-28deg);
+      font-family: 'Playfair Display', serif;
+      font-size: 62pt;
+      font-weight: 700;
+      color: rgba(197, 164, 103, 0.042);
+      letter-spacing: 6px;
       white-space: nowrap;
       pointer-events: none;
       user-select: none;
       z-index: 0;
     }
 
-    /* ——— BARRE D'IDENTIFICATION SUBTILE ——— */
-    .id-bar {
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 1.5mm;
-      background: linear-gradient(90deg, #f77f00 0%, #f77f00 33%, #009e60 33%, #009e60 66%, #b8860b 66%, #b8860b 100%);
-      z-index: 2;
-    }
-
-    /* Contenu principal — zones très agrandies pour une page A4 */
-    .content {
+    /* ══ CONTENU : flex-column sur 100% hauteur ══ */
+    .inner {
       position: relative;
       z-index: 1;
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-      gap: 4px;
-      padding: 0;
-    }
-    .content-top {
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-      margin-bottom: 3px;
-    }
-    .sections-group {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 6px;
+      margin: 0 6mm;
+      padding: 5mm 3mm 4mm;
       flex: 1;
-      align-items: start;
-      max-height: 135mm;
-    }
-    .section-full { 
-      grid-column: 1 / -1;
-      margin: 2px 0;
-    }
-    .bottom-row {
-      display: grid;
-      grid-template-columns: 1fr 130px;
-      gap: 6px;
-      align-items: start;
-      margin-top: 3px;
-      max-height: 45mm;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
     }
 
-    /* ——— EN-TÊTE ÉQUILIBRÉ ——— */
+    /* ══ BANDE TRICOLORE ══ */
+    .tricolor-bar {
+      height: 3px;
+      background: linear-gradient(90deg, #F77F00 0% 33.3%, #ffffff 33.3% 66.6%, #009E60 66.6% 100%);
+      border: 0.5px solid rgba(197,164,103,0.3);
+      margin-bottom: 6px;
+      flex-shrink: 0;
+    }
+
+    /* ══ EN-TÊTE : grille 3 col → 4 | 2.5 | 4 ══ */
     .header {
       display: grid;
-      grid-template-columns: 1fr 50px 1fr;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 4px;
-      padding-bottom: 4px;
+      grid-template-columns: 4fr 58px 4fr;
+      align-items: start;
+      gap: 7px;
+      padding-bottom: 6px;
+      border-bottom: 1.5px solid #C5A467;
+      margin-bottom: 6px;
+      flex-shrink: 0;
     }
-    .hdr {
-      font-family: 'EB Garamond', serif;
-      font-size: 10pt;
-      font-weight: 600;
+    .hdr-col {
+      font-family: 'Inter', sans-serif;
+      font-size: 8.5pt;
+      font-weight: 500;
       text-transform: uppercase;
-      line-height: 1.4;
-      color: #2a2a2a;
-      letter-spacing: 0.2px;
+      letter-spacing: 0.3px;
+      color: #2C2C2C;
+      line-height: 1.5;
     }
-    .hdr .accent {
-      color: #006b3f;
-      font-size: 11pt;
-      letter-spacing: 0.5px;
-    }
+    .hdr-col .accent { color: #006B3F; font-weight: 600; font-size: 9pt; }
     .hdr-right { text-align: right; }
-    .emblem-wrap {
-      width: 50px; height: 50px;
+    .hdr-right .devise { font-style: italic; font-size: 7.5pt; color: #555; font-weight: 300; }
+    /* Logo village — aligné sous nom village, hauteur 22mm */
+    .village-logo-wrap {
+      width: 58px; height: 58px;
       display: flex; align-items: center; justify-content: center;
       margin: 0 auto;
+      border: 1px solid rgba(197,164,103,0.45);
+      background: transparent;
+      overflow: hidden;
     }
-    .emblem-wrap svg { width: 100%; height: 100%; }
+    .village-logo-wrap img { width: 100%; height: 100%; object-fit: contain; }
 
-    /* ——— FILET SOUS EN-TÊTE ——— */
-    .header-rule {
-      height: 0.5px;
-      background: linear-gradient(90deg, transparent 0%, #b8860b 15%, #b8860b 85%, transparent 100%);
-      margin-bottom: 2px;
-    }
-
-    /* ——— TITRE PRÉPONDÉRANT ——— */
-    .title-section {
-      text-align: center;
-      margin: 12px 0 16px;
-      padding: 12px 0;
-    }
-    .title {
-      font-family: 'Cinzel', serif;
-      font-size: 18pt;
-      font-weight: 700;
-      letter-spacing: 2.5px;
-      text-transform: uppercase;
-      color: #0b4b2f;
-      padding: 12px 24px 16px;
-      display: inline-block;
+    /* ══ CADRE DU TITRE ══ */
+    .title-frame {
       position: relative;
-      line-height: 1.3;
-      background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(250,240,220,0.85));
-      border: 1.5px solid rgba(184, 134, 11, 0.6);
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      text-align: center;
+      margin: 6px 0 4px;
+      padding: 8px 20px 10px;
+      background: linear-gradient(180deg, rgba(197,164,103,0.09) 0%, rgba(250,250,249,0.5) 100%);
+      flex-shrink: 0;
     }
-    .title::before {
+    .title-frame::before, .title-frame::after {
       content: '';
       position: absolute;
-      top: 6px; left: 50%; transform: translateX(-50%);
-      width: 100px; height: 1px;
-      background: #b8860b;
+      left: 0; right: 0;
+      height: 6px;
     }
-    .title::after {
-      content: '';
-      position: absolute;
-      bottom: 6px; left: 50%; transform: translateX(-50%);
-      width: 100px; height: 1px;
-      background: #b8860b;
+    .title-frame::before { top: 0;    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='6'%3E%3Cpolygon points='9,1 17,5 1,5' fill='none' stroke='%23C5A467' stroke-width='0.7' opacity='0.7'/%3E%3C/svg%3E") repeat-x center; }
+    .title-frame::after  { bottom: 0; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='6'%3E%3Cpolygon points='9,5 17,1 1,1' fill='none' stroke='%23C5A467' stroke-width='0.7' opacity='0.7'/%3E%3C/svg%3E") repeat-x center; }
+    .doc-title {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 19pt;
+      font-weight: 700;
+      color: #2C2C2C;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      line-height: 1.25;
+      display: block;
+    }
+    .doc-subtitle {
+      font-family: 'Inter', sans-serif;
+      font-size: 8pt;
+      font-weight: 400;
+      color: #666;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-top: 5px;
+      display: block;
     }
 
-    /* ——— RÉFÉRENCE CENTRÉE ——— */
-    .ref-line {
-      text-align: center;
-      margin: 8px 0 10px;
+    /* ══ FILET ORNÉ SOUS TITRE ══ */
+    .ornament-rule {
       display: flex;
-      justify-content: center;
       align-items: center;
       gap: 8px;
-      flex-wrap: wrap;
+      margin: 4px 0 6px;
+      flex-shrink: 0;
     }
-    .ref-box {
-      font-family: 'Cinzel', serif;
-      font-size: 12pt;
-      font-weight: 700;
-      color: #b8860b;
-      letter-spacing: 0.8px;
-      padding: 4px 12px;
-      border: 1.5px solid #b8860b;
-      background: rgba(184, 134, 11, 0.1);
-      border-radius: 6px;
-      box-shadow: 0 1px 4px rgba(184, 134, 11, 0.2);
-    }
-    .ref-meta {
-      font-size: 9pt;
-      font-weight: 600;
-      letter-spacing: 0.6px;
-      color: #555;
-      text-transform: uppercase;
+    .ornament-rule .line { flex: 1; height: 0.75px; background: linear-gradient(90deg, transparent, #C5A467 30%, #C5A467 70%, transparent); }
+    .ornament-rule .diamond {
+      width: 8px; height: 8px;
+      background: #C5A467;
+      transform: rotate(45deg);
+      flex-shrink: 0;
+      opacity: 0.85;
     }
 
-    /* ——— BASE LÉGALE AGRANDIE ——— */
-    .legal {
-      font-size: 8pt;
+    /* ══ BASE LÉGALE ══ */
+    .legal-base {
+      font-family: 'Inter', sans-serif;
+      font-size: 7.5pt;
+      font-style: italic;
+      color: #555;
       text-align: center;
-      color: #555;
-      margin: 6px 0 8px;
-      line-height: 1.3;
-      padding: 4px 12px;
-      border-top: 1px solid #e0e0e0;
-      border-bottom: 1px solid #e0e0e0;
-      background: rgba(0, 107, 63, 0.03);
-      border-radius: 4px;
+      line-height: 1.35;
+      padding: 4px 16px;
+      background: rgba(0,107,63,0.03);
+      border-top: 0.5px solid #e0d9cc;
+      border-bottom: 0.5px solid #e0d9cc;
+      margin-bottom: 6px;
+      flex-shrink: 0;
     }
 
-    /* ——— DÉCLARATION AGRANDIE ——— */
+    /* ══ DÉCLARATION SOLENNELLE ══ */
     .declaration {
-      font-size: 11pt;
+      font-family: 'Playfair Display', serif;
+      font-size: 10pt;
+      font-style: italic;
       line-height: 1.5;
       text-align: justify;
-      margin: 6px 0 8px;
-      padding: 8px 8px 8px 12px;
-      border-left: 3px solid #006b3f;
-      color: #222;
-      background: rgba(0, 107, 63, 0.03);
-      border-radius: 6px;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.03);
-    }
-
-    /* ——— TABLEAUX DE CHAMPS TRÈS AGRANDIS ——— */
-    .section {
-      margin: 0;
-      padding: 16px 16px 20px;
-      border: 0.5px solid #e5e7eb;
-      border-radius: 10px;
-      background: #fcfcfb;
-      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5);
-    }
-    .section-header {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 12px;
-      padding-bottom: 4px;
-      border-bottom: 0.75px solid #006b3f;
-    }
-    .section-numeral {
-      font-family: 'Cinzel', serif;
-      font-size: 10pt;
-      font-weight: 700;
-      color: #b8860b;
-    }
-    .section-title {
-      font-family: 'Cinzel', serif;
-      font-size: 10.5pt;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.6px;
-      color: #006b3f;
-    }
-
-    /* Tableau structuré très agrandi */
-    .data-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 11pt;
-    }
-    .data-table td {
-      padding: 6px 8px;
-      vertical-align: middle;
-    }
-    .data-table .label {
-      font-weight: 600;
-      color: #333;
-      white-space: nowrap;
-      width: 35%;
-      border: 0.5px solid #d4d4d4;
-      background: rgba(0, 107, 63, 0.03);
-    }
-    .data-table .value {
-      color: #111;
-      border: 0.5px solid #d4d4d4;
-      border-left: none;
-    }
-
-    /* ——— CODE-BARRES ——— */
-    .barcode-section {
-      text-align: center;
-      margin: 3px 0;
-    }
-    .barcode-section svg { height: 30px; }
-
-    /* ——— ZONE DE SIGNATURE TRÈS AGRANDIE ——— */
-    .signature-zone {
-      display: flex;
-      justify-content: center;
-      align-items: stretch;
-      gap: 12px;
-      margin: 0;
-      min-height: 140px;
-    }
-    .sig-frame {
-      border: 1.5px solid #b8860b;
-      padding: 18px 18px 22px;
-      background: rgba(184, 134, 11, 0.08);
-      min-width: 200px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      text-align: center;
-      justify-content: space-between;
-      width: 100%;
-      border-radius: 6px;
-      box-shadow: 0 2px 6px rgba(184, 134, 11, 0.15);
-    }
-    .sig-frame-title {
-      font-family: 'Cinzel', serif;
-      font-size: 7pt;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.3px;
-      color: #b8860b;
-      margin-bottom: 4px;
-      padding-bottom: 2px;
-      border-bottom: 1px solid #e0d5b5;
-      width: 100%;
-    }
-    .sig-frame-name {
-      font-size: 9pt;
-      font-weight: 600;
-      color: #006b3f;
-      text-transform: uppercase;
-      margin-bottom: 8px;
+      color: #1A1A1A;
+      padding: 7px 10px 7px 14px;
+      border-left: 3px solid #C5A467;
+      background: rgba(197,164,103,0.05);
+      margin-bottom: 7px;
       flex-shrink: 0;
-      line-height: 1.2;
-      width: 100%;
     }
-    .sig-frame-line {
-      border-top: 1px solid #999;
-      margin-top: auto;
-      padding-top: 4px;
-      font-size: 6pt;
-      color: #888;
-      text-transform: uppercase;
-      letter-spacing: 0.2px;
-      flex-shrink: 0;
-      width: 100%;
-    }
+    .declaration strong { font-style: normal; font-weight: 700; color: #2C2C2C; }
 
-    /* ——— ZONE DE SÉCURITÉ TRÈS AGRANDIE ——— */
-    .validation-area {
-      display: block;
-      margin: 0;
+    /* ══ GRILLE DE SECTIONS : 12 colonnes, s'étire pour occuper tout l'espace restant ══ */
+    .sections-wrap {
+      flex: 1 1 0;
+      height: 100%;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      grid-auto-rows: 1fr;
+      gap: 6px;
+      align-content: stretch;
     }
-    .security-footer {
-      position: relative;
-      margin: 0;
-      border: 1.5px solid #d4d4d4;
-      padding: 16px 16px 16px;
-      background: rgba(0, 107, 63, 0.06);
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      align-items: center;
-      border-radius: 8px;
-      font-size: 9pt;
-      min-height: 140px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    /* alias pour la transition grille → wrap */
+    .sections-grid {
+      display: contents;
     }
-    .sec-qr {
-      width: 100px; height: 100px;
-      border: 2px solid #ccc;
-      padding: 5px;
+    .col-6 { grid-column: span 6; }
+    .col-12 { grid-column: span 12; }
+    .section-full { grid-column: 1 / -1; }
+
+    /* ══ SECTION CARD — compactée ══ */
+    .section-card {
+      border: 0.75px solid #E0E0D8;
       background: #fff;
-      border-radius: 4px;
-      margin-bottom: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    .sec-qr img { width: 100%; height: 100%; object-fit: contain; }
-    .sec-left {
+      padding: 6px 8px 8px;
       display: flex;
       flex-direction: column;
-      gap: 3px;
-      text-align: center;
-      width: 100%;
     }
-    .sec-control {
+    .section-card .dtable { flex: 1; }
+    .section-head {
       display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 4px;
+      align-items: baseline;
+      gap: 6px;
+      border-bottom: 0.75px solid #C5A467;
+      padding-bottom: 3px;
+      margin-bottom: 5px;
     }
-    .sec-control-label {
-      font-size: 7pt;
+    .section-num {
+      font-family: 'Playfair Display', serif;
+      font-size: 8.5pt;
       font-weight: 700;
+      color: #C5A467;
+    }
+    .section-label {
+      font-family: 'Inter', sans-serif;
+      font-size: 8.5pt;
+      font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.3px;
-      color: #006b3f;
-      flex-shrink: 0;
-    }
-    .sec-control-value {
-      font-family: 'Courier New', monospace;
-      font-size: 8pt;
-      font-weight: 700;
-      color: #006b3f;
-      letter-spacing: 0.4px;
-    }
-    .sec-hash {
-      font-size: 6pt;
-      color: #666;
-      font-family: 'Courier New', monospace;
-      word-break: break-all;
-      line-height: 1.2;
-      margin-top: 2px;
-    }
-    .sec-url {
-      font-size: 6pt;
-      color: #006b3f;
-      margin-top: 2px;
-    }
-    .sec-url a {
-      color: #006b3f;
-      text-decoration: none;
+      letter-spacing: 0.8px;
+      color: #006B3F;
     }
 
-    /* ——— MENTIONS LÉGALES ——— */
-    .legal-notice {
-      position: relative;
-      margin-top: 4px;
+    /* ══ TABLE DE DONNÉES — compactée ══ */
+    .dtable { width: 100%; border-collapse: collapse; font-size: 8pt; }
+    .dtable td { padding: 2px 5px; vertical-align: top; line-height: 1.25; }
+    .dtable .lbl {
+      font-weight: 500;
+      color: #444;
+      white-space: nowrap;
+      width: 38%;
+      border-bottom: 0.5px dotted #d0c9bc;
+    }
+    .dtable .val {
+      color: #1A1A1A;
+      font-weight: 400;
+      border-bottom: 0.5px dotted #d0c9bc;
+    }
+    .dtable .lbl.fill, .dtable .val.fill {
+      background: rgba(197,164,103,0.05);
+    }
+
+    /* ══ CODE-BARRES ══ */
+    .barcode-wrap {
+      text-align: center;
+      padding: 3px 0 2px;
+      border-top: 0.5px solid #e0d9cc;
+      border-bottom: 0.5px solid #e0d9cc;
+      margin: 5px 0;
+      flex-shrink: 0;
+    }
+    .barcode-wrap svg { height: 26px; }
+
+    /* ══ BAS DE PAGE : stretch + 135px QR ══ */
+    .footer-row {
+      display: grid;
+      grid-template-columns: 1fr 135px;
+      gap: 6px;
+      margin-top: 6px;
+      flex-shrink: 0;
+    }
+
+    /* ══ SIGNATURE — hauteur 18mm, filet pointillé ══ */
+    .sig-box {
+      border: 0.75px solid #C5A467;
+      padding: 8px 10px 10px;
+      background: rgba(197,164,103,0.04);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100px;
+    }
+    .sig-box-title {
+      font-family: 'Inter', sans-serif;
       font-size: 7pt;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #C5A467;
+      border-bottom: 0.5px solid #e0d9cc;
+      padding-bottom: 3px;
+      margin-bottom: 5px;
+      width: 100%;
+      text-align: center;
+    }
+    .sig-box-name {
+      font-family: 'Inter', sans-serif;
+      font-size: 8.5pt;
+      font-weight: 600;
+      color: #006B3F;
+      text-transform: uppercase;
+      text-align: center;
+      line-height: 1.3;
+      margin-bottom: auto;
+    }
+    .sig-box-line {
+      width: 100%;
+      border-top: 1.5px dashed #888;
+      margin-top: 18mm;
+      padding-top: 5px;
+      font-family: 'Inter', sans-serif;
+      font-size: 7.5pt;
       color: #777;
       text-align: center;
-      font-style: italic;
-      letter-spacing: 0.2px;
-      line-height: 1.2;
-      padding: 4px 8px;
-      border-top: 1px solid #eee;
-      background: rgba(0,0,0,0.01);
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
     }
 
-    @media print {
-      body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    /* ══ SÉCURITÉ — QR 32×32mm ══ */
+    .security-box {
+      border: 0.75px solid #ddd5c4;
+      padding: 6px 7px;
+      background: rgba(0,107,63,0.04);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      font-size: 7pt;
+    }
+    .sec-qr {
+      width: 121px; height: 121px;
+      border: 1px solid #ccc;
+      padding: 4px;
+      background: #fff;
+    }
+    .sec-qr img { width: 100%; height: 100%; object-fit: contain; }
+    .sec-ctrl {
+      font-family: 'Courier New', monospace;
+      font-size: 7pt;
+      font-weight: 700;
+      color: #006B3F;
+      letter-spacing: 0.3px;
+      text-align: center;
+    }
+    .sec-hash {
+      font-family: 'Courier New', monospace;
+      font-size: 5.5pt;
+      color: #888;
+      word-break: break-all;
+      text-align: center;
+      line-height: 1.2;
+    }
+
+    /* ══ PIED DE PAGE FINAL ══ */
+    .page-footer {
+      margin-top: 5px;
+      border-top: 1px solid #C5A467;
+      padding-top: 4px;
+      flex-shrink: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .footer-mention {
+      font-family: 'Inter', sans-serif;
+      font-size: 7pt;
+      font-style: italic;
+      color: #777;
+      line-height: 1.3;
+    }
+    .footer-date {
+      font-family: 'Inter', sans-serif;
+      font-size: 7pt;
+      color: #777;
+      text-align: right;
+      font-style: italic;
     }
   </style>
 </head>
 <body>
 <div class="page">
 
-  <!-- Barre d'identification -->
-  <div class="id-bar"></div>
-
-  <!-- Coins discrets -->
-  <div class="corner corner-tl"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30"><path d="M3 27 L3 3 L27 3" stroke="#b8860b" stroke-width="1" fill="none" opacity="0.6"/><circle cx="3" cy="3" r="2" fill="#b8860b" opacity="0.6"/></svg></div>
-  <div class="corner corner-tr"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30"><path d="M3 27 L3 3 L27 3" stroke="#b8860b" stroke-width="1" fill="none" opacity="0.6"/><circle cx="3" cy="3" r="2" fill="#b8860b" opacity="0.6"/></svg></div>
-  <div class="corner corner-bl"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30"><path d="M3 27 L3 3 L27 3" stroke="#b8860b" stroke-width="1" fill="none" opacity="0.6"/><circle cx="3" cy="3" r="2" fill="#b8860b" opacity="0.6"/></svg></div>
-  <div class="corner corner-br"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30"><path d="M3 27 L3 3 L27 3" stroke="#b8860b" stroke-width="1" fill="none" opacity="0.6"/><circle cx="3" cy="3" r="2" fill="#b8860b" opacity="0.6"/></svg></div>
-
-  <!-- Filigrane -->
+  <!-- Filigrane institutionnel -->
   <div class="watermark">GNAMBA</div>
 
   <!-- Contenu principal -->
-  <div class="content">
-    <div class="content-top">
+  <div class="inner">
 
-    <!-- EN-TÊTE -->
+    <!-- Bande tricolore Côte d'Ivoire -->
+    <div class="tricolor-bar"></div>
+
+    <!-- ══ EN-TÊTE : 4 colonnes — Localisation | Logo village | Emblème CI | République ══ -->
     <div class="header">
-      <div class="hdr">
-        ${region ? `<span class="accent">RÉGION ${region.toUpperCase()}</span><br>` : 'RÉGION<br>'}
+      <!-- Col 1 : Localisation administrative -->
+      <div class="hdr-col">
+        <span class="accent">RÉGION ${region ? region.toUpperCase() : '—'}</span><br>
         Département de ${departement || '—'}<br>
         Commune de ${commune || '—'}<br>
-        <strong>VILLAGE ${villageNom.toUpperCase()}</strong>
+        <strong>Village de ${villageNom.toUpperCase()}</strong>
       </div>
-      <div class="emblem-wrap">
-        ${villageLogoUrl
-          ? `<img src="${villageLogoUrl}" alt="" style="width:100%;height:100%;object-fit:contain;" />`
-          : logoUrl
-            ? `<img src="${logoUrl}" alt="" style="width:100%;height:100%;object-fit:contain;" />`
-            : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="45" fill="none" stroke="#b8860b" stroke-width="2"/>
-                <rect x="15" y="20" width="22" height="35" fill="#f77f00" rx="1"/>
-                <rect x="39" y="20" width="22" height="35" fill="#fff" rx="1"/>
-                <rect x="63" y="20" width="22" height="35" fill="#009e60" rx="1"/>
-                <text x="50" y="72" text-anchor="middle" font-family="serif" font-size="9" fill="#006b3f" font-weight="bold">RÉPUBLIQUE</text>
-                <text x="50" y="83" text-anchor="middle" font-family="serif" font-size="6" fill="#666">CÔTE D'IVOIRE</text>
-               </svg>`
+
+      <!-- Col 2 : Logo villageois officiel -->
+      <div class="village-logo-wrap">
+        ${villageLogoUrl && villageLogoUrl !== ''
+          ? `<img src="${villageLogoUrl}" alt="Logo ${villageNom}" onerror="this.outerHTML='<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 58 58' width='54' height='54'><circle cx='29' cy='29' r='27' fill='none' stroke='%23C5A467' stroke-width='1.2'/>  <text x='29' y='33' text-anchor='middle' font-family='serif' font-size='14' font-weight='bold' fill='%23C5A467'>${villageNom.charAt(0).toUpperCase()}</text></svg>'"/>`
+          : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 58 58" width="54" height="54">
+               <circle cx="29" cy="29" r="27" fill="none" stroke="#C5A467" stroke-width="1.2"/>
+               <text x="29" y="34" text-anchor="middle" font-family="Georgia,serif" font-size="18" font-weight="bold" fill="#C5A467">${villageNom.charAt(0).toUpperCase()}</text>
+             </svg>`
         }
       </div>
-      <div class="hdr hdr-right">
+
+      <!-- Col 3 : République -->
+      <div class="hdr-col hdr-right">
         RÉPUBLIQUE DE CÔTE D'IVOIRE<br>
-        <span style="color:#006b3f; font-size:8.5pt;">Union – Discipline – Travail</span>
+        <span class="devise">Union — Discipline — Travail</span><br>
+        <span style="font-size:7.5pt;color:#444;">Enreg. N° ${safeText(data.numero_enregistrement || reference)}</span>
       </div>
     </div>
 
-    <div class="header-rule"></div>
-
-    <!-- TITRE -->
-    <div class="title-section">
-      <div class="title">${documentTitle}</div>
+    <!-- ══ TITRE CENTRAL ══ -->
+    <div class="title-frame">
+      <span class="doc-title">${documentTitle}</span>
+      <span class="doc-subtitle">Droits Fonciers Coutumiers — Territoire Villageois</span>
     </div>
 
-    <!-- RÉFÉRENCE -->
-    <div class="ref-line">
-      <span class="ref-box">N° ${reference}</span>
+    <!-- ══ FILET ORNÉ ══ -->
+    <div class="ornament-rule">
+      <div class="line"></div>
+      <div class="diamond"></div>
+      <div class="line"></div>
+      <div class="diamond"></div>
+      <div class="line"></div>
     </div>
 
-    <!-- BASE LÉGALE -->
-    <div class="legal">
-      Loi n° 98-750 du 23 décembre 1998 relative au domaine foncier rural —
+    <!-- ══ BASE LÉGALE ══ -->
+    <div class="legal-base">
+      Loi n° 98-750 du 23 décembre 1998 relative au domaine foncier rural &mdash;
       Décret n° 2019-361 du 15 mai 2019 relatif à la constatation des droits fonciers coutumiers
     </div>
 
-    <!-- DÉCLARATION -->
+    <!-- ══ DÉCLARATION SOLENNELLE ══ -->
     <div class="declaration">
-      Nous, soussigné, <strong>${chefNom}</strong>, Chef Coutumier du Village de <strong>${villageNom.toUpperCase()}</strong>,
-      attestons solennellement que les droits fonciers coutumiers afférents à la parcelle désignée ci-après sont détenus par :
+      Nous, soussigné, <strong>${chefNom}</strong>, Chef Coutumier du Village de
+      <strong>${villageNom.toUpperCase()}</strong>, attestons solennellement que les droits
+      fonciers coutumiers afférents à la parcelle désignée ci-après appartiennent de plein
+      droit coutumier à la personne dont l'identité suit, et ce en vertu d'une possession
+      paisible, publique et ininterrompue, reconnue par les autorités villageoises compétentes.
     </div>
 
-    </div><!-- fin .content-top -->
+    <!-- ══ SECTIONS DONNÉES : grille 12 colonnes, remplissage vertical ══ -->
+    <div class="sections-wrap">
 
-    <div class="sections-group">
-
-    <!-- I. IDENTITÉ DU DÉTENTEUR -->
-    <div class="section">
-      <div class="section-header">
-        <span class="section-numeral">I.</span>
-        <span class="section-title">Identité du détenteur</span>
-      </div>
-      <table class="data-table">
-        <tr>
-          <td class="label">Nom & Prénoms</td>
-          <td class="value">${proprietairePrenom} ${proprietaireNom}</td>
-        </tr>
-        <tr>
-          <td class="label">Date & Lieu de naissance</td>
-          <td class="value">${naissanceDate || '—'} à ${naissanceLieu || '—'}</td>
-        </tr>
-        ${proprietaireProfession ? `<tr>
-          <td class="label">Profession</td>
-          <td class="value">${proprietaireProfession}</td>
-        </tr>` : ''}
-        <tr>
-          <td class="label">CNI N°</td>
-          <td class="value">${cniNumero || '—'}${cniDate ? ` — Délivrée le ${cniDate} à ${cniLieu}` : ''}</td>
-        </tr>
-        <tr>
-          <td class="label">Domicile</td>
-          <td class="value">${proprietaireDomicile || '—'}</td>
-        </tr>
-        ${telephone ? `<tr>
-          <td class="label">Téléphone</td>
-          <td class="value">${telephone}</td>
-        </tr>` : ''}
-      </table>
-    </div>
-
-    <!-- II. CESSION (si applicable) -->
-    ${isCession ? `
-    <div class="section section-full">
-      <div class="section-header">
-        <span class="section-numeral">II.</span>
-        <span class="section-title">Informations de cession</span>
-      </div>
-      <table class="data-table">
-        <tr>
-          <td class="label">Cédant</td>
-          <td class="value">${cedantPrenom} ${cedantNom}${cedantCni ? ` — CNI ${cedantCni}` : ''}</td>
-        </tr>
-        ${dateCession ? `<tr>
-          <td class="label">Date de cession</td>
-          <td class="value">${dateCession}</td>
-        </tr>` : ''}
-      </table>
-    </div>
-    ` : ''}
-
-    <!-- III. DESCRIPTION DE LA PARCELLE -->
-    <div class="section">
-      <div class="section-header">
-        <span class="section-numeral">${isCession ? 'III' : 'II'}.</span>
-        <span class="section-title">Description de la parcelle</span>
-      </div>
-      <table class="data-table">
-        <tr>
-          <td class="label">Lot N°</td>
-          <td class="value">${numeroLot}</td>
-          <td class="label" style="width:25%;">Superficie</td>
-          <td class="value">${superficie} m²</td>
-        </tr>
-        ${quartier ? `<tr>
-          <td class="label">Quartier</td>
-          <td class="value">${quartier}</td>
-          <td class="label">Lotissement</td>
-          <td class="value">${lotissement || '—'}</td>
-        </tr>` : `<tr>
-          <td class="label">Lotissement</td>
-          <td class="value" colspan="3">${lotissement || '—'}</td>
-        </tr>`}
-        <tr>
-          <td class="label">Village</td>
-          <td class="value" colspan="3">${villageNom.toUpperCase()}</td>
-        </tr>
-      </table>
-    </div>
-
-    <!-- CODE-BARRES -->
-    ${barcodeSvg ? `<div class="barcode-section section-full">${barcodeSvg}</div>` : ''}
-
-    </div><!-- fin .sections-group -->
-
-    <!-- IV. SIGNATURE & DATE -->
-    <div class="bottom-row">
-      <div class="section">
-        <div class="section-header">
-          <span class="section-numeral">${isCession ? 'IV' : 'III'}.</span>
-          <span class="section-title">Validation</span>
+      <!-- I. IDENTITÉ DU TITULAIRE — 6 col -->
+      <div class="section-card col-6">
+        <div class="section-head">
+          <span class="section-num">I.</span>
+          <span class="section-label">Identité du Titulaire</span>
         </div>
-        <div class="signature-zone">
-          <div class="sig-frame">
-            <div class="sig-frame-title">Chef du Village</div>
-            <div class="sig-frame-name">${chefNom || '—'}</div>
-            <div class="sig-frame-line">Signature & Cachet</div>
-          </div>
-        </div>
+        <table class="dtable">
+          <tr><td class="lbl fill">Nom &amp; Prénoms</td><td class="val fill"><strong>${proprietairePrenom} ${proprietaireNom}</strong></td></tr>
+          <tr><td class="lbl">Né(e) le</td><td class="val">${naissanceDate || '—'} à ${naissanceLieu || '—'}</td></tr>
+          ${proprietaireProfession ? `<tr><td class="lbl">Profession</td><td class="val">${proprietaireProfession}</td></tr>` : '<tr><td class="lbl">Profession</td><td class="val">—</td></tr>'}
+          <tr><td class="lbl">CNI N°</td><td class="val">${cniNumero || '—'}${cniDate ? ` — délivrée le ${cniDate}${cniLieu ? ' à ' + cniLieu : ''}` : ''}</td></tr>
+          <tr><td class="lbl">Domicile</td><td class="val">${proprietaireDomicile || '—'}</td></tr>
+          <tr><td class="lbl">Téléphone</td><td class="val">${telephone || '—'}</td></tr>
+        </table>
       </div>
 
-      <div class="security-footer">
-        ${qrDataUrl ? `<div class="sec-qr"><img src="${qrDataUrl}" alt="QR Code de vérification" /></div>` : ''}
-        <div class="sec-left">
-          ${controlNumber ? `<div class="sec-control">
-            <span class="sec-control-label">N°</span>
-            <span class="sec-control-value">${controlNumber}</span>
-          </div>` : ''}
-          ${hashSha256 ? `<div class="sec-hash">${hashSha256.substring(0, 24)}...</div>` : ''}
-          ${verificationUrl ? `<div class="sec-url"><a href="${verificationUrl}">Vérifier en ligne</a></div>` : ''}
+      <!-- II/III. DESCRIPTION DE LA PARCELLE — 6 col -->
+      <div class="section-card col-6">
+        <div class="section-head">
+          <span class="section-num">${isCession ? 'III.' : 'II.'}</span>
+          <span class="section-label">Description Parcellaire</span>
         </div>
+        <table class="dtable">
+          <tr><td class="lbl fill">Lot N°</td><td class="val fill"><strong>${numeroLot || '—'}</strong></td></tr>
+          <tr><td class="lbl">Superficie</td><td class="val">${superficie} m²</td></tr>
+          <tr><td class="lbl">Quartier</td><td class="val">${quartier || '—'}</td></tr>
+          <tr><td class="lbl">Lotissement</td><td class="val">${lotissement || '—'}</td></tr>
+          <tr><td class="lbl">Village</td><td class="val">${villageNom.toUpperCase()}</td></tr>
+          <tr><td class="lbl">Mode d'acquisition</td><td class="val">${safeText(data.mode_acquisition) || '—'}</td></tr>
+        </table>
+      </div>
+
+      <!-- CESSION (si applicable) — 12 col -->
+      ${isCession ? `
+      <div class="section-card col-12">
+        <div class="section-head">
+          <span class="section-num">II.</span>
+          <span class="section-label">Acte de Cession de Droits Coutumiers</span>
+        </div>
+        <table class="dtable">
+          <tr>
+            <td class="lbl fill" style="width:20%;">Cédant</td>
+            <td class="val fill"><strong>${cedantPrenom} ${cedantNom}</strong>${cedantCni ? ' &mdash; CNI&nbsp;' + cedantCni : ''}</td>
+            <td class="lbl" style="width:20%;">Date de cession</td>
+            <td class="val">${dateCession || '—'}</td>
+          </tr>
+        </table>
+      </div>` : ''}
+
+    </div><!-- fin .sections-wrap -->
+
+    <!-- CODE-BARRES pleine largeur -->
+    ${barcodeSvg ? `<div class="barcode-wrap" style="margin:5px 0;">${barcodeSvg}</div>` : ''}
+
+    <!-- ══ BAS DE PAGE : VISA + SÉCURITÉ ══ -->
+    <div class="footer-row">
+      <div class="sig-box">
+        <div class="sig-box-title">Chef Coutumier du Village</div>
+        <div class="sig-box-name">${chefNom || '—'}</div>
+        <div class="sig-box-line">Signature &amp; Sceau</div>
+      </div>
+      <div class="security-box">
+        ${qrDataUrl ? `<div class="sec-qr"><img src="${qrDataUrl}" alt="Code de vérification"/></div>` : ''}
+        ${controlNumber ? `<div class="sec-ctrl">N° ${controlNumber}</div>` : ''}
+        ${hashSha256 ? `<div class="sec-hash">${hashSha256.substring(0, 32)}</div>` : ''}
       </div>
     </div>
 
-    <div class="legal-notice">
-      La présente attestation ne vaut pas titre de propriété foncier —
-      Elle constitue une présomption simple de possession coutumière
+    <!-- ══ PIED DE PAGE FINAL ══ -->
+    <div class="page-footer">
+      <div class="footer-mention">
+        La présente attestation ne vaut pas titre foncier.<br>
+        Elle constitue une présomption simple de possession coutumière,<br>
+        établie par l'autorité coutumière du Village de <strong>${villageNom.toUpperCase()}</strong>.
+      </div>
+      <div class="footer-date">
+        Délivré à ${safeText(data.lieu_signature) || villageNom.toUpperCase()}<br>
+        le ${safeText(data.date_etablissement) || '22/05/2026 — 07:30'}
+      </div>
     </div>
 
-  </div><!-- fin .content -->
+  </div><!-- fin .inner -->
 </div>
 </body>
 </html>`;
@@ -945,8 +868,19 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
 }
 
 
-export function printAttestationCoutumiere(data: AttestationCoutumiereData) {
-  const html = buildAttestationCoutumiereHTML(data);
+export async function printAttestationCoutumiere(data: AttestationCoutumiereData) {
+  console.log('[PRINT] village_logo_url reçu:', data.village_logo_url || '(vide)');
+  console.log('[PRINT] logoUrl reçu:', data.logoUrl || '(vide)');
+  const resolved = { ...data };
+  if (resolved.village_logo_url) {
+    resolved.village_logo_url = await fetchAsDataUrl(resolved.village_logo_url);
+    console.log('[PRINT] village_logo_url après fetch:', resolved.village_logo_url?.substring(0, 60));
+  }
+  if (resolved.logoUrl) {
+    resolved.logoUrl = await fetchAsDataUrl(resolved.logoUrl);
+    console.log('[PRINT] logoUrl après fetch:', resolved.logoUrl?.substring(0, 60));
+  }
+  const html = buildAttestationCoutumiereHTML(resolved);
   openPrintWindow(html);
 }
 
@@ -955,7 +889,7 @@ export function printAttestationCoutumiere(data: AttestationCoutumiereData) {
  * Contient : GPS, limites, témoins — données facultatives exclues du document officiel
  * À imprimer séparément, au besoin, si les données existent.
  */
-export function printAttestationAnnex(data: AttestationCoutumiereData) {
+export async function printAttestationAnnex(data: AttestationCoutumiereData) {
   const hasLimites = data.limites && (data.limites.nord || data.limites.sud || data.limites.est || data.limites.ouest);
   const hasGps = data.coordonnees_gps && (data.coordonnees_gps.lat != null || data.coordonnees_gps.lng != null);
   const hasGpsPoints = data.gps_points && data.gps_points.length > 0;
@@ -965,6 +899,13 @@ export function printAttestationAnnex(data: AttestationCoutumiereData) {
   if (!hasLimites && !hasGps && !hasGpsPoints && !hasTemoins) {
     alert('Aucune donnée technique (GPS, limites, témoins) disponible pour cette attestation.');
     return;
+  }
+
+  if (data.village_logo_url) {
+    data = { ...data, village_logo_url: await fetchAsDataUrl(data.village_logo_url) };
+  }
+  if (data.logoUrl) {
+    data = { ...data, logoUrl: await fetchAsDataUrl(data.logoUrl) };
   }
 
   const reference = safeText(data.reference);
@@ -1538,13 +1479,29 @@ export function printAuditReport(data: AuditReportData) {
   openPrintWindow(html);
 }
 
+function sanitizePrintHtml(html: string): string {
+  if (typeof window === 'undefined') return html;
+  try {
+    return DOMPurify.sanitize(html, {
+      WHOLE_DOCUMENT: true,
+      FORCE_BODY: false,
+      ADD_TAGS: ['style', 'link', 'meta', 'title', 'head', 'body', 'html'],
+      FORBID_TAGS: ['script'],
+      FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur'],
+    });
+  } catch {
+    return html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+  }
+}
+
 function openPrintWindow(html: string) {
   const win = window.open('', '_blank', 'width=900,height=700');
   if (!win) {
     alert('Veuillez autoriser les fenêtres popup pour imprimer.');
     return;
   }
-  win.document.write(html);
+  const safeHtml = sanitizePrintHtml(html);
+  win.document.write(safeHtml);
   win.document.close();
   win.focus();
   setTimeout(() => {

@@ -26,6 +26,7 @@ import {
   getContractStatusConfig,
   formatMontantImmo,
   generateMonthRange,
+  isDateRangeOverlap,
 } from "../../lib/immobilier";
 
 const emptyForm = {
@@ -124,6 +125,35 @@ async function generateMonthlyPayments(
   }
 }
 
+function hasContractOverlap(
+  contract: LeaseContract,
+  existingContracts: LeaseContract[],
+  currentId: string | null,
+) {
+  return existingContracts.some((other) => {
+    if (other.id === currentId) return false;
+    if (other.property_id !== contract.property_id) return false;
+    if (other.statut !== "actif") return false;
+
+    return isDateRangeOverlap(
+      contract.date_debut,
+      contract.date_fin,
+      other.date_debut,
+      other.date_fin,
+    );
+  });
+}
+
+async function updatePropertyStatus(
+  propertyId: string,
+  statut: "loue" | "disponible",
+) {
+  await supabase
+    .from("properties")
+    .update({ statut })
+    .eq("id", propertyId);
+}
+
 export default function ContractsTab({
   contracts,
   properties,
@@ -186,6 +216,33 @@ export default function ContractsTab({
       return;
     }
 
+    const existingContract = editingId
+      ? contracts.find((c) => c.id === editingId)
+      : null;
+
+    const proposedContract: LeaseContract = {
+      id: editingId || "new",
+      reference: existingContract?.reference || null,
+      property_id: form.property_id,
+      locataire_id: form.locataire_id,
+      date_debut: form.date_debut,
+      date_fin: form.date_fin || null,
+      loyer_mensuel: parseFloat(form.loyer_mensuel) || 0,
+      charges: parseFloat(form.charges) || 0,
+      depot_garantie: parseFloat(form.depot_garantie) || 0,
+      statut: form.statut,
+      notes: form.notes.trim() || null,
+      created_at: existingContract?.created_at || new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    if (form.statut === "actif" && hasContractOverlap(proposedContract, contracts, editingId)) {
+      setError(
+        "Ce bien possède déjà un contrat actif sur une période qui se chevauche.",
+      );
+      return;
+    }
+
     setSaving(true);
     setError(null);
 
@@ -216,6 +273,42 @@ export default function ContractsTab({
         });
         if (error) throw error;
       }
+
+      const targetPropertyId = form.property_id;
+      if (form.statut === "actif") {
+        await updatePropertyStatus(targetPropertyId, "loue");
+      }
+
+      if (editingId && existingContract) {
+        const oldPropertyId = existingContract.property_id;
+        if (oldPropertyId !== targetPropertyId) {
+          const hasOtherActive = contracts.some(
+            (c) =>
+              c.id !== editingId &&
+              c.property_id === oldPropertyId &&
+              c.statut === "actif",
+          );
+          if (!hasOtherActive) {
+            await updatePropertyStatus(oldPropertyId, "disponible");
+          }
+        }
+
+        if (
+          existingContract.statut === "actif" &&
+          form.statut !== "actif"
+        ) {
+          const stillActive = contracts.some(
+            (c) =>
+              c.id !== editingId &&
+              c.property_id === oldPropertyId &&
+              c.statut === "actif",
+          );
+          if (!stillActive) {
+            await updatePropertyStatus(oldPropertyId, "disponible");
+          }
+        }
+      }
+
       setModalOpen(false);
       onRefresh();
     } catch (err: any) {
@@ -232,6 +325,7 @@ export default function ContractsTab({
       window.alert(getDemoBlockMessage());
       return;
     }
+    const contractToDelete = contracts.find((c) => c.id === id);
     if (
       !confirm(
         "Supprimer ce contrat de location ?\n\nLes paiements associés ne seront pas supprimés mais ne seront plus liés à ce contrat.",
@@ -244,6 +338,19 @@ export default function ContractsTab({
         .delete()
         .eq("id", id);
       if (error) throw error;
+
+      if (contractToDelete) {
+        const stillActive = contracts.some(
+          (c) =>
+            c.id !== id &&
+            c.property_id === contractToDelete.property_id &&
+            c.statut === "actif",
+        );
+        if (!stillActive) {
+          await updatePropertyStatus(contractToDelete.property_id, "disponible");
+        }
+      }
+
       onRefresh();
     } catch (err: any) {
       alert(`Erreur lors de la suppression: ${err.message}`);
@@ -260,6 +367,21 @@ export default function ContractsTab({
         .update({ statut: newStatus, updated_at: new Date().toISOString() })
         .eq("id", c.id);
       if (error) throw error;
+
+      if (newStatus === "actif") {
+        await updatePropertyStatus(c.property_id, "loue");
+      } else {
+        const stillActive = contracts.some(
+          (other) =>
+            other.id !== c.id &&
+            other.property_id === c.property_id &&
+            other.statut === "actif",
+        );
+        if (!stillActive) {
+          await updatePropertyStatus(c.property_id, "disponible");
+        }
+      }
+
       onRefresh();
     } catch (err: any) {
       alert(`Erreur lors du changement de statut: ${err.message}`);

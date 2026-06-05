@@ -13,8 +13,13 @@ import {
   Tag,
   ChevronDown,
   Filter,
+  Trash,
+  RotateCcw,
+  AlertTriangle,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import { logMediaAction } from "../lib/mediaUtils";
+import { useAuth } from "../context/AuthContext";
 import type { MediaFile } from "../types";
 import { useBranding } from "../hooks/useBranding";
 import MediaCard from "../components/media/MediaCard";
@@ -34,6 +39,7 @@ const CATEGORIES: { value: string; label: string }[] = [
   { value: "services", label: "Services" },
   { value: "equipe", label: "Équipe" },
   { value: "documents", label: "Documents" },
+  { value: "foncier_villages", label: "Logos Villages" },
   { value: "autre", label: "Autre" },
 ];
 
@@ -44,9 +50,10 @@ const SORT_OPTIONS = [
   { value: "size_desc", label: "Plus grand" },
 ];
 
-type MainTab = "library" | "brand" | "assignments";
+type MainTab = "library" | "brand" | "assignments" | "trash";
 
 export default function Media() {
+  const { user, loading: authLoading } = useAuth();
   const { primaryColor } = useBranding();
   const [mainTab, setMainTab] = useState<MainTab>("library");
   const [files, setFiles] = useState<MediaFile[]>([]);
@@ -61,41 +68,86 @@ export default function Media() {
   const [showUpload, setShowUpload] = useState(false);
   const [detail, setDetail] = useState<MediaFile | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<MediaFile | null>(null);
+  const [trashedFiles, setTrashedFiles] = useState<MediaFile[]>([]);
+  const [loadingTrash, setLoadingTrash] = useState(false);
+  const [purgeConfirm, setPurgeConfirm] = useState<MediaFile | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const PAGE_SIZE = 100;
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
 
-  const fetchFiles = useCallback(async () => {
+  const fetchTrashed = useCallback(async () => {
+    if (authLoading || !user) return;
+    setLoadingTrash(true);
+    const { data } = await supabase
+      .from("media_files")
+      .select("*")
+      .not("deleted_at", "is", null)
+      .order("deleted_at", { ascending: false });
+    setTrashedFiles((data as MediaFile[]) || []);
+    setLoadingTrash(false);
+  }, [authLoading, user]);
+
+  useEffect(() => {
+    if (mainTab === "trash" && !authLoading && user) fetchTrashed();
+  }, [mainTab, fetchTrashed, authLoading, user]);
+
+  const fetchFiles = useCallback(async (currentOffset = 0) => {
+    if (authLoading || !user) return;
     setLoading(true);
-    let query = supabase.from("media_files").select("*");
-
-    if (category !== "all") query = query.eq("category", category);
-
     const [orderCol, orderDir] = (() => {
       switch (sort) {
-        case "date_asc":
-          return ["upload_date", true];
-        case "name_asc":
-          return ["original_name", true];
-        case "size_desc":
-          return ["size", false];
-        default:
-          return ["upload_date", false];
+        case "date_asc":  return ["upload_date", true];
+        case "name_asc":  return ["original_name", true];
+        case "size_desc": return ["size", false];
+        default:          return ["upload_date", false];
       }
     })();
 
-    query = query.order(orderCol as string, { ascending: orderDir as boolean });
-    const { data } = await query;
-    const mediaFiles = (data as MediaFile[]) || [];
-    setFiles(mediaFiles);
+    let query = supabase
+      .from("media_files")
+      .select("*")
+      .is("deleted_at", null)
+      .order(orderCol as string, { ascending: orderDir as boolean })
+      .range(currentOffset, currentOffset + PAGE_SIZE - 1);
 
-    const tags = Array.from(
-      new Set(mediaFiles.flatMap((f) => f.tags || [])),
-    ).sort();
-    setAllTags(tags);
+    if (category !== "all") query = query.eq("category", category);
+
+    const { data, error: fetchError } = await query;
+    if (fetchError) { console.error("[Media] fetchFiles error:", fetchError.message); setLoading(false); return; }
+    const mediaFiles = (data as MediaFile[]) || [];
+
+    if (currentOffset === 0) {
+      setFiles(mediaFiles);
+    } else {
+      setFiles((prev) => [...prev, ...mediaFiles]);
+    }
+
+    setHasMore(mediaFiles.length === PAGE_SIZE);
+
+    if (currentOffset === 0) {
+      const tags = Array.from(new Set(mediaFiles.flatMap((f) => f.tags || []))).sort();
+      setAllTags(tags);
+    } else {
+      setAllTags((prev) =>
+        Array.from(new Set([...prev, ...mediaFiles.flatMap((f) => f.tags || [])])).sort()
+      );
+    }
     setLoading(false);
-  }, [category, sort]);
+  }, [authLoading, user, category, sort]);
+
+  const loadMore = useCallback(() => {
+    if (authLoading || !user) return;
+    const next = offset + PAGE_SIZE;
+    setOffset(next);
+    fetchFiles(next);
+  }, [authLoading, user, offset, fetchFiles]);
 
   useEffect(() => {
-    fetchFiles();
-  }, [fetchFiles]);
+    if (authLoading || !user) return;
+    setOffset(0);
+    fetchFiles(0);
+  }, [category, sort, authLoading, user, fetchFiles]);
 
   const handleUploadComplete = (uploaded: MediaFile[]) => {
     setFiles((prev) => [...uploaded, ...prev]);
@@ -107,11 +159,51 @@ export default function Media() {
   };
 
   const handleDelete = async (file: MediaFile) => {
-    await supabase.storage.from("media").remove([file.filename]);
-    await supabase.from("media_files").delete().eq("id", file.id);
+    setActionError(null);
+    const { error } = await supabase
+      .from("media_files")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", file.id);
+    if (error) { setActionError(error.message); return; }
+    void logMediaAction("soft_delete", file.id, user?.id ?? null, { filename: file.filename, category: file.category });
     setFiles((prev) => prev.filter((f) => f.id !== file.id));
     setDeleteConfirm(null);
     if (detail?.id === file.id) setDetail(null);
+  };
+
+  const handleRestore = async (file: MediaFile) => {
+    setActionError(null);
+    const { error } = await supabase
+      .from("media_files")
+      .update({ deleted_at: null })
+      .eq("id", file.id);
+    if (error) { setActionError(error.message); return; }
+    void logMediaAction("restore", file.id, user?.id ?? null, { filename: file.filename });
+    setTrashedFiles((prev) => prev.filter((f) => f.id !== file.id));
+  };
+
+  const handlePurge = async (file: MediaFile) => {
+    setActionError(null);
+    // Delete DB record first to avoid dangling references; then remove storage files.
+    const { error: dbErr } = await supabase.from("media_files").delete().eq("id", file.id);
+    if (dbErr) {
+      setActionError(`Erreur base de données : ${dbErr.message}`);
+      return;
+    }
+
+    const filesToRemove = [file.filename];
+    if (file.thumbnail_url) {
+      filesToRemove.push(file.filename.replace(/\.([^.]+)$/, "_thumb.webp"));
+    }
+    const { error: storageErr } = await supabase.storage.from("media").remove(filesToRemove);
+    if (storageErr) {
+      // Storage failed but DB already removed; surface warning to user.
+      setActionError(`Attention : suppression stockage échouée — ${storageErr.message}`);
+    }
+
+    void logMediaAction("purge", null, user?.id ?? null, { filename: file.filename, category: file.category });
+    setTrashedFiles((prev) => prev.filter((f) => f.id !== file.id));
+    setPurgeConfirm(null);
   };
 
   const handleUpdate = (updated: MediaFile) => {
@@ -135,6 +227,30 @@ export default function Media() {
   };
 
   const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+
+  if (authLoading) {
+    return (
+      <div className="min-h-[50vh] flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-700 mx-auto mb-4" />
+          <p className="text-sm text-gray-500">Vérification de l'authentification...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-[50vh] flex items-center justify-center bg-amber-50 rounded-xl border border-amber-200 p-6">
+        <div className="text-center">
+          <h3 className="text-lg font-semibold text-amber-900 mb-2">Accès refusé</h3>
+          <p className="text-sm text-amber-700">
+            Vous devez être connecté pour voir la bibliothèque de médias.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -217,6 +333,7 @@ export default function Media() {
               { id: "library", label: "Bibliothèque", icon: Images },
               { id: "brand", label: "Actifs de marque", icon: Star },
               { id: "assignments", label: "Assignations", icon: Tag },
+              { id: "trash", label: `Corbeille${trashedFiles.length > 0 ? ` (${trashedFiles.length})` : ""}`, icon: Trash },
             ] as {
               id: MainTab;
               label: string;
@@ -404,16 +521,29 @@ export default function Media() {
                   )}
                 </div>
               ) : viewMode === "grid" ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-                  {filtered.map((file) => (
-                    <MediaCard
-                      key={file.id}
-                      file={file}
-                      onDetail={setDetail}
-                      onDelete={(f) => setDeleteConfirm(f)}
-                    />
-                  ))}
-                </div>
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                    {filtered.map((file) => (
+                      <MediaCard
+                        key={file.id}
+                        file={file}
+                        onDetail={setDetail}
+                        onDelete={(f) => setDeleteConfirm(f)}
+                      />
+                    ))}
+                  </div>
+                  {hasMore && !search && !tagFilter && (
+                    <div className="mt-4 flex justify-center">
+                      <button
+                        onClick={loadMore}
+                        disabled={loading}
+                        className="px-5 py-2 text-sm text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors disabled:opacity-50"
+                      >
+                        {loading ? "Chargement..." : "Charger plus"}
+                      </button>
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="space-y-1">
                   {filtered.map((file) => (
@@ -423,8 +553,10 @@ export default function Media() {
                       className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors group cursor-pointer"
                     >
                       <img
-                        src={file.url}
+                        src={file.thumbnail_url || file.url}
                         alt={file.original_name}
+                        crossOrigin="anonymous"
+                        loading="lazy"
                         className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
                       />
                       <div className="flex-1 min-w-0">
@@ -487,6 +619,74 @@ export default function Media() {
 
       {mainTab === "assignments" && <SiteMediaAssignments />}
 
+      {mainTab === "trash" && (
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+          <div className="p-4 border-b border-gray-100 flex flex-col gap-2">
+            {actionError && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                <AlertTriangle size={14} className="flex-shrink-0" />
+                <span>{actionError}</span>
+                <button onClick={() => setActionError(null)} className="ml-auto text-red-400 hover:text-red-600"><X size={13} /></button>
+              </div>
+            )}
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <AlertTriangle size={15} className="text-amber-500" />
+              <span>Les fichiers en corbeille ne sont plus accessibles dans la bibliothèque. Suppression définitive pour libérer le stockage.</span>
+            </div>
+          </div>
+          <div className="p-4">
+            {loadingTrash ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+              </div>
+            ) : trashedFiles.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                <Trash size={48} className="mb-3 opacity-20" />
+                <p className="text-sm font-medium">La corbeille est vide</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {trashedFiles.map((file) => (
+                  <div key={file.id} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 border border-gray-100">
+                    <img
+                      src={file.thumbnail_url || file.url}
+                      alt={file.original_name}
+                      crossOrigin="anonymous"
+                      loading="lazy"
+                      className="w-12 h-12 rounded-lg object-cover flex-shrink-0 opacity-60"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-700 truncate">{file.original_name}</p>
+                      <p className="text-xs text-gray-400">
+                        Supprimé le {new Date(file.deleted_at!).toLocaleDateString("fr-FR")}
+                        {" · "}{file.size < 1024*1024 ? `${(file.size/1024).toFixed(0)} KB` : `${(file.size/1024/1024).toFixed(1)} MB`}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleRestore(file)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-600 bg-green-50 hover:bg-green-100 rounded-lg transition-colors"
+                      >
+                        <RotateCcw size={12} />
+                        Restaurer
+                      </button>
+                      <button
+                        onClick={() => setPurgeConfirm(file)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                      >
+                        <Trash2 size={12} />
+                        Supprimer définitivement
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {detail && (
         <MediaDetailModal
           file={detail}
@@ -502,29 +702,63 @@ export default function Media() {
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-            <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
-              <Trash2 size={20} className="text-red-600" />
+            <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-4">
+              <Trash size={20} className="text-amber-600" />
             </div>
             <h3 className="text-base font-semibold text-gray-900 text-center mb-1">
-              Supprimer l'image
+              Déplacer en corbeille
             </h3>
             <p className="text-sm text-gray-500 text-center mb-5">
-              Cette action supprimera définitivement{" "}
-              <strong>"{deleteConfirm.original_name}"</strong> de la
-              bibliothèque et de tous les emplacements où elle est utilisée.
+              <strong>"{deleteConfirm.original_name}"</strong> sera déplacé dans la corbeille. Vous pourrez le restaurer ou le supprimer définitivement depuis l'onglet Corbeille.
             </p>
+            {actionError && (
+              <p className="text-xs text-red-600 text-center -mt-2 mb-2">{actionError}</p>
+            )}
             <div className="flex items-center gap-3">
               <button
-                onClick={() => setDeleteConfirm(null)}
+                onClick={() => { setDeleteConfirm(null); setActionError(null); }}
                 className="flex-1 px-4 py-2 border border-gray-200 text-gray-600 text-sm rounded-xl hover:bg-gray-50 transition-colors"
               >
                 Annuler
               </button>
               <button
                 onClick={() => handleDelete(deleteConfirm)}
+                className="flex-1 px-4 py-2 bg-amber-500 text-white text-sm font-medium rounded-xl hover:bg-amber-600 transition-colors"
+              >
+                Mettre en corbeille
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {purgeConfirm && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+              <Trash2 size={20} className="text-red-600" />
+            </div>
+            <h3 className="text-base font-semibold text-gray-900 text-center mb-1">
+              Suppression définitive
+            </h3>
+            <p className="text-sm text-gray-500 text-center mb-5">
+              <strong>"{purgeConfirm.original_name}"</strong> sera supprimé définitivement du stockage. Cette action est irréversible.
+            </p>
+            {actionError && (
+              <p className="text-xs text-red-600 text-center -mt-2 mb-2">{actionError}</p>
+            )}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => { setPurgeConfirm(null); setActionError(null); }}
+                className="flex-1 px-4 py-2 border border-gray-200 text-gray-600 text-sm rounded-xl hover:bg-gray-50 transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => handlePurge(purgeConfirm)}
                 className="flex-1 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-xl hover:bg-red-700 transition-colors"
               >
-                Supprimer
+                Supprimer définitivement
               </button>
             </div>
           </div>

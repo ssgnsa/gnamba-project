@@ -17,26 +17,8 @@ services:
         "/database/filebrowser.db",
       ]
     volumes:
-      # Répertoire de fichiers partagés
+      # Répertoire de fichiers partagés (EGS Documents)
       - /home/soma/partage:/srv
-
-      # Disques locaux (exposés dans /srv/Disques/*)
-      - /mnt/partage_sdc2:/srv/Disques/SDC2
-      - /mnt/partage_sdc3:/srv/Disques/SDC3
-      - /mnt/partage_sdd1:/srv/Disques/SDD1
-      - /mnt/partage_sdd2:/srv/Disques/SDD2_GHOSTHOME
-
-      # Partages réseau montés (confirmés fonctionnels)
-      - /mnt/reseau/Poste2/egsdocuments:/srv/Reseau/Poste2/egsdocuments
-      - /mnt/reseau/Poste2/Documents:/srv/Reseau/Poste2/Documents
-      - /mnt/reseau/SOMASOULEYMANE/Documents:/srv/Reseau/SOMASOULEYMANE/Documents
-
-      # Partages optionnels (à décommenter si montés avec succès)
-      # - /mnt/reseau/Poste2/Proxmox-Backups:/srv/Reseau/Poste2/Proxmox-Backups
-      # - /mnt/reseau/Poste2/Proxmox-ISOs:/srv/Reseau/Poste2/Proxmox-ISOs
-      # - /mnt/reseau/Poste2/Users:/srv/Reseau/Poste2/Users
-      # - /mnt/reseau/Poste3/Users:/srv/Reseau/Poste3/Users
-      # - /mnt/reseau/SOMASOULEYMANE/Users:/srv/Reseau/SOMASOULEYMANE/Users
 
       # Base de données utilisateur
       - /home/soma/filebrowser/database:/database

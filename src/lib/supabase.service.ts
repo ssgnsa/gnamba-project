@@ -10,6 +10,7 @@
 
 import { supabase } from "./supabase";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { FoncierLot } from "../types";
 import { logFoncierAudit } from "./foncierAudit";
 
 /**
@@ -72,8 +73,42 @@ export class SupabaseService {
   private client: SupabaseClient;
   private defaultRetries = 3;
 
+  // Cache pour les données fréquemment utilisées
+  private cache = new Map<string, { data: any; timestamp: number; ttl: number }>();
+  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
   constructor(client: SupabaseClient = supabase) {
     this.client = client;
+  }
+
+  /**
+   * Récupère des données du cache si elles sont valides
+   */
+  private getCachedData(key: string): any | null {
+    const cached = this.cache.get(key);
+    if (cached && Date.now() - cached.timestamp < cached.ttl) {
+      return cached.data;
+    }
+    this.cache.delete(key);
+    return null;
+  }
+
+  /**
+   * Stocke des données en cache
+   */
+  private setCachedData(key: string, data: any, ttl: number = this.CACHE_TTL): void {
+    this.cache.set(key, { data, timestamp: Date.now(), ttl });
+  }
+
+  /**
+   * Invalide le cache pour une clé spécifique ou toutes les clés
+   */
+  invalidateCache(key?: string): void {
+    if (key) {
+      this.cache.delete(key);
+    } else {
+      this.cache.clear();
+    }
   }
 
   /**
@@ -271,47 +306,95 @@ export class SupabaseService {
   }
 
   /**
-   * Obtient les statistiques par village
+   * Obtient les statistiques par village (avec cache)
    */
   async getVillageStats(includeArchived: boolean = false) {
-    return this.queryWithRetry(async () =>
+    const cacheKey = `village_stats_${includeArchived}`;
+
+    // Vérifier le cache d'abord
+    const cachedData = this.getCachedData(cacheKey);
+    if (cachedData) {
+      return { data: cachedData, error: null };
+    }
+
+    const result = await this.queryWithRetry(async () =>
       this.client.rpc("foncier_stats_by_village", {
         p_include_archived: includeArchived,
       }),
     );
+
+    if (result.data) {
+      // Mettre en cache pour 2 minutes (statistiques changent fréquemment)
+      this.setCachedData(cacheKey, result.data, 2 * 60 * 1000);
+    }
+
+    return result;
   }
 
   /**
-   * Charge les villages depuis la base de données
+   * Charge les villages depuis la base de données (avec cache)
    */
-  async getVillages() {
-    return this.queryWithRetry(async () =>
+  async getVillages(): Promise<{ data: string[] | null; error: string | null }> {
+    const cacheKey = "villages";
+
+    // Vérifier le cache d'abord
+    const cachedData = this.getCachedData(cacheKey);
+    if (cachedData) {
+      return { data: cachedData, error: null };
+    }
+
+    const result = await this.queryWithRetry(async () =>
       this.client
         .from("foncier_villages")
         .select("name")
         .order("name", { ascending: true }),
     );
+
+    if (result.data) {
+      const villageNames = result.data.map((row: { name: string }) => row.name);
+      // Mettre en cache pour 10 minutes (villages changent rarement)
+      this.setCachedData(cacheKey, villageNames, 10 * 60 * 1000);
+      return { data: villageNames, error: null };
+    }
+
+    return { data: null, error: result.error ?? null };
   }
 
   /**
    * Soft delete d'un lot foncier
    */
   async softDeleteLot(lotId: string, reason: string = "archivage") {
-    return this.queryWithRetry(async () =>
+    const result = await this.queryWithRetry(async () =>
       this.client.rpc("soft_delete_foncier_lot", {
         p_lot_id: lotId,
         p_reason: reason,
       }),
     );
+
+    // Invalider le cache des statistiques
+    if (result.data) {
+      this.invalidateCache("village_stats_true");
+      this.invalidateCache("village_stats_false");
+    }
+
+    return result;
   }
 
   /**
    * Restaure un lot foncier archivé
    */
   async restoreLot(lotId: string) {
-    return this.queryWithRetry(async () =>
+    const result = await this.queryWithRetry(async () =>
       this.client.rpc("restore_foncier_lot", { p_lot_id: lotId }),
     );
+
+    // Invalider le cache des statistiques
+    if (result.data) {
+      this.invalidateCache("village_stats_true");
+      this.invalidateCache("village_stats_false");
+    }
+
+    return result;
   }
 
   /**
@@ -354,6 +437,173 @@ export class SupabaseService {
         details: payload.details || null,
       }),
     );
+  }
+
+  /**
+   * Récupère les données d'audit foncier avec pagination et filtres
+   */
+  async getAudit(params: {
+    page: number;
+    pageSize: number;
+    actionFilter?: string;
+  }) {
+    return this.queryWithRetry(async () => {
+      const from = (params.page - 1) * params.pageSize;
+      const to = from + params.pageSize - 1;
+
+      let query = this.client
+        .from("foncier_audit")
+        .select(
+          "id, lot_id, action, performed_by, performed_at, old_values, new_values, foncier_lots:lot_id(reference, numero_lot, village)",
+          { count: "exact" },
+        )
+        .order("performed_at", { ascending: false })
+        .range(from, to);
+
+      if (params.actionFilter) {
+        query = query.eq("action", params.actionFilter);
+      }
+
+      return query;
+    });
+  }
+
+  /**
+   * Récupère les profils utilisateurs par IDs
+   */
+  async getUserProfiles(userIds: string[]) {
+    if (userIds.length === 0) {
+      return { data: {}, error: null };
+    }
+
+    return this.queryWithRetry(async () =>
+      this.client
+        .from("user_profiles")
+        .select("id, full_name")
+        .in("id", userIds),
+    );
+  }
+
+  /**
+   * Vérifie si une référence de lot existe déjà
+   */
+  async checkLotReferenceExists(reference: string, excludeLotId?: string) {
+    return this.queryWithRetry(async () => {
+      let query = this.client
+        .from("foncier_lots")
+        .select("id")
+        .eq("reference", reference);
+
+      if (excludeLotId) {
+        query = query.neq("id", excludeLotId);
+      }
+
+      return query.maybeSingle();
+    });
+  }
+
+  /**
+   * Sauvegarde un lot foncier (insertion ou mise à jour)
+   */
+  async saveLot(lotData: Partial<FoncierLot>, isUpdate: boolean = false) {
+    const result = await this.queryWithRetry(async () => {
+      if (isUpdate) {
+        return this.client
+          .from("foncier_lots")
+          .update(lotData)
+          .eq("id", lotData.id!)
+          .eq("row_version", lotData.row_version ?? 1)
+          .select("*")
+          .single();
+      } else {
+        return this.client
+          .from("foncier_lots")
+          .insert(lotData)
+          .select("*")
+          .single();
+      }
+    });
+
+    // Invalider le cache des statistiques si la sauvegarde réussit
+    if (result.data) {
+      this.invalidateCache("village_stats_true");
+      this.invalidateCache("village_stats_false");
+    }
+
+    return result;
+  }
+
+  /**
+   * Récupère la dernière attestation pour un lot
+   */
+  async getLatestAttestationForLot(
+    lotId: string,
+    includeArchived: boolean = false,
+    select: string = "*, foncier_attestation_temoins(*)"
+  ) {
+    return this.queryWithRetry(async () => {
+      let query = this.client
+        .from("foncier_attestations")
+        .select(select)
+        .eq("lot_id", lotId)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (!includeArchived) {
+        query = query.is("deleted_at", null);
+      }
+
+      return query.maybeSingle();
+    });
+  }
+
+  /**
+   * Crée une attestation atomique
+   */
+  async createAttestationAtomic(attestationPayload: any) {
+    return this.queryWithRetry(async () =>
+      this.client.rpc("create_foncier_attestation_atomic", attestationPayload),
+    );
+  }
+
+  /**
+   * Attache les métadonnées PDF à une attestation
+   */
+  async attachAttestationPdfMetadata(params: {
+    attestation_id: string;
+    pdf_metadata: any;
+  }) {
+    return this.queryWithRetry(async () =>
+      this.client.rpc("attach_foncier_attestation_pdf_metadata", params),
+    );
+  }
+
+  /**
+   * Signe une attestation via Edge Function
+   */
+  async signAttestation(attestationId: string, payload: Record<string, unknown>) {
+    try {
+      const result = await this.client.functions.invoke("attestation-sign", {
+        body: {
+          attestation_id: attestationId,
+          payload: JSON.stringify(payload),
+        },
+      });
+
+      if (result.error) {
+        return { data: null, error: result.error.message };
+      }
+
+      return {
+        data: (result.data as { signature?: string })?.signature || "",
+        error: null
+      };
+    } catch (error) {
+      return {
+        data: null,
+        error: error instanceof Error ? error.message : "Erreur de signature",
+      };
+    }
   }
 }
 

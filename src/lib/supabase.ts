@@ -1,4 +1,8 @@
-import { createClient, SupabaseClientOptions } from "@supabase/supabase-js";
+import {
+  createClient,
+  type SupabaseClient,
+  type SupabaseClientOptions,
+} from "@supabase/supabase-js";
 
 // Support for both local and cloud Supabase instances
 // Mode: VITE_SUPABASE_MODE = 'cloud' | 'local' | 'auto' (default)
@@ -78,8 +82,8 @@ const supabaseOptions: SupabaseClientOptions<any> = {
     persistSession: true,
     storage: authStorage,
     autoRefreshToken: true,
-    detectSessionInUrl: true,
-    flowType: "implicit",
+    detectSessionInUrl: false,
+    storageKey: "egs-supabase-auth",
   },
   global: {
     // Timeouts pour les requêtes HTTP (en ms)
@@ -93,6 +97,11 @@ const supabaseOptions: SupabaseClientOptions<any> = {
           ...options,
           signal: controller.signal,
         });
+
+        // Les checks de santé utilisent maintenant /auth/v1/health.
+        // Si une requête métier renvoie 401, la gestion d'erreur reste locale
+        // au composant appelant pour éviter de déconnecter l'utilisateur sur un simple ping.
+
         return response;
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") {
@@ -104,15 +113,21 @@ const supabaseOptions: SupabaseClientOptions<any> = {
         clearTimeout(timeoutId);
       }
     },
-    // Headers pour optimiser les connexions
-    headers: {
-      "Content-Type": "application/json",
-    },
+    // Ne pas forcer Content-Type ici — le SDK Supabase le gère selon la requête
+    // (application/json pour REST, multipart pour Storage uploads)
   },
 };
 
-export const supabase = createClient(
-  supabaseUrl,
-  supabaseAnonKey,
-  supabaseOptions,
-);
+type SupabaseClientSingleton = SupabaseClient<any, any, any>;
+
+const globalForSupabase = globalThis as typeof globalThis & {
+  __EGS_SUPABASE_CLIENT__?: SupabaseClientSingleton;
+};
+
+export const supabase =
+  globalForSupabase.__EGS_SUPABASE_CLIENT__ ??
+  (globalForSupabase.__EGS_SUPABASE_CLIENT__ = createClient(
+    supabaseUrl,
+    supabaseAnonKey,
+    supabaseOptions,
+  ));

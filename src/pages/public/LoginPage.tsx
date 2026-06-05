@@ -143,6 +143,12 @@ export default function LoginPage({ onSuccess, onForgotPassword }: Props) {
     setLoading(false);
     if (err) {
       recordFailedAttempt();
+      if (err.startsWith("EMAIL_NOT_CONFIRMED")) {
+        setError(
+          "Compte non confirmé. Vérifiez l'email d'activation ou faites confirmer le compte dans Supabase avant de réessayer.",
+        );
+        return;
+      }
       setError("Email ou mot de passe incorrect. Vérifiez vos identifiants.");
       return;
     }

@@ -7,6 +7,7 @@ import {
   X,
   UserPlus,
   AlertCircle,
+  Loader,
 } from "lucide-react";
 
 interface FormulaireVisiteurProps {
@@ -19,6 +20,7 @@ interface FormulaireVisiteurProps {
   errors?: Record<string, string>;
   onFieldBlur?: (field: keyof VisiteurFormData) => void;
   touched?: Record<string, boolean>;
+  photoUploading?: boolean;
 }
 
 // Validation functions
@@ -53,6 +55,7 @@ export const FormulaireVisiteur = memo(function FormulaireVisiteur({
   errors = {},
   onFieldBlur,
   touched = {},
+  photoUploading = false,
 }: FormulaireVisiteurProps) {
   const inputClass =
     "w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all";
@@ -129,10 +132,15 @@ export const FormulaireVisiteur = memo(function FormulaireVisiteur({
         <div>
           <label className={labelClass}>Photo du visiteur</label>
           <div className="flex items-center gap-4">
-            {visitorForm.photo_base64 ? (
+            {photoUploading ? (
+              <div className="w-24 h-32 bg-gray-100 rounded-xl border-2 border-blue-200 flex flex-col items-center justify-center gap-2">
+                <Loader size={24} className="text-blue-400 animate-spin" />
+                <span className="text-xs text-blue-500">Upload...</span>
+              </div>
+            ) : visitorForm.photo_url ? (
               <div className="relative">
                 <img
-                  src={visitorForm.photo_base64}
+                  src={visitorForm.photo_url}
                   alt="Photo"
                   className="w-24 h-32 object-cover rounded-xl border-2 border-blue-200"
                 />
@@ -156,18 +164,20 @@ export const FormulaireVisiteur = memo(function FormulaireVisiteur({
               <button
                 type="button"
                 onClick={onStartWebcam}
-                className="px-4 py-2.5 bg-blue-500 text-white rounded-xl text-sm font-medium hover:bg-blue-600 transition-colors flex items-center gap-2"
+                disabled={photoUploading}
+                className="px-4 py-2.5 bg-blue-500 text-white rounded-xl text-sm font-medium hover:bg-blue-600 transition-colors flex items-center gap-2 disabled:opacity-50"
               >
                 <Camera size={16} />
                 Webcam
               </button>
-              <label className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors cursor-pointer flex items-center gap-2">
+              <label className={`px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors flex items-center gap-2 ${photoUploading ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
                 <Upload size={16} />
                 Upload
                 <input
                   type="file"
                   accept="image/*"
                   onChange={handlePhotoUpload}
+                  disabled={photoUploading}
                   className="hidden"
                 />
               </label>

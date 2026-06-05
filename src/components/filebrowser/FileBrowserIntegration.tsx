@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Folder,
   File,
@@ -11,6 +11,7 @@ import {
   Home,
 } from "lucide-react";
 import { FileBrowserService, FileBrowserFile } from "../../lib/filebrowser";
+import { useAuth } from "../../context/AuthContext";
 
 interface FileBrowserIntegrationProps {
   onFileSelect?: (file: FileBrowserFile) => void;
@@ -21,6 +22,7 @@ export default function FileBrowserIntegration({
   onFileSelect,
   initialPath = "/",
 }: FileBrowserIntegrationProps) {
+  const { user } = useAuth();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -30,9 +32,32 @@ export default function FileBrowserIntegration({
   const [files, setFiles] = useState<FileBrowserFile[]>([]);
   const [uploading, setUploading] = useState(false);
 
-  useEffect(() => {
-    checkAuth();
+  const checkAuth = useCallback(async () => {
+    const token = await FileBrowserService.getToken();
+    setIsAuthenticated(!!token);
   }, []);
+
+  const autoLoginWithEGS = useCallback(async () => {
+    if (!user || !user.email) return;
+
+    try {
+      // Utiliser l'email EGS comme username et un token généré comme password
+      await FileBrowserService.login(user.email, generateToken(user.id));
+      setIsAuthenticated(true);
+    } catch {
+      // Fallback vers authentification manuelle si auto-login échoue
+      checkAuth();
+    }
+  }, [user, checkAuth]);
+
+  useEffect(() => {
+    // Auto-login avec EGS Auth si utilisateur connecté
+    if (user) {
+      autoLoginWithEGS();
+    } else {
+      checkAuth();
+    }
+  }, [user, autoLoginWithEGS, checkAuth]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -40,9 +65,9 @@ export default function FileBrowserIntegration({
     }
   }, [currentPath, isAuthenticated]);
 
-  const checkAuth = async () => {
-    const token = await FileBrowserService.getToken();
-    setIsAuthenticated(!!token);
+  const generateToken = (userId: string): string => {
+    // Générer un token basé sur l'ID utilisateur pour l'auth FileBrowser
+    return btoa(`${userId}-${Date.now()}`);
   };
 
   const handleLogin = async (e: React.FormEvent) => {

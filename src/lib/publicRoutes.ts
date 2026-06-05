@@ -5,7 +5,8 @@ export type PublicPage =
   | "realisations"
   | "contact"
   | "login"
-  | "verification";
+  | "verification"
+  | "lots";
 
 export const PUBLIC_PAGE_PATHS: Record<PublicPage, string> = {
   home: "/",
@@ -15,6 +16,7 @@ export const PUBLIC_PAGE_PATHS: Record<PublicPage, string> = {
   contact: "/contact",
   login: "/login",
   verification: "/verification-attestation",
+  lots: "/lots",
 };
 
 const PUBLIC_PAGE_ALIASES: Record<string, PublicPage> = {

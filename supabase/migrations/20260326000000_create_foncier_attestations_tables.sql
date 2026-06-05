@@ -15,7 +15,7 @@
 -- ============================================
 
 -- Create table if not exists
--- NOTE: lot_id FK to foncier_lots is added later (20260405150000) after foncier_lots is created
+-- NOTE: lot_id FK to foncier_lots is added at the end of this migration (foncier_lots now created in 20260324)
 CREATE TABLE IF NOT EXISTS public.foncier_attestations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   lot_id uuid,  -- FK added later to avoid circular dependency
@@ -208,6 +208,16 @@ CREATE INDEX IF NOT EXISTS idx_foncier_attestations_reference ON public.foncier_
 CREATE INDEX IF NOT EXISTS idx_foncier_attestations_statut ON public.foncier_attestations(statut);
 CREATE INDEX IF NOT EXISTS idx_foncier_attestations_revoked ON public.foncier_attestations(revoked_at) WHERE revoked_at IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_foncier_attestations_expiration ON public.foncier_attestations(date_expiration) WHERE date_expiration IS NOT NULL;
+
+-- ============================================
+-- FOREIGN KEY: foncier_attestations.lot_id → foncier_lots.id
+-- ============================================
+ALTER TABLE public.foncier_attestations
+  DROP CONSTRAINT IF EXISTS foncier_attestations_lot_id_fkey;
+
+ALTER TABLE public.foncier_attestations
+  ADD CONSTRAINT foncier_attestations_lot_id_fkey
+  FOREIGN KEY (lot_id) REFERENCES foncier_lots(id) ON DELETE CASCADE;
 
 -- Comments
 COMMENT ON TABLE public.foncier_attestations IS 'Attestations de propriété coutumière pour les lots fonciers';

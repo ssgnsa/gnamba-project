@@ -126,8 +126,13 @@ export default function Finances() {
   };
 
   const handleSave = async () => {
-    if (!form.montant || !form.categorie) {
-      setFormError("Le montant et la catégorie sont obligatoires.");
+    const parsedMontant = parseFloat(form.montant);
+    if (!form.montant || isNaN(parsedMontant) || parsedMontant <= 0) {
+      setFormError("Le montant doit être un nombre positif.");
+      return;
+    }
+    if (!form.categorie) {
+      setFormError("La catégorie est obligatoire.");
       return;
     }
 
@@ -137,7 +142,7 @@ export default function Finances() {
     const payload = {
       type_transaction: form.type_transaction,
       categorie: form.categorie,
-      montant: parseFloat(form.montant) || 0,
+      montant: parsedMontant,
       date_transaction: form.date_transaction,
       mode_paiement: form.mode_paiement,
       reference: ref,
@@ -176,7 +181,8 @@ export default function Finances() {
       return;
     }
     if (!confirm("Supprimer cette transaction ?")) return;
-    await supabase.from("finances").delete().eq("id", id);
+    const { error } = await supabase.from("finances").delete().eq("id", id);
+    if (error) { setFormError(error.message); return; }
     fetchData();
   };
 

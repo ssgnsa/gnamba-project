@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { supabase } from "../lib/supabase";
+import { supabaseService } from '../lib/supabase.service'
 import type { FoncierLot, FoncierAttestation } from "../types";
 import type { FoncierConfigMap, AttestationForm } from "../components/foncier/FoncierConstants";
 import DOMPurify from "dompurify";
@@ -13,6 +14,7 @@ import {
 import {
   printAttestationCoutumiere,
 } from "../utils/print";
+import { getUsageForSlot } from "../lib/mediaUtils";
 import {
   validateAttestationForm,
   validateFoncierForm,
@@ -23,6 +25,7 @@ import {
   getLocalDateInput,
   isMissingColumnError,
 } from "../components/foncier/FoncierConstants";
+import { withBackoff } from "../lib/supabase.service";
 
 type VerificationUrlParams = {
   reference?: string | null;
@@ -72,26 +75,14 @@ const fetchLatestAttestationForLot = async (
   const select = options?.select || "*, foncier_attestation_temoins(*)";
   const includeArchived = options?.includeArchived ?? false;
 
-  const runQuery = (supportsDeletedAt: boolean) =>
-    withBackoff(() => {
-      let query = supabase
-        .from("foncier_attestations")
-        .select(select)
-        .eq("lot_id", lotId)
-        .order("created_at", { ascending: false })
-        .limit(1);
-      if (!includeArchived && supportsDeletedAt) {
-        query = query.is("deleted_at", null);
-      }
-      return query.maybeSingle();
-    });
-
+  // Pour la compatibilité, on gère encore la logique deleted_at ici
+  // mais on utilise le service pour la requête
   const supportsDeletedAt = attestationHasDeletedAt !== false;
-  let result = await runQuery(supportsDeletedAt);
+  let result = await supabaseService.getLatestAttestationForLot(lotId, includeArchived, select);
 
   if (result.error && isMissingColumnError(result.error, "deleted_at")) {
     setAttestationHasDeletedAt(false);
-    result = await runQuery(false);
+    result = await supabaseService.getLatestAttestationForLot(lotId, includeArchived, select);
   } else if (
     !result.error &&
     supportsDeletedAt &&
@@ -117,16 +108,9 @@ const signAttestationPayload = async (
   payload: Record<string, unknown>,
 ) => {
   try {
-    const { data, error } = await withBackoff(() =>
-      supabase.functions.invoke("attestation-sign", {
-        body: {
-          attestation_id: attestationId,
-          payload: JSON.stringify(payload),
-        },
-      }),
-    );
+    const { data, error } = await supabaseService.signAttestation(attestationId, payload);
     if (error) return "";
-    return (data as { signature?: string })?.signature || "";
+    return data || "";
   } catch {
     return "";
   }
@@ -135,7 +119,6 @@ import { logFoncierAudit } from "../lib/foncierAudit";
 import {
   createEmptyForm,
 } from "../components/foncier/FoncierConstants";
-import { withBackoff } from "./useFoncierSync";
 import {
   upsertCachedLot,
   addQueueItem,
@@ -209,24 +192,25 @@ export function useFoncierLogic(
 
       // 5. Vérifier doublons en ligne
       if (isOnline) {
-        const { data: existingLot } = await withBackoff(
-          () =>
-            supabase
-              .from("foncier_lots")
-              .select("id, reference")
-              .eq("village", form.village)
-              .eq("nom_lotissement", form.nom_lotissement)
-              .eq("numero_ilot", form.numero_ilot)
-              .eq("numero_lot", form.numero_lot)
-              .neq("id", editingId || "00000000-0000-0000-0000-000000000000")
-              .is("deleted_at", null)
-              .maybeSingle(),
-        );
+        const { data: duplicateData, error: duplicateError } = await supabaseService.checkLotDuplicate({
+          village: form.village,
+          lotissement: form.nom_lotissement,
+          ilot: form.numero_ilot,
+          lot: form.numero_lot,
+          exclude_lot_id: editingId,
+        });
 
-        if (existingLot) {
+        if (duplicateError) {
           return {
             success: false,
-            error: `Un lot existe déjà avec ces caractéristiques : ${existingLot.reference}.`,
+            error: "Erreur lors de la vérification des doublons.",
+          };
+        }
+
+        if (duplicateData && duplicateData.length > 0) {
+          return {
+            success: false,
+            error: `Un lot existe déjà avec ces caractéristiques : ${duplicateData[0].reference}.`,
           };
         }
       }
@@ -251,13 +235,9 @@ export function useFoncierLogic(
       }
 
       if (isOnline) {
-        const { data: refExists } = await withBackoff(() =>
-          supabase
-            .from("foncier_lots")
-            .select("id")
-            .eq("reference", ref)
-            .neq("id", editingId || "00000000-0000-0000-0000-000000000000")
-            .maybeSingle(),
+        const { data: refExists } = await supabaseService.checkLotReferenceExists(
+          ref,
+          editingId || undefined
         );
 
         if (refExists) {
@@ -298,6 +278,7 @@ export function useFoncierLogic(
         arrete_prefectoral: cleanText(form.arrete_prefectoral),
         arrete_date: cleanText(arreteDate),
         statut: form.statut,
+        publier_sur_vitrine: form.publier_sur_vitrine || false,
         date_cession: dateCession,
         prix_cession: prixValue,
         notes: DOMPurify.sanitize(form.notes),
@@ -340,28 +321,7 @@ export function useFoncierLogic(
       }
 
       // 10. Insertion/mise à jour en ligne
-      let data: FoncierLot | null = null;
-      let dbError: string | null = null;
-
-      if (editingId) {
-        const result = await withBackoff(() =>
-          supabase
-            .from("foncier_lots")
-            .update(payload)
-            .eq("id", editingId)
-            .eq("row_version", existing?.row_version ?? 1)
-            .select("*")
-            .single(),
-        );
-        data = result.data as FoncierLot | null;
-        dbError = result.error?.message || null;
-      } else {
-        const result = await withBackoff(() =>
-          supabase.from("foncier_lots").insert(payload).select("*").single(),
-        );
-        data = result.data as FoncierLot | null;
-        dbError = result.error?.message || null;
-      }
+      const { data, error: dbError } = await supabaseService.saveLot(payload, !!editingId);
 
       if (dbError) {
         return {
@@ -416,7 +376,7 @@ export function useFoncierLogic(
             message: "Lot archivé hors-ligne.",
             offline: true,
           };
-        } catch (err: any) {
+        } catch {
           return {
             success: false,
             error: "Archivage hors-ligne impossible.",
@@ -424,12 +384,7 @@ export function useFoncierLogic(
         }
       }
 
-      const { error } = await withBackoff(() =>
-        supabase.rpc("soft_delete_foncier_lot", {
-          p_lot_id: lot.id,
-          p_reason: "archivage",
-        }),
-      );
+      const { error } = await supabaseService.softDeleteLot(lot.id, "archivage");
 
       if (error) {
         return {
@@ -468,7 +423,7 @@ export function useFoncierLogic(
             message: "Lot restauré hors-ligne.",
             offline: true,
           };
-        } catch (err: any) {
+        } catch {
           return {
             success: false,
             error: "Restauration hors-ligne impossible.",
@@ -476,9 +431,7 @@ export function useFoncierLogic(
         }
       }
 
-      const { error } = await withBackoff(() =>
-        supabase.rpc("restore_foncier_lot", { p_lot_id: lot.id }),
-      );
+      const { error } = await supabaseService.restoreLot(lot.id);
 
       if (error) {
         return {
@@ -537,6 +490,7 @@ export function useFoncierLogic(
     qrDataUrl?: string,
     gpsPointsResult?: Array<{ label: string; lat: number; lng: number }> | null,
     verificationUrl?: string,
+    villageLogoUrl?: string,
   ) => {
     const gpsLat = form.gps_lat ? parseFloat(form.gps_lat) : null;
     const gpsLng = form.gps_lng ? parseFloat(form.gps_lng) : null;
@@ -626,7 +580,7 @@ export function useFoncierLogic(
         config.chef_village ||
         "",
       logoUrl: config.logo_url || "",
-      village_logo_url: config.village_logo_url || "",
+      village_logo_url: villageLogoUrl || config.village_logo_url || "",
       signatureUrl: attestationData.signatureUrl || "",
       cachetUrl:
         attestationData.cachetUrl || attestationData.chef_empreinte_url || "",
@@ -804,9 +758,7 @@ export function useFoncierLogic(
     });
 
     const { data: attestationRows, error: attestationError } =
-      await withBackoff(() =>
-        supabase.rpc("create_foncier_attestation_atomic", attestationPayload),
-      );
+      await supabaseService.createAttestationAtomic(attestationPayload);
 
     const createdAttestation = (
       Array.isArray(attestationRows) ? attestationRows[0] : attestationRows
@@ -829,15 +781,15 @@ export function useFoncierLogic(
       if (import.meta.env.DEV)
         console.error("❌ Attestation atomic creation failed", {
           error: attestationError,
-          message: attestationError?.message,
-          details: attestationError?.details,
-          hint: attestationError?.hint,
-          code: attestationError?.code,
+          message: (attestationError as any)?.message,
+          details: (attestationError as any)?.details,
+          hint: (attestationError as any)?.hint,
+          code: (attestationError as any)?.code,
         });
       return {
         success: false,
         error:
-          attestationError?.message || "Création de l'attestation impossible.",
+          (attestationError as any)?.message || "Création de l'attestation impossible.",
       };
     }
 
@@ -886,7 +838,7 @@ export function useFoncierLogic(
       chefName,
       attestationType,
     };
-  }, [deviceId, profile]);
+  }, [deviceId, profile, attestationHasDeletedAt, setAttestationHasDeletedAt]);
 
   const signAndGenerateQr = useCallback(async (createdAttestation: any) => {
     const qrVerificationUrl = buildAttestationVerificationUrl({
@@ -934,6 +886,12 @@ export function useFoncierLogic(
     refreshQueueCount: () => void,
     setPageNotice: (notice: string) => void,
   ) => {
+    const hookVillageKey = (lot.village || '').replace(/^(VILLAGE\s+DE\s+|VILLAGE\s+)/i, '').trim();
+    const hookVillageLogoMedia = hookVillageKey
+      ? await getUsageForSlot('foncier_village', hookVillageKey, 'logo').catch(() => null)
+      : null;
+    const hookVillageLogoUrl = hookVillageLogoMedia?.url || config.village_logo_url || config.logo_url || '';
+
     const onlinePrintData = buildAttestationPrintData(
       {
         ...createdAttestation,
@@ -949,6 +907,7 @@ export function useFoncierLogic(
       qrDataUrl,
       undefined, // gpsPointsResult
       qrVerificationUrl,
+      hookVillageLogoUrl,
     );
 
     printAttestationCoutumiere(onlinePrintData);
@@ -963,16 +922,16 @@ export function useFoncierLogic(
         printed_by: profile?.id || null,
       };
       // Call client-side RPC (requires service role; best-effort)
-      await withBackoff(() =>
-        supabase.rpc("attach_foncier_attestation_pdf_metadata", {
-          p_attestation_id: pdfMeta.attestation_id,
-          p_hash_sha256: pdfMeta.hash_sha256,
-          p_verify_url: pdfMeta.verify_url,
-          p_pdf_path: pdfMeta.pdf_path,
-          p_pdf_generated_at: new Date().toISOString(),
-          p_printed_by: pdfMeta.printed_by,
-        }),
-      );
+      await supabaseService.attachAttestationPdfMetadata({
+        attestation_id: pdfMeta.attestation_id,
+        pdf_metadata: {
+          hash_sha256: pdfMeta.hash_sha256,
+          verify_url: pdfMeta.verify_url,
+          pdf_path: pdfMeta.pdf_path,
+          pdf_generated_at: new Date().toISOString(),
+          printed_by: pdfMeta.printed_by,
+        },
+      });
     } catch {
       // ignore — server script will reconcile metadata if RPC not available
     }
@@ -1011,7 +970,7 @@ export function useFoncierLogic(
         setPageNotice("Impression OK, mais journalisation impossible.");
       }
     }
-  }, [profile]);
+  }, [profile, buildAttestationPrintData]);
 
   const handleGenerateAttestation = useCallback(async (
     attestationLot: FoncierLot | null,
@@ -1097,7 +1056,12 @@ export function useFoncierLogic(
       if (import.meta.env.DEV)
         console.error("Attestation generation error:", error);
     }
-  }, [deviceId, profile]);
+  }, [
+    validateAttestationPrerequisites,
+    createAttestationRecord,
+    signAndGenerateQr,
+    printAndAuditAttestation,
+  ]);
 
   return {
     saveLot,

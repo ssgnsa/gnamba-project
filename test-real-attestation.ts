@@ -40,11 +40,6 @@ const html = buildAttestationCoutumiereHTML(testData as any);
 
 // Inspecter les couleurs du texte et du fond
 const bodyMatch = html.match(/<body[^>]*>/);
-const hasBodyStyle = html.includes('style');
-
-// Chercher les zones problématiques
-const titleMatch = html.match(/<div class="title-main"[^>]*>([^<]+)<\/div>/);
-const headerLeftMatch = html.match(/<div class="header-left"[^>]*>/);
 
 console.log('=== DIAGNOSTIC D\'AFFICHAGE ===\n');
 console.log('Longueur HTML:', html.length);

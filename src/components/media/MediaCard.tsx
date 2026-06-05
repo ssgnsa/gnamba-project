@@ -12,6 +12,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   services: "Services",
   equipe: "Équipe",
   documents: "Documents",
+  foncier_villages: "Logos Villages",
   autre: "Autre",
 };
 
@@ -25,6 +26,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   services: "bg-cyan-100 text-cyan-700",
   equipe: "bg-pink-100 text-pink-700",
   documents: "bg-gray-100 text-gray-700",
+  foncier_villages: "bg-emerald-100 text-emerald-700",
   autre: "bg-slate-100 text-slate-700",
 };
 
@@ -49,9 +51,11 @@ export default function MediaCard({
 }: MediaCardProps) {
   const [copied, setCopied] = useState(false);
   const [imgError, setImgError] = useState(false);
+  // Compatibilité ancien schéma (public_url) et nouveau (url)
+  const resolvedUrl = file.url || (file as MediaFile & { public_url?: string }).public_url || "";
   const isImage =
     file.type?.startsWith("image/") ||
-    /\.(png|jpe?g|gif|webp|svg)$/i.test(file.url || "");
+    /\.(png|jpe?g|gif|webp|svg)$/i.test(resolvedUrl);
 
   const formatSize = (bytes: number) => {
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
@@ -91,8 +95,9 @@ export default function MediaCard({
       <div className="aspect-square bg-gray-100 overflow-hidden relative">
         {isImage && !imgError ? (
           <img
-            src={file.url}
+            src={file.thumbnail_url || resolvedUrl}
             alt={file.alt_text || file.original_name}
+            loading="lazy"
             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
             onError={() => setImgError(true)}
           />

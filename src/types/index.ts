@@ -294,6 +294,7 @@ export interface FoncierLot {
   arrete_date: string;
   // Transaction
   statut: "actif" | "vendu" | "litige" | "reserve" | "annule";
+  publier_sur_vitrine?: boolean | null;
   date_cession: string; // Format ISO "YYYY-MM-DD"
   prix_cession: number;
   notes: string;
@@ -417,6 +418,7 @@ export type MediaCategory =
   | "services"
   | "equipe"
   | "documents"
+  | "foncier_villages"
   | "autre";
 
 export type BrandAssetType =
@@ -430,6 +432,7 @@ export interface MediaFile {
   filename: string;
   original_name: string;
   url: string;
+  thumbnail_url: string | null;
   category: MediaCategory;
   uploaded_by: string | null;
   upload_date: string;
@@ -442,6 +445,10 @@ export interface MediaFile {
   brand_asset_type: BrandAssetType | null;
   created_at: string;
   updated_at: string;
+  deleted_at: string | null;
+  deleted_by: string | null;
+  width: number | null;
+  height: number | null;
 }
 
 export interface MediaUsage {
@@ -463,6 +470,23 @@ export interface MediaVersion {
   old_filename: string;
   replaced_at: string;
   replaced_by: string | null;
+}
+
+export type MediaAuditAction =
+  | "upload"
+  | "soft_delete"
+  | "restore"
+  | "purge"
+  | "replace"
+  | "metadata_update";
+
+export interface MediaAuditLog {
+  id: string;
+  media_id: string | null;
+  action: MediaAuditAction;
+  actor_id: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
 }
 
 export interface BrandSettings {
@@ -695,6 +719,7 @@ export interface VisiteurFormData {
   email: string;
   societe: string;
   photo_base64: string | null;
+  photo_url: string | null;
 }
 
 export interface VisiteFormData {

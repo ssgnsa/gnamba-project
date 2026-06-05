@@ -1,8 +1,39 @@
+# ============================================
+# EGS - Docker Compose Unifié
+# Usage:
+#   docker-compose --profile dev up -d     # Mode développement (port 5173)
+#   docker-compose --profile prod up -d    # Mode production (port 80)
+# ============================================
+
 services:
-  # EGS frontend only.
-  # Local Supabase services are managed by `supabase start`, not by docker-compose.
+  # ============================================
+  # EGS Frontend - Mode Développement
+  # ============================================
   egs-frontend:
+    profiles: ["dev"]
     image: egs-frontend:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_SUPABASE_MODE: ${VITE_SUPABASE_MODE:-local}
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-}
+        VITE_SUPABASE_LOCAL_URL: ${VITE_SUPABASE_LOCAL_URL:-}
+        VITE_SUPABASE_LOCAL_ANON_KEY: ${VITE_SUPABASE_LOCAL_ANON_KEY:-}
+    container_name: egs-frontend
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-5173}:80"
+    networks:
+      - gnamba-network
+
+  # ============================================
+  # EGS Web - Mode Production/Serveur
+  # ============================================
+  egs-web:
+    profiles: ["prod", "server"]
+    image: egs-web:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -12,7 +43,61 @@ services:
         VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-}
         VITE_SUPABASE_LOCAL_URL: ${VITE_SUPABASE_LOCAL_URL:-}
         VITE_SUPABASE_LOCAL_ANON_KEY: ${VITE_SUPABASE_LOCAL_ANON_KEY:-}
-    container_name: egs-frontend
+    container_name: egs-web
     restart: unless-stopped
     ports:
-      - "${WEB_PORT:-5173}:80"
+      - "${WEB_PORT:-80}:80"
+    networks:
+      - gnamba-network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://127.0.0.1/health",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ============================================
+  # Filebrowser - Gestionnaire de fichiers
+  # ============================================
+  filebrowser:
+    image: filebrowser/filebrowser:latest
+    container_name: filebrowser
+    restart: unless-stopped
+    ports:
+      - "${FILEBROWSER_PORT:-8081}:80"
+    command:
+      [
+        "--address", "0.0.0.0",
+        "--port", "80",
+        "--database", "/database/filebrowser.db",
+      ]
+    volumes:
+      - /home/soma/partage:/srv
+      - /home/soma/filebrowser/database:/database
+      - /home/soma/filebrowser/config:/config
+    environment:
+      - FB_BASE_URL=/
+      - FB_ADDRESS=0.0.0.0
+      - FB_PORT=80
+    user: "0:0"
+    networks:
+      - gnamba-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+networks:
+  gnamba-network:
+    name: gnamba-network
+    driver: bridge

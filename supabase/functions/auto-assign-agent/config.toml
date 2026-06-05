@@ -1,0 +1,2 @@
+[functions.auto-assign-agent]
+verify_jwt = true
