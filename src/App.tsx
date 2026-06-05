@@ -10,9 +10,12 @@ import {
 } from "react";
 import { SettingsProvider, useSettings } from "./context/SettingsContext";
 import { AuthProvider, useAuth, hasAccess } from "./context/AuthContext";
+import { NotificationProvider, useNotifications } from "./context/NotificationContext";
+import ToastContainer from "./components/ui/Toast";
 import { useServiceWorker } from "./lib/useServiceWorker";
 import { WifiOff } from "lucide-react";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { OfflineIndicator } from "./offline/ui/offline-indicator";
 import Layout from "./components/Layout";
 import PublicLayout from "./components/public/PublicLayout";
 import type { Page } from "./components/Sidebar";
@@ -22,6 +25,8 @@ import { supabase } from "./lib/supabase";
 import type { PageSection } from "./components/page-builder/types";
 import PublicPageLayoutRenderer from "./components/public/PublicPageLayoutRenderer";
 import PublicSocialWall from "./components/public/PublicSocialWall";
+import OneSignal from 'react-onesignal';
+import { onesignalProvider } from "./services/onesignalService";
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Clients = lazy(() => import("./pages/Clients"));
@@ -63,6 +68,7 @@ const ResetPasswordPage = lazy(
 const PublicVerification = lazy(
   () => import("./pages/public/PublicVerification"),
 );
+const PublicLots = lazy(() => import("./pages/public/PublicLots"));
 
 type EmptyProps = Record<string, never>;
 type LazyComponent<TProps extends object = EmptyProps> = LazyExoticComponent<
@@ -111,6 +117,7 @@ const publicPages: Record<string, PublicPageComponent> = {
   realisations: PublicRealisationsPage,
   contact: PublicContactPage,
   verification: PublicVerification,
+  lots: PublicLots,
 };
 
 const publicPageLayoutSlug: Partial<Record<PublicPage, string>> = {
@@ -170,6 +177,11 @@ const getDashboardPageFromPath = (path: string): Page | null => {
   if (directMatch) return directMatch;
   return DASHBOARD_PAGE_ALIASES[normalized] || null;
 };
+
+function NotificationToastWrapper() {
+  const { toasts, removeToast } = useNotifications();
+  return <ToastContainer toasts={toasts} onClose={removeToast} />;
+}
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
@@ -369,6 +381,7 @@ function AppContent() {
         contact: "Contact",
         login: "Connexion",
         verification: "Vérification",
+        lots: "Lots Foncier",
       };
       pageTitle = `${publicPageTitles[publicPage]} - `;
     }
@@ -436,6 +449,43 @@ function AppContent() {
     settings.seo_description,
     settings.seo_keywords,
   ]);
+
+  // ============================================
+  // INITIALISATION ONESIGNAL
+  // ============================================
+  useEffect(() => {
+    const initOneSignal = async () => {
+      try {
+        await OneSignal.init({
+          appId: import.meta.env.VITE_ONESIGNAL_APP_ID,
+          allowLocalhostAsSecureOrigin: true,
+          notifyButton: {
+            enable: true,
+            size: 'medium',
+            position: 'bottom-right',
+            theme: 'default',
+            showCredit: false
+          }
+        });
+        
+        // Capturer le player_id quand l'utilisateur s'abonne
+        OneSignal.on('subscriptionChange', async (isSubscribed) => {
+          if (isSubscribed && user) {
+            const playerId = await OneSignal.getUserId();
+            if (playerId) {
+              // Sauvegarder playerId pour les propriétés de l'utilisateur
+              // Note: Cette logique peut être adaptée selon vos besoins
+              console.log('OneSignal playerId:', playerId);
+            }
+          }
+        });
+      } catch (error) {
+        console.error('Erreur initialisation OneSignal:', error);
+      }
+    };
+    
+    initOneSignal();
+  }, [user]);
 
   const role = profile?.role;
   const accessLevel = profile?.access_level;
@@ -600,6 +650,7 @@ function AppContent() {
     if (typeof window === "undefined") return;
     const canonicalFromEnv = import.meta.env.VITE_CANONICAL_ORIGIN;
     const canonicalKey = "egs:canonical_origin";
+    const redirectAttemptKey = "egs:canonical_redirect_attempted";
     const normalizeOrigin = (value: string | null) => {
       if (!value) return null;
       try {
@@ -608,6 +659,15 @@ function AppContent() {
         return null;
       }
     };
+    
+    // Guard against infinite redirect loops
+    if (window.sessionStorage.getItem(redirectAttemptKey)) {
+      // Clear the invalid canonical origin that caused the loop
+      window.localStorage.removeItem(canonicalKey);
+      window.sessionStorage.removeItem(redirectAttemptKey);
+      return;
+    }
+    
     const stored = normalizeOrigin(window.localStorage.getItem(canonicalKey));
     const envOrigin = normalizeOrigin(canonicalFromEnv);
     const currentOrigin = window.location.origin;
@@ -627,6 +687,8 @@ function AppContent() {
     }
 
     if (canonical && currentOrigin !== canonical) {
+      // Mark that we're attempting a redirect to avoid infinite loops
+      window.sessionStorage.setItem(redirectAttemptKey, "true");
       const target = `${canonical}${window.location.pathname}${window.location.search}${window.location.hash}`;
       window.location.replace(target);
     }
@@ -878,6 +940,9 @@ function AppContent() {
           onNavigate={handleDashNav}
           onGoPublic={goToPublic}
         >
+          <div className="fixed top-4 right-4 z-50">
+            <OfflineIndicator showDetails={false} />
+          </div>
           <Suspense fallback={<PageLoader label="Chargement du module..." />}>
             <ErrorBoundary moduleName={getPageTitle(dashPage)} key={dashPage}>
               <PageComponent />
@@ -1020,6 +1085,7 @@ function AppContent() {
           )}
         </PublicLayout>
       )}
+      <NotificationToastWrapper />
     </>
   );
 }
@@ -1028,7 +1094,9 @@ export default function App() {
   return (
     <AuthProvider>
       <SettingsProvider>
-        <AppContent />
+        <NotificationProvider>
+          <AppContent />
+        </NotificationProvider>
       </SettingsProvider>
     </AuthProvider>
   );
