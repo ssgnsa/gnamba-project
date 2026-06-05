@@ -43,6 +43,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   services: "Services",
   equipe: "Équipe",
   documents: "Documents",
+  foncier_villages: "Logos Villages",
   autre: "Autre",
 };
 
@@ -52,12 +53,13 @@ export default function MediaDetailModal({
   onDelete,
   onUpdate,
 }: MediaDetailModalProps) {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [tab, setTab] = useState<DetailTab>("info");
   const [usages, setUsages] = useState<MediaUsage[]>([]);
   const [versions, setVersions] = useState<MediaVersion[]>([]);
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [replacing, setReplacing] = useState(false);
   const [altText, setAltText] = useState(file.alt_text || "");
   const [description, setDescription] = useState(file.description || "");
@@ -66,14 +68,16 @@ export default function MediaDetailModal({
   const replaceRef = useRef<HTMLInputElement>(null);
 
   const loadUsages = useCallback(async () => {
+    if (authLoading || !user) return;
     const data = await getMediaUsages(file.id);
     setUsages(data);
-  }, [file.id]);
+  }, [file.id, authLoading, user]);
 
   const loadVersions = useCallback(async () => {
+    if (authLoading || !user) return;
     const data = await getMediaVersions(file.id);
     setVersions(data);
-  }, [file.id]);
+  }, [file.id, authLoading, user]);
 
   useEffect(() => {
     if (tab === "usages") void loadUsages();
@@ -101,8 +105,13 @@ export default function MediaDetailModal({
   };
 
   const saveMetadata = async () => {
+    if (!user) {
+      setSaveError("Vous devez être connecté pour modifier ce média.");
+      return;
+    }
     setSaving(true);
-    const { data } = await supabase
+    setSaveError(null);
+    const { data, error } = await supabase
       .from("media_files")
       .update({
         alt_text: altText,
@@ -113,7 +122,8 @@ export default function MediaDetailModal({
       .eq("id", file.id)
       .select()
       .single();
-    if (data) onUpdate(data as MediaFile);
+    if (error) setSaveError(error.message);
+    else if (data) onUpdate(data as MediaFile);
     setSaving(false);
   };
 
@@ -140,6 +150,37 @@ export default function MediaDetailModal({
     setReplacing(false);
     if (!error) loadVersions();
   };
+
+  if (authLoading) {
+    return (
+      <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl p-8 text-center">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-700 mx-auto mb-4" />
+          <p className="text-sm text-gray-500">Vérification de l'authentification...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl p-8 text-center">
+          <h3 className="text-lg font-semibold text-amber-900 mb-2">Accès refusé</h3>
+          <p className="text-sm text-amber-700 mb-4">
+            Vous devez être connecté pour voir les détails de ce média.
+          </p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            Fermer
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -213,6 +254,7 @@ export default function MediaDetailModal({
               <img
                 src={file.url}
                 alt={file.alt_text || file.original_name}
+                crossOrigin="anonymous"
                 className="w-full rounded-xl object-contain max-h-64 shadow-sm"
               />
               <div className="mt-3 space-y-2">
@@ -395,6 +437,9 @@ export default function MediaDetailModal({
                     ))}
                   </div>
 
+                  {saveError && (
+                    <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{saveError}</p>
+                  )}
                   <div className="pt-3 flex justify-end">
                     <button
                       onClick={saveMetadata}
@@ -470,6 +515,7 @@ export default function MediaDetailModal({
                             <img
                               src={v.old_url}
                               alt=""
+                              crossOrigin="anonymous"
                               className="w-full h-full object-cover"
                               onError={(e) => {
                                 (e.target as HTMLImageElement).style.display =

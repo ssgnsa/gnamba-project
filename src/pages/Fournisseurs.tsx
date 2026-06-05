@@ -109,7 +109,8 @@ export default function Fournisseurs() {
       return;
     }
     if (!confirm("Supprimer ce fournisseur ?")) return;
-    await supabase.from("suppliers").delete().eq("id", id);
+    const { error } = await supabase.from("suppliers").delete().eq("id", id);
+    if (error) { setFormError(error.message); return; }
     fetchSuppliers();
   };
 

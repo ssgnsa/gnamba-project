@@ -7,7 +7,7 @@ import { Bell, ChevronLeft, Menu } from "lucide-react";
 import BrandLogo from "./BrandLogo";
 import AICopilot from "./AICopilot";
 import { isOllamaEnabled } from "../lib/ollama";
-import "../lib/lead-capture"; // Auto-inject lead capture on all pages
+import { ensureLeadCaptureInit } from "../lib/lead-capture";
 
 const pageTitles: Record<Page, string> = {
   dashboard: "Tableau de Bord",
@@ -36,6 +36,8 @@ interface LayoutProps {
   onGoPublic?: () => void;
   children: ReactNode;
 }
+
+ensureLeadCaptureInit();
 
 export default function Layout({
   activePage,

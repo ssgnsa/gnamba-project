@@ -267,7 +267,8 @@ export default function Taches() {
       return;
     }
     if (!confirm("Supprimer cette tâche ?")) return;
-    await supabase.from("tasks").delete().eq("id", id);
+    const { error } = await supabase.from("tasks").delete().eq("id", id);
+    if (error) { setFormError(error.message); return; }
     fetchData();
   };
 

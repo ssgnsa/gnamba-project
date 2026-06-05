@@ -20,6 +20,7 @@ const FILEBROWSER_API_URL = (() => {
 interface FileBrowserAuth {
   token: string;
   expires: number;
+  refreshToken?: string;
 }
 
 interface FileBrowserFile {
@@ -88,26 +89,88 @@ class FileBrowserServiceClass {
   }
 
   /**
-   * Récupérer le token depuis le storage
+   * Récupérer le token depuis le storage avec refresh automatique
    */
   async getToken(): Promise<string | null> {
+    // Vérifier si le token actuel est encore valide
     if (this.auth && this.auth.expires > Date.now()) {
       return this.auth.token;
     }
 
-    // Try to restore from localStorage
+    // Essayer de rafraîchir le token si un refresh token est disponible
+    if (this.auth?.refreshToken) {
+      try {
+        const newToken = await this.refreshAccessToken(this.auth.refreshToken);
+        if (newToken) {
+          return newToken;
+        }
+      } catch (error) {
+        if (import.meta.env.DEV) console.error("Token refresh failed:", error);
+      }
+    }
+
+    // Essayer de restaurer depuis localStorage
     const storedToken = localStorage.getItem("filebrowser_token");
     const storedExpiry = localStorage.getItem("filebrowser_token_expiry");
+    const storedRefreshToken = localStorage.getItem("filebrowser_refresh_token");
 
     if (storedToken && storedExpiry && parseInt(storedExpiry) > Date.now()) {
       this.auth = {
         token: storedToken,
         expires: parseInt(storedExpiry),
+        refreshToken: storedRefreshToken || undefined,
       };
       return storedToken;
     }
 
     return null;
+  }
+
+  /**
+   * Rafraîchir le token d'accès
+   */
+  private async refreshAccessToken(refreshToken: string): Promise<string | null> {
+    try {
+      const response = await fetch(`${FILEBROWSER_API_URL}/refresh`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ refreshToken }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Token refresh failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const newToken = data.token || data.access_token;
+
+      if (newToken) {
+        this.auth = {
+          token: newToken,
+          expires: Date.now() + 24 * 60 * 60 * 1000, // 24 hours
+          refreshToken: data.refreshToken || refreshToken,
+        };
+
+        // Mettre à jour localStorage
+        localStorage.setItem("filebrowser_token", newToken);
+        localStorage.setItem(
+          "filebrowser_token_expiry",
+          this.auth.expires.toString(),
+        );
+        if (this.auth.refreshToken) {
+          localStorage.setItem("filebrowser_refresh_token", this.auth.refreshToken);
+        }
+
+        return newToken;
+      }
+
+      return null;
+    } catch (error) {
+      if (import.meta.env.DEV) console.error("Token refresh error:", error);
+      return null;
+    }
   }
 
   /**
@@ -117,6 +180,7 @@ class FileBrowserServiceClass {
     this.auth = null;
     localStorage.removeItem("filebrowser_token");
     localStorage.removeItem("filebrowser_token_expiry");
+    localStorage.removeItem("filebrowser_refresh_token");
   }
 
   /**

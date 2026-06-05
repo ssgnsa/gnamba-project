@@ -18,6 +18,7 @@ const navLinks: { id: PublicPage; label: string; href: string }[] = [
     label: "Réalisations",
     href: PUBLIC_PAGE_PATHS.realisations,
   },
+  { id: "lots", label: "Lots fonciers", href: PUBLIC_PAGE_PATHS.lots },
   { id: "contact", label: "Contact", href: PUBLIC_PAGE_PATHS.contact },
 ];
 

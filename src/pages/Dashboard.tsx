@@ -202,13 +202,13 @@ export default function Dashboard() {
             // For non-HTTP services, assume online if defined
             return { ...service, status: "online" as const };
           }
-        } catch (error) {
+        } catch {
           return { ...service, status: "offline" as const };
         }
       }),
     );
     setServices(updatedServices);
-  }, []);
+  }, [serviceLinks]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);

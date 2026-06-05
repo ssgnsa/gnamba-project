@@ -124,7 +124,8 @@ export default function Fournitures() {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Supprimer ce produit ?")) return;
-    await supabase.from("products").delete().eq("id", id);
+    const { error } = await supabase.from("products").delete().eq("id", id);
+    if (error) { setFormError(error.message); return; }
     fetchProducts();
   };
 
@@ -217,6 +218,7 @@ export default function Fournitures() {
                             <img
                               src={p.image_url}
                               alt={p.nom}
+                              crossOrigin="anonymous"
                               className="w-9 h-9 rounded-lg object-cover flex-shrink-0 border border-gray-200"
                             />
                           ) : (
@@ -309,6 +311,7 @@ export default function Fournitures() {
                   <img
                     src={form.image_url}
                     alt="Produit"
+                    crossOrigin="anonymous"
                     className="w-16 h-16 rounded-xl object-cover border-2 border-gray-200"
                   />
                   <button

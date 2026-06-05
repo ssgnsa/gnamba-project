@@ -178,6 +178,28 @@ export function generateMonthRange(
   return months;
 }
 
+export function isDateRangeOverlap(
+  startA: string,
+  endA: string | null,
+  startB: string,
+  endB: string | null,
+): boolean {
+  const aStart = new Date(startA);
+  const aEnd = endA ? new Date(endA) : new Date("9999-12-31");
+  const bStart = new Date(startB);
+  const bEnd = endB ? new Date(endB) : new Date("9999-12-31");
+
+  return aStart <= bEnd && bStart <= aEnd;
+}
+
+export function getPropertyStatusFromContractStatus(
+  statut: string,
+): "loue" | "disponible" | null {
+  if (statut === "actif") return "loue";
+  if (statut === "termine" || statut === "resilie") return "disponible";
+  return null;
+}
+
 /**
  * Statut d'un contrat avec label et couleur
  */

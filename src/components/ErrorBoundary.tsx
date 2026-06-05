@@ -102,7 +102,7 @@ export class ErrorBoundary extends Component<Props, State> {
               </p>
             </div>
 
-            {this.state.error && (
+            {this.state.error && import.meta.env.DEV && (
               <details className="mb-6">
                 <summary className="text-xs font-medium text-gray-600 cursor-pointer hover:text-gray-800 flex items-center gap-2">
                   <Bug size={14} />

@@ -1,0 +1,77 @@
+name: Deploy Supabase Edge Functions
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - "supabase/functions/send-payment-notification/**"
+      - "supabase/config.toml"
+      - ".github/workflows/deploy-supabase-functions.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy-send-payment-notification:
+    name: Deploy send-payment-notification
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      ONESIGNAL_APP_ID: ${{ secrets.ONESIGNAL_APP_ID }}
+      ONESIGNAL_API_KEY: ${{ secrets.ONESIGNAL_API_KEY }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Verify required secrets
+        shell: bash
+        run: |
+          missing=()
+          for key in \
+            SUPABASE_ACCESS_TOKEN \
+            SUPABASE_PROJECT_ID \
+            SUPABASE_URL \
+            SUPABASE_ANON_KEY \
+            SUPABASE_SERVICE_ROLE_KEY \
+            ONESIGNAL_APP_ID \
+            ONESIGNAL_API_KEY; do
+            if [[ -z "${!key}" ]]; then
+              missing+=("$key")
+            fi
+          done
+
+          if [[ ${#missing[@]} -gt 0 ]]; then
+            echo "Missing required secrets: ${missing[*]}"
+            exit 1
+          fi
+
+      - name: Sync Supabase runtime secrets
+        shell: bash
+        run: |
+          supabase secrets set \
+            SUPABASE_URL="$SUPABASE_URL" \
+            SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
+            SUPABASE_SERVICE_ROLE_KEY="$SUPABASE_SERVICE_ROLE_KEY" \
+            ONESIGNAL_APP_ID="$ONESIGNAL_APP_ID" \
+            ONESIGNAL_API_KEY="$ONESIGNAL_API_KEY" \
+            --project-ref "$SUPABASE_PROJECT_ID"
+
+      - name: Deploy Edge Function
+        working-directory: supabase
+        shell: bash
+        run: |
+          supabase functions deploy send-payment-notification \
+            --project-ref "$SUPABASE_PROJECT_ID"

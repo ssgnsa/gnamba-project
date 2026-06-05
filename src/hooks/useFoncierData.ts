@@ -1,7 +1,6 @@
 import { useCallback } from "react";
-import { supabase } from "../lib/supabase";
+import { supabaseService } from "../lib/supabase.service";
 import type { FoncierLot } from "../types";
-import { withBackoff } from "./useFoncierSync";
 
 /**
  * Hook pour la gestion des données foncier (lots)
@@ -22,20 +21,18 @@ export function useFoncierData() {
         return { data: null, error: "Offline mode not implemented", total: 0 };
       }
 
-      const { data, error } = await withBackoff(() =>
-        supabase.rpc("search_foncier_lots", {
-          p_search: debouncedSearch,
-          p_village: filterVillage,
-          p_quartier: "",
-          p_lotissement: "",
-          p_statut: filterStatut,
-          p_sort: "created_at",
-          p_dir: "desc",
-          p_page: page,
-          p_limit: pageSize,
-          p_include_archived: showArchived,
-        }),
-      );
+      const { data, error } = await supabaseService.searchLots({
+        search: debouncedSearch,
+        village: filterVillage,
+        quartier: "",
+        lotissement: "",
+        statut: filterStatut,
+        sort: "created_at",
+        dir: "desc",
+        page,
+        limit: pageSize,
+        include_archived: showArchived,
+      });
 
       if (error) {
         return { data: null, error, total: 0 };
@@ -62,11 +59,7 @@ export function useFoncierData() {
         return { data: null, error: "Offline mode not implemented" };
       }
 
-      const { data, error } = await withBackoff(() =>
-        supabase.rpc("foncier_stats_by_village", {
-          p_include_archived: showArchived,
-        }),
-      );
+      const { data, error } = await supabaseService.getVillageStats(showArchived);
 
       if (error) {
         return { data: null, error };

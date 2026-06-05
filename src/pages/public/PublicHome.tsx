@@ -524,7 +524,7 @@ export default function PublicHome({ onNavigate }: Props) {
           let promoLots: any[] = [];
           try {
             promoLots = raw ? JSON.parse(raw) : [];
-          } catch (e) {
+          } catch {
             promoLots = [];
           }
           return promoLots.length > 0 ? (

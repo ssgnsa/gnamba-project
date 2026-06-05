@@ -1,8 +1,7 @@
 import { useCallback } from "react";
-import { supabase } from "../lib/supabase";
+import { supabaseService, withBackoff } from "../lib/supabase.service";
+export { withBackoff } from "../lib/supabase.service";
 import type { FoncierLot } from "../types";
-import type { AuditRecord, AuditQueryRow } from "../components/foncier/FoncierConstants";
-import { sleep, isRateLimitError } from "../components/foncier/FoncierConstants";
 import {
   getCachedLots,
   countQueueItems,
@@ -13,37 +12,6 @@ import {
   getDeviceId,
 } from "../lib/foncierOffline";
 import { generateUUID } from "../utils/reference";
-
-/**
- * Utilitaire retry avec backoff exponentiel
- */
-export const withBackoff = async <
-  T extends { data: any; error?: any; count?: number },
->(
-  fn: () => PromiseLike<T> | any,
-  retries = 3,
-  baseMs = 500,
-): Promise<T> => {
-  let attempt = 0;
-  while (true) {
-    try {
-      const result = await fn();
-      if (
-        !result?.error ||
-        !isRateLimitError(result.error) ||
-        attempt >= retries
-      ) {
-        return result;
-      }
-    } catch (error) {
-      if (!isRateLimitError(error) || attempt >= retries) {
-        throw error;
-      }
-    }
-    await sleep(baseMs * 2 ** attempt);
-    attempt += 1;
-  }
-};
 
 /**
  * Hook centralisé pour la synchronisation et le fetch de données foncier
@@ -92,20 +60,18 @@ export function useFoncierSync() {
         return { data: paged, error: null, total };
       }
 
-      const { data, error } = await withBackoff(() =>
-        supabase.rpc("search_foncier_lots", {
-          p_search: debouncedSearch,
-          p_village: filterVillage,
-          p_quartier: "",
-          p_lotissement: "",
-          p_statut: filterStatut,
-          p_sort: "created_at",
-          p_dir: "desc",
-          p_page: page,
-          p_limit: pageSize,
-          p_include_archived: showArchived,
-        }),
-      );
+      const { data, error } = await supabaseService.searchLots({
+        search: debouncedSearch,
+        village: filterVillage,
+        quartier: "",
+        lotissement: "",
+        statut: filterStatut,
+        sort: "created_at",
+        dir: "desc",
+        page,
+        limit: pageSize,
+        include_archived: showArchived,
+      });
 
       if (error) {
         if (import.meta.env.DEV) console.error("search_foncier_lots failed", error);
@@ -149,10 +115,8 @@ export function useFoncierSync() {
         return { data: map, error: null };
       }
 
-      const { data, error } = await withBackoff(() =>
-        supabase.rpc("foncier_stats_by_village", {
-          p_include_archived: showArchived,
-        }),
+      const { data, error } = await supabaseService.getVillageStats(
+        showArchived,
       );
 
       if (error) {
@@ -179,97 +143,13 @@ export function useFoncierSync() {
     [],
   );
 
-  // ============ FETCH AUDIT ============
-  const fetchAudit = useCallback(
-    async (
-      auditPage: number,
-      auditPageSize: number,
-      auditActionFilter: string,
-      isOnline: boolean,
-    ) => {
-      if (!isOnline) {
-        return { data: null, error: "Mode hors-ligne", total: 0 };
-      }
-
-      const from = (auditPage - 1) * auditPageSize;
-      const to = from + auditPageSize - 1;
-
-      let query = supabase
-        .from("foncier_audit")
-        .select(
-          "id, lot_id, action, performed_by, performed_at, old_values, new_values, foncier_lots:lot_id(reference, numero_lot, village)",
-          { count: "exact" },
-        )
-        .order("performed_at", { ascending: false })
-        .range(from, to);
-
-      if (auditActionFilter) {
-        query = query.eq("action", auditActionFilter);
-      }
-
-      const { data, error, count } = await withBackoff(() => query);
-
-      if (error) {
-        if (import.meta.env.DEV)
-          console.error("fetchAudit failed", error);
-        return { data: null, error, total: 0 };
-      }
-
-      const rows = (data || []) as AuditQueryRow[];
-      const performerIds = Array.from(
-        new Set(
-          rows
-            .map((row) => row.performed_by)
-            .filter((value): value is string => Boolean(value)),
-        ),
-      );
-
-      let namesById: Record<string, string> = {};
-      if (performerIds.length > 0) {
-        const { data: profilesData } = await withBackoff(() =>
-          supabase
-            .from("user_profiles")
-            .select("id, full_name")
-            .in("id", performerIds),
-        );
-        namesById = (profilesData || []).reduce(
-          (acc: Record<string, string>, profile: { id: string; full_name: string | null }) => {
-            acc[profile.id] = profile.full_name || "";
-            return acc;
-          },
-          {} as Record<string, string>,
-        );
-      }
-
-      const normalizedRows: AuditRecord[] = rows.map((row) => ({
-        id: row.id,
-        parcelle_id: row.lot_id,
-        action: row.action,
-        utilisateur_nom: row.performed_by
-          ? namesById[row.performed_by] || null
-          : null,
-        date_action: row.performed_at,
-        details: row.new_values || row.old_values || null,
-        foncier_lots: row.foncier_lots || null,
-      }));
-
-      return { data: normalizedRows, error: null, total: count ?? 0 };
-    },
-    [],
-  );
-
   // ============ LOAD VILLAGES ============
   const loadVillages = useCallback(async (isOnline: boolean) => {
     if (!isOnline) {
       return { data: null, error: "Mode hors-ligne" };
     }
 
-    const { data, error } = await withBackoff(() =>
-      supabase
-        .from("foncier_villages")
-        .select("name")
-        .order("name", { ascending: true }),
-    );
+    const { data, error } = await supabaseService.getVillages();
 
     if (error) {
       if (import.meta.env.DEV)
@@ -278,7 +158,7 @@ export function useFoncierSync() {
     }
 
     return {
-      data: data ? data.map((row: { name: string }) => row.name) : null,
+      data,
       error: null,
     };
   }, []);
@@ -287,20 +167,18 @@ export function useFoncierSync() {
   const refreshCache = useCallback(async (isOnline: boolean) => {
     if (!isOnline) return { error: "Mode hors-ligne" };
 
-    const { data, error } = await withBackoff(() =>
-      supabase.rpc("search_foncier_lots", {
-        p_search: "",
-        p_village: "",
-        p_quartier: "",
-        p_lotissement: "",
-        p_statut: "",
-        p_sort: "created_at",
-        p_dir: "desc",
-        p_page: 1,
-        p_limit: 1000,
-        p_include_archived: true,
-      }),
-    );
+    const { data, error } = await supabaseService.searchLots({
+      search: "",
+      village: "",
+      quartier: "",
+      lotissement: "",
+      statut: "",
+      sort: "created_at",
+      dir: "desc",
+      page: 1,
+      limit: 1000,
+      include_archived: true,
+    });
 
     if (!error && data) {
       try {
@@ -311,7 +189,7 @@ export function useFoncierSync() {
       }
     }
 
-    return { error: error?.message || null };
+    return { error };
   }, []);
 
   // ============ LOAD CACHED ============
@@ -349,7 +227,6 @@ export function useFoncierSync() {
     deviceId,
     fetchData,
     fetchVillageStats,
-    fetchAudit,
     loadVillages,
     refreshCache,
     loadCachedLots,

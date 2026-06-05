@@ -61,7 +61,7 @@ async function generatePostVariants(
 ${ctx}
 
 📞 Contactez-nous dès maintenant pour un devis gratuit!
-🌐 www.gnambaservices.ci`,
+🌐 gnambaservices.ci`,
       (ctx) => `✨ NOUVEAU CHEZ GNAMBA SERVICES!
 
 ${ctx}
@@ -79,7 +79,7 @@ ${ctx}
 Notre expertise dans le BTP, l'immobilier et le foncier en Côte d'Ivoire nous permet de accompagner nos clients vers la réussite.
 
 📧 contact@gnambaservices.ci
-🌐 www.gnambaservices.ci
+🌐 gnambaservices.ci
 
 #Construction #Immobilier #CoteDIvoire #Business`,
     ],
@@ -95,7 +95,7 @@ Contact: 📞 +225 07 XX XX XX XX
       (ctx) => `${ctx}
 
 Gnamba Services — BTP · Immobilier · Foncier
-🌐 www.gnambaservices.ci
+🌐 gnambaservices.ci
 
 #BTP #Abidjan`,
     ],
@@ -105,7 +105,7 @@ Gnamba Services — BTP · Immobilier · Foncier
 ${ctx}
 
 📞 +225 07 XX XX XX XX
-🌐 www.gnambaservices.ci`,
+🌐 gnambaservices.ci`,
     ],
   };
 

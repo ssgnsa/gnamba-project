@@ -1,7 +1,6 @@
 import { useCallback } from "react";
-import { supabase } from "../lib/supabase";
+import { supabaseService } from "../lib/supabase.service";
 import type { AuditRecord, AuditQueryRow } from "../components/foncier/FoncierConstants";
-import { withBackoff } from "./useFoncierSync";
 
 /**
  * Hook pour la gestion de l'audit foncier
@@ -18,29 +17,17 @@ export function useFoncierAudit() {
         return { data: null, error: "Mode hors-ligne : journal d'audit indisponible.", total: 0 };
       }
 
-      const from = (auditPage - 1) * auditPageSize;
-      const to = from + auditPageSize - 1;
-
-      let query = supabase
-        .from("foncier_audit")
-        .select(
-          "id, lot_id, action, performed_by, performed_at, old_values, new_values, foncier_lots:lot_id(reference, numero_lot, village)",
-          { count: "exact" },
-        )
-        .order("performed_at", { ascending: false })
-        .range(from, to);
-
-      if (auditActionFilter) {
-        query = query.eq("action", auditActionFilter);
-      }
-
-      const { data, error, count } = await withBackoff(() => query);
+      const { data, error, count } = await supabaseService.getAudit({
+        page: auditPage,
+        pageSize: auditPageSize,
+        actionFilter: auditActionFilter || undefined,
+      }) as { data: any[] | null; error: any; count: number | null };
 
       if (error) {
         return { data: null, error, total: 0 };
       }
 
-      const rows = (data || []) as AuditQueryRow[];
+      const rows = (data || []) as unknown as AuditQueryRow[];
       const performerIds = Array.from(
         new Set(
           rows
@@ -51,19 +38,21 @@ export function useFoncierAudit() {
 
       let namesById: Record<string, string> = {};
       if (performerIds.length > 0) {
-        const { data: profilesData } = await withBackoff(() =>
-          supabase
-            .from("user_profiles")
-            .select("id, full_name")
-            .in("id", performerIds),
-        );
-        namesById = (profilesData || []).reduce(
-          (acc: Record<string, string>, profile: { id: string; full_name: string | null }) => {
-            acc[profile.id] = profile.full_name || "";
-            return acc;
-          },
-          {} as Record<string, string>,
-        );
+        const { data: profilesData, error: profilesError } = await supabaseService.getUserProfiles(performerIds) as {
+          data: Array<{ id: string; full_name: string | null }> | null;
+          error: any;
+        };
+        if (profilesError) {
+          if (import.meta.env.DEV) console.warn("Failed to load user profiles for audit", profilesError);
+        } else {
+          namesById = (profilesData || []).reduce(
+            (acc: Record<string, string>, profile: { id: string; full_name: string | null }) => {
+              acc[profile.id] = profile.full_name || "";
+              return acc;
+            },
+            {} as Record<string, string>,
+          );
+        }
       }
 
       const normalizedRows: AuditRecord[] = rows.map((row) => ({

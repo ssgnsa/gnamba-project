@@ -3,8 +3,23 @@ import type {
   MediaFile,
   MediaUsage,
   MediaVersion,
+  MediaAuditAction,
   BrandAssetType,
 } from "../types";
+
+export async function logMediaAction(
+  action: MediaAuditAction,
+  mediaId: string | null,
+  actorId: string | null,
+  metadata: Record<string, unknown> = {},
+): Promise<void> {
+  await supabase.from("media_audit_logs").insert({
+    media_id: mediaId,
+    action,
+    actor_id: actorId,
+    metadata,
+  });
+}
 
 export async function getMediaUsages(mediaId: string): Promise<MediaUsage[]> {
   const { data } = await supabase
@@ -56,8 +71,9 @@ export async function assignMedia(
   return { error: error?.message || null };
 }
 
-export async function removeAssignment(usageId: string): Promise<void> {
-  await supabase.from("media_usage").delete().eq("id", usageId);
+export async function removeAssignment(usageId: string): Promise<{ error: string | null }> {
+  const { error } = await supabase.from("media_usage").delete().eq("id", usageId);
+  return { error: error?.message || null };
 }
 
 export async function getBrandAsset(
@@ -117,6 +133,7 @@ export async function setBrandAsset(
   }
 
   await assignMedia(mediaId, "brand", null, type, type.replace("_", " "));
+  await logMediaAction("metadata_update", mediaId, userId, { brand_asset_type: type });
   return { error: null };
 }
 
@@ -129,7 +146,8 @@ export async function getUsageForSlot(
     .from("media_usage")
     .select("media_id, media_files!inner(*)")
     .eq("entity_type", entityType)
-    .eq("usage_type", usageType);
+    .eq("usage_type", usageType)
+    .is("media_files.deleted_at", null);
 
   if (entityId) {
     query = query.eq("entity_id", entityId);
@@ -139,7 +157,13 @@ export async function getUsageForSlot(
 
   const { data } = await query.maybeSingle();
   if (!data) return null;
-  return (data as unknown as { media_files: MediaFile }).media_files || null;
+  const file = (data as unknown as { media_files: MediaFile & { public_url?: string } }).media_files;
+  if (!file || (file as MediaFile & { deleted_at?: string | null }).deleted_at) return null;
+  // Compatibilité ancien schéma : certaines images ont public_url mais url vide
+  if (!file.url && (file as { public_url?: string }).public_url) {
+    file.url = (file as { public_url?: string }).public_url!;
+  }
+  return file;
 }
 
 export async function getMediaVersions(
@@ -191,7 +215,7 @@ export async function replaceMediaFile(
 
   const { error: uploadError } = await supabase.storage
     .from("media")
-    .upload(newFilename, newFile, { cacheControl: "3600", upsert: false });
+    .upload(newFilename, newFile, { cacheControl: "31536000", upsert: false, contentType: newFile.type });
 
   if (uploadError) return { data: null, error: uploadError.message };
 
@@ -212,7 +236,11 @@ export async function replaceMediaFile(
     .select()
     .single();
 
-  if (dbError) return { data: null, error: dbError.message };
+  if (dbError) {
+    // ROLLBACK : supprimer le nouveau fichier du Storage car la DB a échoué
+    await supabase.storage.from("media").remove([newFilename]);
+    return { data: null, error: dbError.message };
+  }
 
   if (existing.brand_asset_type) {
     const settingsKeyByType: Record<BrandAssetType, string> = {
@@ -229,6 +257,12 @@ export async function replaceMediaFile(
         .upsert({ key: settingKey, value: publicUrl }, { onConflict: "key" });
     }
   }
+
+  await logMediaAction("replace", mediaId, userId, {
+    old_filename: existing.filename,
+    new_filename: newFilename,
+    old_url: existing.url,
+  });
 
   return { data: updated as MediaFile, error: null };
 }
@@ -258,6 +292,7 @@ export const ENTITY_TYPE_LABELS: Record<string, string> = {
   product: "Produit",
   realisation: "Réalisation",
   foncier_attestation: "Attestation foncière",
+  foncier_village: "Village (Logo)",
 };
 
 /**

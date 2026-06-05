@@ -457,23 +457,35 @@ export default function PaymentsTab({
     const headers = [
       "Référence",
       "Locataire",
+      "Bien",
+      "Contrat",
       "Montant",
       "Mois",
       "Statut",
       "Mode",
-      "Date",
+      "Date paiement",
+      "Propriétaire",
     ];
-    const rows = filteredPayments.map((p) => [
-      p.reference || "",
-      getTenantName(p.locataires as any),
-      p.montant,
-      p.mois_concerne,
-      p.statut,
-      p.mode_paiement,
-      p.date_paiement,
-    ]);
+    const rows = filteredPayments.map((p) => {
+      const property = properties.find((prop) => prop.id === p.property_id);
+      const contract = contracts.find((c) => c.id === p.contract_id);
+      return [
+        p.reference || "",
+        getTenantName(p.locataires as any),
+        getPropertyAddress(p.properties as any) || property?.adresse || "",
+        contract?.reference || "",
+        p.montant,
+        p.mois_concerne,
+        p.statut,
+        getPaymentModeLabel(p.mode_paiement),
+        p.date_paiement,
+        property?.proprietaire || "",
+      ];
+    });
 
-    const csv = [headers, ...rows].map((row) => row.join(";")).join("\n");
+    const csv = [headers, ...rows]
+      .map((row) => row.map((cell) => String(cell).replace(/"/g, '""')).join(";"))
+      .join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");

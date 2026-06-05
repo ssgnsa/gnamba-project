@@ -36,8 +36,6 @@ import {
   AttestationTemoinForm,
   AttestationHistoryItem,
   AttestationScan,
-  AuditRecord,
-  AuditQueryRow,
   FoncierConfigKey,
   FoncierConfigMap,
   auditActions,
@@ -48,15 +46,15 @@ import {
   getLocalDateInput,
   gpsBoundaryFields as _gpsBoundaryFields,
   isMissingColumnError,
-  isRateLimitError,
   parseAttestationSnapshot,
-  sleep,
 } from "../components/foncier/FoncierConstants";
 import { useSettings } from "../context/SettingsContext";
 import { useAuth, resolveAccessLevel } from "../context/AuthContext";
+import { withBackoff } from "../lib/supabase.service";
 import { useFoncierState } from "../hooks/useFoncierState";
 import { useFoncierSync } from "../hooks/useFoncierSync";
 import { useFoncierLogic } from "../hooks/useFoncierLogic";
+import { useFoncierAudit } from "../hooks/useFoncierAudit";
 import {
   generateFoncierReference,
   formatDateLong,
@@ -80,6 +78,7 @@ import {
   validateAttestationForm,
 } from "../lib/foncierValidation";
 import { buildAttestationRpcParams } from "../lib/foncierAttestation";
+import { getUsageForSlot } from "../lib/mediaUtils";
 import {
   addQueueItem,
   countQueueItems,
@@ -219,6 +218,7 @@ const buildAttestationPrintData = (
   qrDataUrl?: string,
   gpsPointsResult?: Array<{ label: string; lat: number; lng: number }> | null,
   verificationUrl?: string,
+  villageLogoUrl?: string,
 ) => {
   const gpsLat = form.gps_lat ? parseFloat(form.gps_lat) : null;
   const gpsLng = form.gps_lng ? parseFloat(form.gps_lng) : null;
@@ -308,7 +308,7 @@ const buildAttestationPrintData = (
       config.chef_village ||
       "",
     logoUrl: config.logo_url || "",
-    village_logo_url: config.village_logo_url || "",
+    village_logo_url: villageLogoUrl || config.village_logo_url || "",
     signatureUrl: attestationData.signatureUrl || "",
     cachetUrl:
       attestationData.cachetUrl || attestationData.chef_empreinte_url || "",
@@ -319,32 +319,6 @@ const buildAttestationPrintData = (
     date_cession: isCession ? lot.date_cession || "" : "",
     prix_cession: isCession ? lot.prix_cession : undefined,
   };
-};
-
-const withBackoff = async <T extends { data: any; error?: any; count?: number }>(
-  fn: () => PromiseLike<T> | any,
-  retries = 3,
-  baseMs = 500,
-): Promise<T> => {
-  let attempt = 0;
-  while (true) {
-    try {
-      const result = await fn();
-      if (
-        !result?.error ||
-        !isRateLimitError(result.error) ||
-        attempt >= retries
-      ) {
-        return result;
-      }
-    } catch (error) {
-      if (!isRateLimitError(error) || attempt >= retries) {
-        throw error;
-      }
-    }
-    await sleep(baseMs * 2 ** attempt);
-    attempt += 1;
-  }
 };
 
 const buildVillageStats = (rows: FoncierLot[]) => {
@@ -367,6 +341,7 @@ export default function Foncier() {
   // Use the custom hooks
   const state = useFoncierState();
   const sync = useFoncierSync();
+  const audit = useFoncierAudit();
 
   // Extract state for easier access
   const {
@@ -716,72 +691,21 @@ export default function Foncier() {
   const fetchAudit = async () => {
     setAuditLoading(true);
     setAuditError(null);
-    if (!isOnline) {
-      setAuditError("Mode hors-ligne : journal d’audit indisponible.");
-      setAuditRecords([]);
-      setAuditTotal(0);
-      setAuditLoading(false);
-      return;
-    }
-    const from = (auditPage - 1) * auditPageSize;
-    const to = from + auditPageSize - 1;
-    let query = supabase
-      .from("foncier_audit")
-      .select(
-        "id, lot_id, action, performed_by, performed_at, old_values, new_values, foncier_lots:lot_id(reference, numero_lot, village)",
-        { count: "exact" },
-      )
-      .order("performed_at", { ascending: false })
-      .range(from, to);
-    if (auditActionFilter) {
-      query = query.eq("action", auditActionFilter);
-    }
-    const { data, error, count } = await withBackoff(() => query);
+
+    const { data, error, total } = await audit.fetchAudit(
+      auditPage,
+      auditPageSize,
+      auditActionFilter,
+      isOnline
+    );
+
     if (error) {
-      setAuditError("Impossible de charger le journal d’audit.");
+      setAuditError(error);
       setAuditRecords([]);
       setAuditTotal(0);
     } else {
-      const rows = (data || []) as AuditQueryRow[];
-      const performerIds = Array.from(
-        new Set(
-          rows
-            .map((row) => row.performed_by)
-            .filter((value): value is string => Boolean(value)),
-        ),
-      );
-
-      let namesById: Record<string, string> = {};
-      if (performerIds.length > 0) {
-        const { data: profilesData } = await withBackoff(() =>
-          supabase
-            .from("user_profiles")
-            .select("id, full_name")
-            .in("id", performerIds),
-        );
-        namesById = (profilesData || []).reduce(
-          (acc: Record<string, string>, profile: { id: string; full_name: string | null }) => {
-            acc[profile.id] = profile.full_name || "";
-            return acc;
-          },
-          {} as Record<string, string>,
-        );
-      }
-
-      const normalizedRows: AuditRecord[] = rows.map((row) => ({
-        id: row.id,
-        parcelle_id: row.lot_id,
-        action: row.action,
-        utilisateur_nom: row.performed_by
-          ? namesById[row.performed_by] || null
-          : null,
-        date_action: row.performed_at,
-        details: row.new_values || row.old_values || null,
-        foncier_lots: row.foncier_lots || null,
-      }));
-
-      setAuditRecords(normalizedRows);
-      setAuditTotal(count ?? 0);
+      setAuditRecords(data || []);
+      setAuditTotal(total);
     }
     setAuditLoading(false);
   };
@@ -1321,7 +1245,7 @@ export default function Foncier() {
       return;
     }
 
-    const records = (data as AttestationHistoryItem[]) || [];
+    const records = (data as unknown as AttestationHistoryItem[]) || [];
     setAttestationHistoryRecords(records);
     await fetchAttestationScans(records.map((r) => r.id));
     setAttestationHistoryLoading(false);
@@ -1524,6 +1448,7 @@ export default function Foncier() {
       arrete_prefectoral: lot.arrete_prefectoral,
       arrete_date: lot.arrete_date,
       statut: lot.statut,
+      publier_sur_vitrine: lot.publier_sur_vitrine || false,
       date_cession: lot.date_cession || getLocalDateInput(),
       prix_cession: String(lot.prix_cession),
       notes: lot.notes,
@@ -1738,7 +1663,7 @@ export default function Foncier() {
           error: "Aucune attestation active à réémettre pour cette cession.",
         };
       }
-      baseAttestation = data as Pick<
+      baseAttestation = data as unknown as Pick<
         FoncierAttestation,
         | "id"
         | "reference"
@@ -1909,6 +1834,12 @@ export default function Foncier() {
     agentName: string,
     chefName: string,
   ) => {
+    const villageKey = (lot.village || '').replace(/^(VILLAGE\s+DE\s+|VILLAGE\s+)/i, '').trim();
+    const printVillageLogoMedia = villageKey
+      ? await getUsageForSlot('foncier_village', villageKey, 'logo').catch(() => null)
+      : null;
+    const printVillageLogoUrl = printVillageLogoMedia?.url || config.village_logo_url || config.logo_url || '';
+
     const onlinePrintData = buildAttestationPrintData(
       {
         ...createdAttestation,
@@ -1924,6 +1855,7 @@ export default function Foncier() {
       qrDataUrl,
       undefined, // gpsPointsResult
       qrVerificationUrl,
+      printVillageLogoUrl,
     );
 
     printAttestationCoutumiere(onlinePrintData);
@@ -2268,7 +2200,7 @@ export default function Foncier() {
       return;
     }
 
-    const attestation = data as FoncierAttestation & {
+    const attestation = data as unknown as FoncierAttestation & {
       foncier_attestation_temoins?: FoncierAttestationTemoin[];
     };
     const temoinsPrint = (attestation.foncier_attestation_temoins || []).map(
@@ -2325,6 +2257,12 @@ export default function Foncier() {
             cni: String(t.cni || ""),
           }))
         : temoinsPrint;
+
+    const villageKey2 = (lot.village || '').replace(/^(VILLAGE\s+DE\s+|VILLAGE\s+)/i, '').trim();
+    const villageLogoMedia = villageKey2
+      ? await getUsageForSlot('foncier_village', villageKey2, 'logo').catch(() => null)
+      : null;
+    const resolvedVillageLogoUrl = villageLogoMedia?.url || config.village_logo_url || config.logo_url || '';
 
     printAttestationCoutumiere({
       reference: attestation.reference,
@@ -2460,7 +2398,7 @@ export default function Foncier() {
         snapValidation.chef_nom || attestation.validation_chef_nom || "",
       ),
       logoUrl: config.logo_url || "",
-      village_logo_url: config.village_logo_url || "",
+      village_logo_url: resolvedVillageLogoUrl,
       chef_nom: String(
         snapValidation.chef_nom ||
           config.chef_village ||
@@ -2544,7 +2482,7 @@ export default function Foncier() {
       return;
     }
 
-    const attestation = data as FoncierAttestation & {
+    const attestation = data as unknown as FoncierAttestation & {
       foncier_attestation_temoins?: FoncierAttestationTemoin[];
     };
     const snapshot = parseAttestationSnapshot(attestation.qr_payload);
@@ -2588,6 +2526,12 @@ export default function Foncier() {
             cni: String(t.cni || ""),
           }))
         : temoinsPrint;
+
+    const villageKey3 = (lot.village || '').replace(/^(VILLAGE\s+DE\s+|VILLAGE\s+)/i, '').trim();
+    const annexVillageLogoMedia = villageKey3
+      ? await getUsageForSlot('foncier_village', villageKey3, 'logo').catch(() => null)
+      : null;
+    const annexVillageLogoUrl = annexVillageLogoMedia?.url || config.village_logo_url || config.logo_url || '';
 
     printAttestationAnnex({
       reference: attestation.reference,
@@ -2646,7 +2590,7 @@ export default function Foncier() {
       validation_agent_nom: String(attestation.validation_agent_nom || ""),
       validation_chef_nom: String(attestation.validation_chef_nom || ""),
       logoUrl: config.logo_url || "",
-      village_logo_url: config.village_logo_url || "",
+      village_logo_url: annexVillageLogoUrl,
       chef_nom: config.chef_village || lot.chef_village || "",
       attestation_type: attestation.type || "",
       statut: attestation.statut,
@@ -3391,6 +3335,24 @@ export default function Foncier() {
                     ))}
                   </select>
                 </div>
+                <div className="flex items-center pt-5">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.publier_sur_vitrine || false}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          publier_sur_vitrine: e.target.checked,
+                        })
+                      }
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-700">
+                      Publier sur la vitrine
+                    </span>
+                  </label>
+                </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">
                     Date de Cession
@@ -3755,6 +3717,7 @@ export default function Foncier() {
             </label>
             <VillageLogoUploader
               villageName={configVillage}
+              villageId={configVillage}
               currentLogoUrl={configForm.logo_url || ""}
               onLogoUploaded={(logoUrl) =>
                 setConfigForm({ ...configForm, logo_url: logoUrl })
@@ -3827,6 +3790,7 @@ export default function Foncier() {
                   <VillageLogoDisplay
                     logoUrl={configForm.logo_url}
                     villageName={configVillage}
+                    villageId={configVillage}
                     size="lg"
                     primaryColor={configForm.primary_color || "#1e3a5f"}
                   />

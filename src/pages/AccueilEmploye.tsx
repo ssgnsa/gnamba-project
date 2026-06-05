@@ -470,7 +470,8 @@ export default function AccueilEmploye() {
   // Admin: Delete message
   const handleDeleteMessage = async (id: string) => {
     if (!confirm("Supprimer ce message ?")) return;
-    await supabase.from("messages_direction").delete().eq("id", id);
+    const { error } = await supabase.from("messages_direction").delete().eq("id", id);
+    if (error) { setMessageFormError(error.message); return; }
     fetchMessages();
   };
 

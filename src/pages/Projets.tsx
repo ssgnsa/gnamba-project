@@ -172,7 +172,8 @@ export default function Projets() {
       return;
     }
     if (!confirm("Supprimer ce projet ?")) return;
-    await supabase.from("projects").delete().eq("id", id);
+    const { error } = await supabase.from("projects").delete().eq("id", id);
+    if (error) { setFormError(error.message); return; }
     fetchData();
   };
 
@@ -286,6 +287,7 @@ export default function Projets() {
                         <img
                           src={p.cover_image_url}
                           alt={p.nom}
+                          crossOrigin="anonymous"
                           className="w-12 h-10 rounded-lg object-cover border border-gray-200"
                         />
                       ) : (
@@ -375,6 +377,7 @@ export default function Projets() {
                               <img
                                 src={p.cover_image_url}
                                 alt={p.nom}
+                                crossOrigin="anonymous"
                                 className="w-10 h-8 rounded-lg object-cover flex-shrink-0 border border-gray-200"
                               />
                             ) : (
@@ -464,6 +467,7 @@ export default function Projets() {
                   <img
                     src={form.cover_image_url}
                     alt="Projet"
+                    crossOrigin="anonymous"
                     className="w-20 h-14 rounded-xl object-cover border-2 border-gray-200"
                   />
                   <button

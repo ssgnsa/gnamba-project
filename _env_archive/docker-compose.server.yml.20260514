@@ -1,0 +1,37 @@
+services:
+  egs-web:
+    image: egs-web:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_SUPABASE_MODE: ${VITE_SUPABASE_MODE:-cloud}
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-}
+        VITE_SUPABASE_LOCAL_URL: ${VITE_SUPABASE_LOCAL_URL:-}
+        VITE_SUPABASE_LOCAL_ANON_KEY: ${VITE_SUPABASE_LOCAL_ANON_KEY:-}
+    container_name: egs-web
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-80}:80"
+    networks:
+      - gnamba-network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://127.0.0.1/health",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+networks:
+  gnamba-network:
+    name: gnamba-network
+    driver: bridge

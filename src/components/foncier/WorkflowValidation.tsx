@@ -14,6 +14,7 @@ import { logFoncierAudit } from "../../lib/foncierAudit";
 import Badge from "../ui/Badge";
 import MediaPicker from "../media/MediaPicker";
 import { assignMedia, getUsageForSlot } from "../../lib/mediaUtils";
+import SafeImage from "../ui/SafeImage";
 import type { MediaFile } from "../../types";
 
 interface AttestationStatus {
@@ -495,13 +496,11 @@ export default function WorkflowValidation({
         ) : scanMedia ? (
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
-              <img
+              <SafeImage
                 src={scanMedia.url}
                 alt={scanMedia.original_name}
                 className="w-full h-full object-cover"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = "none";
-                }}
+                fallbackClassName="w-full h-full"
               />
               <ImageIcon size={20} className="text-gray-300" />
             </div>

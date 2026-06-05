@@ -1,6 +1,7 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Upload, X, CheckCircle, AlertCircle, Image, Tag } from "lucide-react";
 import { supabase } from "../../lib/supabase";
+import { logMediaAction } from "../../lib/mediaUtils";
 import { useAuth } from "../../context/AuthContext";
 import type { MediaCategory, MediaFile } from "../../types";
 
@@ -28,6 +29,7 @@ const CATEGORY_LABELS: Record<MediaCategory, string> = {
   services: "Services",
   equipe: "Équipe",
   documents: "Documents",
+  foncier_villages: "Logos Villages",
   autre: "Autre",
 };
 
@@ -36,10 +38,53 @@ const ACCEPTED_TYPES = [
   "image/png",
   "image/webp",
   "image/gif",
-  "image/svg+xml",
   "application/pdf",
 ];
 const MAX_SIZE = 10 * 1024 * 1024;
+const COMPRESS_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const COMPRESS_MAX_PX = 1920;
+const THUMB_PX = 320;
+
+interface CompressResult {
+  file: File;
+  width: number;
+  height: number;
+}
+
+async function compressToWebP(
+  file: File,
+  maxPx: number,
+  quality: number,
+): Promise<CompressResult> {
+  return new Promise((resolve) => {
+    const img = new window.Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      let { width, height } = img;
+      if (width > maxPx || height > maxPx) {
+        const ratio = Math.min(maxPx / width, maxPx / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) { resolve({ file, width: img.naturalWidth, height: img.naturalHeight }); return; }
+          const name = file.name.replace(/\.[^.]+$/, ".webp");
+          resolve({ file: new File([blob], name, { type: "image/webp" }), width, height });
+        },
+        "image/webp",
+        quality,
+      );
+    };
+    img.onerror = () => { URL.revokeObjectURL(objectUrl); resolve({ file, width: 0, height: 0 }); };
+    img.src = objectUrl;
+  });
+}
 
 export default function MediaUploader({
   category: defaultCategory = "autre",
@@ -55,7 +100,14 @@ export default function MediaUploader({
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [previewUrls, setPreviewUrls] = useState<Map<number, string>>(new Map());
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    return () => {
+      previewUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [previewUrls]);
 
   const addFiles = useCallback((files: FileList | File[]) => {
     const validFiles: UploadItem[] = [];
@@ -64,7 +116,18 @@ export default function MediaUploader({
       if (file.size > MAX_SIZE) return;
       validFiles.push({ file, progress: 0, status: "pending" });
     });
-    setItems((prev) => [...prev, ...validFiles]);
+    setItems((prev) => {
+      const newItems = [...prev, ...validFiles];
+      setPreviewUrls((prevUrls) => {
+        const map = new Map(prevUrls);
+        validFiles.forEach((_, i) => {
+          const idx = prev.length + i;
+          map.set(idx, URL.createObjectURL(validFiles[i].file));
+        });
+        return map;
+      });
+      return newItems;
+    });
   }, []);
 
   const handleDrop = useCallback(
@@ -99,18 +162,38 @@ export default function MediaUploader({
     for (let i = 0; i < items.length; i++) {
       if (items[i].status === "done") continue;
       const item = items[i];
-      const ext = item.file.name.split(".").pop();
-      const filename = `${category}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
 
       setItems((prev) =>
         prev.map((it, idx) =>
-          idx === i ? { ...it, status: "uploading", progress: 10 } : it,
+          idx === i ? { ...it, status: "uploading", progress: 5 } : it,
         ),
       );
 
+      const canCompress = COMPRESS_TYPES.includes(item.file.type);
+      let imgWidth: number | null = null;
+      let imgHeight: number | null = null;
+      let mainFile: File;
+      if (canCompress) {
+        const result = await compressToWebP(item.file, COMPRESS_MAX_PX, 0.82);
+        mainFile = result.file;
+        imgWidth = result.width || null;
+        imgHeight = result.height || null;
+      } else {
+        mainFile = item.file;
+      }
+
+      setItems((prev) =>
+        prev.map((it, idx) => (idx === i ? { ...it, progress: 15 } : it)),
+      );
+
+      const ext = mainFile.name.split(".").pop();
+      const base = `${category}/${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      const filename = `${base}.${ext}`;
+
+      const uploadContentType = canCompress ? "image/webp" : (mainFile.type || "application/octet-stream");
       const { error: storageError } = await supabase.storage
         .from("media")
-        .upload(filename, item.file, { cacheControl: "3600", upsert: false });
+        .upload(filename, mainFile, { cacheControl: "31536000", upsert: false, contentType: uploadContentType });
 
       if (storageError) {
         setItems((prev) =>
@@ -124,12 +207,43 @@ export default function MediaUploader({
       }
 
       setItems((prev) =>
-        prev.map((it, idx) => (idx === i ? { ...it, progress: 70 } : it)),
+        prev.map((it, idx) => (idx === i ? { ...it, progress: 60 } : it)),
       );
 
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("media").getPublicUrl(filename);
+      const { data: { publicUrl } } = supabase.storage.from("media").getPublicUrl(filename);
+
+      let thumbnailUrl: string | null = null;
+      let thumbFilename: string | null = null;
+      if (canCompress) {
+        const { file: thumbFile } = await compressToWebP(item.file, THUMB_PX, 0.75);
+        thumbFilename = `${base}_thumb.webp`;
+        const { error: thumbErr } = await supabase.storage
+          .from("media")
+          .upload(thumbFilename, thumbFile, { cacheControl: "31536000", upsert: false, contentType: "image/webp" });
+        if (!thumbErr) {
+          const { data: { publicUrl: tUrl } } = supabase.storage.from("media").getPublicUrl(thumbFilename);
+          thumbnailUrl = tUrl;
+        } else {
+          thumbFilename = null;
+        }
+      }
+
+      setItems((prev) =>
+        prev.map((it, idx) => (idx === i ? { ...it, progress: 85 } : it)),
+      );
+
+      // Vérifier que la session est toujours valide avant l'INSERT
+      const { error: sessionError } = await supabase.auth.getUser();
+      if (sessionError) {
+        // Session expirée ou token invalide — rollback storage
+        await supabase.storage.from("media").remove([filename]);
+        setItems((prev) =>
+          prev.map((it, idx) =>
+            idx === i ? { ...it, status: "error", error: "Session expirée — veuillez vous reconnecter et réessayer." } : it,
+          ),
+        );
+        continue;
+      }
 
       const { data: mediaData, error: dbError } = await supabase
         .from("media_files")
@@ -137,25 +251,41 @@ export default function MediaUploader({
           filename,
           original_name: item.file.name,
           url: publicUrl,
+          thumbnail_url: thumbnailUrl,
           category,
           uploaded_by: user.id,
-          size: item.file.size,
-          type: item.file.type,
+          size: mainFile.size,
+          type: mainFile.type,
           alt_text: altText,
           description,
           tags,
+          width: imgWidth,
+          height: imgHeight,
         })
         .select()
         .single();
 
       if (dbError) {
+        // ROLLBACK transactionnel : supprimer les fichiers Storage déjà uploadés
+        const filesToRollback = [filename];
+        if (thumbFilename) filesToRollback.push(thumbFilename);
+        await supabase.storage.from("media").remove(filesToRollback);
+
         setItems((prev) =>
           prev.map((it, idx) =>
-            idx === i ? { ...it, status: "error", error: dbError.message } : it,
+            idx === i ? { ...it, status: "error", error: `Erreur base de données — fichier supprimé du stockage. (${dbError.message})` } : it,
           ),
         );
         continue;
       }
+
+      void logMediaAction("upload", (mediaData as MediaFile).id, user.id, {
+        filename,
+        original_name: item.file.name,
+        category,
+        size: mainFile.size,
+        type: mainFile.type,
+      });
 
       setItems((prev) =>
         prev.map((it, idx) =>
@@ -284,7 +414,7 @@ export default function MediaUploader({
           ref={fileInputRef}
           type="file"
           multiple
-          accept=".jpg,.jpeg,.png,.webp,.gif,.svg"
+          accept=".jpg,.jpeg,.png,.webp,.gif,.pdf"
           className="hidden"
           onChange={(e) => e.target.files && addFiles(e.target.files)}
         />
@@ -301,7 +431,7 @@ export default function MediaUploader({
           ou cliquez pour sélectionner
         </p>
         <p className="text-xs text-gray-400 mt-2">
-          JPG, PNG, WEBP, GIF, SVG — max 10 MB
+          JPG, PNG, WEBP, GIF, PDF — max 10 MB
         </p>
       </div>
 
@@ -313,9 +443,9 @@ export default function MediaUploader({
               className="flex items-center gap-3 bg-gray-50 rounded-lg px-3 py-2"
             >
               <div className="w-10 h-10 rounded-lg bg-gray-200 flex-shrink-0 overflow-hidden">
-                {item.status !== "error" ? (
+                {item.status !== "error" && previewUrls.get(idx) ? (
                   <img
-                    src={URL.createObjectURL(item.file)}
+                    src={previewUrls.get(idx)}
                     alt=""
                     className="w-full h-full object-cover"
                   />

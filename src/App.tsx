@@ -26,7 +26,6 @@ import type { PageSection } from "./components/page-builder/types";
 import PublicPageLayoutRenderer from "./components/public/PublicPageLayoutRenderer";
 import PublicSocialWall from "./components/public/PublicSocialWall";
 import OneSignal from 'react-onesignal';
-import { onesignalProvider } from "./services/onesignalService";
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Clients = lazy(() => import("./pages/Clients"));
@@ -455,23 +454,52 @@ function AppContent() {
   // ============================================
   useEffect(() => {
     const initOneSignal = async () => {
+      const appId = import.meta.env.VITE_ONESIGNAL_APP_ID;
+      if (!appId || typeof window === 'undefined' || typeof navigator === 'undefined') {
+        return;
+      }
+
+      const supportsPush =
+        'serviceWorker' in navigator &&
+        'PushManager' in window &&
+        'Notification' in window;
+
+      if (!supportsPush) {
+        return;
+      }
+
       try {
         await OneSignal.init({
-          appId: import.meta.env.VITE_ONESIGNAL_APP_ID,
+          appId,
           allowLocalhostAsSecureOrigin: true,
           notifyButton: {
             enable: true,
             size: 'medium',
             position: 'bottom-right',
-            theme: 'default',
-            showCredit: false
+            prenotify: false,
+            showCredit: false,
+            text: {
+              'dialog.blocked.message': "Activez les notifications dans votre navigateur.",
+              'dialog.blocked.title': "Notifications bloquées",
+              'dialog.main.button.subscribe': "S'abonner",
+              'dialog.main.button.unsubscribe': "Se désabonner",
+              'dialog.main.title': "Recevoir les notifications",
+              'message.action.resubscribed': "Vous êtes de nouveau abonné.",
+              'message.action.subscribed': "Abonnement activé.",
+              'message.action.subscribing': "Abonnement en cours...",
+              'message.action.unsubscribed': "Abonnement désactivé.",
+              'message.prenotify': "Recevez les alertes importantes.",
+              'tip.state.blocked': "Notifications bloquées",
+              'tip.state.subscribed': "Abonné",
+              'tip.state.unsubscribed': "Non abonné",
+            }
           }
         });
         
         // Capturer le player_id quand l'utilisateur s'abonne
-        OneSignal.on('subscriptionChange', async (isSubscribed) => {
-          if (isSubscribed && user) {
-            const playerId = await OneSignal.getUserId();
+        OneSignal.User.PushSubscription.addEventListener("change", (change) => {
+          if (change.current.optedIn && user) {
+            const playerId = change.current.id;
             if (playerId) {
               // Sauvegarder playerId pour les propriétés de l'utilisateur
               // Note: Cette logique peut être adaptée selon vos besoins
@@ -648,50 +676,24 @@ function AppContent() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const canonicalFromEnv = import.meta.env.VITE_CANONICAL_ORIGIN;
-    const canonicalKey = "egs:canonical_origin";
-    const redirectAttemptKey = "egs:canonical_redirect_attempted";
-    const normalizeOrigin = (value: string | null) => {
-      if (!value) return null;
-      try {
-        return new URL(value).origin;
-      } catch {
-        return null;
-      }
-    };
-    
-    // Guard against infinite redirect loops
-    if (window.sessionStorage.getItem(redirectAttemptKey)) {
-      // Clear the invalid canonical origin that caused the loop
-      window.localStorage.removeItem(canonicalKey);
-      window.sessionStorage.removeItem(redirectAttemptKey);
+
+    const canonicalHost = "gnambaservices.ci";
+    const hostname = window.location.hostname;
+    const aliasHosts = new Set([
+      "www.gnambaservices.ci",
+      "portal.gnambaservices.ci",
+      "erp.gnambaservices.ci",
+      "www.erp.gnambaservices.ci",
+      "immobilier.gnambaservices.ci",
+      "foncier.gnambaservices.ci",
+    ]);
+
+    if (!aliasHosts.has(hostname) || hostname === canonicalHost) {
       return;
     }
-    
-    const stored = normalizeOrigin(window.localStorage.getItem(canonicalKey));
-    const envOrigin = normalizeOrigin(canonicalFromEnv);
-    const currentOrigin = window.location.origin;
-    const hostname = window.location.hostname;
-    const isLocalhost =
-      hostname === "localhost" ||
-      hostname === "127.0.0.1" ||
-      hostname === "[::1]";
 
-    let canonical = envOrigin || stored;
-    if (!canonical && !isLocalhost) {
-      canonical = currentOrigin;
-    }
-
-    if (!envOrigin && canonical && canonical === currentOrigin && !stored) {
-      window.localStorage.setItem(canonicalKey, canonical);
-    }
-
-    if (canonical && currentOrigin !== canonical) {
-      // Mark that we're attempting a redirect to avoid infinite loops
-      window.sessionStorage.setItem(redirectAttemptKey, "true");
-      const target = `${canonical}${window.location.pathname}${window.location.search}${window.location.hash}`;
-      window.location.replace(target);
-    }
+    const target = `https://${canonicalHost}${window.location.pathname}${window.location.search}${window.location.hash}`;
+    window.location.replace(target);
   }, []);
 
   const isLoading = settingsLoading || authLoading;
@@ -1092,12 +1094,14 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <SettingsProvider>
-        <NotificationProvider>
-          <AppContent />
-        </NotificationProvider>
-      </SettingsProvider>
-    </AuthProvider>
+    <ErrorBoundary moduleName="Application EGS">
+      <AuthProvider>
+        <SettingsProvider>
+          <NotificationProvider>
+            <AppContent />
+          </NotificationProvider>
+        </SettingsProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

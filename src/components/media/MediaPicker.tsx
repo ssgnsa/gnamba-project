@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { X, Search, Upload, Images, Tag, ChevronDown } from "lucide-react";
 import { supabase } from "../../lib/supabase";
+import { useAuth } from "../../context/AuthContext";
 import type { MediaFile, MediaCategory } from "../../types";
 import MediaCard from "./MediaCard";
 import MediaUploader from "./MediaUploader";
@@ -16,6 +17,7 @@ const CATEGORIES: { value: string; label: string }[] = [
   { value: "services", label: "Services" },
   { value: "equipe", label: "Équipe" },
   { value: "documents", label: "Documents" },
+  { value: "foncier_villages", label: "Logos Villages" },
   { value: "autre", label: "Autre" },
 ];
 
@@ -32,6 +34,7 @@ export default function MediaPicker({
   defaultCategory,
   title,
 }: MediaPickerProps) {
+  const { user, loading: authLoading } = useAuth();
   const [tab, setTab] = useState<"library" | "upload">("library");
   const [files, setFiles] = useState<MediaFile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,13 +44,19 @@ export default function MediaPicker({
   const [allTags, setAllTags] = useState<string[]>([]);
   const [selected, setSelected] = useState<MediaFile | null>(null);
   const [showTagFilter, setShowTagFilter] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const PAGE_SIZE = 100;
 
-  const fetchFiles = useCallback(async () => {
+  const fetchFiles = useCallback(async (currentOffset = 0) => {
+    if (authLoading || !user) return;
     setLoading(true);
     let query = supabase
       .from("media_files")
       .select("*")
-      .order("upload_date", { ascending: false });
+      .is("deleted_at", null)
+      .order("upload_date", { ascending: false })
+      .range(currentOffset, currentOffset + PAGE_SIZE - 1);
 
     if (category && category !== "all") {
       query = query.eq("category", category);
@@ -55,18 +64,31 @@ export default function MediaPicker({
 
     const { data } = await query;
     const mediaFiles = (data as MediaFile[]) || [];
-    setFiles(mediaFiles);
+    if (currentOffset === 0) {
+      setFiles(mediaFiles);
+    } else {
+      setFiles((prev) => [...prev, ...mediaFiles]);
+    }
+    setHasMore(mediaFiles.length === PAGE_SIZE);
 
     const tags = Array.from(
       new Set(mediaFiles.flatMap((f) => f.tags || [])),
     ).sort();
-    setAllTags(tags);
+    setAllTags((prev) => Array.from(new Set([...prev, ...tags])).sort());
     setLoading(false);
-  }, [category]);
+  }, [category, authLoading, user]);
 
   useEffect(() => {
-    fetchFiles();
-  }, [fetchFiles]);
+    if (authLoading || !user) return;
+    setOffset(0);
+    fetchFiles(0);
+  }, [fetchFiles, authLoading, user]);
+
+  const loadMore = useCallback(() => {
+    const next = offset + PAGE_SIZE;
+    setOffset(next);
+    fetchFiles(next);
+  }, [offset, fetchFiles]);
 
   const filtered = files.filter((f) => {
     const matchesSearch =
@@ -84,8 +106,45 @@ export default function MediaPicker({
   };
 
   const handleConfirm = () => {
-    if (selected) onSelect(selected);
+    if (!selected) return;
+    // Compatibilité ancien schéma : normaliser url avant de passer au parent
+    const normalized = { ...selected };
+    if (!normalized.url && (normalized as MediaFile & { public_url?: string }).public_url) {
+      normalized.url = (normalized as MediaFile & { public_url?: string }).public_url!;
+    }
+    onSelect(normalized);
   };
+
+  if (authLoading) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl p-8 text-center">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-700 mx-auto mb-4" />
+          <p className="text-sm text-gray-500">Vérification de l'authentification...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl p-8 text-center">
+          <h3 className="text-lg font-semibold text-amber-900 mb-2">Accès refusé</h3>
+          <p className="text-sm text-amber-700 mb-4">
+            Vous devez être connecté pour utiliser la sélection de médias.
+          </p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            Fermer
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -223,17 +282,30 @@ export default function MediaPicker({
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-4 gap-3">
-                    {filtered.map((file) => (
-                      <MediaCard
-                        key={file.id}
-                        file={file}
-                        selectable
-                        selected={selected?.id === file.id}
-                        onSelect={(f) => setSelected(f)}
-                      />
-                    ))}
-                  </div>
+                  <>
+                    <div className="grid grid-cols-4 gap-3">
+                      {filtered.map((file) => (
+                        <MediaCard
+                          key={file.id}
+                          file={file}
+                          selectable
+                          selected={selected?.id === file.id}
+                          onSelect={(f) => setSelected(f)}
+                        />
+                      ))}
+                    </div>
+                    {hasMore && !search && !tagFilter && (
+                      <div className="mt-4 flex justify-center">
+                        <button
+                          onClick={loadMore}
+                          disabled={loading}
+                          className="px-5 py-2 text-sm text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors disabled:opacity-50"
+                        >
+                          {loading ? "Chargement..." : "Charger plus"}
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </>
@@ -256,6 +328,7 @@ export default function MediaPicker({
                 <img
                   src={selected.url}
                   alt=""
+                  crossOrigin="anonymous"
                   className="w-8 h-8 rounded-lg object-cover"
                 />
                 <div>

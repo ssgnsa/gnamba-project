@@ -173,7 +173,8 @@ export default function SiteEditor() {
 
   const deleteRealisation = async (id: string) => {
     if (!confirm("Supprimer cette réalisation ?")) return;
-    await supabase.from("site_realisations").delete().eq("id", id);
+    const { error } = await supabase.from("site_realisations").delete().eq("id", id);
+    if (error) { setSaveError(error.message); return; }
     setRealisations((prev) => prev.filter((r) => r.id !== id));
   };
 
@@ -488,6 +489,7 @@ export default function SiteEditor() {
                       <img
                         src={editingReal.image_url}
                         alt="Réalisation"
+                        crossOrigin="anonymous"
                         className="w-20 h-14 rounded-xl object-cover border-2 border-gray-200"
                       />
                       <button
@@ -599,6 +601,7 @@ export default function SiteEditor() {
                         <img
                           src={r.image_url}
                           alt={r.title}
+                          crossOrigin="anonymous"
                           className="w-14 h-10 rounded-lg object-cover border border-gray-200"
                         />
                       ) : (

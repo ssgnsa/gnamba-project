@@ -24,6 +24,8 @@ const emptyForm = {
   prenom: "",
   telephone: "",
   email: "",
+  loyer: "",
+  depot_garantie: "",
   statut: "actif" as Tenant["statut"],
 };
 
@@ -70,6 +72,8 @@ export default function TenantsTab({
       prenom: t.prenom,
       telephone: t.telephone || "",
       email: t.email || "",
+      loyer: String(t.loyer || 0),
+      depot_garantie: String(t.depot_garantie || 0),
       statut: t.statut,
     });
     setEditingId(t.id);
@@ -101,6 +105,8 @@ export default function TenantsTab({
       prenom: form.prenom,
       telephone: form.telephone.trim() || null,
       email: form.email.trim() || null,
+      loyer: parseFloat(form.loyer) || 0,
+      depot_garantie: parseFloat(form.depot_garantie) || 0,
       statut: form.statut,
       updated_at: new Date().toISOString(),
     };
@@ -113,11 +119,7 @@ export default function TenantsTab({
           .eq("id", editingId);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from(tenantTableName).insert({
-          ...payload,
-          loyer: 0,
-          depot_garantie: 0,
-        });
+        const { error } = await supabase.from(tenantTableName).insert(payload);
         if (error) throw error;
       }
       setModalOpen(false);
@@ -363,6 +365,36 @@ export default function TenantsTab({
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 className={inputClass}
                 placeholder="Ex: konan@example.com"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Loyer par défaut (FCFA)
+              </label>
+              <input
+                type="number"
+                value={form.loyer}
+                onChange={(e) =>
+                  setForm({ ...form, loyer: e.target.value })
+                }
+                className={inputClass}
+                placeholder="0"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Dépôt de garantie (FCFA)
+              </label>
+              <input
+                type="number"
+                value={form.depot_garantie}
+                onChange={(e) =>
+                  setForm({ ...form, depot_garantie: e.target.value })
+                }
+                className={inputClass}
+                placeholder="0"
               />
             </div>
           </div>

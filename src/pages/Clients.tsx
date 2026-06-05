@@ -178,7 +178,8 @@ export default function Clients() {
       return;
     }
     if (!confirm("Supprimer ce client ?")) return;
-    await supabase.from("clients").delete().eq("id", id);
+    const { error } = await supabase.from("clients").delete().eq("id", id);
+    if (error) { setFormError(error.message); return; }
     fetchClients();
   };
 

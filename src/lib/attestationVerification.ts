@@ -227,7 +227,7 @@ export function generateVerificationUrl(
  */
 export function generateCanonicalVerificationUrl(
   input: string | VerificationLookup,
-  domain: string = "portal.gnambaservices.ci",
+  domain: string = "gnambaservices.ci",
 ): string {
   const normalized = sanitizeLookup(normalizeLookup(input));
   const url = new URL("/verification-attestation", `https://${domain}`);

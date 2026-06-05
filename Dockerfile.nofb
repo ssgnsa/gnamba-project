@@ -1,0 +1,39 @@
+# ============================================
+# Dockerfile EGS - SANS Filebrowser
+# Corrige: host not found in upstream "filebrowser"
+# ============================================
+
+# Étape 1: Build React
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Arguments de build
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
+ARG VITE_SUPABASE_MODE
+
+# Variables d'environnement pour le build
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
+ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
+ENV VITE_SUPABASE_MODE=$VITE_SUPABASE_MODE
+
+# Installation et build
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+RUN npm run build
+
+# Étape 2: Nginx sans filebrowser
+FROM nginx:alpine
+
+# Config nginx SANS upstream filebrowser
+COPY nginx-standalone.conf /etc/nginx/conf.d/default.conf
+
+# Copier l'app buildée
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]

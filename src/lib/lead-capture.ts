@@ -1,449 +1,147 @@
 /**
  * Lead Capture System — Universal Form Interceptor
- * ================================================
- * Injects into every page to capture phone numbers from ALL forms.
- * Sends leads to /api/capture-lead endpoint asynchronously.
- *
- * Usage: Add to index.html or inject via layout component.
- * Conforms to Loi n° 2013-450 (Côte d'Ivoire) — requires explicit consent.
+ * Version: Supabase Edge Function
  */
 
-(function () {
-  "use strict";
+const CONFIG = {
+  retryAttempts: 3,
+  retryDelay: 2000,
+  consentCheckboxId: "lead-capture-consent",
+}
 
-  const CONFIG = {
-    apiUrl: "/api/capture-lead",
-    retryAttempts: 3,
-    retryDelay: 2000,
-    consentCheckboxId: "lead-capture-consent",
-    consentText:
-      "J'accepte de recevoir des communications commerciales par SMS, WhatsApp, Email et Telegram de la part de Gnamba Services.",
-    debug: false,
-  };
+const LEGACY_CAPTURE_PATTERNS = [/\/api\/capture-lead(?:\/|$)/i, /\/api\/capture(?:\/|$)/i]
+const PHONE_SELECTORS = [
+  'input[type="tel"]',
+  'input[name*="phone" i]',
+  'input[name*="tel" i]',
+  'input[name*="mobile" i]',
+  'input[name*="portable" i]',
+  'input[name*="telephone" i]',
+  'input[id*="phone" i]',
+  'input[id*="tel" i]',
+]
 
-  // Phone field detection patterns
-  const PHONE_SELECTORS = [
-    'input[type="tel"]',
-    'input[name*="phone" i]',
-    'input[name*="tel" i]',
-    'input[name*="mobile" i]',
-    'input[name*="portable" i]',
-    'input[name*="telephone" i]',
-    'input[id*="phone" i]',
-    'input[id*="tel" i]',
-    'input[id*="mobile" i]',
-  ];
+interface LeadData {
+  phone: string
+  first_name?: string
+  last_name?: string
+  email?: string
+  source?: string
+  source_page?: string
+  source_form?: string
+  consent_text?: string
+  channels_optin?: string[]
+}
 
-  const NAME_SELECTORS = [
-    'input[name*="nom" i]',
-    'input[name*="name" i]',
-    'input[name*="prenom" i]',
-    'input[name*="first_name" i]',
-    'input[name*="last_name" i]',
-  ];
+export async function captureLead(leadData: LeadData): Promise<{ success: boolean; data?: any; error?: any }> {
+  try {
+    // Vérifier le consentement (RGPD/Loi ivoirienne)
+    const consentCheckbox = document.getElementById(CONFIG.consentCheckboxId) as HTMLInputElement
+    if (consentCheckbox && !consentCheckbox.checked) {
+      throw new Error("Consentement requis pour collecter les données")
+    }
 
-  const EMAIL_SELECTORS = ['input[type="email"]', 'input[name*="email" i]'];
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+    if (!supabaseUrl) {
+      throw new Error("Supabase URL not configured")
+    }
 
-  /**
-   * Extract phone number from form
-   */
-  function extractPhone(form: HTMLFormElement): string | null {
-    for (const selector of PHONE_SELECTORS) {
-      const el = form.querySelector(selector);
-      if (
-        el &&
-        (el as HTMLInputElement).value &&
-        (el as HTMLInputElement).value.trim()
-      ) {
-        return normalizePhone((el as HTMLInputElement).value.trim());
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_LOCAL_ANON_KEY || ''
+    const response = await fetch(`${supabaseUrl}/functions/v1/capture-lead`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${anonKey}`,
+        },
+        body: JSON.stringify({
+          phone: leadData.phone,
+          first_name: leadData.first_name || null,
+          last_name: leadData.last_name || null,
+          email: leadData.email || null,
+          source: leadData.source || 'web_form',
+          source_page: leadData.source_page || window.location.pathname,
+          source_form: leadData.source_form || 'unknown',
+          consent_text: leadData.consent_text || "J'accepte d'être contacté",
+          channels_optin: leadData.channels_optin || ['phone'],
+        })
       }
+    )
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.error || `API error: ${response.status}`)
     }
-    return null;
+
+    const result = await response.json()
+    console.log('✅ Lead capturé avec succès:', result.data)
+    return { success: true, data: result.data }
+  } catch (error) {
+    console.error('❌ Erreur capture lead:', error)
+    return { success: false, error }
   }
+}
 
-  /**
-   * Extract name from form
-   */
-  function extractName(form: HTMLFormElement): {
-    firstName: string;
-    lastName: string;
-  } {
-    let firstName = "";
-    let lastName = "";
-
-    for (const selector of NAME_SELECTORS) {
-      const el = form.querySelector(selector);
-      if (
-        el &&
-        (el as HTMLInputElement).value &&
-        (el as HTMLInputElement).value.trim()
-      ) {
-        if (selector.includes("prenom") || selector.includes("first")) {
-          firstName = (el as HTMLInputElement).value.trim();
-        } else if (selector.includes("nom") || selector.includes("last")) {
-          lastName = (el as HTMLInputElement).value.trim();
-        } else {
-          // Generic name field — split on space
-          const parts = (el as HTMLInputElement).value.trim().split(" ");
-          if (parts.length > 1) {
-            firstName = parts[0];
-            lastName = parts.slice(1).join(" ");
-          } else {
-            lastName = parts[0];
-          }
-        }
-      }
-    }
-
-    return { firstName, lastName };
+// Fonction pour intercepter automatiquement les formulaires
+function isLegacyCaptureEndpoint(action?: string | null): boolean {
+  if (!action) return false
+  try {
+    const url = new URL(action, window.location.href)
+    return LEGACY_CAPTURE_PATTERNS.some((pattern) => pattern.test(url.pathname))
+  } catch {
+    return false
   }
+}
 
-  /**
-   * Extract email from form
-   */
-  function extractEmail(form: HTMLFormElement): string | null {
-    for (const selector of EMAIL_SELECTORS) {
-      const el = form.querySelector(selector);
-      if (
-        el &&
-        (el as HTMLInputElement).value &&
-        (el as HTMLInputElement).value.trim()
-      ) {
-        return (el as HTMLInputElement).value.trim();
-      }
-    }
-    return null;
+function findPhoneInput(form: HTMLFormElement): HTMLInputElement | null {
+  for (const selector of PHONE_SELECTORS) {
+    const input = form.querySelector(selector) as HTMLInputElement | null
+    if (input && input.value) return input
   }
+  return null
+}
 
-  /**
-   * Normalize phone to E.164 format
-   */
-  function normalizePhone(phone: string): string {
-    // Remove all non-digit and non-plus characters
-    const cleaned = phone.replace(/[^0-9+]/g, "");
+export function initLeadCapture() {
+  document.addEventListener('submit', async (event) => {
+    const form = event.target as HTMLFormElement
+    const originalAction = form.getAttribute('action')
+    const phoneInput = findPhoneInput(form)
+    const shouldIntercept = Boolean(phoneInput && phoneInput.value)
 
-    // Handle Ivorian local format: 07 XX XX XX XX → +225 07 XX XX XX XX
-    if (cleaned.startsWith("0") && cleaned.length === 10) {
-      return "+225" + cleaned.substring(1);
+    if (!shouldIntercept || !phoneInput) return
+
+    event.preventDefault()
+
+    const leadData: LeadData = {
+      phone: phoneInput.value,
+      first_name: (form.querySelector('input[name="first_name"], input[name="firstName"], input[name*="prenom" i], input[name*="nom" i]') as HTMLInputElement)?.value,
+      last_name: (form.querySelector('input[name="last_name"], input[name="lastName"], input[name*="prenom" i], input[name*="nom" i]') as HTMLInputElement)?.value,
+      email: (form.querySelector('input[type="email"]') as HTMLInputElement)?.value,
+      source_form: form.id || form.name || originalAction || 'unknown',
     }
 
-    // Handle 00 prefix: 00225... → +225...
-    if (cleaned.startsWith("00")) {
-      return "+" + cleaned.substring(2);
-    }
+    const result = await captureLead(leadData)
 
-    // Already E.164
-    if (cleaned.startsWith("+")) {
-      return cleaned;
-    }
-
-    // Fallback: assume Ivorian
-    if (cleaned.length === 9) {
-      return "+225" + cleaned;
-    }
-
-    return cleaned;
-  }
-
-  /**
-   * Check consent — returns true if user has opted in
-   */
-  function checkConsent(form: HTMLFormElement): boolean {
-    // Try custom checkbox first
-    const checkbox = document.getElementById(CONFIG.consentCheckboxId);
-    if (checkbox && (checkbox as HTMLInputElement).type === "checkbox") {
-      return (checkbox as HTMLInputElement).checked;
-    }
-
-    // Look for any consent checkbox in the form
-    const allCheckboxes = form.querySelectorAll('input[type="checkbox"]');
-    for (const cb of allCheckboxes) {
-      const label = getLabelForCheckbox(cb);
-      if (
-        label &&
-        (label.toLowerCase().includes("accept") ||
-          label.toLowerCase().includes("consent") ||
-          label.toLowerCase().includes("communication") ||
-          label.toLowerCase().includes("promotion") ||
-          label.toLowerCase().includes("recevoir"))
-      ) {
-        return (cb as HTMLInputElement).checked;
-      }
-    }
-
-    // Default: assume consent if no checkbox found (will be flagged in backend)
-    return true;
-  }
-
-  /**
-   * Get label text for a checkbox
-   */
-  function getLabelForCheckbox(cb: Element): string | null {
-    // Try <label for="...">
-    if (cb.id) {
-      const label = document.querySelector(`label[for="${cb.id}"]`);
-      if (label) return label.textContent;
-    }
-
-    // Try wrapping label
-    const parentLabel = cb.closest("label");
-    if (parentLabel) return parentLabel.textContent;
-
-    // Try next sibling
-    const next = cb.nextElementSibling;
-    if (next && next.tagName === "LABEL") return next.textContent;
-
-    return "";
-  }
-
-  /**
-   * Send lead to API with retry
-   */
-  interface LeadData {
-    phone: string;
-    source: string;
-    source_form?: string;
-    first_name?: string;
-    last_name?: string;
-    email?: string | null;
-    consent_given: boolean;
-    channels_optin?: {
-      sms: boolean;
-      whatsapp: boolean;
-      email: boolean;
-      telegram: boolean;
-    };
-  }
-
-  async function sendLead(leadData: LeadData): Promise<boolean> {
-    let attempts = 0;
-
-    while (attempts < CONFIG.retryAttempts) {
-      try {
-        const response = await fetch(CONFIG.apiUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(leadData),
-        });
-
-        if (response.ok) {
-          if (CONFIG.debug) {
-            console.log(
-              "[LeadCapture] Lead captured successfully:",
-              leadData.phone,
-            );
-          }
-          return true;
-        }
-
-        if (response.status === 409) {
-          // Duplicate — already captured
-          if (CONFIG.debug) {
-            console.log("[LeadCapture] Lead already exists:", leadData.phone);
-          }
-          return true;
-        }
-
-        attempts++;
-        if (attempts < CONFIG.retryAttempts) {
-          await new Promise((r) => setTimeout(r, CONFIG.retryDelay * attempts));
-        }
-      } catch (err) {
-        attempts++;
-        if (attempts < CONFIG.retryAttempts) {
-          await new Promise((r) => setTimeout(r, CONFIG.retryDelay * attempts));
-        } else if (CONFIG.debug && import.meta.env.DEV) {
-          console.error(
-            "[LeadCapture] Failed to capture lead after retries:",
-            err,
-          );
-        }
-      }
-    }
-
-    // Fallback: store in localStorage for later retry
-    storeLeadLocally(leadData);
-    return false;
-  }
-
-  /**
-   * Store lead locally if API fails (background sync)
-   */
-  function storeLeadLocally(leadData: LeadData): void {
-    try {
-      const pending = JSON.parse(
-        localStorage.getItem("egs:pending_leads") || "[]",
-      );
-      pending.push({ ...leadData, storedAt: Date.now() });
-      localStorage.setItem("egs:pending_leads", JSON.stringify(pending));
-      if (CONFIG.debug) {
-        console.log(
-          "[LeadCapture] Lead stored locally for retry:",
-          leadData.phone,
-        );
-      }
-    } catch {
-      // localStorage full or unavailable
-    }
-  }
-
-  /**
-   * Retry pending leads from localStorage
-   */
-  async function retryPendingLeads() {
-    try {
-      const pending = JSON.parse(
-        localStorage.getItem("egs:pending_leads") || "[]",
-      );
-      const remaining = [];
-
-      for (const lead of pending) {
-        const success = await sendLead(lead);
-        if (!success) {
-          remaining.push(lead);
-        }
+    if (result.success) {
+      if (isLegacyCaptureEndpoint(originalAction)) {
+        console.warn(
+          'Lead capture succeeded, skipped legacy form submission to',
+          originalAction,
+        )
+        return
       }
 
-      localStorage.setItem("egs:pending_leads", JSON.stringify(remaining));
-    } catch {
-      // Ignore
+      form.submit()
+    } else {
+      alert("Erreur lors de l'enregistrement. Veuillez réessayer.")
     }
-  }
+  })
+}
 
-  /**
-   * Handle form submission — intercept and capture
-   */
-  async function handleFormSubmit(event: Event): Promise<void> {
-    const form = event.target as HTMLFormElement;
+let leadCaptureInitialized = false
 
-    // Skip if already processed
-    if (form.hasAttribute("data-lead-captured")) return;
-
-    const phone = extractPhone(form);
-    if (!phone) return; // No phone found — skip
-
-    const { firstName, lastName } = extractName(form);
-    const email = extractEmail(form);
-    const consent = checkConsent(form);
-
-    // Check consent — do not capture if declined
-    if (!consent) {
-      if (CONFIG.debug) {
-        console.log("[LeadCapture] User declined consent — not capturing");
-      }
-      return;
-    }
-
-    const leadData = {
-      phone,
-      first_name: firstName,
-      last_name: lastName,
-      email,
-      source: window.location.href,
-      source_page: window.location.pathname,
-      source_form: form.id || form.className?.split(" ")[0] || "unknown",
-      consent_text: CONFIG.consentText,
-      consent_given: consent,
-      channels_optin: {
-        sms: true,
-        whatsapp: true,
-        email: true,
-        telegram: false,
-      },
-    };
-
-    // Mark form as processed
-    form.setAttribute("data-lead-captured", "true");
-
-    // Send asynchronously (don't block form submission)
-    sendLead(leadData);
-  }
-
-  /**
-   * Inject consent checkbox into forms with phone fields
-   */
-  function injectConsentCheckboxes() {
-    const allForms = document.querySelectorAll("form");
-
-    for (const form of allForms) {
-      // Check if form has phone field
-      let hasPhone = false;
-      for (const selector of PHONE_SELECTORS) {
-        if (form.querySelector(selector)) {
-          hasPhone = true;
-          break;
-        }
-      }
-
-      if (!hasPhone) continue;
-
-      // Check if consent checkbox already exists
-      if (form.querySelector(`#${CONFIG.consentCheckboxId}`)) continue;
-
-      // Find submit button
-      const submitBtn = form.querySelector(
-        'button[type="submit"], input[type="submit"]',
-      );
-      if (!submitBtn) continue;
-
-      // Create consent checkbox
-      const wrapper = document.createElement("div");
-      wrapper.style.cssText =
-        "margin-bottom: 12px; padding: 10px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;";
-
-      const checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.id = CONFIG.consentCheckboxId;
-      checkbox.checked = true;
-      checkbox.style.cssText = "margin-right: 8px; accent-color: #16a34a;";
-
-      const label = document.createElement("label");
-      label.htmlFor = CONFIG.consentCheckboxId;
-      label.style.cssText = "font-size: 13px; color: #166534; cursor: pointer;";
-      label.textContent = CONFIG.consentText;
-
-      wrapper.appendChild(checkbox);
-      wrapper.appendChild(label);
-
-      // Insert before submit button
-      if (submitBtn.parentNode) {
-        submitBtn.parentNode.insertBefore(wrapper, submitBtn);
-      }
-    }
-  }
-
-  /**
-   * Initialize — set up listeners
-   */
-  function init() {
-    // Intercept all form submissions
-    document.addEventListener("submit", handleFormSubmit, true);
-
-    // Inject consent checkboxes
-    injectConsentCheckboxes();
-
-    // Re-inject on DOM changes (SPA navigation)
-    const observer = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
-          injectConsentCheckboxes();
-        }
-      }
-    });
-
-    observer.observe(document.body, { childList: true, subtree: true });
-
-    // Retry pending leads on load
-    retryPendingLeads();
-
-    // Retry every 5 minutes
-    setInterval(retryPendingLeads, 5 * 60 * 1000);
-  }
-
-  // Initialize when DOM is ready
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
-  } else {
-    init();
-  }
-})();
+export function ensureLeadCaptureInit() {
+  if (typeof window === 'undefined') return
+  if (leadCaptureInitialized) return
+  initLeadCapture()
+  leadCaptureInitialized = true
+}

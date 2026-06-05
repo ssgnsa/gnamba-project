@@ -1,6 +1,7 @@
 /**
  * Utilitaires de validation pour les paramètres de l'application
  */
+import type { BrandSettings } from "../types";
 
 // ============================================
 // EXPRESSIONS RÉGULIÈRES
@@ -10,7 +11,25 @@ const EMAIL_REGEX = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 const PHONE_CI_REGEX =
   /^\+225\s?[0-9]{2}\s?[0-9]{2}\s?[0-9]{2}\s?[0-9]{2}\s?[0-9]{2}$/;
 const URL_REGEX = /^https?:\/\/.+/i;
+const RELAXED_URL_REGEX = /^(https?:\/\/)?[\w-]+(\.[\w-]+)+([\w-.,@?^=%&:/~+#]*[\w-@?^=%&/~+#])?$/i;
 const HEX_COLOR_REGEX = /^#[0-9A-Fa-f]{6}$/;
+
+function normalizeUrl(value: string): string {
+  if (/^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//.test(value)) {
+    return value;
+  }
+  return `https://${value}`;
+}
+
+function isUrlNormalized(value: string, allowWithoutProtocol = false): boolean {
+  try {
+    const normalized = allowWithoutProtocol ? normalizeUrl(value) : value;
+    new URL(normalized);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // ============================================
 // TYPES
@@ -34,11 +53,14 @@ export interface ValidationResult {
 /**
  * Valide une adresse email
  */
-export function validateEmail(email: string): ValidationError | null {
+export function validateEmail(
+  email: string,
+  fieldName: string = "email",
+): ValidationError | null {
   if (!email) return null; // Champ vide, pas une erreur si optionnel
   if (!EMAIL_REGEX.test(email)) {
     return {
-      field: "email",
+      field: fieldName,
       message: "Format d'email invalide (ex: contact@exemple.com)",
       type: "format",
     };
@@ -49,12 +71,15 @@ export function validateEmail(email: string): ValidationError | null {
 /**
  * Valide un numéro de téléphone (format Côte d'Ivoire)
  */
-export function validatePhone(phone: string): ValidationError | null {
+export function validatePhone(
+  phone: string,
+  fieldName: string = "phone",
+): ValidationError | null {
   if (!phone) return null;
   const cleaned = phone.replace(/\s/g, "");
   if (!PHONE_CI_REGEX.test(phone) && !/^\+225[0-9]{9}$/.test(cleaned)) {
     return {
-      field: "phone",
+      field: fieldName,
       message: "Format invalide. Utilisez: +225 XX XX XX XX XX",
       type: "format",
     };
@@ -68,12 +93,20 @@ export function validatePhone(phone: string): ValidationError | null {
 export function validateUrl(
   url: string,
   fieldName: string = "URL",
+  allowWithoutProtocol = false,
 ): ValidationError | null {
   if (!url) return null;
-  if (!URL_REGEX.test(url)) {
+  const value = url.trim();
+  const isValid = allowWithoutProtocol
+    ? RELAXED_URL_REGEX.test(value) && isUrlNormalized(value, true)
+    : URL_REGEX.test(value);
+
+  if (!isValid) {
     return {
       field: fieldName,
-      message: `URL invalide. Doit commencer par http:// ou https://`,
+      message: `URL invalide. Doit être une adresse valide${
+        allowWithoutProtocol ? " (http(s) ou domaine)" : " (http:// ou https://)"
+      }`,
       type: "format",
     };
   }
@@ -177,7 +210,7 @@ export function validateLength(
 /**
  * Valide tous les paramètres
  */
-export function validateSettings(form: any): ValidationResult {
+export function validateSettings(form: BrandSettings): ValidationResult {
   const errors: ValidationError[] = [];
 
   // Champs requis
@@ -206,15 +239,15 @@ export function validateSettings(form: any): ValidationResult {
     errors.push({ ...secondaryColorError, field: "secondary_color" });
 
   // Email
-  const emailError = validateEmail(form.contact_email);
+  const emailError = validateEmail(form.contact_email, "contact_email");
   if (emailError) errors.push(emailError);
 
   // Téléphone
-  const phoneError = validatePhone(form.contact_phone);
+  const phoneError = validatePhone(form.contact_phone, "contact_phone");
   if (phoneError) errors.push(phoneError);
 
   // URLs des réseaux sociaux
-  const socialFields = [
+  const socialFields: Array<keyof BrandSettings> = [
     "social_facebook",
     "social_youtube",
     "social_linkedin",
@@ -223,14 +256,15 @@ export function validateSettings(form: any): ValidationResult {
     "social_tiktok",
   ];
   for (const field of socialFields) {
-    if (form[field]) {
-      const urlError = validateUrl(form[field], field);
+    const val = form[field] as string | undefined;
+    if (val) {
+      const urlError = validateUrl(val, field, true);
       if (urlError) errors.push(urlError);
     }
   }
 
   // URLs des logos
-  const logoFields = [
+  const logoFields: Array<keyof BrandSettings> = [
     "logo_url",
     "brand_logo_dark",
     "brand_favicon_url",
@@ -238,10 +272,11 @@ export function validateSettings(form: any): ValidationResult {
     "hero_background_url",
   ];
   for (const field of logoFields) {
-    if (form[field]) {
+    const val = form[field] as string | undefined;
+    if (val) {
       // Les URLs des logos peuvent venir de media_files, donc on ne valide pas strictement
       // Mais on peut vérifier si c'est une URL valide
-      const urlError = validateUrl(form[field], field);
+      const urlError = validateUrl(val, field);
       if (urlError) {
         // Ce n'est pas bloquant, on ne l'ajoute pas aux erreurs
         if (import.meta.env.DEV)

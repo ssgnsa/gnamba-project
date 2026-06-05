@@ -6,6 +6,7 @@ import {
   removeAssignment,
   getMediaUsages,
 } from "../../lib/mediaUtils";
+import { useAuth } from "../../context/AuthContext";
 import type { MediaFile } from "../../types";
 import MediaPicker from "./MediaPicker";
 
@@ -118,12 +119,18 @@ interface SlotCardProps {
 }
 
 function SlotCard({ slot }: SlotCardProps) {
+  const { user, loading: authLoading } = useAuth();
   const [current, setCurrent] = useState<MediaFile | null>(null);
   const [loading, setLoading] = useState(true);
   const [picking, setPicking] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const loadSlot = useCallback(async () => {
+    if (authLoading || !user) {
+      setCurrent(null);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     const file = await getUsageForSlot(
       slot.entityType,
@@ -132,11 +139,12 @@ function SlotCard({ slot }: SlotCardProps) {
     );
     setCurrent(file);
     setLoading(false);
-  }, [slot.entityId, slot.entityType, slot.usageType]);
+  }, [slot.entityId, slot.entityType, slot.usageType, authLoading, user]);
 
   useEffect(() => {
+    if (authLoading || !user) return;
     void loadSlot();
-  }, [loadSlot]);
+  }, [loadSlot, authLoading, user]);
 
   const handleAssign = async (file: MediaFile) => {
     setSaving(true);
@@ -153,7 +161,7 @@ function SlotCard({ slot }: SlotCardProps) {
   };
 
   const handleRemove = async () => {
-    if (!current) return;
+    if (!current || !user) return;
     setSaving(true);
     const usages = await getMediaUsages(current.id);
     const usage = usages.find(
@@ -162,7 +170,10 @@ function SlotCard({ slot }: SlotCardProps) {
         u.entity_id === slot.entityId &&
         u.usage_type === slot.usageType,
     );
-    if (usage) await removeAssignment(usage.id);
+    if (usage) {
+      const { error } = await removeAssignment(usage.id);
+      if (error) { setSaving(false); return; }
+    }
     setCurrent(null);
     setSaving(false);
   };
@@ -180,6 +191,7 @@ function SlotCard({ slot }: SlotCardProps) {
               <img
                 src={current.url}
                 alt={slot.label}
+                crossOrigin="anonymous"
                 className="w-full h-full object-cover"
               />
             ) : (
