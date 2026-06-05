@@ -3,3 +3,11 @@ _archive/
 *.log
 .env*
 node_modules
+
+dist/
+dist-local/
+dist_old/
+*.bak
+.env
+.env.server
+.sync-config
