@@ -2,8 +2,8 @@
  * Service d'envoi automatique de SMS pour les rappels de paiement de loyer
  *
  * Configuration:
- * 1. Ajouter VITE_SMS_API_URL et VITE_SMS_API_KEY dans .env.server
- * 2. Configurer un cron job pour exécuter ce script le 5 de chaque mois
+ * 1. Configurer le fournisseur SMS dans une fonction serveur ou un worker
+ * 2. Déclencher le job le 5 de chaque mois
  *
  * Usage:
  * - Appel automatique via Cloud Function ou serveur
@@ -55,40 +55,17 @@ async function sendSMS(
   phone: string,
   message: string,
 ): Promise<{ success: boolean; error?: string }> {
-  const smsApiUrl = import.meta.env.VITE_SMS_API_URL;
-  const smsApiKey = import.meta.env.VITE_SMS_API_KEY;
-
-  if (!smsApiUrl || !smsApiKey) {
-    if (typeof window !== "undefined" && import.meta.env.DEV)
-      console.warn("SMS API not configured. Skipping SMS send.");
-    return { success: false, error: "SMS API not configured" };
+  if (typeof window !== "undefined" && import.meta.env.DEV) {
+    console.warn(
+      "SMS direct désactivé côté navigateur; routez l'envoi via une fonction serveur.",
+      { phone: formatPhoneNumber(phone), messageLength: message.length },
+    );
   }
 
-  try {
-    const response = await fetch(smsApiUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${smsApiKey}`,
-      },
-      body: JSON.stringify({
-        to: formatPhoneNumber(phone),
-        message: message,
-        sender: "EGS",
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`SMS API error: ${response.status}`);
-    }
-
-    const result = await response.json();
-    return { success: true, ...result };
-  } catch (error: any) {
-    if (typeof window !== "undefined" && import.meta.env.DEV)
-      console.error("SMS send error:", error);
-    return { success: false, error: error.message };
-  }
+  return {
+    success: false,
+    error: "SMS sending must be handled server-side",
+  };
 }
 
 /**

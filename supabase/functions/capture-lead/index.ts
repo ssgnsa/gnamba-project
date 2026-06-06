@@ -89,7 +89,50 @@ interface LeadData {
   source_page?: string
   source_form?: string
   consent_text?: string
-  channels_optin?: string[]
+  channels_optin?:
+    | {
+        sms?: boolean
+        whatsapp?: boolean
+        email?: boolean
+        telegram?: boolean
+      }
+    | string[]
+}
+
+function normalizeChannelsOptIn(
+  channels?: LeadData['channels_optin'],
+): {
+  sms: boolean
+  whatsapp: boolean
+  email: boolean
+  telegram: boolean
+} {
+  const defaults = {
+    sms: true,
+    whatsapp: true,
+    email: true,
+    telegram: false,
+  }
+
+  if (!channels) return defaults
+  if (Array.isArray(channels)) {
+    const normalized = { ...defaults }
+    for (const channel of channels) {
+      const key = String(channel).toLowerCase()
+      if (key === 'phone' || key === 'sms') normalized.sms = true
+      if (key === 'whatsapp') normalized.whatsapp = true
+      if (key === 'email') normalized.email = true
+      if (key === 'telegram') normalized.telegram = true
+    }
+    return normalized
+  }
+
+  return {
+    sms: Boolean(channels.sms ?? defaults.sms),
+    whatsapp: Boolean(channels.whatsapp ?? defaults.whatsapp),
+    email: Boolean(channels.email ?? defaults.email),
+    telegram: Boolean(channels.telegram ?? defaults.telegram),
+  }
 }
 
 export const handler = async (req: Request): Promise<Response> => {
@@ -114,6 +157,7 @@ export const handler = async (req: Request): Promise<Response> => {
   try {
     const body = (await req.json()) as LeadData
     const { phone, first_name, last_name, email, source, source_page, source_form, consent_text, channels_optin } = body
+    const normalizedChannels = normalizeChannelsOptIn(channels_optin)
 
     if (!phone || !validatePhone(phone)) {
       return jsonResponse({ error: 'Numéro de téléphone invalide ou manquant' }, 400, req)
@@ -141,7 +185,7 @@ export const handler = async (req: Request): Promise<Response> => {
         source_page: safeSourcePage,
         source_form: safeSourceForm,
         consent_text: safeConsent,
-        channels_optin: channels_optin || ['phone'],
+        channels_optin: normalizedChannels,
         ip_address: ip !== 'unknown' ? ip : null,
         created_at: new Date().toISOString(),
       })

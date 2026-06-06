@@ -61,12 +61,12 @@ export default function PublicServices({ onNavigate }: Props) {
       id: "btp",
       icon: HardHat,
       title: get("services", "btp_title", "BTP & Construction"),
-      subtitle: "Du projet à la livraison, nous réalisons vos rêves",
+      subtitle: "Du plan au chantier, un suivi sérieux",
       color: "blue",
       description: get(
         "services",
         "btp_description",
-        "Construction, rénovation et suivi de chantier avec des équipes qualifiées et des matériaux de premier choix.",
+        "Construction, rénovation et suivi de chantier avec des équipes qualifiées, une organisation rigoureuse et des matériaux adaptés au climat et aux usages locaux.",
       ),
       features: [
         "Construction de villas, immeubles et bâtiments commerciaux",
@@ -78,8 +78,8 @@ export default function PublicServices({ onNavigate }: Props) {
       ],
       examples: [
         "Villa R+2 à Cocody",
-        "Immeuble commercial Plateau",
-        "Rénovation bureaux SGBCI",
+        "Immeuble commercial au Plateau",
+        "Rénovation de bureaux à Treichville",
       ],
     },
     {
@@ -91,7 +91,7 @@ export default function PublicServices({ onNavigate }: Props) {
       description: get(
         "services",
         "immobilier_description",
-        "Gestion locative, vente et conseil en investissement immobilier pour maximiser votre patrimoine.",
+        "Gestion locative, vente et conseil en investissement immobilier pour valoriser votre patrimoine et sécuriser vos revenus.",
       ),
       features: [
         "Gestion locative complète (résidentiel et commercial)",
@@ -102,9 +102,9 @@ export default function PublicServices({ onNavigate }: Props) {
         "Évaluation et estimation immobilière",
       ],
       examples: [
-        "Résidence Les Palmiers",
-        "Gestion 45 biens locatifs",
-        "Programme logements Bingerville",
+        "Résidence locative à Bingerville",
+        "Gestion de biens à Abidjan",
+        "Programme résidentiel à Grand-Bassam",
       ],
     },
     {
@@ -116,7 +116,7 @@ export default function PublicServices({ onNavigate }: Props) {
       description: get(
         "services",
         "foncier_description",
-        "Gestion de terrains, régularisation foncière et constitution de dossiers fonciers en toute conformité.",
+        "Gestion de terrains, régularisation foncière et constitution de dossiers fonciers pour réduire les risques et accélérer les décisions.",
       ),
       features: [
         "Gestion et viabilisation de lotissements",
@@ -127,8 +127,8 @@ export default function PublicServices({ onNavigate }: Props) {
         "Transactions foncières sécurisées",
       ],
       examples: [
-        "Lotissement Gnamba Village (80 parcelles)",
-        "Régularisation terrains Yopougon",
+        "Lotissement de parcelles à Sikensi",
+        "Régularisation de terrains à Yopougon",
         "Attestations coutumières",
       ],
     },
@@ -140,12 +140,12 @@ export default function PublicServices({ onNavigate }: Props) {
         "fournitures_title",
         "Fournitures Professionnelles",
       ),
-      subtitle: "Équipez votre espace avec excellence",
+      subtitle: "Équipez votre activité sans perdre de temps",
       color: "amber",
       description: get(
         "services",
         "fournitures_description",
-        "Mobilier de bureau, équipements professionnels et fournitures de chantier pour tous vos besoins.",
+        "Mobilier de bureau, équipements professionnels et fournitures de chantier pour simplifier vos achats et livrer vite.",
       ),
       features: [
         "Mobilier de bureau (bureaux, chaises, rangements)",
@@ -156,9 +156,9 @@ export default function PublicServices({ onNavigate }: Props) {
         "Maintenance et SAV des équipements",
       ],
       examples: [
-        "Aménagement bureaux SGBCI 1200m²",
-        "Équipements chantier villa Cocody",
-        "Fournitures bureautiques annuelles",
+        "Aménagement de bureaux à Abidjan-Plateau",
+        "Équipements chantier à Cocody",
+        "Fournitures bureautiques pour PME",
       ],
     },
   ];
@@ -181,8 +181,8 @@ export default function PublicServices({ onNavigate }: Props) {
             Nos Services
           </h1>
           <p className="text-blue-100/80 text-lg max-w-2xl mx-auto leading-relaxed">
-            Des solutions complètes et sur mesure pour tous vos besoins en BTP,
-            immobilier, foncier et fournitures professionnelles.
+            Des solutions concrètes, rapides et adaptées au marché ivoirien
+            pour vos besoins en BTP, immobilier, foncier et fournitures.
           </p>
         </div>
       </section>
@@ -276,8 +276,8 @@ export default function PublicServices({ onNavigate }: Props) {
             Un projet en tête ?
           </h2>
           <p className="text-gray-500 mb-6">
-            Contactez notre équipe pour obtenir un devis gratuit et
-            personnalisé.
+            Contactez notre équipe pour obtenir un devis clair, rapide et
+            réellement adapté à votre budget.
           </p>
           <button
             onClick={() => {

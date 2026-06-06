@@ -1,6 +1,8 @@
 _archive/
 .secrets/
 *.log
+logs/
+backups/
 .env*
 node_modules
 

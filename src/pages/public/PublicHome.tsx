@@ -101,6 +101,18 @@ export default function PublicHome({ onNavigate }: Props) {
   const { settings } = useSettings();
   const primaryColor = settings.primary_color || "#1e40af";
   const appCompany = settings.app_company || "Gnamba Services";
+  const normalizePhoneForWhatsApp = (value: string) => {
+    const digits = value.replace(/\D/g, "");
+    if (!digits) return "";
+    if (digits.startsWith("225")) return digits;
+    if (digits.startsWith("0") && digits.length === 10) {
+      return `225${digits.slice(1)}`;
+    }
+    if (digits.length === 8) {
+      return `225${digits}`;
+    }
+    return digits;
+  };
 
   const [realisations, setRealisations] = useState<Realisation[]>([]);
   const [loadingRealisations, setLoadingRealisations] = useState(true);
@@ -255,15 +267,19 @@ export default function PublicHome({ onNavigate }: Props) {
   const heroTitle = get(
     "hero",
     "title",
-    "Bâtir, Gérer et Développer vos Projets",
+    "BTP, immobilier et foncier pour faire avancer vos projets",
   );
   const heroSubtitle = get(
     "hero",
     "subtitle",
-    "Entreprise multiservices spécialisée dans le BTP, l'immobilier, le foncier et les fournitures professionnelles.",
+    "Entreprise multiservices en Côte d'Ivoire, nous accompagnons particuliers, promoteurs et entreprises avec un suivi sérieux, des devis rapides et un vrai relais commercial.",
   );
-  const ctaPrimary = get("hero", "cta_primary", "Découvrir nos services");
-  const ctaSecondary = get("hero", "cta_secondary", "Nous contacter");
+  const ctaPrimary = get("hero", "cta_primary", "Demander un devis");
+  const ctaSecondary = get("hero", "cta_secondary", "Découvrir nos services");
+  const primaryTarget: PublicPage =
+    /service|découvr|decouvr/i.test(ctaPrimary) ? "services" : "contact";
+  const secondaryTarget: PublicPage =
+    /service|découvr|decouvr/i.test(ctaSecondary) ? "services" : "contact";
   // Use settings.hero_background_url first, fallback to site_content
   const heroBg =
     settings.hero_background_url || get("hero", "background_url", "");
@@ -277,6 +293,9 @@ export default function PublicHome({ onNavigate }: Props) {
   const contactEmail =
     settings.contact_email ||
     get("contact", "email", "contact@gnambaservices.ci");
+  const whatsappLink = contactPhone
+    ? `https://wa.me/${normalizePhoneForWhatsApp(contactPhone)}`
+    : "";
 
   const services = [
     {
@@ -284,10 +303,10 @@ export default function PublicHome({ onNavigate }: Props) {
       title: get("services", "btp_title", "BTP & Construction"),
       color: "blue",
       items: [
-        "Construction neuve",
-        "Rénovation",
-        "Suivi de chantier",
-        "Génie civil",
+        "Villas, immeubles et locaux commerciaux",
+        "Rénovation et réhabilitation",
+        "Suivi de chantier et contrôle qualité",
+        "Études techniques et accompagnement",
       ],
       page: "services" as PublicPage,
     },
@@ -296,10 +315,10 @@ export default function PublicHome({ onNavigate }: Props) {
       title: get("services", "immobilier_title", "Immobilier"),
       color: "sky",
       items: [
-        "Gestion locative",
-        "Vente immobilière",
-        "Conseil investissement",
-        "Syndic de copropriété",
+        "Gestion locative résidentielle et commerciale",
+        "Vente et acquisition de biens",
+        "Conseil en investissement",
+        "Syndic et valorisation du patrimoine",
       ],
       page: "services" as PublicPage,
     },
@@ -308,10 +327,10 @@ export default function PublicHome({ onNavigate }: Props) {
       title: get("services", "foncier_title", "Foncier"),
       color: "emerald",
       items: [
-        "Gestion de terrains",
+        "Gestion de terrains et lotissements",
         "Régularisation foncière",
-        "Dossiers fonciers",
-        "Attestations coutumières",
+        "Dossiers fonciers et attestations",
+        "Bornage et sécurisation des parcelles",
       ],
       page: "services" as PublicPage,
     },
@@ -320,10 +339,10 @@ export default function PublicHome({ onNavigate }: Props) {
       title: get("services", "fournitures_title", "Fournitures Pro"),
       color: "amber",
       items: [
-        "Mobilier de bureau",
-        "Équipements chantier",
-        "Fournitures bureau",
-        "Matériaux construction",
+        "Mobilier de bureau et aménagement",
+        "Équipements chantier et consommables",
+        "Fournitures professionnelles",
+        "Maintenance et accompagnement",
       ],
       page: "services" as PublicPage,
     },
@@ -332,23 +351,23 @@ export default function PublicHome({ onNavigate }: Props) {
   const advantages = [
     {
       icon: Award,
-      title: "Expertise Reconnue",
+      title: "Expertise de terrain",
       desc: `Plus de ${statsYears} d'expérience dans le BTP, l'immobilier et le foncier en Côte d'Ivoire.`,
     },
     {
       icon: Users,
-      title: "Équipe Qualifiée",
-      desc: "Des professionnels certifiés et passionnés, engagés pour la réussite de vos projets.",
+      title: "Réactivité locale",
+      desc: "Des professionnels disponibles et joignables rapidement pour faire avancer vos dossiers.",
     },
     {
       icon: CheckCircle2,
-      title: "Solutions Complètes",
-      desc: "Un guichet unique pour tous vos besoins : construction, immobilier, foncier et fournitures.",
+      title: "Un seul interlocuteur",
+      desc: "Un guichet unique pour la construction, l'immobilier, le foncier et les fournitures.",
     },
     {
       icon: Star,
-      title: "Accompagnement Personnalisé",
-      desc: "Un suivi sur mesure à chaque étape de votre projet, de la conception à la livraison.",
+      title: "Suivi jusqu'au résultat",
+      desc: "Un accompagnement sur mesure à chaque étape, de la première prise de contact à la livraison.",
     },
   ];
 
@@ -411,7 +430,7 @@ export default function PublicHome({ onNavigate }: Props) {
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
-              onClick={() => nav("services")}
+              onClick={() => nav(primaryTarget)}
               className="flex items-center justify-center gap-2 px-8 py-4 text-white rounded-2xl font-semibold text-base transition-all duration-200 shadow-lg hover:-translate-y-0.5"
               style={{
                 backgroundColor: primaryColor,
@@ -425,13 +444,23 @@ export default function PublicHome({ onNavigate }: Props) {
               <ArrowRight size={18} aria-hidden="true" />
             </button>
             <button
-              onClick={() => nav("contact")}
+              onClick={() => nav(secondaryTarget)}
               className="flex items-center justify-center gap-2 px-8 py-4 bg-white/10 hover:bg-white/20 border border-white/30 text-white rounded-2xl font-semibold text-base transition-all duration-200 backdrop-blur-sm"
-              aria-label={`${ctaSecondary} - ${contactPhone}`}
+              aria-label={ctaSecondary}
             >
-              <Phone size={18} aria-hidden="true" />
               {ctaSecondary}
             </button>
+            {whatsappLink && (
+              <a
+                href={whatsappLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 px-8 py-4 bg-emerald-500/90 hover:bg-emerald-500 text-white rounded-2xl font-semibold text-base transition-all duration-200 shadow-lg"
+                aria-label="Contacter l'équipe par WhatsApp"
+              >
+                WhatsApp
+              </a>
+            )}
           </div>
 
           <div className="mt-16 grid grid-cols-2 sm:grid-cols-4 gap-6 max-w-2xl mx-auto">
@@ -471,8 +500,8 @@ export default function PublicHome({ onNavigate }: Props) {
               Nos Domaines d'Expertise
             </h2>
             <p className="text-gray-500 max-w-xl mx-auto">
-              Une gamme complète de services professionnels pour accompagner
-              tous vos projets immobiliers et de construction.
+              Une offre complète pensée pour sécuriser vos projets et accélérer
+              vos décisions d'achat, de vente ou de chantier en Côte d'Ivoire.
             </p>
           </div>
 
@@ -692,8 +721,8 @@ export default function PublicHome({ onNavigate }: Props) {
               Pourquoi Choisir {appCompany} ?
             </h2>
             <p className="text-gray-500 max-w-xl mx-auto">
-              Notre engagement envers l'excellence fait de nous le partenaire
-              idéal pour tous vos projets.
+              Notre approche met la réactivité, la proximité et le suivi
+              commercial au service de vos projets.
             </p>
           </div>
 
@@ -756,17 +785,17 @@ export default function PublicHome({ onNavigate }: Props) {
             Prêt à Concrétiser Votre Projet ?
           </h2>
           <p className="text-blue-200 text-lg mb-8 max-w-2xl mx-auto">
-            Contactez notre équipe dès aujourd'hui pour une consultation
-            gratuite et personnalisée.
+            Parlez-nous de votre projet pour recevoir une proposition claire,
+            rapide et adaptée au contexte ivoirien.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
               onClick={() => nav("contact")}
               className="flex items-center justify-center gap-2 px-8 py-4 bg-white text-blue-700 hover:bg-blue-50 rounded-2xl font-bold text-base transition-all shadow-lg"
-              aria-label="Nous contacter par email"
+              aria-label="Demander un devis et être rappelé"
             >
               <Mail size={18} aria-hidden="true" />
-              Nous contacter
+              Demander un devis
             </button>
             <button
               onClick={() => nav("realisations")}
@@ -792,9 +821,8 @@ export default function PublicHome({ onNavigate }: Props) {
                 Parlons de votre projet
               </h2>
               <p className="text-gray-500 mb-8 leading-relaxed">
-                Notre équipe est à votre disposition pour répondre à toutes vos
-                questions et vous accompagner dans la réalisation de vos
-                projets.
+                Notre équipe vous accompagne rapidement pour tout projet de
+                construction, achat, vente ou sécurisation foncière.
               </p>
               <div className="space-y-4">
                 {contactPhone && (
@@ -803,12 +831,15 @@ export default function PublicHome({ onNavigate }: Props) {
                       <Phone size={18} className="text-blue-700" />
                     </div>
                     <div>
-                      <div className="text-xs text-gray-400 font-medium uppercase tracking-wide">
+                    <div className="text-xs text-gray-400 font-medium uppercase tracking-wide">
                         Téléphone
                       </div>
-                      <div className="text-gray-700 font-semibold">
+                      <a
+                        href={`tel:${contactPhone}`}
+                        className="text-gray-700 font-semibold hover:text-blue-700 transition-colors"
+                      >
                         {contactPhone}
-                      </div>
+                      </a>
                     </div>
                   </div>
                 )}
@@ -820,9 +851,12 @@ export default function PublicHome({ onNavigate }: Props) {
                     <div className="text-xs text-gray-400 font-medium uppercase tracking-wide">
                       Email
                     </div>
-                    <div className="text-gray-700 font-semibold">
+                    <a
+                      href={`mailto:${contactEmail}`}
+                      className="text-gray-700 font-semibold hover:text-blue-700 transition-colors"
+                    >
                       {contactEmail}
-                    </div>
+                    </a>
                   </div>
                 </div>
               </div>

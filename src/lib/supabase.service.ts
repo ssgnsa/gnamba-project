@@ -115,14 +115,15 @@ export class SupabaseService {
    * Exécute une requête Supabase avec retry automatique
    */
   async queryWithRetry<T>(
-    queryFn: () => Promise<{ data: T | null; error: any }>,
+    queryFn: () => Promise<{ data: T | null; error: any; count?: number | null }>,
     retries = this.defaultRetries,
-  ): Promise<{ data: T | null; error: string | null }> {
+  ): Promise<{ data: T | null; error: string | null; count: number | null }> {
     try {
       const result = await withBackoff(queryFn, retries);
       return {
         data: result.data as T | null,
         error: result.error?.message || null,
+        count: result.count ?? null,
       };
     } catch (error) {
       if (import.meta.env.DEV)
@@ -130,6 +131,7 @@ export class SupabaseService {
       return {
         data: null,
         error: error instanceof Error ? error.message : "Erreur inconnue",
+        count: null,
       };
     }
   }

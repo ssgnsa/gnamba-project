@@ -5,7 +5,10 @@ import { parseNumberInput } from "../utils/reference";
 
 export const sanitizeText = (value: string | null | undefined): string => {
   if (!value) return "";
-  return DOMPurify.sanitize(value.trim());
+  return DOMPurify.sanitize(value.trim(), {
+    ALLOWED_TAGS: [],
+    ALLOWED_ATTR: [],
+  }).trim();
 };
 
 export const normalizeOptionalText = (

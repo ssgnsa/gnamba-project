@@ -18,7 +18,12 @@ Serverless function to capture lead data into the Supabase `leads` table.
   "source_page": "/services",
   "source_form": "contact-form",
   "consent_text": "J'accepte d'être contacté",
-  "channels_optin": ["phone", "email"]
+  "channels_optin": {
+    "sms": true,
+    "whatsapp": true,
+    "email": true,
+    "telegram": false
+  }
 }
 ```
 
@@ -33,7 +38,7 @@ Serverless function to capture lead data into the Supabase `leads` table.
 - `source_page` — Referring page
 - `source_form` — Form identifier
 - `consent_text` — Consent statement
-- `channels_optin` — Array of opted-in channels (default: ["phone"])
+- `channels_optin` — Opt-in map by channel (default: sms/whatsapp/email true, telegram false)
 
 ## Response
 

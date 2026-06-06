@@ -3,6 +3,7 @@ import { supabase } from "../../lib/supabase";
 import type { FoncierLot } from "../../types";
 import { MapPin, Ruler, Tag, Phone, Mail, ArrowLeft, Filter } from "lucide-react";
 import { formatMontant } from "../../utils/reference";
+import { captureLead } from "../../lib/lead-capture";
 
 interface LeadFormData {
   nom: string;
@@ -29,6 +30,7 @@ export default function PublicLots() {
   const [leadForm, setLeadForm] = useState<LeadFormData>(emptyLeadForm);
   const [submitting, setSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [leadBridgeError, setLeadBridgeError] = useState<string | null>(null);
 
   // Filtres
   const [filterVillage, setFilterVillage] = useState<string>("");
@@ -88,6 +90,7 @@ export default function PublicLots() {
     setSelectedLot(lot);
     setShowLeadForm(true);
     setSubmitSuccess(false);
+    setLeadBridgeError(null);
     setLeadForm({
       ...emptyLeadForm,
       message: `Bonjour, je suis intéressé(e) par le lot ${lot.numero_lot} (${lot.village}). Pouvez-vous me contacter pour plus d'informations ?`,
@@ -100,6 +103,7 @@ export default function PublicLots() {
 
     setSubmitting(true);
     setError(null);
+    setLeadBridgeError(null);
 
     try {
       // 1. Créer le client
@@ -145,6 +149,31 @@ export default function PublicLots() {
         opportunite_id: opportunity.id,
         echeance: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // +24h
       });
+
+      // 4. Alimenter aussi le moteur central de leads pour déclencher les campagnes
+      const bridgeResult = await captureLead({
+        phone: leadForm.telephone,
+        first_name: leadForm.prenom,
+        last_name: leadForm.nom,
+        email: leadForm.email,
+        source: "vitrine_foncier",
+        source_page: "/lots",
+        source_form: "public_lots",
+        consent_text:
+          "J'accepte d'être recontacté par Gnamba Services pour ce lot foncier.",
+        channels_optin: {
+          sms: true,
+          whatsapp: true,
+          email: true,
+          telegram: false,
+        },
+      });
+
+      if (!bridgeResult.success) {
+        setLeadBridgeError(
+          "La demande est enregistrée, mais le relais CRM automatique a rencontré un souci. L'équipe restera notifiée via la fiche commerciale.",
+        );
+      }
 
       setSubmitSuccess(true);
       setLeadForm(emptyLeadForm);
@@ -195,10 +224,18 @@ export default function PublicLots() {
               </h1>
               <p className="text-sm text-gray-600 mt-1">
                 {filteredLots.length} lot{filteredLots.length > 1 ? "s" : ""} disponible
-                {filteredLots.length > 1 ? "s" : ""}
+                {filteredLots.length > 1 ? "s" : ""} pour achat, investissement
+                ou revente.
               </p>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-2">
+        <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-4 text-sm text-blue-900">
+          Ce catalogue sert aussi de point d'entrée commercial: chaque demande
+          est enregistrée, suivie et reliée à nos équipes terrain et CRM.
         </div>
       </div>
 
@@ -378,7 +415,8 @@ export default function PublicLots() {
                   Demande envoyée !
                 </h3>
                 <p className="text-gray-600 mt-2">
-                  Notre équipe vous contactera très prochainement.
+                  Notre équipe vous contactera très prochainement par téléphone
+                  ou WhatsApp pour qualifier votre besoin.
                 </p>
               </div>
             ) : (
@@ -386,6 +424,11 @@ export default function PublicLots() {
                 {error && (
                   <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
                     {error}
+                  </div>
+                )}
+                {leadBridgeError && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+                    {leadBridgeError}
                   </div>
                 )}
 
@@ -486,8 +529,8 @@ export default function PublicLots() {
                 </div>
 
                 <p className="text-xs text-gray-500 text-center">
-                  En envoyant cette demande, vous acceptez d'être contacté(e) par
-                  notre équipe commerciale.
+                  En envoyant cette demande, vous acceptez d'être contacté(e)
+                  par notre équipe commerciale pour ce lot.
                 </p>
               </form>
             )}

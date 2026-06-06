@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ComponentType,
   type LazyExoticComponent,
@@ -271,6 +272,106 @@ const buildThemeCss = (primary: string, secondary: string) => {
   );
 };
 
+type SeoConfig = {
+  title: string;
+  description: string;
+  keywords: string;
+  noindex?: boolean;
+};
+
+const PUBLIC_SEO_CONFIG: Partial<Record<PublicPage, SeoConfig>> = {
+  home: {
+    title: "BTP, immobilier, foncier et solutions commerciales",
+    description:
+      "BTP, immobilier, foncier et fournitures en Côte d'Ivoire. Devis rapides, suivi terrain et accompagnement commercial par Gnamba Services.",
+    keywords:
+      "BTP Côte d'Ivoire, immobilier Abidjan, foncier sécurisé, lots à vendre, construction villas, gestion locative, fournitures professionnelles, devis BTP, Gnamba Services",
+  },
+  about: {
+    title: "À propos de Gnamba Services",
+    description:
+      "Découvrez Gnamba Services, votre partenaire multiservices en Côte d'Ivoire pour la construction, l'immobilier, le foncier et les fournitures.",
+    keywords:
+      "Gnamba Services, entreprise BTP Abidjan, immobilier Côte d'Ivoire, foncier, histoire, équipe, expertise",
+  },
+  services: {
+    title: "Services BTP, immobilier, foncier et fournitures",
+    description:
+      "Construction, rénovation, gestion immobilière, sécurisation foncière et fournitures professionnelles en Côte d'Ivoire.",
+    keywords:
+      "services BTP, construction Abidjan, gestion immobilière, foncier villageois, fournitures pro, Côte d'Ivoire",
+  },
+  realisations: {
+    title: "Réalisations et références terrain",
+    description:
+      "Parcourez nos réalisations pour évaluer notre savoir-faire en BTP, immobilier, foncier et fournitures en Côte d'Ivoire.",
+    keywords:
+      "réalisations BTP, références immobilières, projets fonciers, portfolio Côte d'Ivoire, Gnamba Services",
+  },
+  contact: {
+    title: "Contact, devis et rappel WhatsApp",
+    description:
+      "Contactez Gnamba Services à Abidjan pour un devis rapide, un rappel WhatsApp ou un rendez-vous sur vos projets BTP, immobilier et foncier.",
+    keywords:
+      "contact Gnamba Services, devis BTP, WhatsApp entreprise, Abidjan, Côte d'Ivoire, immobilier, foncier",
+  },
+  lots: {
+    title: "Lots fonciers disponibles",
+    description:
+      "Consultez nos lots fonciers disponibles pour investir, acheter ou revendre avec un accompagnement commercial et terrain.",
+    keywords:
+      "lots fonciers, terrain à vendre, investissement foncier, Abidjan, Côte d'Ivoire, Gnamba Services",
+  },
+};
+
+const AUTH_SEO_CONFIG: SeoConfig = {
+  title: "Connexion",
+  description:
+    "Accédez à l'espace interne Gnamba Services. Page réservée aux utilisateurs autorisés.",
+  keywords: "connexion, espace interne, Gnamba Services",
+  noindex: true,
+};
+
+const VERIFICATION_SEO_CONFIG: SeoConfig = {
+  title: "Vérification d'attestation",
+  description:
+    "Vérifiez une attestation Gnamba Services de manière sécurisée et rapide.",
+  keywords: "vérification attestation, Gnamba Services",
+  noindex: true,
+};
+
+const DASHBOARD_SEO_CONFIG: SeoConfig = {
+  title: "Espace interne",
+  description:
+    "Tableau de bord interne Gnamba Services pour la gestion commerciale, opérationnelle et administrative.",
+  keywords: "espace interne, tableau de bord, Gnamba Services",
+  noindex: true,
+};
+
+const ensureMeta = (name: string, attribute: "name" | "property") => {
+  let element = document.querySelector(
+    `meta[${attribute}="${name}"]`,
+  ) as HTMLMetaElement | null;
+  if (!element) {
+    element = document.createElement("meta");
+    element.setAttribute(attribute, name);
+    document.head.appendChild(element);
+  }
+  return element;
+};
+
+const ensureLink = (rel: string) => {
+  let element = document.querySelector(
+    `link[rel="${rel}"]`,
+  ) as HTMLLinkElement | null;
+  if (!element) {
+    element = document.createElement("link");
+    element.setAttribute("rel", rel);
+    document.head.appendChild(element);
+  }
+  return element;
+};
+
 const PageLoader = ({ label = "Chargement..." }: { label?: string }) => (
   <div className="min-h-[50vh] flex items-center justify-center bg-gray-50">
     <div className="text-center">
@@ -284,6 +385,7 @@ function AppContent() {
   const { loading: settingsLoading, settings } = useSettings();
   const { user, profile, loading: authLoading } = useAuth();
   const sw = useServiceWorker();
+  const oneSignalInitializedRef = useRef(false);
   const [view, setView] = useState<AppView>("public");
   const [publicPage, setPublicPage] = useState<PublicPage>("home");
   const [dashPage, setDashPage] = useState<Page>("dashboard");
@@ -392,61 +494,150 @@ function AppContent() {
   // GESTION DES META TAGS SEO
   // ============================================
   useEffect(() => {
-    // Meta description
-    let metaDescription = document.querySelector(
-      'meta[name="description"]',
-    ) as HTMLMetaElement;
-    if (!metaDescription) {
-      metaDescription = document.createElement("meta");
-      metaDescription.setAttribute("name", "description");
-      document.head.appendChild(metaDescription);
-    }
-    metaDescription.content =
-      settings.seo_description ||
-      `${settings.app_company || "Gnamba Services"} - BTP, Immobilier & Foncier en Côte d'Ivoire.`;
+    const canonicalHost = "gnambaservices.ci";
+    const currentPath =
+      typeof window !== "undefined" ? normalizePath(window.location.pathname) : "/";
 
-    // Meta keywords
-    let metaKeywords = document.querySelector(
-      'meta[name="keywords"]',
-    ) as HTMLMetaElement;
-    if (!metaKeywords) {
-      metaKeywords = document.createElement("meta");
-      metaKeywords.setAttribute("name", "keywords");
-      document.head.appendChild(metaKeywords);
-    }
-    metaKeywords.content =
-      settings.seo_keywords ||
-      "BTP, immobilier, foncier, construction, Côte d'Ivoire, Gnamba Services";
+    const brandName = settings.app_company || "Gnamba Services";
+    const publicSeo: SeoConfig =
+      PUBLIC_SEO_CONFIG[publicPage] ?? PUBLIC_SEO_CONFIG.home!;
+    const internalSeo =
+      view === "dashboard"
+        ? DASHBOARD_SEO_CONFIG
+        : currentPath === "/login" ||
+            currentPath === "/forgot-password" ||
+            currentPath === "/reset-password"
+          ? AUTH_SEO_CONFIG
+          : currentPath.startsWith("/verification-attestation") ||
+              currentPath.startsWith("/verify/")
+            ? VERIFICATION_SEO_CONFIG
+            : null;
 
-    // Open Graph tags
-    let ogTitle = document.querySelector(
-      'meta[property="og:title"]',
-    ) as HTMLMetaElement;
-    if (!ogTitle) {
-      ogTitle = document.createElement("meta");
-      ogTitle.setAttribute("property", "og:title");
-      document.head.appendChild(ogTitle);
+    let seoConfig: SeoConfig;
+    if (view === "public") {
+      if (
+        currentPath === "/verification-attestation" ||
+        currentPath.startsWith("/verify/")
+      ) {
+        seoConfig = VERIFICATION_SEO_CONFIG;
+      } else if (
+        currentPath === "/login" ||
+        currentPath === "/forgot-password" ||
+        currentPath === "/reset-password"
+      ) {
+        seoConfig = AUTH_SEO_CONFIG;
+      } else {
+        seoConfig = publicSeo;
+      }
+    } else {
+      seoConfig = internalSeo || DASHBOARD_SEO_CONFIG;
     }
-    ogTitle.content =
-      settings.app_title ||
-      `${settings.app_company || "Gnamba Services"} - BTP, Immobilier & Foncier`;
 
-    let ogDescription = document.querySelector(
-      'meta[property="og:description"]',
-    ) as HTMLMetaElement;
-    if (!ogDescription) {
-      ogDescription = document.createElement("meta");
-      ogDescription.setAttribute("property", "og:description");
-      document.head.appendChild(ogDescription);
+    const pageTitle = `${seoConfig.title} | ${brandName}`;
+    document.title = pageTitle;
+
+    const description =
+      view === "public"
+        ? seoConfig.description
+        : settings.seo_description?.trim() || seoConfig.description;
+    const keywords =
+      view === "public"
+        ? seoConfig.keywords
+        : settings.seo_keywords?.trim() || seoConfig.keywords;
+    const robotsContent = seoConfig.noindex
+      ? "noindex,nofollow"
+      : "index,follow,max-image-preview:large,max-snippet:-1";
+
+    ensureMeta("description", "name").content = description;
+    ensureMeta("keywords", "name").content = keywords;
+    ensureMeta("robots", "name").content = robotsContent;
+    ensureMeta("theme-color", "name").content =
+      settings.primary_color || "#1e40af";
+
+    const canonicalPath =
+      view === "public"
+        ? currentPath === "/forgot-password" || currentPath === "/reset-password"
+          ? "/login"
+          : currentPath || "/"
+        : currentPath;
+    const canonicalUrl = `https://${canonicalHost}${canonicalPath}`;
+
+    ensureLink("canonical").href = canonicalUrl;
+
+    const ogImage =
+      settings.brand_logo_dark ||
+      settings.brand_favicon_url ||
+      "/og-image.png";
+    const ogImageUrl = (() => {
+      try {
+        return new URL(ogImage, canonicalUrl).toString();
+      } catch {
+        return ogImage;
+      }
+    })();
+
+    ensureMeta("og:type", "property").content = "website";
+    ensureMeta("og:title", "property").content = pageTitle;
+    ensureMeta("og:description", "property").content = description;
+    ensureMeta("og:url", "property").content = canonicalUrl;
+    ensureMeta("og:image", "property").content = ogImageUrl;
+    ensureMeta("og:locale", "property").content = "fr_FR";
+    ensureMeta("twitter:card", "name").content = "summary_large_image";
+    ensureMeta("twitter:title", "name").content = pageTitle;
+    ensureMeta("twitter:description", "name").content = description;
+    ensureMeta("twitter:image", "name").content = ogImageUrl;
+
+    let schemaScript = document.getElementById(
+      "egs-organization-schema",
+    ) as HTMLScriptElement | null;
+    if (!schemaScript) {
+      schemaScript = document.createElement("script");
+      schemaScript.id = "egs-organization-schema";
+      schemaScript.type = "application/ld+json";
+      document.head.appendChild(schemaScript);
     }
-    ogDescription.content =
-      settings.seo_description ||
-      `${settings.app_company || "Gnamba Services"} - BTP, Immobilier & Foncier en Côte d'Ivoire.`;
+
+    if (view === "public" && !seoConfig.noindex) {
+      const socialSameAs = [
+        settings.social_facebook,
+        settings.social_instagram,
+        settings.social_linkedin,
+        settings.social_youtube,
+        settings.social_twitter,
+        settings.social_tiktok,
+      ].filter(Boolean);
+      const schema = {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        name: brandName,
+        url: canonicalUrl,
+        description,
+        areaServed: {
+          "@type": "Country",
+          name: "Côte d'Ivoire",
+        },
+        sameAs: socialSameAs,
+      };
+      schemaScript.textContent = JSON.stringify(schema);
+    } else {
+      schemaScript.textContent = "";
+    }
   }, [
+    publicPage,
+    view,
     settings.app_title,
     settings.app_company,
     settings.seo_description,
     settings.seo_keywords,
+    settings.primary_color,
+    settings.brand_logo_dark,
+    settings.brand_favicon_url,
+    settings.social_facebook,
+    settings.social_instagram,
+    settings.social_linkedin,
+    settings.social_youtube,
+    settings.social_twitter,
+    settings.social_tiktok,
   ]);
 
   // ============================================
@@ -455,7 +646,13 @@ function AppContent() {
   useEffect(() => {
     const initOneSignal = async () => {
       const appId = import.meta.env.VITE_ONESIGNAL_APP_ID;
-      if (!appId || typeof window === 'undefined' || typeof navigator === 'undefined') {
+      if (
+        !user ||
+        oneSignalInitializedRef.current ||
+        !appId ||
+        typeof window === 'undefined' ||
+        typeof navigator === 'undefined'
+      ) {
         return;
       }
 
@@ -495,6 +692,7 @@ function AppContent() {
             }
           }
         });
+        oneSignalInitializedRef.current = true;
         
         // Capturer le player_id quand l'utilisateur s'abonne
         OneSignal.User.PushSubscription.addEventListener("change", (change) => {
@@ -508,6 +706,20 @@ function AppContent() {
           }
         });
       } catch (error) {
+        const message =
+          error instanceof Error ? error.message : String(error ?? "");
+        const isExpectedBlock =
+          message.includes("script failed to load") ||
+          message.includes("ERR_BLOCKED_BY_CLIENT") ||
+          message.includes("blocked by client");
+
+        if (isExpectedBlock) {
+          if (import.meta.env.DEV) {
+            console.info("OneSignal bloqué par le navigateur, ignoré.");
+          }
+          return;
+        }
+
         console.error('Erreur initialisation OneSignal:', error);
       }
     };
@@ -829,6 +1041,9 @@ function AppContent() {
       typeof window !== "undefined"
         ? window.localStorage.getItem(POST_LOGIN_PATH_KEY)
         : null;
+    setShowForgotPassword(false);
+    setPublicPage("home");
+
     if (pendingPath) {
       const targetPage = getDashboardPageFromPath(pendingPath);
       window.localStorage.removeItem(POST_LOGIN_PATH_KEY);
@@ -885,7 +1100,35 @@ function AppContent() {
     return titles[page];
   };
 
-  if (view === "dashboard" && user) {
+  if (view === "dashboard" && !user) {
+    return (
+      <>
+        {showProdBanner && (
+          <div className="bg-amber-100 text-amber-800 text-xs px-3 py-2 border-b border-amber-200">
+            Mode production local détecté. Pour le dev, utilisez npm run dev
+            (port 5173). Build: {buildTime}
+          </div>
+        )}
+        <style>{themeCss}</style>
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-center">
+            <div
+              className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4"
+              style={{ borderColor: settings.primary_color || "#1e40af" }}
+            />
+            <p className="text-gray-600 text-sm font-medium">
+              Ouverture de l'espace interne...
+            </p>
+            <p className="text-gray-400 text-xs mt-1">
+              Validation de votre session en cours.
+            </p>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  if ((view === "dashboard" || publicPage === "login") && user) {
     // TOUS les utilisateurs (admin, gestionnaire, employé) -> Page d'accueil employé en premier
     if (showAccueil) {
       return (

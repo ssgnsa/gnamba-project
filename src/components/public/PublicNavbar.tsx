@@ -169,7 +169,7 @@ export default function PublicNavbar({
               style={{ backgroundColor: primaryColor }}
             >
               <LogIn size={15} />
-              Connexion employés
+              Espace interne
             </a>
           </div>
 
@@ -213,7 +213,7 @@ export default function PublicNavbar({
               style={{ backgroundColor: primaryColor }}
             >
               <LogIn size={15} />
-              Connexion employés
+              Espace interne
             </a>
           </div>
         </div>

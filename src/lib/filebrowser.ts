@@ -5,17 +5,7 @@
  * Documentation : https://filebrowser.org/usage/api
  */
 
-const FILEBROWSER_API_URL = (() => {
-  if (import.meta.env.DEV) {
-    return import.meta.env.VITE_FILEBROWSER_API_URL || "http://localhost:8081/api";
-  }
-  if (!import.meta.env.VITE_FILEBROWSER_API_URL) {
-    throw new Error(
-      "VITE_FILEBROWSER_API_URL must be set for production builds.",
-    );
-  }
-  return import.meta.env.VITE_FILEBROWSER_API_URL;
-})();
+import { FILEBROWSER_API_URL } from "./filebrowserConfig";
 
 interface FileBrowserAuth {
   token: string;

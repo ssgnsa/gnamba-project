@@ -97,13 +97,13 @@ Solution professionnelle et fiable.
 2. Activez WhatsApp dans votre console Twilio
 3. Obtenez vos credentials
 
-Variables d'environnement (`.env`) :
+Variables d'environnement serveur (fonction Edge ou worker, jamais dans un bundle Vite) :
 ```bash
-VITE_WHATSAPP_PROVIDER=twilio
-VITE_TWILIO_ACCOUNT_SID=votre_account_sid
-VITE_TWILIO_AUTH_TOKEN=votre_auth_token
-VITE_TWILIO_PHONE_NUMBER=+14155238886  # Numéro Twilio WhatsApp
-VITE_WHATSAPP_DEFAULT_RECIPIENT=+2250102030405
+WHATSAPP_PROVIDER=twilio
+TWILIO_ACCOUNT_SID=votre_account_sid
+TWILIO_AUTH_TOKEN=votre_auth_token
+TWILIO_PHONE_NUMBER=+14155238886  # Numéro Twilio WhatsApp
+WHATSAPP_DEFAULT_RECIPIENT=+2250102030405
 ```
 
 #### Option C: WhatsApp Business API (Meta)
@@ -114,24 +114,24 @@ Pour les entreprises avec un compte WhatsApp Business vérifié.
 2. Configurez WhatsApp Business API
 3. Obtenez votre access token et numéro
 
-Variables d'environnement (`.env`) :
+Variables d'environnement serveur (fonction Edge ou worker, jamais dans un bundle Vite) :
 ```bash
-VITE_WHATSAPP_PROVIDER=whatsapp_business_api
-VITE_WHATSAPP_ACCESS_TOKEN=votre_access_token
-VITE_WHATSAPP_BUSINESS_NUMBER=votre_numero_whatsapp_business
-VITE_WHATSAPP_DEFAULT_RECIPIENT=+2250102030405
+WHATSAPP_PROVIDER=whatsapp_business_api
+WHATSAPP_ACCESS_TOKEN=votre_access_token
+WHATSAPP_BUSINESS_NUMBER=votre_numero_whatsapp_business
+WHATSAPP_DEFAULT_RECIPIENT=+2250102030405
 ```
 
 #### Option D: MessageBird
 
 Alternative professionnelle à Twilio.
 
-Variables d'environnement (`.env`) :
+Variables d'environnement serveur (fonction Edge ou worker, jamais dans un bundle Vite) :
 ```bash
-VITE_WHATSAPP_PROVIDER=messagebird
-VITE_MESSAGEBIRD_API_KEY=votre_api_key
-VITE_TWILIO_PHONE_NUMBER=+14155238886  # Numéro MessageBird WhatsApp
-VITE_WHATSAPP_DEFAULT_RECIPIENT=+2250102030405
+WHATSAPP_PROVIDER=messagebird
+MESSAGEBIRD_API_KEY=votre_api_key
+WHATSAPP_PHONE_NUMBER=+14155238886  # Numéro MessageBird WhatsApp
+WHATSAPP_DEFAULT_RECIPIENT=+2250102030405
 ```
 
 ### 3. Configuration des numéros de téléphone

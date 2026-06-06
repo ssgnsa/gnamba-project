@@ -30,7 +30,7 @@ export default function PublicFooter({ onNavigate }: PublicFooterProps) {
   const tagline = get(
     "footer",
     "tagline",
-    "Votre partenaire de confiance pour tous vos projets immobiliers et de construction.",
+    "Votre partenaire de confiance pour vos projets BTP, immobiliers et fonciers en Côte d'Ivoire.",
   );
   const copyright = get(
     "footer",
@@ -178,7 +178,7 @@ export default function PublicFooter({ onNavigate }: PublicFooterProps) {
               {[
                 "BTP & Construction",
                 "Gestion Immobilière",
-                "Foncier Villageois",
+                "Foncier Sécurisé",
                 "Fournitures Pro",
               ].map((s) => (
                 <li key={s}>
@@ -299,6 +299,20 @@ export default function PublicFooter({ onNavigate }: PublicFooterProps) {
           {footerSignature && (
             <p className="text-xs text-slate-600">{footerSignature}</p>
           )}
+        </div>
+        <div className="border-t border-slate-800/70 py-6 flex flex-col md:flex-row gap-3 md:items-center md:justify-between text-sm text-slate-400">
+          <p>
+            Vous avez un chantier, un terrain ou un bien à valoriser ?
+            Demandez un devis et recevez un retour rapide.
+          </p>
+          <a
+            href={PUBLIC_PAGE_PATHS.contact}
+            onClick={(event) => handleLinkClick(event, "contact")}
+            className="inline-flex items-center gap-2 text-white font-medium hover:text-slate-200 transition-colors"
+          >
+            Demander un devis
+            <ChevronRight size={14} />
+          </a>
         </div>
       </div>
     </footer>

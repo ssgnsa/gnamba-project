@@ -30,7 +30,42 @@ interface LeadData {
   source_page?: string
   source_form?: string
   consent_text?: string
-  channels_optin?: string[]
+  channels_optin?: {
+    sms: boolean
+    whatsapp: boolean
+    email: boolean
+    telegram: boolean
+  } | string[]
+}
+
+const DEFAULT_CHANNELS_OPTIN = {
+  sms: true,
+  whatsapp: true,
+  email: true,
+  telegram: false,
+}
+
+function normalizeChannelsOptIn(
+  channels?: LeadData["channels_optin"],
+): LeadData["channels_optin"] {
+  if (!channels) return DEFAULT_CHANNELS_OPTIN
+  if (Array.isArray(channels)) {
+    const normalized = { ...DEFAULT_CHANNELS_OPTIN }
+    for (const channel of channels) {
+      const key = String(channel).toLowerCase()
+      if (key === "phone" || key === "sms") normalized.sms = true
+      if (key === "whatsapp") normalized.whatsapp = true
+      if (key === "email") normalized.email = true
+      if (key === "telegram") normalized.telegram = true
+    }
+    return normalized
+  }
+  return {
+    sms: Boolean(channels.sms),
+    whatsapp: Boolean(channels.whatsapp),
+    email: Boolean(channels.email),
+    telegram: Boolean(channels.telegram),
+  }
 }
 
 export async function captureLead(leadData: LeadData): Promise<{ success: boolean; data?: any; error?: any }> {
@@ -62,7 +97,7 @@ export async function captureLead(leadData: LeadData): Promise<{ success: boolea
           source_page: leadData.source_page || window.location.pathname,
           source_form: leadData.source_form || 'unknown',
           consent_text: leadData.consent_text || "J'accepte d'être contacté",
-          channels_optin: leadData.channels_optin || ['phone'],
+          channels_optin: normalizeChannelsOptIn(leadData.channels_optin),
         })
       }
     )

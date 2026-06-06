@@ -203,40 +203,19 @@ export class WhatsAppService {
  * Configuration WhatsApp depuis les variables d'environnement
  */
 export function getWhatsAppConfig(): WhatsAppConfig | null {
-  const provider = (import.meta.env.VITE_WHATSAPP_PROVIDER ||
-    "callmebot") as WhatsAppConfig["provider"];
+  const provider = import.meta.env.VITE_WHATSAPP_PROVIDER;
 
-  const config: WhatsAppConfig = {
-    provider,
-    accountSid: import.meta.env.VITE_TWILIO_ACCOUNT_SID,
-    authToken: import.meta.env.VITE_TWILIO_AUTH_TOKEN,
-    phoneNumber: import.meta.env.VITE_TWILIO_PHONE_NUMBER,
-    apiKey: import.meta.env.VITE_MESSAGEBIRD_API_KEY,
-    whatsappBusinessNumber: import.meta.env.VITE_WHATSAPP_BUSINESS_NUMBER,
-    accessToken: import.meta.env.VITE_WHATSAPP_ACCESS_TOKEN,
-  };
-
-  // Vérifier que la configuration minimale est présente
   if (provider === "callmebot") {
-    return config; // CallMeBot fonctionne avec config minimale
+    return { provider };
   }
 
-  if (provider === "twilio" && (!config.accountSid || !config.authToken || !config.phoneNumber)) {
-    console.error("Configuration Twilio incomplète");
-    return null;
+  if (import.meta.env.DEV) {
+    console.warn(
+      "WhatsApp direct est désactivé côté navigateur; utilisez une fonction serveur pour Twilio, MessageBird ou Meta.",
+    );
   }
 
-  if (provider === "messagebird" && (!config.apiKey || !config.phoneNumber)) {
-    console.error("Configuration MessageBird incomplète");
-    return null;
-  }
-
-  if (provider === "whatsapp_business_api" && (!config.accessToken || !config.whatsappBusinessNumber)) {
-    console.error("Configuration WhatsApp Business API incomplète");
-    return null;
-  }
-
-  return config;
+  return null;
 }
 
 /**

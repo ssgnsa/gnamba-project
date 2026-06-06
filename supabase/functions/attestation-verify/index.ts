@@ -62,6 +62,7 @@ const buildRateHeaders = (rate: { remaining: number; resetAt: number }) => ({
 });
 
 const jsonResponse = (
+  req: Request,
   payload: unknown,
   status = 200,
   headers: Record<string, string> = {},
@@ -227,6 +228,7 @@ Deno.serve(async (req) => {
 
   if (!rate.allowed) {
     return jsonResponse(
+      req,
       {
         error: "Trop de requetes. Veuillez reessayer plus tard.",
         retry_after: Math.max(0, Math.ceil((rate.resetAt - Date.now()) / 1000)),
@@ -237,7 +239,7 @@ Deno.serve(async (req) => {
   }
 
   if (req.method !== "GET") {
-    return jsonResponse({ error: "Methode non autorisee." }, 405, rateHeaders);
+    return jsonResponse(req, { error: "Methode non autorisee." }, 405, rateHeaders);
   }
 
   const url = new URL(req.url);
@@ -251,7 +253,7 @@ Deno.serve(async (req) => {
     url.searchParams.get("hash") || url.searchParams.get("hash_sha256") || "";
 
   if (!ref && !control && !hashParam) {
-    return jsonResponse({ error: "Reference manquante." }, 400, rateHeaders);
+    return jsonResponse(req, { error: "Reference manquante." }, 400, rateHeaders);
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -259,6 +261,7 @@ Deno.serve(async (req) => {
 
   if (!supabaseUrl || !serviceRoleKey) {
     return jsonResponse(
+      req,
       { error: "Configuration manquante." },
       500,
       rateHeaders,
@@ -303,6 +306,7 @@ Deno.serve(async (req) => {
 
   if (error) {
     return jsonResponse(
+      req,
       { error: "Erreur lors de la verification." },
       500,
       rateHeaders,
@@ -311,6 +315,7 @@ Deno.serve(async (req) => {
 
   if (!data) {
     return jsonResponse(
+      req,
       { error: "Attestation introuvable." },
       404,
       rateHeaders,
@@ -356,6 +361,7 @@ Deno.serve(async (req) => {
     (hashValid || signatureValid);
 
   return jsonResponse(
+    req,
     {
       reference: data.reference,
       date_etablissement: data.date_etablissement,
