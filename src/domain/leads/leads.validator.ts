@@ -24,7 +24,18 @@ export const leadSchema = z.object({
   budget_estime: z.number().min(0).max(10_000_000_000).optional().nullable(),
   notes: z.string().max(2000).optional().nullable(),
   consent_text: z.string().max(500).optional().nullable(),
-  channels_optin: z.array(z.string()).optional().nullable(),
+  channels_optin: z
+    .union([
+      z.array(z.string()),
+      z.object({
+        sms: z.boolean(),
+        whatsapp: z.boolean(),
+        email: z.boolean(),
+        telegram: z.boolean(),
+      }),
+    ])
+    .optional()
+    .nullable(),
 });
 
 export type LeadFormData = z.infer<typeof leadSchema>;

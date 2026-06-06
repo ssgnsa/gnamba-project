@@ -119,8 +119,8 @@ export default function PublicRealisations() {
             Nos Réalisations
           </h1>
           <p className="text-blue-100/80 text-lg max-w-2xl mx-auto leading-relaxed">
-            Découvrez quelques-uns de nos projets réalisés avec excellence à
-            travers la Côte d'Ivoire.
+            Découvrez des projets livrés avec méthode, qualité et sens du
+            résultat à travers la Côte d'Ivoire.
           </p>
         </div>
       </section>
@@ -152,7 +152,7 @@ export default function PublicRealisations() {
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Rechercher un projet..."
+                placeholder="Rechercher par projet, ville ou service..."
                 className="pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 w-60 transition"
               />
             </div>
@@ -171,6 +171,10 @@ export default function PublicRealisations() {
             <div className="text-center py-20 text-gray-400">
               <HardHat size={40} className="mx-auto mb-3 opacity-30" />
               <p>Aucun projet trouvé</p>
+              <p className="mt-2 text-sm text-gray-500">
+                Essayez une autre ville ou revenez plus tard pour voir nos
+                dernières références.
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">

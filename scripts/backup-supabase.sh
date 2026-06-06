@@ -40,8 +40,37 @@ fi
 log "${YELLOW}📦 Création du backup...${NC}"
 
 # Méthode 1: Via l'API REST (téléchargement des données)
-CLOUD_URL="https://thykrnoqgylrbfupophs.supabase.co"
-TABLES=("user_profiles" "app_settings" "foncier_villages" "foncier_lots" "foncier_attestations" "foncier_owners" "foncier_payments" "foncier_config" "media_files" "media_versions" "media_usage" "page_layouts" "site_content")
+CLOUD_URL="${VITE_SUPABASE_URL:-https://thykrnoqgylrbfupophs.supabase.co}"
+TABLES=(
+    "clients"
+    "projects"
+    "employees"
+    "suppliers"
+    "products"
+    "documents"
+    "tasks"
+    "contact_messages"
+    "messages_direction"
+    "user_profiles"
+    "finances"
+    "app_settings"
+    "media_files"
+    "media_versions"
+    "media_usage"
+    "site_content"
+    "page_layouts"
+    "properties"
+    "locataires"
+    "lease_contracts"
+    "rent_payments"
+    "foncier_config"
+    "foncier_lots"
+    "foncier_audit"
+    "foncier_villages"
+    "user_village_access"
+    "foncier_attestations"
+    "foncier_attestation_temoins"
+)
 
 # Créer un fichier JSON avec toutes les données
 BACKUP_JSON="${BACKUP_DIR}/supabase_backup_${DATE}.json"

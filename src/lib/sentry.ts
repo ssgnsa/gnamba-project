@@ -26,13 +26,50 @@ type SentryEvent = {
 
 let sentryEnabled = false;
 let sentryDsn = "";
+let sentryEnvelopeUrl = "";
+
+const parseSentryDsn = (dsn: string) => {
+  try {
+    const url = new URL(dsn);
+    const publicKey = url.username;
+    const projectId = url.pathname
+      .replace(/^\/+/, "")
+      .split("/")
+      .filter(Boolean)
+      .pop();
+
+    if (!publicKey || !projectId) return "";
+
+    return `${url.origin}/api/${projectId}/envelope/?sentry_key=${publicKey}`;
+  } catch {
+    return "";
+  }
+};
+
+const getStoredSentryUser = () => {
+  if (typeof window === "undefined") return undefined;
+
+  try {
+    const userId = sessionStorage.getItem("sentry:user_id");
+    if (!userId) return undefined;
+
+    const userRole = sessionStorage.getItem("sentry:user_role") || undefined;
+    return {
+      id: userId,
+      role: userRole,
+    };
+  } catch {
+    return undefined;
+  }
+};
 
 // Lazy init — only when first error occurs
 const initSentry = () => {
   if (sentryDsn) return; // Already initialized
 
   sentryDsn = import.meta.env.VITE_SENTRY_DSN || "";
-  sentryEnabled = !!sentryDsn && import.meta.env.PROD;
+  sentryEnvelopeUrl = parseSentryDsn(sentryDsn);
+  sentryEnabled = !!sentryEnvelopeUrl && import.meta.env.PROD;
 
   if (sentryEnabled) {
     if (import.meta.env.DEV) console.info("[Sentry] Error monitoring enabled");
@@ -61,10 +98,12 @@ const sendToSentry = async (event: SentryEvent) => {
       environment: import.meta.env.MODE,
       release: import.meta.env.VITE_APP_VERSION || "unknown",
       tags: {
+        ...(event.tags ?? {}),
         module: event.module,
         severity: event.severity,
         supabase_mode: import.meta.env.VITE_SUPABASE_MODE || "unknown",
       },
+      user: getStoredSentryUser(),
       contexts: {
         react: {
           component_stack: event.componentStack,
@@ -81,29 +120,35 @@ const sendToSentry = async (event: SentryEvent) => {
       },
     };
 
+    const envelopeStr = [
+      JSON.stringify(envelope),
+      JSON.stringify(itemHeader),
+      JSON.stringify(payload),
+      "",
+    ].join("\n");
+
     // Use beacon API for non-blocking send (better than fetch for error reporting)
     if ("sendBeacon" in navigator) {
-      const envelopeStr = JSON.stringify([envelope, itemHeader, payload]);
-      navigator.sendBeacon(
-        `https://o0.ingest.sentry.io/api/0/envelope/?sentry_key=${sentryDsn.split("//")[1].split("@")[0]}`,
-        new Blob([envelopeStr], { type: "application/json" }),
+      const queued = navigator.sendBeacon(
+        sentryEnvelopeUrl,
+        new Blob([envelopeStr], { type: "text/plain;charset=UTF-8" }),
       );
-    } else {
-      // Fallback to fetch
-      const response = await fetch(
-        `https://o0.ingest.sentry.io/api/0/envelope/?sentry_key=${sentryDsn.split("//")[1].split("@")[0]}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify([envelope, itemHeader, payload]),
-          keepalive: true,
-        },
-      );
+      if (queued) return;
+    }
 
-      if (!response.ok) {
-        if (import.meta.env.DEV)
-          console.warn("[Sentry] Failed to send error event:", response.status);
-      }
+    // Fallback to fetch. text/plain avoids CORS preflight noise in browsers.
+    const response = await fetch(sentryEnvelopeUrl, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=UTF-8" },
+      body: envelopeStr,
+      keepalive: true,
+      credentials: "omit",
+      mode: "cors",
+    });
+
+    if (!response.ok) {
+      if (import.meta.env.DEV)
+        console.warn("[Sentry] Failed to send error event:", response.status);
     }
   } catch (err) {
     // Never let error reporting break the app

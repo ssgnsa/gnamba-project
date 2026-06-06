@@ -10,15 +10,12 @@
 import { useEffect, useState, useRef } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Lock, Loader2, ExternalLink, AlertCircle } from "lucide-react";
+import { FILEBROWSER_BASE_URL } from "../../lib/filebrowserConfig";
 
 interface FilebrowserIframeProps {
   initialPath?: string;
   height?: string;
 }
-
-const FILEBROWSER_BASE_URL = import.meta.env.DEV 
-  ? "http://localhost:8081"  // Port par défaut Filebrowser en dev
-  : "/filebrowser";          // Reverse proxy en production
 
 export default function FilebrowserIframe({ 
   initialPath = "/",

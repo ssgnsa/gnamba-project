@@ -18,13 +18,26 @@ const subjects = [
   "Immobilier",
   "Foncier",
   "Fournitures professionnelles",
-  "Partenariat",
+  "Devis rapide",
+  "Partenariat / Réseaux sociaux",
   "Autre",
 ];
 
 export default function PublicContact() {
   const { get } = useSiteContent();
   const { settings } = useSettings();
+  const normalizePhoneForWhatsApp = (value: string) => {
+    const digits = value.replace(/\D/g, "");
+    if (!digits) return "";
+    if (digits.startsWith("225")) return digits;
+    if (digits.startsWith("0") && digits.length === 10) {
+      return `225${digits.slice(1)}`;
+    }
+    if (digits.length === 8) {
+      return `225${digits}`;
+    }
+    return digits;
+  };
   const [form, setForm] = useState({
     name: "",
     phone: "",
@@ -106,6 +119,9 @@ export default function PublicContact() {
     settings.contact_hours ||
     get("contact", "hours", "Lun-Ven : 08h00 - 18h00 | Sam : 09h00 - 13h00");
   const mapsEmbed = get("contact", "maps_embed", "");
+  const whatsappLink = phone
+    ? `https://wa.me/${normalizePhoneForWhatsApp(phone)}`
+    : "";
 
   // FIX: Sanitize mapsEmbed HTML to prevent XSS attacks
   // Only allow safe iframe tags from Google Maps
@@ -203,8 +219,8 @@ export default function PublicContact() {
             Parlons de votre projet
           </h1>
           <p className="text-blue-100/80 text-lg max-w-2xl mx-auto leading-relaxed">
-            Notre équipe est disponible pour répondre à toutes vos questions et
-            vous accompagner dans la concrétisation de vos projets.
+            Notre équipe vous répond vite, vous oriente clairement et vous
+            accompagne jusqu'à la prochaine étape de votre projet.
           </p>
         </div>
       </section>
@@ -238,9 +254,25 @@ export default function PublicContact() {
                       <div className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
                         {info.label}
                       </div>
-                      <div className="text-gray-700 font-medium text-sm">
-                        {info.value}
-                      </div>
+                      {info.label === "Téléphone" ? (
+                        <a
+                          href={`tel:${info.value}`}
+                          className="text-gray-700 font-medium text-sm hover:text-blue-700 transition-colors"
+                        >
+                          {info.value}
+                        </a>
+                      ) : info.label === "Email" ? (
+                        <a
+                          href={`mailto:${info.value}`}
+                          className="text-gray-700 font-medium text-sm hover:text-blue-700 transition-colors"
+                        >
+                          {info.value}
+                        </a>
+                      ) : (
+                        <div className="text-gray-700 font-medium text-sm">
+                          {info.value}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -251,9 +283,29 @@ export default function PublicContact() {
                 <h3 className="font-bold mb-2">Réponse rapide garantie</h3>
                 <p className="text-blue-200 text-sm leading-relaxed">
                   Nous nous engageons à répondre à toutes les demandes dans un
-                  délai de 24h ouvrées.
+                  délai de 24h ouvrées, avec un retour orienté devis ou
+                  rendez-vous selon votre besoin.
                 </p>
               </div>
+
+              {whatsappLink && (
+                <a
+                  href={whatsappLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-emerald-600 hover:bg-emerald-700 rounded-2xl p-5 text-white flex items-center justify-between gap-4 shadow-sm transition-colors"
+                >
+                  <div>
+                    <h3 className="font-bold mb-1">Échangez sur WhatsApp</h3>
+                    <p className="text-emerald-100 text-sm leading-relaxed">
+                      Pour une réponse plus rapide, écrivez-nous directement.
+                    </p>
+                  </div>
+                  <span className="text-sm font-semibold whitespace-nowrap">
+                    Ouvrir WhatsApp
+                  </span>
+                </a>
+              )}
 
               <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
                 <h3 className="font-bold text-gray-900 mb-3">Localisation</h3>
@@ -297,7 +349,8 @@ export default function PublicContact() {
                       .
                     </p>
                     <p className="text-gray-500 mb-8">
-                      Notre équipe vous contactera dans les plus brefs délais.
+                      Notre équipe vous contactera rapidement pour préciser
+                      votre besoin et proposer la meilleure suite.
                     </p>
                     <button
                       onClick={() => {
@@ -336,7 +389,7 @@ export default function PublicContact() {
                             onChange={(e) =>
                               setForm({ ...form, name: e.target.value })
                             }
-                            placeholder="Votre nom complet"
+                          placeholder="Votre nom complet"
                             className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition"
                             required
                           />
@@ -350,7 +403,7 @@ export default function PublicContact() {
                             onChange={(e) =>
                               setForm({ ...form, phone: e.target.value })
                             }
-                            placeholder="+225 XX XX XX XX XX"
+                          placeholder="+225 XX XX XX XX XX"
                             className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition"
                           />
                         </div>
@@ -401,7 +454,7 @@ export default function PublicContact() {
                           onChange={(e) =>
                             setForm({ ...form, message: e.target.value })
                           }
-                          placeholder="Décrivez votre projet ou votre question en détail..."
+                          placeholder="Décrivez votre besoin, votre budget ou votre zone d'intérêt..."
                           rows={6}
                           className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition resize-none"
                           required

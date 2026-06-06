@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { supabase } from "../lib/supabase";
 import { useNotifications } from "../context/NotificationContext";
-import { sendPaymentNotification } from "../lib/whatsappService";
 import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 
 interface PaymentChange {
@@ -23,7 +22,50 @@ interface PaymentChange {
 
 export function useRealtimePayments() {
   const { showPaymentNotification } = useNotifications();
-  const lastProcessedId = useRef<string | null>(null);
+  const lastNotificationKey = useRef<string | null>(null);
+
+  const notifyPaidPayment = useCallback(
+    async (
+      tenantName: string,
+      amount: number,
+      propertyAddress: string,
+      paymentId: string,
+      propertyId: string | null,
+      mois: string,
+    ) => {
+      showPaymentNotification(tenantName, amount, propertyAddress);
+
+      if (propertyId) {
+        void supabase.functions
+          .invoke("send-payment-notification", {
+            body: {
+              property_id: propertyId,
+              payment_id: paymentId,
+              montant: amount,
+              locataire_nom: tenantName,
+              propriete_nom: propertyAddress,
+              mois,
+            },
+          })
+          .then(({ data, error }) => {
+            if (error) {
+              console.error("Erreur lors de l'envoi OneSignal:", error);
+              return;
+            }
+
+            if (data?.sent) {
+              console.log("✅ Notification OneSignal envoyée avec succès");
+            } else {
+              console.log("⚠️ Échec de l'envoi OneSignal");
+            }
+          })
+          .catch((error) => {
+            console.error("Erreur lors de l'envoi OneSignal:", error);
+          });
+      }
+    },
+    [showPaymentNotification],
+  );
 
   const handlePaymentChange = useCallback(
     (payload: RealtimePostgresChangesPayload<PaymentChange>) => {
@@ -45,136 +87,41 @@ export function useRealtimePayments() {
         return;
       }
 
-      // Ignorer les doublons en vérifiant l'ID
-      if (newRecord.id === lastProcessedId.current) {
+      const shouldNotify =
+        newRecord.statut === "paye" &&
+        (eventType === "INSERT" ||
+          (eventType === "UPDATE" && oldRecord?.statut !== "paye"));
+
+      if (!shouldNotify) {
         return;
       }
 
-      lastProcessedId.current = newRecord.id;
+      const notificationKey =
+        eventType === "INSERT"
+          ? `insert:${newRecord.id}:${newRecord.statut}`
+          : `update:${newRecord.id}:${oldRecord?.statut ?? "unknown"}:${newRecord.statut}`;
 
-      // Notification lors d'un INSERT ou UPDATE avec statut "paye"
-      if (eventType === "INSERT" || eventType === "UPDATE") {
-        if (newRecord.statut === "paye") {
-          const tenantName = newRecord.locataires
-            ? `${newRecord.locataires.prenom} ${newRecord.locataires.nom}`
-            : "Un locataire";
-
-          const propertyAddress = newRecord.properties?.adresse || "";
-          const tenantPhone = newRecord.locataires?.telephone || undefined;
-
-          // Envoyer la notification WhatsApp
-          sendPaymentNotification(
-            tenantName,
-            newRecord.montant,
-            propertyAddress,
-            tenantPhone,
-          )
-            .then((success) => {
-              if (success) {
-                console.log("✅ Notification WhatsApp envoyée avec succès");
-              } else {
-                console.log("⚠️ Échec de l'envoi WhatsApp, fallback vers notification toast");
-                showPaymentNotification(tenantName, newRecord.montant, propertyAddress);
-              }
-            })
-            .catch((error) => {
-              console.error("Erreur lors de l'envoi WhatsApp:", error);
-              showPaymentNotification(tenantName, newRecord.montant, propertyAddress);
-            });
-
-          if (newRecord.property_id) {
-            void supabase.functions
-              .invoke("send-payment-notification", {
-                body: {
-                  property_id: newRecord.property_id,
-                  payment_id: newRecord.id,
-                  montant: newRecord.montant,
-                  locataire_nom: tenantName,
-                  propriete_nom: propertyAddress,
-                  mois: newRecord.mois_concerne || "ce mois",
-                },
-              })
-              .then(({ data, error }) => {
-                if (error) {
-                  console.error("Erreur lors de l'envoi OneSignal:", error);
-                  return;
-                }
-
-                if (data?.sent) {
-                  console.log("✅ Notification OneSignal envoyée avec succès");
-                } else {
-                  console.log("⚠️ Échec de l'envoi OneSignal");
-                }
-              })
-              .catch((error) => {
-                console.error("Erreur lors de l'envoi OneSignal:", error);
-              });
-          }
-        }
+      if (lastNotificationKey.current === notificationKey) {
+        return;
       }
 
-      // Notification lors d'un changement de statut vers "paye"
-      if (eventType === "UPDATE" && oldRecord) {
-        if (oldRecord.statut !== "paye" && newRecord.statut === "paye") {
-          const tenantName = newRecord.locataires
-            ? `${newRecord.locataires.prenom} ${newRecord.locataires.nom}`
-            : "Un locataire";
+      lastNotificationKey.current = notificationKey;
 
-          const propertyAddress = newRecord.properties?.adresse || "";
-          const tenantPhone = newRecord.locataires?.telephone || undefined;
+      const tenantName = newRecord.locataires
+        ? `${newRecord.locataires.prenom} ${newRecord.locataires.nom}`
+        : "Un locataire";
+      const propertyAddress = newRecord.properties?.adresse || "";
 
-          // Envoyer la notification WhatsApp
-          sendPaymentNotification(
-            tenantName,
-            newRecord.montant,
-            propertyAddress,
-            tenantPhone,
-          )
-            .then((success) => {
-              if (success) {
-                console.log("✅ Notification WhatsApp envoyée avec succès");
-              } else {
-                console.log("⚠️ Échec de l'envoi WhatsApp, fallback vers notification toast");
-                showPaymentNotification(tenantName, newRecord.montant, propertyAddress);
-              }
-            })
-            .catch((error) => {
-              console.error("Erreur lors de l'envoi WhatsApp:", error);
-              showPaymentNotification(tenantName, newRecord.montant, propertyAddress);
-            });
-
-          if (newRecord.property_id) {
-            void supabase.functions
-              .invoke("send-payment-notification", {
-                body: {
-                  property_id: newRecord.property_id,
-                  payment_id: newRecord.id,
-                  montant: newRecord.montant,
-                  locataire_nom: tenantName,
-                  propriete_nom: propertyAddress,
-                  mois: newRecord.mois_concerne || "ce mois",
-                },
-              })
-              .then(({ data, error }) => {
-                if (error) {
-                  console.error("Erreur lors de l'envoi OneSignal:", error);
-                  return;
-                }
-
-                if (data?.sent) {
-                  console.log("✅ Notification OneSignal envoyée avec succès");
-                } else {
-                  console.log("⚠️ Échec de l'envoi OneSignal");
-                }
-              })
-              .catch((error) => {
-                console.error("Erreur lors de l'envoi OneSignal:", error);
-              });
-          }
-        }
-      }
+      void notifyPaidPayment(
+        tenantName,
+        newRecord.montant,
+        propertyAddress,
+        newRecord.id,
+        newRecord.property_id ?? null,
+        newRecord.mois_concerne || "ce mois",
+      );
     },
-    [showPaymentNotification],
+    [notifyPaidPayment],
   );
 
   useEffect(() => {

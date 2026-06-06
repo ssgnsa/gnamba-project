@@ -14,6 +14,16 @@ interface State {
   errorInfo: ErrorInfo | null;
 }
 
+const isRecoverableBrowserDomMutation = (error: Error) => {
+  const message = error.message || "";
+  return (
+    error.name === "NotFoundError" &&
+    (message.includes("removeChild") ||
+      message.includes("insertBefore") ||
+      message.includes("not a child of this node"))
+  );
+};
+
 /**
  * Error Boundary - Capture les erreurs React et affiche un fallback utilisateur
  *
@@ -33,6 +43,14 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   static getDerivedStateFromError(error: Error): State {
+    if (isRecoverableBrowserDomMutation(error)) {
+      return {
+        hasError: false,
+        error: null,
+        errorInfo: null,
+      };
+    }
+
     return {
       hasError: true,
       error,
@@ -41,6 +59,17 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    if (isRecoverableBrowserDomMutation(error)) {
+      if (import.meta.env.DEV) {
+        console.warn(
+          `[ErrorBoundary] Mutation DOM externe ignorée dans "${this.props.moduleName}".`,
+          error,
+          errorInfo,
+        );
+      }
+      return;
+    }
+
     if (import.meta.env.DEV)
       console.error(
         `[ErrorBoundary] Module "${this.props.moduleName}" crashed:`,

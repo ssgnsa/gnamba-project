@@ -18,12 +18,36 @@ class ConnectivityManager {
 
   private pingInterval: NodeJS.Timeout | null = null;
   private listeners: Array<(status: ConnectivityStatus) => void> = [];
+  private isRunning = false;
+  private readonly handleOnline = () => {
+    this.consecutiveFailures = 0;
+    this.isDegradedMode = false;
+    this.updateStatus(true, 'browser online');
+  };
+  private readonly handleOffline = () => {
+    this.updateStatus(false, 'browser offline');
+  };
   
   // Gestion des retries avec backoff
   private consecutiveFailures = 0;
   private readonly MAX_RETRIES = 5;
   private readonly BASE_DELAY = 30_000; // 30s base
   private isDegradedMode = false;
+
+  private resolveSupabaseHealthConfig(): { url?: string; anonKey?: string } {
+    const mode = String(import.meta.env.VITE_SUPABASE_MODE || '').toLowerCase();
+    const cloudUrl = import.meta.env.VITE_SUPABASE_URL;
+    const localUrl = import.meta.env.VITE_SUPABASE_LOCAL_URL;
+    const cloudAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    const localAnonKey = import.meta.env.VITE_SUPABASE_LOCAL_ANON_KEY;
+
+    if (mode === 'local') return { url: localUrl, anonKey: localAnonKey };
+    if (mode === 'cloud') return { url: cloudUrl, anonKey: cloudAnonKey };
+
+    return cloudUrl
+      ? { url: cloudUrl, anonKey: cloudAnonKey }
+      : { url: localUrl, anonKey: localAnonKey };
+  }
 
   /**
    * Démarrer le monitoring de connectivité
@@ -32,14 +56,11 @@ class ConnectivityManager {
     if (typeof window === 'undefined' || typeof navigator === 'undefined') {
       return;
     }
+    this.isRunning = true;
 
     // Écouter les événements natifs
-    window.addEventListener('online', () => {
-      this.consecutiveFailures = 0;
-      this.isDegradedMode = false;
-      this.updateStatus(true, 'browser online');
-    });
-    window.addEventListener('offline', () => this.updateStatus(false, 'browser offline'));
+    window.addEventListener('online', this.handleOnline);
+    window.addEventListener('offline', this.handleOffline);
 
     // Ping immédiat
     void this.pingSupabase();
@@ -52,6 +73,10 @@ class ConnectivityManager {
    * Programme le prochain ping avec backoff exponentiel
    */
   private scheduleNextPing(): void {
+    if (!this.isRunning) {
+      return;
+    }
+
     if (this.pingInterval) {
       clearTimeout(this.pingInterval);
     }
@@ -70,8 +95,14 @@ class ConnectivityManager {
     }
     
     this.pingInterval = setTimeout(() => {
+      if (!this.isRunning) {
+        return;
+      }
+
       void this.pingSupabase().then(() => {
-        this.scheduleNextPing();
+        if (this.isRunning) {
+          this.scheduleNextPing();
+        }
       });
     }, delay);
   }
@@ -84,12 +115,14 @@ class ConnectivityManager {
       return;
     }
 
+    this.isRunning = false;
+
     if (this.pingInterval) {
-      clearInterval(this.pingInterval);
+      clearTimeout(this.pingInterval);
       this.pingInterval = null;
     }
-    window.removeEventListener('online', () => this.updateStatus(true, 'browser online'));
-    window.removeEventListener('offline', () => this.updateStatus(false, 'browser offline'));
+    window.removeEventListener('online', this.handleOnline);
+    window.removeEventListener('offline', this.handleOffline);
   }
 
   /**
@@ -125,11 +158,11 @@ class ConnectivityManager {
       return this.updateStatus(false, 'fetch indisponible');
     }
 
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_LOCAL_URL;
+    const { url: supabaseUrl, anonKey: supabaseAnonKey } = this.resolveSupabaseHealthConfig();
     
-    if (!supabaseUrl) {
+    if (!supabaseUrl || !supabaseAnonKey) {
       this.consecutiveFailures++;
-      return this.updateStatus(false, 'URL Supabase manquante');
+      return this.updateStatus(false, 'Configuration Supabase manquante');
     }
 
     // En mode dégradé, on ne spam plus les logs
@@ -139,15 +172,22 @@ class ConnectivityManager {
 
     try {
       // Utiliser un endpoint de santé explicite pour éviter les faux 401 sur /rest/v1/
-      void await fetch(`${supabaseUrl}/auth/v1/health`, {
+      const response = await fetch(`${supabaseUrl}/auth/v1/health`, {
         method: 'GET',
         cache: 'no-cache',
+        headers: {
+          apikey: supabaseAnonKey,
+        },
         signal: AbortSignal.timeout(8_000), // Timeout 8s (adapté 2G/3G)
       });
 
+      if (!response.ok) {
+        throw new Error(`Supabase health HTTP ${response.status}`);
+      }
+
       const latency = Date.now() - startTime;
       
-      // Reset des compteurs en cas de succès réseau (même si 401)
+      // Reset des compteurs en cas de succès réseau confirmé
       this.consecutiveFailures = 0;
       this.isDegradedMode = false;
       
@@ -172,8 +212,10 @@ class ConnectivityManager {
         }
       }
       
-      // Log moins verbeux en mode dégradé
-      if (!this.isDegradedMode) {
+      // En production, un seul timeout mobile/Cloudflare isolé ne doit pas polluer la console.
+      if (import.meta.env.DEV && this.consecutiveFailures === 1) {
+        console.warn(`[ConnectivityManager] Échec ping #${this.consecutiveFailures}: ${errorMsg}`);
+      } else if (!this.isDegradedMode && this.consecutiveFailures >= 2) {
         console.warn(`[ConnectivityManager] Échec ping #${this.consecutiveFailures}: ${errorMsg}`);
       }
       

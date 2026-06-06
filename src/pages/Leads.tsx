@@ -64,6 +64,9 @@ export default function LeadsPage() {
   const [filterStatus, setFilterStatus] = useState("");
   const [filterChannel, setFilterChannel] = useState("");
   const [search, setSearch] = useState("");
+  const [creatingCampaign, setCreatingCampaign] = useState(false);
+  const [campaignNotice, setCampaignNotice] = useState<string | null>(null);
+  const [campaignError, setCampaignError] = useState<string | null>(null);
   const [stats, setStats] = useState({
     total: 0,
     active: 0,
@@ -125,6 +128,113 @@ export default function LeadsPage() {
       (l.email || "").toLowerCase().includes(search.toLowerCase());
     return matchStatus && matchChannel && matchSearch;
   });
+
+  const channelLabels: Record<string, string> = {
+    sms: "SMS",
+    whatsapp: "WhatsApp",
+    email: "Email",
+    telegram: "Telegram",
+  };
+
+  const statusLabels: Record<string, string> = {
+    active: "actif",
+    opted_out: "désabonné",
+    converted: "converti",
+    bounced: "rebond",
+  };
+
+  const createSalesCampaign = async () => {
+    if (filteredLeads.length === 0) {
+      setCampaignError(
+        "Aucun lead ne correspond aux filtres actuels. Ajustez votre sélection avant de créer une campagne.",
+      );
+      return;
+    }
+
+    setCreatingCampaign(true);
+    setCampaignError(null);
+    setCampaignNotice(null);
+
+    try {
+      const now = new Date();
+      const segmentSummary = [
+        filterStatus ? `statut ${statusLabels[filterStatus] || filterStatus}` : "tous statuts",
+        filterChannel ? `canal ${channelLabels[filterChannel] || filterChannel}` : "multi-canal",
+        search.trim() ? `recherche "${search.trim()}"` : null,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+
+      const campaignName = `Campagne ${channelLabels[filterChannel] || "Commerciale"} ${now.toLocaleDateString("fr-FR", {
+        day: "2-digit",
+        month: "short",
+      })}`;
+
+      const channels =
+        filterChannel && channelLabels[filterChannel]
+          ? [filterChannel]
+          : ["whatsapp", "email", "sms"];
+
+      const templateContent = {
+        summary: segmentSummary,
+        lead_count: filteredLeads.length,
+        audience_preview: filteredLeads.slice(0, 25).map((lead) => ({
+          id: lead.id,
+          name: [lead.first_name, lead.last_name].filter(Boolean).join(" ").trim() || "Lead",
+          phone: lead.phone,
+          source: lead.source_page || lead.source_form || lead.source,
+          score: lead.score,
+        })),
+        whatsapp:
+          "Bonjour, Gnamba Services vous accompagne sur vos projets en Côte d'Ivoire. Répondez à ce message pour recevoir un devis rapide ou une fiche projet.",
+        sms:
+          "Gnamba Services: demandez votre devis rapide pour BTP, immobilier ou foncier. Répondez OUI pour être rappelé.",
+        email:
+          "Gnamba Services vous propose un accompagnement rapide et local pour vos projets BTP, immobilier et foncier en Côte d'Ivoire.",
+        facebook:
+          "Nouvelle campagne Gnamba Services: des solutions claires et rapides pour vos projets BTP, immobilier et foncier en Côte d'Ivoire. Contactez-nous pour un devis.",
+        instagram:
+          "BTP, immobilier, foncier: un seul partenaire, un seul suivi, plus de réactivité. Demandez votre devis Gnamba Services.",
+        linkedin:
+          "Gnamba Services lance une campagne de vente ciblée pour accompagner les projets BTP, immobiliers et fonciers en Côte d'Ivoire.",
+        call_to_action: "Demander un devis",
+      };
+
+      const { data, error } = await supabase
+        .from("lead_campaigns")
+        .insert({
+          name: campaignName,
+          description: `Campagne commerciale construite depuis le tableau de bord leads pour ${filteredLeads.length} contact(s).`,
+          channels,
+          segment_filter: {
+            status: filterStatus || null,
+            channel: filterChannel || null,
+            search: search.trim() || null,
+            lead_count: filteredLeads.length,
+            source: "lead-dashboard",
+          },
+          template_content: templateContent,
+          status: "draft",
+        })
+        .select("id, name")
+        .single();
+
+      if (error) throw error;
+
+      setCampaignNotice(
+        `Campagne brouillon créée avec succès: ${data?.name || campaignName}.`,
+      );
+      await fetchData();
+    } catch (err) {
+      setCampaignError(
+        err instanceof Error
+          ? err.message
+          : "Impossible de créer la campagne pour le moment.",
+      );
+    } finally {
+      setCreatingCampaign(false);
+    }
+  };
 
   const updateLeadStatus = async (leadId: string, status: string) => {
     await supabase.from("leads").update({ status }).eq("id", leadId);
@@ -188,16 +298,37 @@ export default function LeadsPage() {
             📢 Gestion des Leads & Campagnes
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Capture automatique + Bot multi-canal autonome
+            Capture automatique, segmentation commerciale et relais multi-canal vers le terrain et les réseaux sociaux
           </p>
         </div>
-        <button
-          onClick={fetchData}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-medium transition-colors"
-        >
-          <RefreshCw size={16} /> Actualiser
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={createSalesCampaign}
+            disabled={creatingCampaign || filteredLeads.length === 0}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-colors bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Send size={16} /> Créer campagne
+          </button>
+          <button
+            onClick={fetchData}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-medium transition-colors"
+          >
+            <RefreshCw size={16} /> Actualiser
+          </button>
+        </div>
       </div>
+
+      {(campaignNotice || campaignError) && (
+        <div
+          className={`rounded-2xl border px-4 py-3 text-sm ${
+            campaignError
+              ? "border-red-200 bg-red-50 text-red-700"
+              : "border-emerald-200 bg-emerald-50 text-emerald-800"
+          }`}
+        >
+          {campaignError || campaignNotice}
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -429,7 +560,7 @@ export default function LeadsPage() {
                             >
                               <option value="active">Actif</option>
                               <option value="opted_out">Désabonné</option>
-                              <option value="converted">Conversi</option>
+                              <option value="converted">Converti</option>
                               <option value="bounced">Rebond</option>
                             </select>
                           </td>
@@ -484,12 +615,36 @@ export default function LeadsPage() {
       {/* TAB: Campaigns */}
       {activeTab === "campaigns" && (
         <div className="space-y-4">
+          <div className="rounded-2xl border border-blue-100 bg-blue-50 p-5">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div>
+                <h3 className="font-bold text-blue-900">
+                  Campagnes de vente multicanal
+                </h3>
+                <p className="text-sm text-blue-900/80 mt-1 max-w-3xl">
+                  Créez un brief commercial à partir de vos filtres actuels et
+                  préparez un relais cohérent entre SMS, WhatsApp, email et
+                  réseaux sociaux.
+                </p>
+              </div>
+              <button
+                onClick={createSalesCampaign}
+                disabled={creatingCampaign || filteredLeads.length === 0}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Send size={15} />
+                Créer un brouillon
+              </button>
+            </div>
+          </div>
+
           {campaigns.length === 0 ? (
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-12 text-center text-slate-400">
               <Send size={40} className="mx-auto mb-3 opacity-30" />
               <p className="text-sm">Aucune campagne pour le moment</p>
               <p className="text-xs mt-1">
-                Les workflows automatiques sont configurés dans bot_workflows
+                Créez un brouillon pour segmenter vos leads et préparer une
+                séquence multicanal.
               </p>
             </div>
           ) : (
@@ -504,7 +659,7 @@ export default function LeadsPage() {
                 </div>
                 <div className="flex gap-2">
                   {(camp.channels || []).map((ch: string) => (
-                    <Badge key={ch} label={ch} color="blue" />
+                    <Badge key={ch} label={channelLabels[ch] || ch} color="blue" />
                   ))}
                 </div>
                 <div className="grid grid-cols-5 gap-3 text-center">

@@ -13,6 +13,20 @@ export async function captureLead(req: Request): Promise<Response> {
       return new Response(JSON.stringify({ error: 'Phone number required' }), { status: 400 })
     }
 
+    const normalizedChannels = Array.isArray(channels_optin)
+      ? {
+          sms: channels_optin.includes('sms') || channels_optin.includes('phone'),
+          whatsapp: channels_optin.includes('whatsapp'),
+          email: channels_optin.includes('email'),
+          telegram: channels_optin.includes('telegram'),
+        }
+      : {
+          sms: Boolean(channels_optin?.sms),
+          whatsapp: Boolean(channels_optin?.whatsapp),
+          email: Boolean(channels_optin?.email),
+          telegram: Boolean(channels_optin?.telegram),
+        }
+
     const { data, error } = await supabase
       .from('leads')
       .insert({
@@ -24,7 +38,7 @@ export async function captureLead(req: Request): Promise<Response> {
         source_page,
         source_form,
         consent_text: consent_text || "Consentement via API",
-        channels_optin: channels_optin || ['phone'],
+        channels_optin: normalizedChannels,
         created_at: new Date().toISOString()
       })
       .select()

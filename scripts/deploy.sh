@@ -234,7 +234,8 @@ check_permissions() {
 # Valider l'artefact frontend généré par le build
 validate_frontend_release_artifacts() {
     local env="$1"
-    local build_dir="${ENV_CONFIG[${env}:build_dir]:-dist}"
+    local build_dir
+    build_dir="$(resolve_frontend_build_dir "$env")"
     local html_file="$ROOT_DIR/$build_dir/index.html"
 
     if [[ ! -f "$html_file" ]]; then
@@ -248,7 +249,8 @@ validate_frontend_release_artifacts() {
 # Valider la version déployée sur les URLs publiques
 validate_frontend_release_live() {
     local env="$1"
-    local build_dir="${ENV_CONFIG[${env}:build_dir]:-dist}"
+    local build_dir
+    build_dir="$(resolve_frontend_build_dir "$env")"
     local html_file="$ROOT_DIR/$build_dir/index.html"
     local urls=()
 
@@ -257,7 +259,12 @@ validate_frontend_release_live() {
             urls=("http://192.168.1.58/")
             ;;
         cloud-prod)
-            urls=("https://gnambaservices.ci/" "https://www.gnambaservices.ci/")
+            urls=(
+                "https://gnambaservices.ci/"
+                "https://gnambaservices.ci/login"
+                "https://www.gnambaservices.ci/"
+                "https://www.gnambaservices.ci/login"
+            )
             ;;
         *)
             return 0
@@ -275,7 +282,40 @@ validate_frontend_release_live() {
         args+=(--url "$url")
     done
 
+    local entry_js_path
+    entry_js_path="$(grep -o '/assets/index-[^"[:space:]]*\.js' "$html_file" | head -n1)"
+    if [[ -n "$entry_js_path" ]]; then
+        case "$env" in
+            local-server)
+                args+=(--url "http://192.168.1.58$entry_js_path")
+                ;;
+            cloud-prod)
+                args+=(--url "https://gnambaservices.ci$entry_js_path")
+                ;;
+        esac
+    fi
+
     bash "$ROOT_DIR/scripts/validate-frontend-release.sh" "${args[@]}"
+}
+
+# Résoudre le dossier réellement produit par Vite. En prod, dist peut être
+# non purgeable et Vite bascule volontairement vers dist-local.
+resolve_frontend_build_dir() {
+    local env="$1"
+    local configured="${ENV_CONFIG[${env}:build_dir]:-dist}"
+    local fallback="dist-local"
+    local configured_index="$ROOT_DIR/$configured/index.html"
+    local fallback_index="$ROOT_DIR/$fallback/index.html"
+
+    if [[ "$configured" != "$fallback" && -f "$fallback_index" ]]; then
+        if [[ ! -f "$configured_index" || "$fallback_index" -nt "$configured_index" ]]; then
+            log_warn "Build frontend detecte dans $fallback; utilisation de ce dossier a la place de $configured"
+            printf '%s\n' "$fallback"
+            return
+        fi
+    fi
+
+    printf '%s\n' "$configured"
 }
 
 # Créer un backup
@@ -464,9 +504,15 @@ deploy_cloud_prod() {
 
     case "$deploy_method" in
         manual)
-            log_info "Déploiement manuel requis"
-            log_info "Fichiers buildés dans: $ROOT_DIR/dist/"
-            log_info "Déployez manuellement vers gnambaservices.ci"
+            if docker ps --format '{{.Names}}' | grep -qx 'egs-frontend'; then
+                deploy_via_local_docker "cloud-prod"
+            else
+                local build_dir
+                build_dir="$(resolve_frontend_build_dir "cloud-prod")"
+                log_info "Déploiement manuel requis"
+                log_info "Fichiers buildés dans: $ROOT_DIR/$build_dir/"
+                log_info "Déployez manuellement vers gnambaservices.ci avec suppression des anciens assets"
+            fi
             ;;
         ftp)
             deploy_via_ftp
@@ -486,11 +532,48 @@ deploy_via_ftp() {
     log_info "Ajoutez la configuration FTP dans .sync-config si vous souhaitez automatiser cette méthode."
 }
 
+# Déploiement local Docker pour le serveur de production lui-même.
+deploy_via_local_docker() {
+    local env="${1:-cloud-prod}"
+    local build_dir
+    build_dir="$(resolve_frontend_build_dir "$env")"
+    local build_path="$ROOT_DIR/$build_dir"
+    local tmp_path="/tmp/egs-frontend-release-$(date +%Y%m%d%H%M%S)"
+
+    [[ -f "$build_path/index.html" ]] || die "Artefact frontend introuvable: $build_path/index.html"
+
+    log_info "Déploiement Docker local propre depuis $build_path vers egs-frontend"
+    docker exec egs-frontend sh -lc "rm -rf '$tmp_path' && mkdir -p '$tmp_path'"
+    docker cp "$build_path/." "egs-frontend:$tmp_path/"
+    docker cp "$ROOT_DIR/nginx.conf" "egs-frontend:/tmp/egs-default.conf"
+
+    docker exec egs-frontend sh -lc "
+        nginx -t &&
+        find /usr/share/nginx/html -mindepth 1 -maxdepth 1 -exec rm -rf {} + &&
+        cp -a '$tmp_path'/. /usr/share/nginx/html/ &&
+        cp /tmp/egs-default.conf /etc/nginx/conf.d/default.conf &&
+        nginx -t &&
+        rm -rf '$tmp_path' /tmp/egs-default.conf
+    "
+
+    docker restart egs-frontend >/dev/null
+
+    if docker ps --format '{{.Names}}' | grep -qx 'egs-nginx-proxy'; then
+        log_info "Validation et redémarrage du proxy Nginx"
+        docker exec egs-nginx-proxy nginx -t
+        docker restart egs-nginx-proxy >/dev/null
+    fi
+
+    log_info "Déploiement Docker local terminé"
+}
+
 # Déploiement via rsync
 deploy_via_rsync() {
     local host="${ENV_CONFIG["cloud-prod:deploy_host"]:-}"
     local path="${ENV_CONFIG["cloud-prod:deploy_path"]:-}"
     local user="${ENV_CONFIG["cloud-prod:deploy_user"]:-}"
+    local build_dir
+    build_dir="$(resolve_frontend_build_dir "cloud-prod")"
 
     if [[ -z "$host" || -z "$path" ]]; then
         die "Déploiement rsync impossible : cloud-prod:deploy_host ou cloud-prod:deploy_path non configurés"
@@ -500,8 +583,8 @@ deploy_via_rsync() {
         user="$USER"
     fi
 
-    log_info "Déploiement rsync vers $user@$host:$path"
-    rsync -avz --delete --exclude='.git' --exclude='node_modules' "$ROOT_DIR/dist/" "$user@$host:$path"
+    log_info "Déploiement rsync vers $user@$host:$path depuis $build_dir"
+    rsync -avz --delete --exclude='.git' --exclude='node_modules' "$ROOT_DIR/$build_dir/" "$user@$host:$path"
     log_info "Déploiement rsync terminé"
 }
 

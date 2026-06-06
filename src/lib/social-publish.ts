@@ -14,27 +14,27 @@ import { supabase } from "../lib/supabase";
 // ============================================
 const CONFIG = {
   meta: {
-    accessToken: import.meta.env.VITE_META_ACCESS_TOKEN || "",
+    accessToken: "",
     facebookPageId: import.meta.env.VITE_FACEBOOK_PAGE_ID || "",
     instagramAccountId: import.meta.env.VITE_INSTAGRAM_ACCOUNT_ID || "",
     apiUrl: "https://graph.facebook.com/v18.0",
   },
   linkedin: {
-    accessToken: import.meta.env.VITE_LINKEDIN_ACCESS_TOKEN || "",
+    accessToken: "",
     personUrn: import.meta.env.VITE_LINKEDIN_PERSON_URN || "",
     organizationId: import.meta.env.VITE_LINKEDIN_ORG_ID || "",
     apiUrl: "https://api.linkedin.com/v2",
   },
   x: {
-    apiKey: import.meta.env.VITE_X_API_KEY || "",
-    apiSecret: import.meta.env.VITE_X_API_SECRET || "",
-    accessToken: import.meta.env.VITE_X_ACCESS_TOKEN || "",
-    accessSecret: import.meta.env.VITE_X_ACCESS_SECRET || "",
+    apiKey: "",
+    apiSecret: "",
+    accessToken: "",
+    accessSecret: "",
     apiUrl: "https://api.twitter.com/2",
   },
   telegram: {
     channelUsername: import.meta.env.VITE_TELEGRAM_CHANNEL || "",
-    botToken: import.meta.env.VITE_TELEGRAM_BOT_TOKEN || "",
+    botToken: "",
   },
 };
 
@@ -56,30 +56,32 @@ async function generatePostVariants(
     facebook: [
       (
         ctx,
-      ) => `🏗️ Gnamba Services — Votre partenaire de confiance en Côte d'Ivoire!
+      ) => `🏗️ Gnamba Services - votre partenaire de confiance en Côte d'Ivoire !
 
 ${ctx}
 
-📞 Contactez-nous dès maintenant pour un devis gratuit!
+📞 Contactez-nous dès maintenant pour un devis rapide et un suivi sérieux.
 🌐 gnambaservices.ci`,
-      (ctx) => `✨ NOUVEAU CHEZ GNAMBA SERVICES!
+      (ctx) => `✨ NOUVEAU CHEZ GNAMBA SERVICES !
 
 ${ctx}
 
-💪 Des professionnels à votre service pour tous vos projets BTP, Immobilier et Foncier.
-📍 Abidjan, Côte d'Ivoire
+💪 Des professionnels à votre service pour tous vos projets BTP, immobilier et foncier.
+📍 Abidjan et Grand Abidjan
 
 #GnambaServices #BTP #Immobilier #Abidjan`,
     ],
     linkedin: [
-      (ctx) => `Gnamba Services est fier de vous présenter:
+      (ctx) => `Gnamba Services est fier de vous présenter :
 
 ${ctx}
 
-Notre expertise dans le BTP, l'immobilier et le foncier en Côte d'Ivoire nous permet de accompagner nos clients vers la réussite.
+Notre expertise dans le BTP, l'immobilier et le foncier en Côte d'Ivoire nous permet d'accompagner nos clients vers des décisions plus rapides et des résultats plus solides.
 
 📧 contact@gnambaservices.ci
 🌐 gnambaservices.ci
+
+Demandez une proposition commerciale adaptée à votre besoin.
 
 #Construction #Immobilier #CoteDIvoire #Business`,
     ],
@@ -89,13 +91,15 @@ Notre expertise dans le BTP, l'immobilier et le foncier en Côte d'Ivoire nous p
 Contact: 📞 +225 07 XX XX XX XX
 📍 Abidjan, Côte d'Ivoire
 
-#GnambaServices #BTP #Construction #Immobilier #Foncier #Abidjan #CoteDIvoire #Architecture`,
+#GnambaServices #BTP #Construction #Immobilier #Foncier #Abidjan #CoteDIvoire #DevisRapide`,
     ],
     x: [
       (ctx) => `${ctx}
 
 Gnamba Services — BTP · Immobilier · Foncier
 🌐 gnambaservices.ci
+
+Besoin d'un devis ou d'un relais commercial ? Écrivez-nous.
 
 #BTP #Abidjan`,
     ],

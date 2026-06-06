@@ -27,6 +27,7 @@ import { useSettings } from "../context/SettingsContext";
 import { useAuth } from "../context/AuthContext";
 import FileBrowserIntegration from "../components/filebrowser/FileBrowserIntegration";
 import DocumentForm from "../components/documents/DocumentForm";
+import { FILEBROWSER_BASE_URL } from "../lib/filebrowserConfig";
 
 const typeConfig: Record<
   string,
@@ -118,7 +119,7 @@ export default function Documents() {
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const urlInputRef = useRef<HTMLInputElement>(null);
-  const fileBrowserUrl = import.meta.env.VITE_FILEBROWSER_URL || "";
+  const fileBrowserUrl = FILEBROWSER_BASE_URL;
   
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);

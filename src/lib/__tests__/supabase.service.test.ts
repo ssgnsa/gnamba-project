@@ -258,8 +258,8 @@ describe("SupabaseService", () => {
         },
       ];
 
-      const mockQuery = {
-        range: vi.fn().mockResolvedValue({
+      const mockRangeQuery = {
+        eq: vi.fn().mockResolvedValue({
           data: mockData,
           error: null,
           count: 1,
@@ -267,15 +267,11 @@ describe("SupabaseService", () => {
       };
 
       const mockOrderQuery = {
-        range: vi.fn().mockReturnValue(mockQuery),
-      };
-
-      const mockEqQuery = {
-        order: vi.fn().mockReturnValue(mockOrderQuery),
+        range: vi.fn().mockReturnValue(mockRangeQuery),
       };
 
       const mockSelectQuery = {
-        eq: vi.fn().mockReturnValue(mockEqQuery),
+        order: vi.fn().mockReturnValue(mockOrderQuery),
       };
 
       mockSupabaseClient.from.mockReturnValue({

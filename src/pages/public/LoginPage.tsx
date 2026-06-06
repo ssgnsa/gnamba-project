@@ -25,6 +25,7 @@ export default function LoginPage({ onSuccess, onForgotPassword }: Props) {
     return window.localStorage.getItem("egs:remember_me") === "true";
   });
   const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileError, setTurnstileError] = useState("");
   const turnstileSiteKey = import.meta.env.VITE_CLOUDFLARE_TURNSTILE_SITE_KEY;
 
   const RATE_LIMIT_MAX = 5;
@@ -264,10 +265,10 @@ export default function LoginPage({ onSuccess, onForgotPassword }: Props) {
                 <Lock size={22} className="text-blue-700" />
               </div>
               <h1 className="text-2xl font-bold text-gray-900">
-                Connexion employés
+                Connexion espace interne
               </h1>
               <p className="text-gray-500 text-sm mt-1">
-                Accédez à votre espace de travail {appTitle}
+                Administrateurs et collaborateurs autorisés
               </p>
             </div>
 
@@ -364,11 +365,23 @@ export default function LoginPage({ onSuccess, onForgotPassword }: Props) {
                 <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-4">
                   <Turnstile
                     siteKey={turnstileSiteKey}
-                    onVerify={(token) => setTurnstileToken(token)}
-                    onExpire={() => setTurnstileToken("")}
-                    onError={() => setTurnstileToken("")}
+                    onVerify={(token) => {
+                      setTurnstileToken(token);
+                      setTurnstileError("");
+                    }}
+                    onExpire={() => {
+                      setTurnstileToken("");
+                      setTurnstileError("La vérification anti-bot a expiré. Relancez la vérification.");
+                    }}
+                    onError={() => {
+                      setTurnstileToken("");
+                      setTurnstileError("La vérification anti-bot n'a pas pu se charger. Vérifiez votre connexion puis réessayez.");
+                    }}
                     options={{ size: "flexible" }}
                   />
+                  {turnstileError && (
+                    <p className="mt-3 text-xs text-red-600">{turnstileError}</p>
+                  )}
                 </div>
               )}
 
@@ -393,7 +406,7 @@ export default function LoginPage({ onSuccess, onForgotPassword }: Props) {
 
             <div className="mt-6 pt-5 border-t border-gray-100 text-center">
               <p className="text-xs text-gray-400">
-                Accès réservé aux employés et collaborateurs de {companyName}.
+                Accès réservé aux administrateurs, employés et collaborateurs autorisés de {companyName}.
               </p>
               <p className="text-xs text-gray-400 mt-1">
                 Contactez votre administrateur pour obtenir vos identifiants.

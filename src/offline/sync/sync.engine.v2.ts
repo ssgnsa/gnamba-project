@@ -13,6 +13,21 @@ const BATCH_SIZE = 10;
 const MAX_RETRY_COUNT = 8;
 const RETRY_DELAYS_MS = [1_000, 5_000, 15_000, 60_000, 300_000, 900_000, 1_800_000, 3_600_000]; // 1s → 1h
 
+const resolveSupabaseHealthConfig = (): { url?: string; anonKey?: string } => {
+  const mode = String(import.meta.env.VITE_SUPABASE_MODE || '').toLowerCase();
+  const cloudUrl = import.meta.env.VITE_SUPABASE_URL;
+  const localUrl = import.meta.env.VITE_SUPABASE_LOCAL_URL;
+  const cloudAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  const localAnonKey = import.meta.env.VITE_SUPABASE_LOCAL_ANON_KEY;
+
+  if (mode === 'local') return { url: localUrl, anonKey: localAnonKey };
+  if (mode === 'cloud') return { url: cloudUrl, anonKey: cloudAnonKey };
+
+  return cloudUrl
+    ? { url: cloudUrl, anonKey: cloudAnonKey }
+    : { url: localUrl, anonKey: localAnonKey };
+};
+
 class SyncEngineV2 {
   private isRunning = false;
   private abortController: AbortController | null = null;
@@ -20,6 +35,13 @@ class SyncEngineV2 {
   private consecutiveConnectivityFailures = 0;
   private readonly MAX_CONNECTIVITY_RETRIES = 5;
   private readonly BASE_CHECK_DELAY = 30_000;
+  private readonly handleOnline = () => {
+    this.consecutiveConnectivityFailures = 0;
+    void this.trySync();
+  };
+  private readonly handleOffline = () => {
+    this.updateOnlineStatus(false);
+  };
 
   /**
    * Démarrer le sync engine (appelé au démarrage app)
@@ -36,11 +58,8 @@ class SyncEngineV2 {
     await offlineDB.init();
 
     // Écouter les changements de connectivité
-    window.addEventListener('online', () => {
-      this.consecutiveConnectivityFailures = 0;
-      void this.trySync();
-    });
-    window.addEventListener('offline', () => this.updateOnlineStatus(false));
+    window.addEventListener('online', this.handleOnline);
+    window.addEventListener('offline', this.handleOffline);
 
     // Ping périodique Supabase avec backoff
     this.scheduleConnectivityCheck();
@@ -55,6 +74,10 @@ class SyncEngineV2 {
    * Programmer le prochain check de connectivité avec backoff
    */
   private scheduleConnectivityCheck(): void {
+    if (!this.isRunning) {
+      return;
+    }
+
     if (this.connectivityCheckTimeout) {
       clearTimeout(this.connectivityCheckTimeout);
     }
@@ -64,8 +87,14 @@ class SyncEngineV2 {
     const delay = this.BASE_CHECK_DELAY * (this.consecutiveConnectivityFailures === 0 ? 1 : delayMultiplier);
     
     this.connectivityCheckTimeout = setTimeout(() => {
+      if (!this.isRunning) {
+        return;
+      }
+
       void this.checkConnectivity().then(() => {
-        this.scheduleConnectivityCheck();
+        if (this.isRunning) {
+          this.scheduleConnectivityCheck();
+        }
       });
     }, delay);
   }
@@ -79,6 +108,10 @@ class SyncEngineV2 {
     if (this.connectivityCheckTimeout) {
       clearTimeout(this.connectivityCheckTimeout);
       this.connectivityCheckTimeout = null;
+    }
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('online', this.handleOnline);
+      window.removeEventListener('offline', this.handleOffline);
     }
   }
 
@@ -303,18 +336,25 @@ class SyncEngineV2 {
    */
   private async checkConnectivity(): Promise<void> {
     try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_LOCAL_URL;
-      if (!supabaseUrl) {
+      const { url: supabaseUrl, anonKey: supabaseAnonKey } = resolveSupabaseHealthConfig();
+      if (!supabaseUrl || !supabaseAnonKey) {
         this.consecutiveConnectivityFailures++;
         this.updateOnlineStatus(false);
         return;
       }
 
-      await fetch(`${supabaseUrl}/auth/v1/health`, {
+      const response = await fetch(`${supabaseUrl}/auth/v1/health`, {
         method: 'GET',
         cache: 'no-cache',
+        headers: {
+          apikey: supabaseAnonKey,
+        },
         signal: AbortSignal.timeout(5_000),
       });
+
+      if (!response.ok) {
+        throw new Error(`Supabase health HTTP ${response.status}`);
+      }
 
       // Reset des échecs en cas de succès
       if (this.consecutiveConnectivityFailures > 0) {
@@ -325,8 +365,10 @@ class SyncEngineV2 {
     } catch {
       this.consecutiveConnectivityFailures++;
       
-      // Log seulement les premiers échecs et le passage en mode dégradé
-      if (this.consecutiveConnectivityFailures <= 3) {
+      // En production, ne signaler que les échecs répétés pour éviter le bruit réseau isolé.
+      if (import.meta.env.DEV && this.consecutiveConnectivityFailures === 1) {
+        console.warn(`[SyncEngineV2] Échec connectivité #${this.consecutiveConnectivityFailures}`);
+      } else if (this.consecutiveConnectivityFailures >= 2 && this.consecutiveConnectivityFailures <= 3) {
         console.warn(`[SyncEngineV2] Échec connectivité #${this.consecutiveConnectivityFailures}`);
       } else if (this.consecutiveConnectivityFailures === this.MAX_CONNECTIVITY_RETRIES) {
         console.warn(`[SyncEngineV2] Mode dégradé - Trop d'échecs consécutifs, prochains checks espacés`);

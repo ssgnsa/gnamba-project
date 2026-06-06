@@ -10,29 +10,28 @@
 import { supabase } from "../lib/supabase";
 
 // ============================================
-// Configuration — Environment-driven
+// Configuration — Server credentials must not be read from VITE_* variables.
 // ============================================
 const CONFIG = {
   twilio: {
-    accountSid: import.meta.env.VITE_TWILIO_ACCOUNT_SID || "",
-    authToken: import.meta.env.VITE_TWILIO_AUTH_TOKEN || "",
-    messagingServiceSid:
-      import.meta.env.VITE_TWILIO_MESSAGING_SERVICE_SID || "",
-    fromPhone: import.meta.env.VITE_TWILIO_PHONE_NUMBER || "",
+    accountSid: "",
+    authToken: "",
+    messagingServiceSid: "",
+    fromPhone: "",
   },
   whatsapp: {
-    accessToken: import.meta.env.VITE_WHATSAPP_ACCESS_TOKEN || "",
-    phoneNumberId: import.meta.env.VITE_WHATSAPP_PHONE_NUMBER_ID || "",
+    accessToken: "",
+    phoneNumberId: "",
     apiUrl: "https://graph.facebook.com/v18.0",
   },
   telegram: {
-    botToken: import.meta.env.VITE_TELEGRAM_BOT_TOKEN || "",
+    botToken: "",
     apiUrl: "https://api.telegram.org/bot",
   },
   email: {
     fromEmail: import.meta.env.VITE_EMAIL_FROM || "contact@gnambaservices.ci",
-    apiUrl: import.meta.env.VITE_EMAIL_API_URL || "",
-    apiKey: import.meta.env.VITE_EMAIL_API_KEY || "",
+    apiUrl: "",
+    apiKey: "",
   },
   batchSize: 50, // Max leads per batch
   rateLimitDelay: 1000, // ms between messages

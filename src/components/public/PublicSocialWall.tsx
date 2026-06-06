@@ -470,7 +470,7 @@ export default function PublicSocialWall() {
         <div className="max-w-2xl">
           <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-blue-700">
             <Radio size={14} />
-            Actualite sociale
+            Actualité sociale
           </div>
           <h2 className="mt-4 text-2xl sm:text-3xl font-bold text-slate-900">
             Les contenus du terrain remontent directement sur la vitrine
@@ -531,7 +531,7 @@ export default function PublicSocialWall() {
                 <div className="relative z-10 flex items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.25em] text-white/65">
-                      A la une
+                      À la une
                     </p>
                     <p className="mt-1 text-sm text-white/75">
                       Un carrousel plus vivant, inspiré des rotating cards.

@@ -49,7 +49,7 @@ const checkRateLimit = (userId: string) => {
   return { allowed: true, remaining: RATE_LIMIT_MAX_REQUESTS - entry.count };
 };
 
-const jsonResponse = (payload: unknown, status = 200) =>
+const jsonResponse = (req: Request, payload: unknown, status = 200) =>
   new Response(JSON.stringify(payload), {
     status,
     headers: { "Content-Type": "application/json", ...getCorsHeaders(req) },
@@ -166,13 +166,13 @@ Deno.serve(async (req) => {
   }
 
   if (req.method !== "POST") {
-    return jsonResponse({ error: "Méthode non autorisée." }, 405);
+    return jsonResponse(req, { error: "Méthode non autorisée." }, 405);
   }
 
   // Auth check
   const authHeader = req.headers.get("authorization");
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return jsonResponse({ error: "Authentification requise." }, 401);
+    return jsonResponse(req, { error: "Authentification requise." }, 401);
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -180,7 +180,7 @@ Deno.serve(async (req) => {
   const privateKeyPem = Deno.env.get("ATTESTATION_PRIVATE_KEY");
 
   if (!supabaseUrl || !serviceRoleKey) {
-    return jsonResponse({ error: "Configuration serveur manquante." }, 500);
+    return jsonResponse(req, { error: "Configuration serveur manquante." }, 500);
   }
 
   const supabase = createClient(supabaseUrl, serviceRoleKey, {
@@ -195,13 +195,14 @@ Deno.serve(async (req) => {
   } = await supabase.auth.getUser(token);
 
   if (authError || !user) {
-    return jsonResponse({ error: "Token invalide ou expiré." }, 401);
+    return jsonResponse(req, { error: "Token invalide ou expiré." }, 401);
   }
 
   // Rate limit per user
   const rate = checkRateLimit(user.id);
   if (!rate.allowed) {
     return jsonResponse(
+      req,
       {
         error: "Trop de signatures. Veuillez réessayer plus tard.",
         retry_after: Math.max(0, Math.ceil((rate.resetAt - Date.now()) / 1000)),
@@ -214,24 +215,25 @@ Deno.serve(async (req) => {
   try {
     body = await req.json();
   } catch {
-    return jsonResponse({ error: "Corps de requête invalide." }, 400);
+    return jsonResponse(req, { error: "Corps de requête invalide." }, 400);
   }
 
   const { attestation_id, payload } = body;
 
   if (!attestation_id) {
-    return jsonResponse({ error: "attestation_id requis." }, 400);
+    return jsonResponse(req, { error: "attestation_id requis." }, 400);
   }
 
   if (!privateKeyPem) {
     return jsonResponse(
+      req,
       { error: "Clé de signature non configurée. Contactez l'administrateur." },
       500,
     );
   }
 
   if (!payload) {
-    return jsonResponse({ error: "payload requis." }, 400);
+    return jsonResponse(req, { error: "payload requis." }, 400);
   }
 
   // Parse and validate payload JSON
@@ -239,7 +241,7 @@ Deno.serve(async (req) => {
   try {
     parsedPayload = JSON.parse(payload);
   } catch {
-    return jsonResponse({ error: "payload JSON invalide." }, 400);
+    return jsonResponse(req, { error: "payload JSON invalide." }, 400);
   }
 
   // Anti-replay: check nonce + timestamp
@@ -247,7 +249,7 @@ Deno.serve(async (req) => {
   const issuedAt = String(parsedPayload.signature_issued_at || "");
   const nonceCheck = checkNonce(nonce, issuedAt);
   if (!nonceCheck.valid) {
-    return jsonResponse({ error: nonceCheck.error }, 400);
+    return jsonResponse(req, { error: nonceCheck.error }, 400);
   }
 
   // Check attestation exists and is not already signed
@@ -261,11 +263,12 @@ Deno.serve(async (req) => {
     .single();
 
   if (fetchError || !attestation) {
-    return jsonResponse({ error: "Attestation introuvable." }, 404);
+    return jsonResponse(req, { error: "Attestation introuvable." }, 404);
   }
 
   if (attestation.statut === "archive") {
     return jsonResponse(
+      req,
       { error: "Impossible de signer une attestation archivée." },
       400,
     );
@@ -311,6 +314,7 @@ Deno.serve(async (req) => {
     if (updateError) {
       console.error("Failed to update attestation signature:", updateError);
       return jsonResponse(
+        req,
         { error: "Erreur lors de la sauvegarde de la signature." },
         500,
       );
@@ -343,7 +347,7 @@ Deno.serve(async (req) => {
         /* audit log failure is non-fatal */
       });
 
-    return jsonResponse({
+    return jsonResponse(req, {
       success: true,
       signature,
       signed_at: now,
@@ -351,6 +355,6 @@ Deno.serve(async (req) => {
     });
   } catch (error) {
     console.error("Signature error:", error);
-    return jsonResponse({ error: "Erreur interne lors de la signature." }, 500);
+    return jsonResponse(req, { error: "Erreur interne lors de la signature." }, 500);
   }
 });

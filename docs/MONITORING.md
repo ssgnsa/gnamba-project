@@ -11,8 +11,8 @@ Le système de monitoring automatique surveille en continu l'état de santé du 
 ## Services surveillés
 
 ### ✅ Services critiques
-- **Conteneurs Docker** (egs-web, somagro-web, filebrowser)
-- **Supabase local** (API, Studio, base de données)
+- **Conteneurs Docker** (`egs-frontend`, `egs-nginx-proxy`, `egs-filebrowser` par défaut)
+- **Supabase Cloud** (Auth health + tables critiques via REST)
 - **Tables de base de données** (attestation_sequences, foncier_lots, etc.)
 - **Sauvegardes** (intégrité et fraîcheur)
 - **Espace disque** (seuil critique: 90%)
@@ -76,6 +76,11 @@ TELEGRAM_CHAT_ID=your_chat_id
 # Seuils
 DISK_THRESHOLD=90        # % disque critique
 BACKUP_MAX_AGE=24        # heures max sans backup
+
+# Production EGS
+SUPABASE_MODE=cloud
+MONITOR_CONTAINERS="egs-frontend egs-nginx-proxy egs-filebrowser"
+MONITOR_CRITICAL_TABLES="app_settings user_profiles foncier_lots properties"
 ```
 
 ## Utilisation

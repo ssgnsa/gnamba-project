@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { renderHook } from "@testing-library/react";
 
 // Mock des dépendances
 vi.mock("../lib/supabase", () => ({
@@ -52,8 +53,16 @@ describe("Foncier Hooks Tests", () => {
 
       (withBackoff as any).mockImplementation((fn: any) => fn());
 
-      const { fetchLots } = useFoncierData();
-      const result = await fetchLots("", "", "", false, 1, 20, true);
+      const { result: hookResult } = renderHook(() => useFoncierData());
+      const result = await hookResult.current.fetchLots(
+        "",
+        "",
+        "",
+        false,
+        1,
+        20,
+        true,
+      );
 
       expect(result.error).toBeNull();
       expect(result.data).toEqual(mockLots);
@@ -92,8 +101,8 @@ describe("Foncier Hooks Tests", () => {
 
       (withBackoff as any).mockImplementation((fn: any) => fn());
 
-      const { fetchVillageStats } = useFoncierData();
-      const result = await fetchVillageStats(false, true);
+      const { result: hookResult } = renderHook(() => useFoncierData());
+      const result = await hookResult.current.fetchVillageStats(false, true);
 
       expect(result.error).toBeNull();
       expect(result.data).toEqual({
@@ -115,10 +124,18 @@ describe("Foncier Hooks Tests", () => {
 
       (withBackoff as any).mockImplementation((fn: any) => fn());
 
-      const { fetchLots } = useFoncierData();
-      const result = await fetchLots("", "", "", false, 1, 20, true);
+      const { result: hookResult } = renderHook(() => useFoncierData());
+      const result = await hookResult.current.fetchLots(
+        "",
+        "",
+        "",
+        false,
+        1,
+        20,
+        true,
+      );
 
-      expect(result.error).toEqual(mockError);
+      expect(result.error).toBe(mockError.message);
       expect(result.data).toBeNull();
       expect(result.total).toBe(0);
     });
@@ -145,28 +162,32 @@ describe("Foncier Hooks Tests", () => {
         { id: "user-1", full_name: "Test User" },
       ];
 
-      (supabase.from as any).mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockReturnValue({
-              range: vi.fn().mockResolvedValue({
-                data: mockAuditData,
-                error: null,
-                count: 1,
-              }),
-            }),
-          }),
-          in: vi.fn().mockResolvedValue({
-            data: mockProfilesData,
-            error: null,
-          }),
+      const mockQuery = {
+        order: vi.fn().mockReturnThis(),
+        range: vi.fn().mockResolvedValue({
+          data: mockAuditData,
+          error: null,
+          count: 1,
         }),
+        eq: vi.fn().mockResolvedValue({
+          data: mockAuditData,
+          error: null,
+          count: 1,
+        }),
+        in: vi.fn().mockResolvedValue({
+          data: mockProfilesData,
+          error: null,
+        }),
+      };
+
+      (supabase.from as any).mockReturnValue({
+        select: vi.fn().mockReturnValue(mockQuery),
       });
 
       (withBackoff as any).mockImplementation((fn: any) => fn());
 
-      const { fetchAudit } = useFoncierAudit();
-      const result = await fetchAudit(1, 20, "", true);
+      const { result: hookResult } = renderHook(() => useFoncierAudit());
+      const result = await hookResult.current.fetchAudit(1, 20, "", true);
 
       expect(result.error).toBeNull();
       expect(result.data).toHaveLength(1);
@@ -177,8 +198,8 @@ describe("Foncier Hooks Tests", () => {
     it("should handle offline mode", async () => {
       const { useFoncierAudit } = await import("../hooks/useFoncierAudit");
 
-      const { fetchAudit } = useFoncierAudit();
-      const result = await fetchAudit(1, 20, "", false);
+      const { result: hookResult } = renderHook(() => useFoncierAudit());
+      const result = await hookResult.current.fetchAudit(1, 20, "", false);
 
       expect(result.error).toBe("Mode hors-ligne : journal d'audit indisponible.");
       expect(result.data).toBeNull();

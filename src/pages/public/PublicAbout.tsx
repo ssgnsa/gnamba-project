@@ -12,18 +12,18 @@ import {
 import { useSiteContent } from "../../context/SiteContentContext";
 
 const milestones = [
-  { year: "2015", event: "Création de Gnamba Services à Abidjan" },
+  { year: "2015", event: "Lancement des premiers accompagnements à Abidjan" },
   {
     year: "2017",
-    event: "Lancement du département Immobilier et gestion locative",
+    event: "Structuration de l'offre immobilière et gestion locative",
   },
-  { year: "2019", event: "Ouverture du service Foncier villageois" },
+  { year: "2019", event: "Déploiement de l'accompagnement foncier sécurisé" },
   {
     year: "2021",
-    event: "Expansion du département Fournitures Professionnelles",
+    event: "Développement des fournitures et de l'aménagement professionnel",
   },
-  { year: "2023", event: "Cap des 300 clients et 150 projets réalisés" },
-  { year: "2025", event: "Digitalisation complète avec le système EGS" },
+  { year: "2023", event: "Renforcement du suivi commercial et de la relation client" },
+  { year: "2025", event: "Vitrine plus lisible, plus rapide et orientée conversion" },
 ];
 
 const valueIcons = [CheckCircle2, Heart, Target, Users];
@@ -35,17 +35,17 @@ export default function PublicAbout() {
   const history = get(
     "about",
     "history",
-    "Fondée avec la vision de transformer le paysage immobilier et foncier ivoirien, Gnamba Services est une entreprise multiservices qui accompagne particuliers et entreprises dans la réalisation de leurs projets.",
+    "Fondée avec la vision d'apporter plus de clarté, de sécurité et de performance au marché ivoirien, Gnamba Services accompagne particuliers, investisseurs et entreprises de la première demande jusqu'à la livraison.",
   );
   const mission = get(
     "about",
     "mission",
-    "Notre mission est d'offrir des services de qualité supérieure dans le BTP, l'immobilier, la gestion foncière et les fournitures professionnelles.",
+    "Notre mission est d'offrir des solutions fiables en BTP, immobilier, foncier et fournitures, avec un accompagnement humain, réactif et adapté au terrain.",
   );
   const vision = get(
     "about",
     "vision",
-    "Devenir la référence incontournable des services immobiliers et BTP en Afrique de l'Ouest, en offrant des solutions innovantes et durables.",
+    "Devenir la référence la plus claire et la plus fiable pour vendre, sécuriser et exécuter des projets en Côte d'Ivoire et en Afrique de l'Ouest.",
   );
   const valuesStr = get(
     "about",
@@ -55,7 +55,7 @@ export default function PublicAbout() {
   const teamDescription = get(
     "about",
     "team_description",
-    "Notre équipe est composée d'experts qualifiés dans leurs domaines respectifs, unis par une passion pour l'excellence.",
+    "Notre équipe réunit des profils terrain et conseil pour vous répondre vite, vous orienter correctement et faire avancer votre dossier sans friction.",
   );
 
   const statsProjects = get("about", "stats_projects", "150+");
@@ -92,8 +92,8 @@ export default function PublicAbout() {
             {title}
           </h1>
           <p className="text-blue-100/80 text-lg max-w-2xl mx-auto leading-relaxed">
-            Depuis 2015, nous accompagnons particuliers et entreprises dans la
-            réalisation de leurs projets immobiliers, de construction et de
+            Nous aidons particuliers, investisseurs et entreprises à avancer
+            plus vite sur leurs projets immobiliers, de construction et de
             gestion foncière en Côte d'Ivoire.
           </p>
         </div>
