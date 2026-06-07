@@ -1542,8 +1542,16 @@ export default function Foncier() {
     const config = await ensureConfigLoaded(lot.village || configVillage);
     const attestationValidation = validateAttestationForm(form);
     if (!attestationValidation.success && attestationValidation.errors) {
-      const firstError = Object.values(attestationValidation.errors)[0];
-      return { success: false, error: firstError, config };
+      const errorEntries = Object.entries(attestationValidation.errors);
+      const [fieldName, errorMsg] = errorEntries[0];
+      // Format field name for display (e.g., "registre_ligne" → "Registre › Ligne")
+      const fieldLabel = fieldName
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (l) => l.toUpperCase());
+      const fullError = errorMsg.includes("›")
+        ? errorMsg
+        : `${fieldLabel}: ${errorMsg}`;
+      return { success: false, error: fullError, config };
     }
 
     const parsedAttestation = attestationValidation.parsedData;
