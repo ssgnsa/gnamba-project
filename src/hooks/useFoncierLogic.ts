@@ -145,8 +145,16 @@ export function useFoncierLogic(
       // 1. Validation
       const validation = validateFoncierForm(form);
       if (!validation.success && validation.errors) {
-        const firstError = Object.values(validation.errors)[0];
-        return { success: false, error: firstError };
+        const errorEntries = Object.entries(validation.errors);
+        const [fieldName, errorMsg] = errorEntries[0];
+        // Format field name for display (e.g., "numero_lot" → "Numero Lot")
+        const fieldLabel = fieldName
+          .replace(/_/g, " ")
+          .replace(/\b\w/g, (l) => l.toUpperCase());
+        const fullError = errorMsg.includes("›")
+          ? errorMsg
+          : `${fieldLabel}: ${errorMsg}`;
+        return { success: false, error: fullError };
       }
 
       const parsed = validation.parsedData;
@@ -603,8 +611,16 @@ export function useFoncierLogic(
     const config = await ensureConfigLoaded(lot.village || configVillage);
     const attestationValidation = validateAttestationForm(form);
     if (!attestationValidation.success && attestationValidation.errors) {
-      const firstError = Object.values(attestationValidation.errors)[0];
-      return { success: false, error: firstError, config };
+      const errorEntries = Object.entries(attestationValidation.errors);
+      const [fieldName, errorMsg] = errorEntries[0];
+      // Format field name for display (e.g., "registre_ligne" → "Registre › Ligne")
+      const fieldLabel = fieldName
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (l) => l.toUpperCase());
+      const fullError = errorMsg.includes("›")
+        ? errorMsg
+        : `${fieldLabel}: ${errorMsg}`;
+      return { success: false, error: fullError, config };
     }
 
     const parsedAttestation = attestationValidation.parsedData;
