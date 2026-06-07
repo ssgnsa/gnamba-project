@@ -93,7 +93,7 @@ const gpsCoordSchema = z
   .string()
   .optional()
   .nullable()
-  .refine((v) => !v || /^-?\d+(\.\d+)?$/.test(v), "Coordonnée GPS invalide")
+  .refine((v) => !v || /^-?\d+(\.\d+)?$/.test(v), "Doit être un nombre (ex: 6.8276)")
   .refine((v) => {
     if (!v) return true;
     const num = parseFloat(v);
@@ -104,7 +104,7 @@ const gpsLngSchema = z
   .string()
   .optional()
   .nullable()
-  .refine((v) => !v || /^-?\d+(\.\d+)?$/.test(v), "Coordonnée GPS invalide")
+  .refine((v) => !v || /^-?\d+(\.\d+)?$/.test(v), "Doit être un nombre (ex: -5.5477)")
   .refine((v) => {
     if (!v) return true;
     const num = parseFloat(v);
@@ -208,12 +208,12 @@ export const attestationFormSchema = z.object({
     .string()
     .optional()
     .nullable()
-    .refine((v) => !v || /^\d+$/.test(v), "Numéro de page invalide"),
+    .refine((v) => !v || /^\d+$/.test(v), "Registre › Page: doit contenir uniquement des chiffres"),
   registre_ligne: z
     .string()
     .optional()
     .nullable()
-    .refine((v) => !v || /^\d+$/.test(v), "Numéro de ligne invalide"),
+    .refine((v) => !v || /^\d+$/.test(v), "Registre › Ligne: doit contenir uniquement des chiffres"),
   numero_enregistrement: optionalString,
   attestation_type: z.enum(["standard", "cession"]).default("standard"),
 
@@ -242,7 +242,7 @@ export const attestationFormSchema = z.object({
     .string()
     .optional()
     .nullable()
-    .refine((v) => !v || /^\d+(\.\d+)?$/.test(v), "Précision invalide"),
+    .refine((v) => !v || /^\d+(\.\d+)?$/.test(v), "GPS › Précision: doit être un nombre (ex: 5 ou 5.5)"),
   gps_nord_lat: gpsCoordSchema,
   gps_nord_lng: gpsLngSchema,
   gps_sud_lat: gpsCoordSchema,
