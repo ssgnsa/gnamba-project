@@ -1,5 +1,4 @@
-import type { User } from "@supabase/supabase-js";
-import type { UserProfile } from "../types";
+import type { AuthUser, UserProfile } from "../types";
 
 const DEMO_EMAIL = "demo@gnambaservices.ci";
 
@@ -13,7 +12,7 @@ export function isDemoModeEnabled(): boolean {
 }
 
 export function isDemoUser(
-  user?: User | null,
+  user?: AuthUser | null,
   profile?: UserProfile | null,
 ): boolean {
   const email = (profile?.email || user?.email || "").toLowerCase().trim();
@@ -21,7 +20,7 @@ export function isDemoUser(
 }
 
 export function shouldBlockDestructiveAction(
-  user?: User | null,
+  user?: AuthUser | null,
   profile?: UserProfile | null,
 ): boolean {
   return isDemoModeEnabled() || isDemoUser(user, profile);

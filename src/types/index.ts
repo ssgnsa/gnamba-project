@@ -1,3 +1,36 @@
+// ============================================
+// AUTH TYPES (replaces Supabase types)
+// ============================================
+
+/**
+ * Represents an authenticated user session
+ * Replaces Supabase User type
+ */
+export interface AuthUser {
+  id: string;
+  email?: string;
+  phone?: string;
+  user_metadata?: Record<string, any>;
+  app_metadata?: Record<string, any>;
+  aud?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/**
+ * Represents a realtime database change event
+ * Replaces Supabase RealtimePostgresChangesPayload type
+ */
+export interface RealtimeChange<T = any> {
+  type: "INSERT" | "UPDATE" | "DELETE";
+  table: string;
+  schema: string;
+  record: T | null;
+  old_record: T | null;
+  new_record: T | null;
+  errors?: string[] | null;
+}
+
 export interface AppSettings {
   id: string;
   key: string;
@@ -259,6 +292,7 @@ export interface FoncierLot {
   nom_lotissement: string;
   quartier: string;
   village: string;
+  village_id?: string | null;
   lotissement_id?: string | null;
   ilot_id?: string | null;
   commune: string;
@@ -294,6 +328,7 @@ export interface FoncierLot {
   arrete_date: string;
   // Transaction
   statut: "actif" | "vendu" | "litige" | "reserve" | "annule";
+  publier_sur_vitrine?: boolean | null;
   date_cession: string; // Format ISO "YYYY-MM-DD"
   prix_cession: number;
   notes: string;
@@ -308,6 +343,34 @@ export interface FoncierLot {
   row_version?: number | null;
   retention_until?: string | null;
   total_count?: number;
+}
+
+export interface VitrineLot {
+  id: string;
+  reference: string;
+  titre: string;
+  description: string;
+  village: string;
+  quartier: string;
+  commune: string;
+  departement: string;
+  region: string;
+  superficie: number;
+  prix_vente: number;
+  statut: "disponible" | "reserve" | "vendu";
+  documents: string;
+  caracteristiques: string[];
+  image_url: string;
+  image_alt: string;
+  contact_phone: string;
+  contact_email: string;
+  publier_sur_vitrine: boolean;
+  ordre_affichage: number;
+  notes: string;
+  created_by?: string | null;
+  updated_by?: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface FoncierGpsPoint {
@@ -348,6 +411,7 @@ export interface FoncierAttestation {
   qr_payload?: string | null;
   signature_numerique?: string | null;
   hash_sha256?: string | null;
+  reference_sequence?: number | null;
   control_number?: string | null;
   signature_nonce?: string | null;
   signature_issued_at?: string | null;
@@ -367,6 +431,12 @@ export interface FoncierAttestation {
   revoke_reason?: string | null; // Motif de révocation
   revoked_at?: string | null; // Date de révocation
   revoked_by?: string | null; // ID utilisateur révocation
+  verify_url?: string | null;
+  pdf_path?: string | null;
+  pdf_generated_at?: string | null;
+  printed_by?: string | null;
+  printed_at?: string | null;
+  print_count?: number | null;
   created_by?: string | null;
   created_at: string;
   updated_at: string;
@@ -393,7 +463,8 @@ export interface FoncierConfig {
 }
 
 export interface FoncierVillage {
-  name: string;
+  id: string;
+  nom: string;
   code: string;
   region: string;
   departement: string;
@@ -417,6 +488,7 @@ export type MediaCategory =
   | "services"
   | "equipe"
   | "documents"
+  | "foncier_villages"
   | "autre";
 
 export type BrandAssetType =
@@ -430,6 +502,7 @@ export interface MediaFile {
   filename: string;
   original_name: string;
   url: string;
+  thumbnail_url: string | null;
   category: MediaCategory;
   uploaded_by: string | null;
   upload_date: string;
@@ -442,6 +515,10 @@ export interface MediaFile {
   brand_asset_type: BrandAssetType | null;
   created_at: string;
   updated_at: string;
+  deleted_at: string | null;
+  deleted_by: string | null;
+  width: number | null;
+  height: number | null;
 }
 
 export interface MediaUsage {
@@ -463,6 +540,23 @@ export interface MediaVersion {
   old_filename: string;
   replaced_at: string;
   replaced_by: string | null;
+}
+
+export type MediaAuditAction =
+  | "upload"
+  | "soft_delete"
+  | "restore"
+  | "purge"
+  | "replace"
+  | "metadata_update";
+
+export interface MediaAuditLog {
+  id: string;
+  media_id: string | null;
+  action: MediaAuditAction;
+  actor_id: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
 }
 
 export interface BrandSettings {
@@ -695,6 +789,7 @@ export interface VisiteurFormData {
   email: string;
   societe: string;
   photo_base64: string | null;
+  photo_url: string | null;
 }
 
 export interface VisiteFormData {
