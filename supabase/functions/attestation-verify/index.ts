@@ -1,11 +1,26 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
+// PostgreSQL direct access (Phase 2: self-hosted mode)
+import { from as queryFrom } from "../_shared/db.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
-};
+const ALLOWED_ORIGINS = [
+  'https://gnambaservices.ci',
+  'https://www.gnambaservices.ci',
+  'https://portal.gnambaservices.ci',
+  'http://localhost:5173',
+  'http://localhost:8080',
+]
+
+const getCorsHeaders = (req: Request): Record<string, string> => {
+  const origin = req.headers.get('origin') || ''
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin)
+    ? origin
+    : 'https://gnambaservices.ci'
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    Vary: 'Origin',
+  }
+}
 
 const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
 const RATE_LIMIT_MAX_REQUESTS = 10; // 10 requests/minute per IP
@@ -48,6 +63,7 @@ const buildRateHeaders = (rate: { remaining: number; resetAt: number }) => ({
 });
 
 const jsonResponse = (
+  req: Request,
   payload: unknown,
   status = 200,
   headers: Record<string, string> = {},
@@ -56,7 +72,7 @@ const jsonResponse = (
     status,
     headers: {
       "Content-Type": "application/json",
-      ...corsHeaders,
+      ...getCorsHeaders(req),
       ...headers,
     },
   });
@@ -92,21 +108,6 @@ const asNumber = (value: unknown): number | undefined => {
     if (Number.isFinite(parsed)) return parsed;
   }
   return undefined;
-};
-
-const normalizeWitnesses = (value: unknown) => {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((item) => asObject(item))
-    .filter((item): item is Record<string, unknown> => Boolean(item))
-    .map((item) => ({
-      nom: asString(item.nom),
-      prenom: asString(item.prenom),
-      profession: asString(item.profession),
-      telephone: asString(item.telephone),
-      cni: asString(item.cni),
-    }))
-    .filter((item) => item.nom || item.prenom);
 };
 
 const sha256Hex = async (input: string): Promise<string> => {
@@ -202,9 +203,12 @@ const computePayloadHash = async (
   return await sha256Hex(json);
 };
 
+const VERIFICATION_SELECT =
+  "reference, date_etablissement, control_number, statut, qr_payload, hash_sha256, signature_numerique, created_at, version, deleted_at, lot_reference, lot_numero_lot, lot_nom_lotissement, lot_village, lot_superficie, lot_quartier, lot_commune, lot_departement, lot_region";
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers: getCorsHeaders(req) });
   }
 
   const ip = getClientIP(req);
@@ -213,6 +217,7 @@ Deno.serve(async (req) => {
 
   if (!rate.allowed) {
     return jsonResponse(
+      req,
       {
         error: "Trop de requetes. Veuillez reessayer plus tard.",
         retry_after: Math.max(0, Math.ceil((rate.resetAt - Date.now()) / 1000)),
@@ -223,7 +228,7 @@ Deno.serve(async (req) => {
   }
 
   if (req.method !== "GET") {
-    return jsonResponse({ error: "Methode non autorisee." }, 405, rateHeaders);
+    return jsonResponse(req, { error: "Methode non autorisee." }, 405, rateHeaders);
   }
 
   const url = new URL(req.url);
@@ -237,30 +242,13 @@ Deno.serve(async (req) => {
     url.searchParams.get("hash") || url.searchParams.get("hash_sha256") || "";
 
   if (!ref && !control && !hashParam) {
-    return jsonResponse({ error: "Reference manquante." }, 400, rateHeaders);
+    return jsonResponse(req, { error: "Reference manquante." }, 400, rateHeaders);
   }
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-
-  if (!supabaseUrl || !serviceRoleKey) {
-    return jsonResponse(
-      { error: "Configuration manquante." },
-      500,
-      rateHeaders,
-    );
-  }
-
-  const supabase = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { persistSession: false },
-  });
-
-  const buildQuery = (filterDeleted: boolean) => {
-    let query = supabase
-      .from("foncier_attestations")
-      .select(
-        "reference, date_etablissement, control_number, statut, qr_payload, hash_sha256, signature_numerique, created_at, version, lot:foncier_lots(reference, numero_lot, nom_lotissement, village, proprietaire_nom, proprietaire_prenom, superficie, quartier)",
-      )
+  // PostgreSQL direct access (replaces Supabase client)
+  const buildQuery = async (filterDeleted: boolean) => {
+    let query = queryFrom("v_foncier_attestation_verification")
+      .select(VERIFICATION_SELECT)
       .order("created_at", { ascending: false })
       .limit(1)
       .neq("statut", "archive");
@@ -271,24 +259,28 @@ Deno.serve(async (req) => {
 
     if (filterDeleted) query = query.is("deleted_at", null);
 
-    return query.maybeSingle();
+    return await query.maybeSingle();
   };
 
-  let data: any = null;
-  let error: any = null;
+  let result = await buildQuery(true);
+  let data: any = result.data;
+  let error: any = result.error;
 
-  ({ data, error } = await buildQuery(true));
-
+  // Fallback: retry without deleted_at filter if column not found
   if (
     error &&
     typeof error.message === "string" &&
     error.message.includes("deleted_at")
   ) {
-    ({ data, error } = await buildQuery(false));
+    result = await buildQuery(false);
+    data = result.data;
+    error = result.error;
   }
+
 
   if (error) {
     return jsonResponse(
+      req,
       { error: "Erreur lors de la verification." },
       500,
       rateHeaders,
@@ -297,6 +289,7 @@ Deno.serve(async (req) => {
 
   if (!data) {
     return jsonResponse(
+      req,
       { error: "Attestation introuvable." },
       404,
       rateHeaders,
@@ -330,11 +323,7 @@ Deno.serve(async (req) => {
 
   const villageInfo = asObject(parsedPayload?.village);
   const parcelInfo = asObject(parsedPayload?.parcelle);
-  const holderInfo = asObject(parsedPayload?.titulaire);
   const validationInfo = asObject(parsedPayload?.validation);
-  const lotData = Array.isArray(data.lot)
-    ? (data.lot[0] ?? null)
-    : (data.lot ?? null);
   const normalizedStatus = String(data.statut || "").toLowerCase();
   const documentAuthentic =
     Boolean(data.reference) &&
@@ -342,6 +331,7 @@ Deno.serve(async (req) => {
     (hashValid || signatureValid);
 
   return jsonResponse(
+    req,
     {
       reference: data.reference,
       date_etablissement: data.date_etablissement,
@@ -358,19 +348,17 @@ Deno.serve(async (req) => {
         typeof parsedPayload?.original === "boolean"
           ? parsedPayload.original
           : undefined,
-      lot: lotData,
-      titulaire: holderInfo
+      lot: data.lot_reference
         ? {
-            nom: asString(holderInfo.nom),
-            prenom: asString(holderInfo.prenom),
-            naissance_date: asString(holderInfo.naissance_date),
-            naissance_lieu: asString(holderInfo.naissance_lieu),
-            domicile: asString(holderInfo.domicile),
-            profession: asString(holderInfo.profession),
-            cni_numero: asString(holderInfo.cni_numero),
-            cni_date: asString(holderInfo.cni_date),
-            cni_lieu: asString(holderInfo.cni_lieu),
-            telephone: asString(holderInfo.telephone),
+            reference: data.lot_reference,
+            numero_lot: data.lot_numero_lot,
+            nom_lotissement: data.lot_nom_lotissement,
+            village: data.lot_village,
+            superficie: asNumber(data.lot_superficie),
+            quartier: data.lot_quartier,
+            commune: data.lot_commune,
+            departement: data.lot_departement,
+            region: data.lot_region,
           }
         : null,
       parcelle: parcelInfo
@@ -407,7 +395,6 @@ Deno.serve(async (req) => {
               : [],
           }
         : null,
-      temoins: normalizeWitnesses(parsedPayload?.temoins),
       village_info: villageInfo
         ? {
             region: asString(villageInfo.region),
