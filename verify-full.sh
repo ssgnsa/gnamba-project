@@ -52,27 +52,17 @@ else
     ((ERRORS++))
 fi
 
-# Test API Supabase
-echo -n "   Supabase Cloud: "
-HTTP_CLOUD=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
-    "https://thykrnoqgylrbfupophs.supabase.co/rest/v1/" 2>&1 || echo "000")
-if [ "$HTTP_CLOUD" = "401" ]; then
-    echo -e "${GREEN}HTTP $HTTP_CLOUD (attendu) ✅${NC}"
+# Test API (use canonical API URL)
+CANONICAL_API_URL=${VITE_API_URL:-https://api.gnambaservices.ci}
+echo -n "   API canonique: "
+HTTP_API=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$CANONICAL_API_URL/healthz" 2>&1 || echo "000")
+if [ "$HTTP_API" = "200" ]; then
+    echo -e "${GREEN}HTTP $HTTP_API ✅${NC}"
 else
-    echo -e "${YELLOW}HTTP $HTTP_CLOUD ⚠️${NC}"
+    echo -e "${YELLOW}HTTP $HTTP_API ⚠️${NC}"
     ((WARNINGS++))
 fi
 
-# Test avec anon key
-echo -n "   Supabase + Auth: "
-HTTP_AUTH=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
-    -H "apikey: sb_publishable_K2AvUraEL_URgy91DbLcyQ_wDPtmWuu" \
-    "https://thykrnoqgylrbfupophs.supabase.co/rest/v1/user_profiles?select=count" 2>&1 || echo "000")
-if [ "$HTTP_AUTH" = "200" ]; then
-    echo -e "${GREEN}HTTP $HTTP_AUTH ✅${NC}"
-else
-    echo -e "${YELLOW}HTTP $HTTP_AUTH ⚠️ (peut nécessiter login)${NC}"
-fi
 
 echo ""
 
@@ -183,13 +173,12 @@ else
     echo -e "${YELLOW}⚠️  Port 8080 non détecté${NC}"
 fi
 
-# Test DNS Supabase
-echo -n "   DNS Supabase: "
-if nslookup thykrnoqgylrbfupophs.supabase.co >/dev/null 2>&1; then
-    IP=$(nslookup thykrnoqgylrbfupophs.supabase.co 2>/dev/null | grep -A1 "Name:" | grep "Address:" | head -1 | awk '{print $2}')
-    echo -e "${GREEN}✅ Résolu ($IP)${NC}"
+# Test DNS local
+echo -n "   DNS local: "
+if nslookup localhost >/dev/null 2>&1; then
+    echo -e "${GREEN}✅ localhost résolu${NC}"
 else
-    echo -e "${YELLOW}⚠️  DNS non résolu${NC}"
+    echo -e "${YELLOW}⚠️  localhost non résolu${NC}"
 fi
 
 echo ""

@@ -1,3 +1,6 @@
+import { getLocalApiBaseUrl, isSelfHostedMode } from "./selfHosted";
+import apiClient from "../api/client";
+
 export interface VerificationLookup {
   ref?: string | null;
   control?: string | null;
@@ -93,28 +96,6 @@ export interface VerificationResult {
   validation?: VerificationValidation | null;
 }
 
-const rawMode = String(import.meta.env.VITE_SUPABASE_MODE || "").toLowerCase();
-const supabaseMode =
-  rawMode === "local" || rawMode === "cloud" ? rawMode : "auto";
-
-const resolveSupabaseUrl = () => {
-  if (supabaseMode === "local") return import.meta.env.VITE_SUPABASE_LOCAL_URL;
-  if (supabaseMode === "cloud") return import.meta.env.VITE_SUPABASE_URL;
-  return (
-    import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_LOCAL_URL
-  );
-};
-
-const resolveSupabaseAnonKey = () => {
-  if (supabaseMode === "local")
-    return import.meta.env.VITE_SUPABASE_LOCAL_ANON_KEY;
-  if (supabaseMode === "cloud") return import.meta.env.VITE_SUPABASE_ANON_KEY;
-  return (
-    import.meta.env.VITE_SUPABASE_ANON_KEY ||
-    import.meta.env.VITE_SUPABASE_LOCAL_ANON_KEY
-  );
-};
-
 const normalizeLookup = (
   input: string | VerificationLookup,
 ): VerificationLookup => {
@@ -149,12 +130,18 @@ const buildVerificationSearch = (lookup: VerificationLookup) => {
 };
 
 const getFunctionEndpoint = (lookup: VerificationLookup) => {
-  const supabaseUrl = resolveSupabaseUrl();
-  if (!supabaseUrl) {
-    throw new Error("Configuration Supabase manquante.");
+  if (isSelfHostedMode()) {
+    const baseUrl = getLocalApiBaseUrl();
+    const endpoint = new URL("/api/v1/foncier/attestations/verify", baseUrl);
+    endpoint.search = buildVerificationSearch(lookup);
+    return endpoint.toString();
   }
 
-  const endpoint = new URL("/functions/v1/attestation-verify", supabaseUrl);
+  const baseUrl =
+    typeof window !== "undefined" && window.location
+      ? window.location.origin
+      : getLocalApiBaseUrl();
+  const endpoint = new URL("/api/v1/foncier/attestations/verify", baseUrl);
   endpoint.search = buildVerificationSearch(lookup);
   return endpoint.toString();
 };
@@ -170,7 +157,7 @@ const parseErrorMessage = async (response: Response) => {
 };
 
 /**
- * Vérifie l'authenticité d'une attestation via l'Edge Function `attestation-verify`.
+ * Vérifie l'authenticité d'une attestation via l'API locale versionnée.
  * Accepte ref, control_number ou hash.
  */
 export async function verifyAttestation(
@@ -181,25 +168,17 @@ export async function verifyAttestation(
     throw new Error("Référence, numéro de contrôle ou hash requis.");
   }
 
-  const anonKey = resolveSupabaseAnonKey();
-  if (!anonKey) {
-    throw new Error("Clé Supabase anonyme manquante.");
+  const query = buildVerificationSearch(normalized);
+  const path = `/api/v1/foncier/attestations/verify${query ? `?${query}` : ""}`;
+
+  const result = await apiClient.request<VerificationResult>(path);
+  if (result.error) {
+    throw new Error(
+      result.error || `Vérification impossible (${result.status}).`,
+    );
   }
 
-  const response = await fetch(getFunctionEndpoint(normalized), {
-    method: "GET",
-    headers: {
-      apikey: anonKey,
-      Authorization: `Bearer ${anonKey}`,
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(await parseErrorMessage(response));
-  }
-
-  const payload = await response.json();
-  return (payload || {}) as VerificationResult;
+  return (result.data || {}) as VerificationResult;
 }
 
 /**
@@ -212,7 +191,7 @@ export function generateVerificationUrl(
   const origin =
     typeof window !== "undefined" && window.location
       ? window.location.origin
-      : "http://localhost";
+      : getLocalApiBaseUrl();
   const url = new URL("/verification-attestation", origin);
 
   if (normalized.ref) url.searchParams.set("ref", normalized.ref);
