@@ -1,14 +1,14 @@
 #!/bin/bash
 
 ################################################################################
-# EGS PRODUCTION DEPLOYMENT VALIDATOR
+# EGS LOCAL TUNNEL DEPLOYMENT VALIDATOR
 # ============================================================
-# Phase 2: Sécurité & Versions - Validation pré-déploiement
+# Phase 2: Sécurité & Versions - Validation pré-déploiement local
 # Date: 2026-06-03
 # Rôle: Enterprise Architect
 #
 # OBJECTIF:
-# Valider que tous les prérequis de déploiement production sont réunis:
+# Valider que tous les prérequis de déploiement local exposé via tunnel sont réunis:
 #  ✅ Variables d'environnement requises
 #  ✅ Certificats TLS en place
 #  ✅ Fichiers docker-compose valides
@@ -131,15 +131,15 @@ check_env_file() {
 
   if [[ ! -f "$PROJECT_ROOT/.env.server" ]]; then
     log_error ".env.server manquant"
-    log_info "Copier depuis .env.template et configurer avec les secrets"
+    log_info "Copier depuis .env.server.example et configurer avec les secrets"
     return 1
   fi
   log_pass ".env.server existe"
 
   # Vérifier les variables obligatoires
   local required_vars=(
-    "VITE_SUPABASE_URL"
-    "VITE_SUPABASE_ANON_KEY"
+    "VITE_SUPABASE_LOCAL_URL"
+    "VITE_SUPABASE_LOCAL_ANON_KEY"
     "VITE_SUPABASE_MODE"
     "POSTGRES_PASSWORD"
     "JWT_SECRET"
@@ -382,12 +382,12 @@ check_network_connectivity() {
     fi
   fi
 
-  # Tester la connectivité Supabase Cloud
+  # Tester la connectivité Supabase locale exposée via tunnel
   if command -v curl &>/dev/null; then
-    if curl -sf "https://thykrnoqgylrbfupophs.supabase.co/rest/v1/" >/dev/null 2>&1; then
-      log_pass "Supabase Cloud accessible"
+    if curl -sf "https://api.gnambaservices.ci/rest/v1/" >/dev/null 2>&1; then
+      log_pass "Supabase local tunnel accessible"
     else
-      log_warn "Supabase Cloud non accessible (vérifier firewall/VPN)"
+      log_warn "Supabase local tunnel non accessible (vérifier tunnel/pare-feu)"
     fi
   fi
 

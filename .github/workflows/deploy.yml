@@ -30,6 +30,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Ensure @supabase/supabase-js is not a runtime dependency
+        run: |
+          node -e "const p=require('./package.json'); if(p.dependencies && p.dependencies['@supabase/supabase-js']){console.error('Error: @supabase/supabase-js must not be in dependencies for production'); process.exit(1);} console.log('OK: @supabase/supabase-js not present in dependencies');"
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -45,11 +49,21 @@ jobs:
       - name: Run TypeScript type check
         run: npm run typecheck
 
+      - name: Verify canonical API build configuration
+        run: |
+          if [[ -z "${VITE_LOCAL_API_URL}" ]]; then
+            echo "VITE_LOCAL_API_URL is missing"
+            exit 1
+          fi
+        env:
+          VITE_LOCAL_API_URL: https://api.gnambaservices.ci
+
       - name: Build application
         run: npm run build
         env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_API_MODE: local
+          VITE_LOCAL_API_URL: https://api.gnambaservices.ci
+          # Do not expose Supabase publishable keys in production builds.
 
       - name: Validate frontend release artifacts
         run: npm run validate:frontend
@@ -91,9 +105,8 @@ jobs:
           push: false
           tags: egs-frontend:latest,egs-frontend:${{ github.sha }}
           build-args: |
-            VITE_SUPABASE_MODE=cloud
-            VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}
-            VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
+            VITE_API_MODE=local
+            VITE_LOCAL_API_URL=https://api.gnambaservices.ci
           cache-from: type=registry,ref=egs-frontend:buildcache
           cache-to: type=inline
 
@@ -118,6 +131,8 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment: production
 
+    env:
+      NPM_CONFIG_PRODUCTION: "true"
     steps:
       - name: Download build artifacts
         uses: actions/download-artifact@v4
@@ -160,7 +175,7 @@ jobs:
       - name: Health check
         uses: jtalk/url-health-check-action@v3
         with:
-          url: ${{ secrets.HEALTH_CHECK_URL || 'https://your-domain.com/health' }}
+          url: ${{ secrets.HEALTH_CHECK_URL || 'https://gnambaservices.ci/health' }}
           max-attempts: 5
           retry-delay: 10s
 

@@ -662,15 +662,14 @@ CREATE POLICY "rate_limit_create_lot" ...
 
 | Date       | Fichier                                                    | Statut | Changement                         |
 | ---------- | ---------------------------------------------------------- | ------ | ---------------------------------- |
-| 2026-04-08 | `20260408020000_idx_foncier_lots_deleted_at.sql`           | ✅     | Index sur `deleted_at`             |
-| 2026-04-08 | `20260408010000_add_foncier_lots_deleted_at.sql`           | ✅     | Colonne `deleted_at` (soft delete) |
-| 2026-04-07 | `20260407000000_fix_foncier_lots.sql`                      | ✅     | Corrections table base             |
-| 2026-04-05 | `20260405150000_create_foncier_base_tables_and_rpc.sql`    | ✅     | 3 tables + 7 RPC (CRITICAL)        |
+| 2026-04-05 | `20260324000000_create_foncier_base_tables_and_rpc.sql`    | ✅     | `foncier_lots` base, `deleted_at`, index + RPC (CRITICAL) |
 | 2026-04-05 | Manual SQL                                                 | ✅     | RLS policies foncier               |
 | 2026-04-04 | `20260404080000_fix_rls_policies_foncier_attestations.sql` | ✅     | Corriger RLS attestations          |
 | 2026-04-01 | `20260401090000_foncier_attestation_reference_archive.sql` | ✅     | Archive reference                  |
 | 2026-04-01 | `20260401080000_fix_foncier_attestations.sql`              | ✅     | Corrections attestations           |
 | 2026-03-26 | `20260326000000_create_foncier_attestations_tables.sql`    | ✅     | Tables attestations initiales      |
+
+> Note: les migrations intermédiaires de soft-delete et d'index ont été consolidées dans la migration de base ci-dessus.
 
 ---
 

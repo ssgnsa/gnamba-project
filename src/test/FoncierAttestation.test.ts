@@ -1,22 +1,26 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock des dépendances externes
-vi.mock("../lib/supabase", () => ({
-  supabase: {
-    rpc: vi.fn(),
-    from: vi.fn(() => ({
-      select: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          is: vi.fn(() => ({
-            maybeSingle: vi.fn(),
-          })),
+const mockDataAttestation = {
+  rpc: vi.fn(),
+  from: vi.fn(() => ({
+    select: vi.fn(() => ({
+      eq: vi.fn(() => ({
+        is: vi.fn(() => ({
+          maybeSingle: vi.fn(),
         })),
       })),
     })),
-    functions: {
-      invoke: vi.fn(),
-    },
-  },
+  })),
+  functions: { invoke: vi.fn() },
+};
+
+vi.mock("../lib/dbClient", () => ({
+  dbClient: mockDataAttestation,
+}));
+
+vi.mock("../data/tableClient", () => ({
+  default: mockDataAttestation,
 }));
 
 vi.mock("../context/SettingsContext", () => ({
@@ -232,7 +236,8 @@ describe("Foncier Module Tests", () => {
 
   describe("Attestation Validation", () => {
     it("should validate standard attestation successfully", async () => {
-      const { validateAttestationForm } = await import("../lib/foncierValidation");
+      const { validateAttestationForm } =
+        await import("../lib/foncierValidation");
 
       const validAttestation = {
         attestation_type: "standard",
@@ -253,7 +258,8 @@ describe("Foncier Module Tests", () => {
     });
 
     it("should validate cession attestation with cedant fields", async () => {
-      const { validateAttestationForm } = await import("../lib/foncierValidation");
+      const { validateAttestationForm } =
+        await import("../lib/foncierValidation");
 
       const cessionAttestation = {
         attestation_type: "cession",
@@ -278,7 +284,8 @@ describe("Foncier Module Tests", () => {
     });
 
     it("should reject cession attestation without cedant fields", async () => {
-      const { validateAttestationForm } = await import("../lib/foncierValidation");
+      const { validateAttestationForm } =
+        await import("../lib/foncierValidation");
 
       const invalidCession = {
         attestation_type: "cession",

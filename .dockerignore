@@ -8,6 +8,3 @@ dist
 *.log
 *.local
 .bolt
-.env
-.env.*
-!.env.server.example

@@ -1,5 +1,13 @@
 #!/bin/bash
+set -euo pipefail
 # Fix restart - Démarrage dans le bon ordre avec vérification DNS
+
+if [ -f .env ]; then
+  set -a
+  # shellcheck disable=SC1091
+  source .env
+  set +a
+fi
 
 echo "🔧 Fix Redémarrage EGS + Filebrowser"
 echo "===================================="
@@ -33,10 +41,13 @@ done
 
 # 3. Démarrer EGS (maintenant filebrowser est résolvable)
 echo "3. Démarrage EGS..."
+LOCAL_API_URL="${VITE_LOCAL_API_URL:-${VITE_SUPABASE_URL:-http://localhost:54321}}"
 docker run -d \
     --name egs-web \
     --network gnamba-network \
     -p 8080:80 \
+    -e VITE_API_MODE="${VITE_API_MODE:-local}" \
+    -e VITE_LOCAL_API_URL="$LOCAL_API_URL" \
     egs-web:cloud-v3
 
 sleep 5

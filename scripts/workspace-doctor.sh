@@ -10,13 +10,12 @@ STRICT=0
 
 usage() {
   cat <<'EOF'
-Doctor du workspace EGS + SomAgro
+Doctor du workspace EGS
 
 Usage:
   scripts/workspace-doctor.sh
   scripts/workspace-doctor.sh --strict
   scripts/workspace-doctor.sh egs
-  scripts/workspace-doctor.sh somagro
 
 Checks:
   - mode env present
@@ -89,17 +88,9 @@ compare_migrations() {
 check_cross_contamination() {
   local app="$1"
   local dir
-  local pattern
 
   dir="$(app_migrations_dir "$app")"
-  case "$app" in
-    egs)
-      pattern='somagro|animals|crop_|livestock|inventory_|construction_projects|site_settings|site_blog'
-      ;;
-    somagro)
-      pattern='foncier|attestation|immobilier|lease_contracts|rent_payments|properties'
-      ;;
-  esac
+  local pattern='animals|crop_|livestock|inventory_|construction_projects|site_settings|site_blog'
 
   if rg -n "$pattern" "$dir" >/dev/null 2>&1; then
     log_warn "$(app_label "$app"): contamination potentielle detectee dans $dir"
@@ -118,10 +109,10 @@ check_egs_schema_drift() {
   fi
 }
 
-check_egs_cloud_snapshot() {
-  local manifest="$ROOT_DIR/supabase/generated/egs-cloud-schema.json"
+check_egs_schema_snapshot() {
+  local manifest="$ROOT_DIR/supabase/generated/egs-schema.json"
   if [ ! -f "$manifest" ]; then
-    echo "  cloud_snapshot: missing"
+    echo "  schema_snapshot: missing"
     return
   fi
 
@@ -137,11 +128,11 @@ project_ref = data.get("project_ref", "unknown")
 table_count = data.get("table_count", 0)
 view_count = data.get("view_count", 0)
 
-print("cloud_snapshot: present")
-print(f"cloud_snapshot_generated_at: {generated_at}")
-print(f"cloud_snapshot_project_ref: {project_ref}")
-print(f"cloud_snapshot_tables: {table_count}")
-print(f"cloud_snapshot_views: {view_count}")
+print("schema_snapshot: present")
+print(f"schema_snapshot_generated_at: {generated_at}")
+print(f"schema_snapshot_project_ref: {project_ref}")
+print(f"schema_snapshot_tables: {table_count}")
+print(f"schema_snapshot_views: {view_count}")
 PY
 }
 
@@ -160,7 +151,7 @@ doctor_app() {
   compare_migrations "$app"
   check_cross_contamination "$app"
   if [ "$app" = "egs" ]; then
-    check_egs_cloud_snapshot
+    check_egs_schema_snapshot
     check_egs_schema_drift
   fi
 }
@@ -173,7 +164,7 @@ main() {
       --strict)
         STRICT=1
         ;;
-      egs|somagro)
+      egs)
         target="$1"
         ;;
       help|--help|-h)
@@ -187,13 +178,7 @@ main() {
     shift
   done
 
-  if [ "$target" = "all" ]; then
-    doctor_app egs
-    echo
-    doctor_app somagro
-  else
-    doctor_app "$target"
-  fi
+  doctor_app egs
 
   if [ "$STRICT" -eq 1 ] && [ "$DRIFT_FOUND" -ne 0 ]; then
     exit 1

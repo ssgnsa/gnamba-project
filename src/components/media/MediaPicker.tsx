@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { X, Search, Upload, Images, Tag, ChevronDown } from "lucide-react";
-import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
+import { apiClient } from "../../api/client";
+import { isSelfHostedMode } from "../../lib/selfHosted";
+import dbClient from "../../data/tableClient";
 import type { MediaFile, MediaCategory } from "../../types";
 import MediaCard from "./MediaCard";
 import MediaUploader from "./MediaUploader";
@@ -48,35 +50,57 @@ export default function MediaPicker({
   const [hasMore, setHasMore] = useState(false);
   const PAGE_SIZE = 100;
 
-  const fetchFiles = useCallback(async (currentOffset = 0) => {
-    if (authLoading || !user) return;
-    setLoading(true);
-    let query = supabase
-      .from("media_files")
-      .select("*")
-      .is("deleted_at", null)
-      .order("upload_date", { ascending: false })
-      .range(currentOffset, currentOffset + PAGE_SIZE - 1);
+  const fetchFiles = useCallback(
+    async (currentOffset = 0) => {
+      if (authLoading || !user) return;
+      setLoading(true);
+      if (isSelfHostedMode()) {
+        const result = await apiClient.media.getAll();
+        const mediaFiles = (result.data || []).filter(
+          (file) => !file.deleted_at,
+        );
+        if (currentOffset === 0) {
+          setFiles(mediaFiles);
+        } else {
+          setFiles((prev) => [...prev, ...mediaFiles]);
+        }
+        setHasMore(false);
+        const tags = Array.from(
+          new Set(mediaFiles.flatMap((f) => f.tags || [])),
+        ).sort();
+        setAllTags((prev) => Array.from(new Set([...prev, ...tags])).sort());
+        setLoading(false);
+        return;
+      }
 
-    if (category && category !== "all") {
-      query = query.eq("category", category);
-    }
+      let query = dbClient
+        .from("media_files")
+        .select("*")
+        .is("deleted_at", null)
+        .order("upload_date", { ascending: false })
+        .range(currentOffset, currentOffset + PAGE_SIZE - 1);
 
-    const { data } = await query;
-    const mediaFiles = (data as MediaFile[]) || [];
-    if (currentOffset === 0) {
-      setFiles(mediaFiles);
-    } else {
-      setFiles((prev) => [...prev, ...mediaFiles]);
-    }
-    setHasMore(mediaFiles.length === PAGE_SIZE);
+      if (category && category !== "all") {
+        query = query.eq("category", category);
+      }
 
-    const tags = Array.from(
-      new Set(mediaFiles.flatMap((f) => f.tags || [])),
-    ).sort();
-    setAllTags((prev) => Array.from(new Set([...prev, ...tags])).sort());
-    setLoading(false);
-  }, [category, authLoading, user]);
+      const { data } = await query;
+      const mediaFiles = (data as MediaFile[]) || [];
+      if (currentOffset === 0) {
+        setFiles(mediaFiles);
+      } else {
+        setFiles((prev) => [...prev, ...mediaFiles]);
+      }
+      setHasMore(mediaFiles.length === PAGE_SIZE);
+
+      const tags = Array.from(
+        new Set(mediaFiles.flatMap((f) => f.tags || [])),
+      ).sort();
+      setAllTags((prev) => Array.from(new Set([...prev, ...tags])).sort());
+      setLoading(false);
+    },
+    [category, authLoading, user],
+  );
 
   useEffect(() => {
     if (authLoading || !user) return;
@@ -109,8 +133,13 @@ export default function MediaPicker({
     if (!selected) return;
     // Compatibilité ancien schéma : normaliser url avant de passer au parent
     const normalized = { ...selected };
-    if (!normalized.url && (normalized as MediaFile & { public_url?: string }).public_url) {
-      normalized.url = (normalized as MediaFile & { public_url?: string }).public_url!;
+    if (
+      !normalized.url &&
+      (normalized as MediaFile & { public_url?: string }).public_url
+    ) {
+      normalized.url = (
+        normalized as MediaFile & { public_url?: string }
+      ).public_url!;
     }
     onSelect(normalized);
   };
@@ -120,7 +149,9 @@ export default function MediaPicker({
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl p-8 text-center">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-700 mx-auto mb-4" />
-          <p className="text-sm text-gray-500">Vérification de l'authentification...</p>
+          <p className="text-sm text-gray-500">
+            Vérification de l'authentification...
+          </p>
         </div>
       </div>
     );
@@ -130,7 +161,9 @@ export default function MediaPicker({
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl p-8 text-center">
-          <h3 className="text-lg font-semibold text-amber-900 mb-2">Accès refusé</h3>
+          <h3 className="text-lg font-semibold text-amber-900 mb-2">
+            Accès refusé
+          </h3>
           <p className="text-sm text-amber-700 mb-4">
             Vous devez être connecté pour utiliser la sélection de médias.
           </p>

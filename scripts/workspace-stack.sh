@@ -8,28 +8,22 @@ source "$ROOT_DIR/scripts/workspace-lib.sh"
 
 usage() {
   cat <<'EOF'
-Workspace control for EGS + SomAgro
+Workspace control for EGS
 
 Usage:
   scripts/workspace-stack.sh status
-  scripts/workspace-stack.sh ports [egs|somagro|all]
+  scripts/workspace-stack.sh ports [egs]
   scripts/workspace-stack.sh egs status
   scripts/workspace-stack.sh egs start-local
   scripts/workspace-stack.sh egs stop-local
-  scripts/workspace-stack.sh egs set-mode <local|cloud|auto>
+  scripts/workspace-stack.sh egs set-mode <local>
   scripts/workspace-stack.sh egs db-push [--dry-run|--apply]
-  scripts/workspace-stack.sh somagro status
-  scripts/workspace-stack.sh somagro start-local
-  scripts/workspace-stack.sh somagro stop-local
-  scripts/workspace-stack.sh somagro set-mode <local|cloud|hybrid>
-  scripts/workspace-stack.sh somagro db-push [--dry-run|--apply]
   scripts/workspace-stack.sh dual status
   scripts/workspace-stack.sh dual start-local
   scripts/workspace-stack.sh dual stop-local
 
 Rules:
   - EGS local ports: 54321 / 54322 / 54323 / 54324
-  - SomAgro local ports: 55321 / 55322 / 55323 / 55324
   - db-push defaults to --dry-run if no flag is provided.
 EOF
 }
@@ -46,17 +40,12 @@ frontend_status() {
 }
 
 show_ports() {
-  local target="${1:-all}"
+  local target="${1:-egs}"
 
   case "$target" in
-    all)
+    egs)
       printf '%-10s %-12s %-12s %-12s %-12s\n' "App" "API" "DB" "Studio" "Inbucket"
       print_port_table egs
-      print_port_table somagro
-      ;;
-    egs|somagro)
-      printf '%-10s %-12s %-12s %-12s %-12s\n' "App" "API" "DB" "Studio" "Inbucket"
-      print_port_table "$target"
       ;;
     *)
       die "Cible de ports invalide: $target"
@@ -173,9 +162,6 @@ app_dispatch() {
     status)
       print_status_for_app "$app"
       ;;
-    start-local)
-      start_local "$app"
-      ;;
     stop-local)
       stop_local "$app"
       ;;
@@ -202,17 +188,14 @@ dual_dispatch() {
     status)
       print_status_for_app egs
       echo
-      print_status_for_app somagro
       ;;
     start-local)
       start_local egs
       echo
-      start_local somagro
       ;;
     stop-local)
       stop_local egs
       echo
-      stop_local somagro
       ;;
     *)
       die "Commande invalide pour dual: $command"
@@ -229,9 +212,6 @@ main() {
       ;;
     ports)
       show_ports "${2:-all}"
-      ;;
-    egs|somagro)
-      app_dispatch "$main_command" "${2:-status}" "${@:3}"
       ;;
     dual)
       dual_dispatch "${2:-status}"

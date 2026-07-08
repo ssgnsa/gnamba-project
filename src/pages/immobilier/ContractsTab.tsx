@@ -10,7 +10,6 @@ import {
   Zap,
   AlertCircle,
 } from "lucide-react";
-import { supabase } from "../../lib/supabase";
 import type { LeaseContract, Property, Tenant, RentPayment } from "../../types";
 import Modal from "../../components/ui/Modal";
 import { useSettings } from "../../context/SettingsContext";
@@ -20,6 +19,12 @@ import {
   shouldBlockDestructiveAction,
 } from "../../lib/demoMode";
 import { generateReference } from "../../utils/reference";
+import {
+  type ManualSyncStatus,
+  normalizeManualStatus,
+  readManualCache,
+  writeManualCache,
+} from "../../lib/manualSyncStore";
 import {
   getTenantName,
   getPropertyAddress,
@@ -41,6 +46,49 @@ const emptyForm = {
   notes: "",
 };
 
+const CONTRACTS_CACHE_KEY = "egs.immobilier.contracts.local_cache.v1";
+const PROPERTIES_CACHE_KEY = "egs.immobilier.properties.local_cache.v1";
+const PAYMENTS_CACHE_KEY = "egs.immobilier.payments.local_cache.v1";
+
+type LocalLeaseContract = LeaseContract & {
+  sync_status: ManualSyncStatus;
+  sync_error: string | null;
+  deleted_at: string | null;
+};
+type LocalProperty = Property & {
+  sync_status: ManualSyncStatus;
+  sync_error: string | null;
+  deleted_at: string | null;
+};
+type LocalRentPayment = RentPayment & {
+  updated_at: string;
+  sync_status: ManualSyncStatus;
+  sync_error: string | null;
+  deleted_at: string | null;
+};
+
+function sortContracts(items: LocalLeaseContract[]): LocalLeaseContract[] {
+  return [...items].sort(
+    (a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  );
+}
+
+function sortPayments(items: LocalRentPayment[]): LocalRentPayment[] {
+  return [...items].sort(
+    (a, b) =>
+      new Date(b.date_paiement || b.created_at).getTime() -
+      new Date(a.date_paiement || a.created_at).getTime(),
+  );
+}
+
+function sortProperties(items: LocalProperty[]): LocalProperty[] {
+  return [...items].sort(
+    (a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  );
+}
+
 interface Props {
   contracts: LeaseContract[];
   properties: Property[];
@@ -52,18 +100,13 @@ interface Props {
 
 async function generateMonthlyPayments(
   contract: LeaseContract,
-  tenantIdColumn: "locataire_id" | "tenant_id",
+  _tenantIdColumn: "locataire_id" | "tenant_id",
 ): Promise<{ created: number; skipped: number; error?: string }> {
   try {
     const end = contract.date_fin ? new Date(contract.date_fin) : new Date();
     end.setDate(1);
 
-    const { data: existing, error: fetchError } = await supabase
-      .from("rent_payments")
-      .select("mois_concerne, mois_concerne_date")
-      .eq("contract_id", contract.id);
-
-    if (fetchError) throw fetchError;
+    const existing = readManualCache<LocalRentPayment>(PAYMENTS_CACHE_KEY);
 
     const existingMonths = new Set(
       (existing || []).flatMap(
@@ -81,38 +124,40 @@ async function generateMonthlyPayments(
       contract.date_debut,
       contract.date_fin,
     );
-    const paymentsToCreate: Partial<RentPayment>[] = [];
+    const paymentsToCreate: LocalRentPayment[] = [];
 
     for (const { mois, moisLabel, lastDay } of monthRange) {
       if (!existingMonths.has(moisLabel) && !existingMonths.has(mois)) {
-        const payload: Partial<RentPayment> = {
+          const payload: LocalRentPayment = {
+            id: crypto.randomUUID(),
           contract_id: contract.id,
           property_id: contract.property_id,
           montant: contract.loyer_mensuel + (contract.charges || 0),
           date_paiement: lastDay,
           date_echeance: lastDay,
-          date_paiement_effectif: null,
           mois_concerne: moisLabel,
           mois_concerne_date: `${mois}-01`,
           mode_paiement: "especes",
           statut: "en_attente",
           notes: "",
           reference: generateReference("QTT"),
+          locataire_id: contract.locataire_id,
+          sync_status: "pending",
+          sync_error: null,
+          deleted_at: null,
+          date_paiement_effectif: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         };
 
-        // Support both legacy and current tenant column names.
-        (payload as Record<"locataire_id" | "tenant_id", string | null>)[
-          tenantIdColumn
-        ] = contract.locataire_id;
         paymentsToCreate.push(payload);
       }
     }
 
     if (paymentsToCreate.length > 0) {
-      const { error: insertError } = await supabase
-        .from("rent_payments")
-        .insert(paymentsToCreate);
-      if (insertError) throw insertError;
+      const cached = readManualCache<LocalRentPayment>(PAYMENTS_CACHE_KEY);
+      const next = sortPayments(cached.concat(paymentsToCreate));
+      writeManualCache(PAYMENTS_CACHE_KEY, next);
     }
 
     return { created: paymentsToCreate.length, skipped: existingMonths.size };
@@ -148,10 +193,21 @@ async function updatePropertyStatus(
   propertyId: string,
   statut: "loue" | "disponible",
 ) {
-  await supabase
-    .from("properties")
-    .update({ statut })
-    .eq("id", propertyId);
+  const cached = readManualCache<LocalProperty>(PROPERTIES_CACHE_KEY);
+  const next = cached.map((property) =>
+    property.id === propertyId
+      ? {
+          ...property,
+          statut,
+          sync_status:
+            normalizeManualStatus(property.sync_status) === "synced"
+              ? "pending"
+              : normalizeManualStatus(property.sync_status),
+          updated_at: new Date().toISOString(),
+        }
+      : property,
+  );
+  writeManualCache(PROPERTIES_CACHE_KEY, sortProperties(next));
 }
 
 export default function ContractsTab({
@@ -246,33 +302,43 @@ export default function ContractsTab({
     setSaving(true);
     setError(null);
 
-    const payload: Record<string, unknown> = {
-      property_id: form.property_id,
-      date_debut: form.date_debut,
-      date_fin: form.date_fin || null,
-      loyer_mensuel: parseFloat(form.loyer_mensuel) || 0,
-      charges: parseFloat(form.charges) || 0,
-      depot_garantie: parseFloat(form.depot_garantie) || 0,
-      statut: form.statut,
-      notes: form.notes.trim() || null,
-      updated_at: new Date().toISOString(),
-    };
-    payload[tenantIdColumn] = form.locataire_id;
-
     try {
-      if (editingId) {
-        const { error } = await supabase
-          .from("lease_contracts")
-          .update(payload)
-          .eq("id", editingId);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("lease_contracts").insert({
-          ...payload,
-          reference: generateReference("CTR"),
-        });
-        if (error) throw error;
-      }
+      const now = new Date().toISOString();
+      const cachedContracts = readManualCache<LocalLeaseContract>(CONTRACTS_CACHE_KEY).map(
+        (contract) => ({
+          ...contract,
+          sync_status: normalizeManualStatus(contract.sync_status),
+          sync_error: contract.sync_error ?? null,
+          deleted_at: contract.deleted_at ?? null,
+        }),
+      );
+      const existingLocalContract = cachedContracts.find((c) => c.id === editingId);
+      const localContract: LocalLeaseContract = {
+        ...(existingLocalContract ?? {}),
+        id: existingLocalContract?.id ?? crypto.randomUUID(),
+        reference: existingLocalContract?.reference ?? generateReference("CTR"),
+        property_id: form.property_id,
+        locataire_id: form.locataire_id,
+        date_debut: form.date_debut,
+        date_fin: form.date_fin || null,
+        loyer_mensuel: parseFloat(form.loyer_mensuel) || 0,
+        charges: parseFloat(form.charges) || 0,
+        depot_garantie: parseFloat(form.depot_garantie) || 0,
+        statut: form.statut,
+        notes: form.notes.trim() || null,
+        created_at: existingLocalContract?.created_at || now,
+        updated_at: now,
+        sync_status: "pending",
+        sync_error: null,
+        deleted_at: null,
+      };
+
+      const nextContracts = sortContracts(
+        cachedContracts
+          .filter((contract) => contract.id !== localContract.id)
+          .concat(localContract),
+      );
+      writeManualCache(CONTRACTS_CACHE_KEY, nextContracts);
 
       const targetPropertyId = form.property_id;
       if (form.statut === "actif") {
@@ -333,11 +399,24 @@ export default function ContractsTab({
     )
       return;
     try {
-      const { error } = await supabase
-        .from("lease_contracts")
-        .delete()
-        .eq("id", id);
-      if (error) throw error;
+      const now = new Date().toISOString();
+      const cached = readManualCache<LocalLeaseContract>(CONTRACTS_CACHE_KEY);
+      const next = cached
+        .map((contract) => {
+          if (contract.id !== id) return contract;
+          if (normalizeManualStatus(contract.sync_status) === "pending") {
+            return null;
+          }
+          return {
+            ...contract,
+            sync_status: "deleted" as const,
+            deleted_at: now,
+            updated_at: now,
+            sync_error: null,
+          };
+        })
+        .filter(Boolean) as LocalLeaseContract[];
+      writeManualCache(CONTRACTS_CACHE_KEY, sortContracts(next));
 
       if (contractToDelete) {
         const stillActive = contracts.some(
@@ -353,7 +432,7 @@ export default function ContractsTab({
 
       onRefresh();
     } catch (err: any) {
-      alert(`Erreur lors de la suppression: ${err.message}`);
+      alert(`Erreur lors de la suppression locale: ${err.message}`);
     }
   };
 
@@ -362,11 +441,21 @@ export default function ContractsTab({
     newStatus: LeaseContract["statut"],
   ) => {
     try {
-      const { error } = await supabase
-        .from("lease_contracts")
-        .update({ statut: newStatus, updated_at: new Date().toISOString() })
-        .eq("id", c.id);
-      if (error) throw error;
+      const cached = readManualCache<LocalLeaseContract>(CONTRACTS_CACHE_KEY);
+      const next = cached.map((contract) =>
+        contract.id === c.id
+          ? {
+              ...contract,
+              statut: newStatus,
+              updated_at: new Date().toISOString(),
+              sync_status:
+                normalizeManualStatus(contract.sync_status) === "synced"
+                  ? "pending"
+                  : normalizeManualStatus(contract.sync_status),
+            }
+          : contract,
+      );
+      writeManualCache(CONTRACTS_CACHE_KEY, sortContracts(next));
 
       if (newStatus === "actif") {
         await updatePropertyStatus(c.property_id, "loue");

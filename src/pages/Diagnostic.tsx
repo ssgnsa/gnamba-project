@@ -6,7 +6,7 @@ import {
   AlertCircle,
   RefreshCw,
 } from "lucide-react";
-import { supabase } from "../lib/supabase";
+import dbClient from "../data/tableClient";
 
 interface TableCheck {
   name: string;
@@ -44,7 +44,7 @@ export default function Diagnostic() {
 
     for (const table of DIAGNOSTIC_TABLES) {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await dbClient
           .from(table)
           .select("id", { count: "exact", head: true });
 
@@ -105,7 +105,7 @@ export default function Diagnostic() {
                 Diagnostic Base de Données
               </h1>
               <p className="text-sm text-gray-500">
-                Vérification de l'accès aux tables Supabase
+                Vérification de l'accès aux tables API locale
               </p>
             </div>
           </div>
@@ -184,7 +184,7 @@ export default function Diagnostic() {
                 <p className="text-sm text-amber-700">
                   Certaines tables n'existent pas dans votre base de données ou
                   les permissions RLS bloquent l'accès. Exécutez les migrations
-                  Supabase pour créer les tables manquantes.
+                  API locale pour créer les tables manquantes.
                 </p>
                 <p className="text-xs text-amber-600 mt-2">
                   Commande :{" "}

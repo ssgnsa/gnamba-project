@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { supabaseService } from "../lib/supabase.service";
+import { dataService } from "../lib/dbClient.service";
 import type { AuditRecord, AuditQueryRow } from "../components/foncier/FoncierConstants";
 
 /**
@@ -17,7 +17,7 @@ export function useFoncierAudit() {
         return { data: null, error: "Mode hors-ligne : journal d'audit indisponible.", total: 0 };
       }
 
-      const { data, error, count } = await supabaseService.getAudit({
+      const { data, error, count } = await dataService.getAudit({
         page: auditPage,
         pageSize: auditPageSize,
         actionFilter: auditActionFilter || undefined,
@@ -38,7 +38,7 @@ export function useFoncierAudit() {
 
       let namesById: Record<string, string> = {};
       if (performerIds.length > 0) {
-        const { data: profilesData, error: profilesError } = await supabaseService.getUserProfiles(performerIds) as {
+        const { data: profilesData, error: profilesError } = await dataService.getUserProfiles(performerIds) as {
           data: Array<{ id: string; full_name: string | null }> | null;
           error: any;
         };

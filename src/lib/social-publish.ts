@@ -7,7 +7,7 @@
  * Usage: Call generateAndPublish() to auto-create from ERP events.
  */
 
-import { supabase } from "../lib/supabase";
+import dbClient from "../data/tableClient";
 
 // ============================================
 // Configuration
@@ -397,7 +397,7 @@ export async function generateAndPublish(
 
       // If scheduled, save for later
       if (scheduleAt) {
-        await supabase.from("social_posts").insert({
+        await dbClient.from("social_posts").insert({
           platform,
           content,
           content_variants: variants,
@@ -442,7 +442,7 @@ export async function generateAndPublish(
           : "messageId" in result
             ? result.messageId
             : undefined;
-      await supabase.from("social_posts").insert({
+      await dbClient.from("social_posts").insert({
         platform,
         content,
         hashtags,
@@ -479,7 +479,7 @@ export async function processScheduledPosts(): Promise<{
   try {
     // Get posts that are due
     const now = new Date().toISOString();
-    const { data: posts } = await supabase
+    const { data: posts } = await dbClient
       .from("social_posts")
       .select("*")
       .eq("status", "scheduled")
@@ -513,7 +513,7 @@ export async function processScheduledPosts(): Promise<{
             continue;
         }
 
-        await supabase
+        await dbClient
           .from("social_posts")
           .update({
             status: result.success ? "posted" : "failed",
@@ -534,7 +534,7 @@ export async function processScheduledPosts(): Promise<{
         }
       } catch {
         failed++;
-        await supabase
+        await dbClient
           .from("social_posts")
           .update({ status: "failed" })
           .eq("id", post.id);

@@ -12,18 +12,18 @@ import {
 import { useSiteContent } from "../../context/SiteContentContext";
 
 const milestones = [
-  { year: "2015", event: "Lancement des premiers accompagnements à Abidjan" },
+  { year: "2021", event: "Création de GNAMBA SERVICES SARLU" },
   {
-    year: "2017",
-    event: "Structuration de l'offre immobilière et gestion locative",
+    year: "2022",
+    event: "Structuration des offres immobilières, foncières et BTP",
   },
-  { year: "2019", event: "Déploiement de l'accompagnement foncier sécurisé" },
+  { year: "2023", event: "Renforcement du suivi client et du conseil terrain" },
   {
-    year: "2021",
-    event: "Développement des fournitures et de l'aménagement professionnel",
+    year: "2024",
+    event: "Mise en avant de l'offre auprès des clients",
   },
-  { year: "2023", event: "Renforcement du suivi commercial et de la relation client" },
-  { year: "2025", event: "Vitrine plus lisible, plus rapide et orientée conversion" },
+  { year: "2025", event: "Renforcement des services fonciers et immobiliers" },
+  { year: "2026", event: "Visibilité en ligne renforcée et site enrichi" },
 ];
 
 const valueIcons = [CheckCircle2, Heart, Target, Users];
@@ -31,21 +31,21 @@ const valueIcons = [CheckCircle2, Heart, Target, Users];
 export default function PublicAbout() {
   const { get } = useSiteContent();
 
-  const title = get("about", "title", "À propos de Gnamba Services");
+  const title = get("about", "title", "À propos de GNAMBA SERVICES");
   const history = get(
     "about",
     "history",
-    "Fondée avec la vision d'apporter plus de clarté, de sécurité et de performance au marché ivoirien, Gnamba Services accompagne particuliers, investisseurs et entreprises de la première demande jusqu'à la livraison.",
+    "Fondée le 1er septembre 2021, GNAMBA SERVICES accompagne particuliers et entreprises dans leurs projets fonciers, immobiliers, BTP et de fournitures professionnelles.",
   );
   const mission = get(
     "about",
     "mission",
-    "Notre mission est d'offrir des solutions fiables en BTP, immobilier, foncier et fournitures, avec un accompagnement humain, réactif et adapté au terrain.",
+    "Notre mission est d'offrir des solutions fiables en BTP, immobilier, foncier sécurisé et lotissement, avec un accompagnement réactif et orienté résultat.",
   );
   const vision = get(
     "about",
     "vision",
-    "Devenir la référence la plus claire et la plus fiable pour vendre, sécuriser et exécuter des projets en Côte d'Ivoire et en Afrique de l'Ouest.",
+    "Devenir la référence de confiance pour sécuriser les transactions, exécuter les chantiers et faire progresser les projets patrimoniaux en Côte d'Ivoire.",
   );
   const valuesStr = get(
     "about",
@@ -55,13 +55,13 @@ export default function PublicAbout() {
   const teamDescription = get(
     "about",
     "team_description",
-    "Notre équipe réunit des profils terrain et conseil pour vous répondre vite, vous orienter correctement et faire avancer votre dossier sans friction.",
+    "Notre équipe réunit des profils terrain, administratif et conseil pour vous répondre vite, vous orienter correctement et faire avancer votre dossier sans friction.",
   );
 
-  const statsProjects = get("about", "stats_projects", "150+");
-  const statsClients = get("about", "stats_clients", "300+");
-  const statsYears = get("about", "stats_years", "10+");
-  const statsEmployees = get("about", "stats_employees", "50+");
+  const statsProjects = get("about", "stats_projects", "50+");
+  const statsClients = get("about", "stats_clients", "100+");
+  const statsYears = get("about", "stats_years", "5+");
+  const statsEmployees = get("about", "stats_employees", "21+");
 
   const valueLabels = valuesStr
     .split("·")

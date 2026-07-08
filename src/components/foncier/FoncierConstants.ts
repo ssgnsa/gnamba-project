@@ -202,7 +202,7 @@ export const createEmptyForm = () => ({
   arrete_date: "",
   statut: "actif" as FoncierLot["statut"],
   publier_sur_vitrine: false,
-  date_cession: getLocalDateInput(),
+  date_cession: "",
   prix_cession: "",
   notes: "",
 });

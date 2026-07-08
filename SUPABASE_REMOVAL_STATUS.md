@@ -9,12 +9,12 @@
 
 ### Deliverables
 
-| Component | Status | PR | Details |
-|-----------|--------|-----|---------|
-| Adapter Pattern | ✅ Complete | #1 | `legacySupabaseAdapter` routes to `apiClient` in self-hosted mode |
-| Dependency Move | ✅ Complete | #2 | @supabase/supabase-js → devDependencies + CI enforcement |
-| Lazy-Loading | ✅ Complete | #3 | Dynamic import with Proxy pattern, async initialization |
-| Type Removal | ✅ Complete | #4 | Local AuthUser, RealtimeChange types replace Supabase types |
+| Component       | Status      | PR  | Details                                                           |
+| --------------- | ----------- | --- | ----------------------------------------------------------------- |
+| Adapter Pattern | ✅ Complete | #1  | `legacySupabaseAdapter` routes to `apiClient` in self-hosted mode |
+| Dependency Move | ✅ Complete | #2  | @supabase/supabase-js → devDependencies + CI enforcement          |
+| Lazy-Loading    | ✅ Complete | #3  | Dynamic import with Proxy pattern, async initialization           |
+| Type Removal    | ✅ Complete | #4  | Local AuthUser, RealtimeChange types replace Supabase types       |
 
 ### Frontend Status: 🎉 ZERO Supabase Runtime Dependency
 
@@ -29,14 +29,14 @@
 
 ### Files Modified (Phase 1)
 
-| File | Changes | Impact |
-|------|---------|--------|
-| `package.json` | Removed @supabase/supabase-js | Dependencies clean |
-| `src/types/index.ts` | Added AuthUser, RealtimeChange | Type safety |
-| `src/lib/demoMode.ts` | User → AuthUser | No runtime impact |
-| `src/lib/supabase.service.ts` | SupabaseClient → any | Proxy compatible |
-| `src/hooks/useRealtimePayments.ts` | RealtimePostgresChangesPayload → RealtimeChange | API compatible |
-| `supabase/functions/_shared/db.ts` | Created | PostgreSQL utility (Phase 2) |
+| File                               | Changes                                         | Impact                       |
+| ---------------------------------- | ----------------------------------------------- | ---------------------------- |
+| `package.json`                     | Removed @supabase/supabase-js                   | Dependencies clean           |
+| `src/types/index.ts`               | Added AuthUser, RealtimeChange                  | Type safety                  |
+| `src/lib/demoMode.ts`              | User → AuthUser                                 | No runtime impact            |
+| `src/lib/supabase.service.ts`      | SupabaseClient → any                            | Proxy compatible             |
+| `src/hooks/useRealtimePayments.ts` | RealtimePostgresChangesPayload → RealtimeChange | API compatible               |
+| `supabase/functions/_shared/db.ts` | Created                                         | PostgreSQL utility (Phase 2) |
 
 ### Test Results
 
@@ -53,17 +53,17 @@ Status:      ✅ PASS
 
 ### 9 Functions to Migrate
 
-| # | Function | Status | Complexity | Phase |
-|---|----------|--------|-----------|-------|
-| 1 | attestation-verify | 📋 Planning | Medium | 1 (PoC) |
-| 2 | attestation-sign | 📋 Planning | Medium | 3 |
-| 3 | auto-assign-agent | 📋 Planning | Medium | 1 |
-| 4 | calculate-lead-score | 📋 Planning | Low | 1 |
-| 5 | capture-lead | 📋 Planning | Low | 2 |
-| 6 | create-user-with-profile | 📋 Planning | High | 1 |
-| 7 | send-payment-notification | 📋 Planning | Low | 2 |
-| 8 | send-welcome-message | 📋 Planning | Low | 2 |
-| 9 | verify-turnstile | 📋 Planning | Low | 3 |
+| #   | Function                  | Status      | Complexity | Phase   |
+| --- | ------------------------- | ----------- | ---------- | ------- |
+| 1   | attestation-verify        | 📋 Planning | Medium     | 1 (PoC) |
+| 2   | attestation-sign          | 📋 Planning | Medium     | 3       |
+| 3   | auto-assign-agent         | 📋 Planning | Medium     | 1       |
+| 4   | calculate-lead-score      | 📋 Planning | Low        | 1       |
+| 5   | capture-lead              | 📋 Planning | Low        | 2       |
+| 6   | create-user-with-profile  | 📋 Planning | High       | 1       |
+| 7   | send-payment-notification | 📋 Planning | Low        | 2       |
+| 8   | send-welcome-message      | 📋 Planning | Low        | 2       |
+| 9   | verify-turnstile          | 📋 Planning | Low        | 3       |
 
 ### Phase 2 Roadmap
 
@@ -83,18 +83,21 @@ See: [`docs/PHASE_2_BACKEND_MIGRATION.md`](./PHASE_2_BACKEND_MIGRATION.md)
 ## Metrics
 
 ### Before Phase 1
+
 - Supabase in dependencies: ✅ (cloud mode required)
 - Type imports from Supabase: 3 locations
 - Runtime dependency on Supabase JS client: ✅ (required)
 - Edge Functions using Supabase: 9/9
 
 ### After Phase 1
+
 - Supabase in dependencies: ❌ (not required)
 - Type imports from Supabase: 0/0 ✅
 - Runtime dependency on Supabase JS client: ❌ ✅
 - Edge Functions using Supabase: 9/9 (next phase)
 
 ### Bundle Size Impact
+
 - Estimated reduction: ~150KB (gzipped ~40KB) ✅
 
 ---
@@ -112,16 +115,19 @@ See: [`docs/PHASE_2_BACKEND_MIGRATION.md`](./PHASE_2_BACKEND_MIGRATION.md)
 ## Next Actions
 
 ### Immediate (This Week)
+
 1. ✅ Complete Phase 1 (done)
 2. ⏳ Review and merge PRs #1-#4
 3. ⏳ Start Phase 2 PoC with `attestation-verify`
 
 ### Short-term (Next 2 Weeks)
+
 1. Refactor Priority 1 functions
 2. Integration testing with local PostgreSQL
 3. Staging deployment
 
 ### Medium-term (Next Month)
+
 1. Complete remaining functions
 2. Production validation
 3. Decommission Supabase account (optional)
@@ -131,6 +137,7 @@ See: [`docs/PHASE_2_BACKEND_MIGRATION.md`](./PHASE_2_BACKEND_MIGRATION.md)
 ## Questions & Support
 
 For Phase 2 implementation:
+
 - See `docs/PHASE_2_BACKEND_MIGRATION.md` for detailed strategy
 - Review `supabase/functions/_shared/db.ts` for API patterns
 - Check test suite at `src/**/*.test.ts` for validation patterns

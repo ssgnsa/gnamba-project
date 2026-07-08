@@ -28,8 +28,8 @@ Usage:
   $0 [--html path/to/index.html] [--url URL] [--strict]
 
 Examples:
-  $0 --html dist-local/index.html
-  $0 --html dist-local/index.html --url https://gnambaservices.ci/ --url https://www.gnambaservices.ci/
+  $0 --html dist/index.html
+  $0 --html dist/index.html --url https://gnambaservices.ci/ --url https://www.gnambaservices.ci/
 EOF
 }
 
@@ -70,7 +70,6 @@ find_html() {
   fi
 
   for candidate in \
-    "$ROOT_DIR/dist-local/index.html" \
     "$ROOT_DIR/dist/index.html"; do
     if [[ -f "$candidate" ]]; then
       printf '%s\n' "$candidate"
@@ -78,7 +77,7 @@ find_html() {
     fi
   done
 
-  log_error "No built index.html found in dist-local/ or dist/"
+  log_error "No built index.html found in dist/"
   return 1
 }
 
@@ -151,11 +150,23 @@ validate_nginx_entry_asset_cache() {
       return 1
     fi
   done
+
+  if [[ -f "$ROOT_DIR/nginx/nginx-release.conf" ]]; then
+    if ! grep -q 'root /var/www/egs/current;' "$ROOT_DIR/nginx/nginx-release.conf"; then
+      log_error "nginx/nginx-release.conf must serve from /var/www/egs/current"
+      return 1
+    fi
+
+    if ! grep -q 'VERSION.json' "$ROOT_DIR/nginx/nginx-release.conf"; then
+      log_error "nginx/nginx-release.conf must expose VERSION.json"
+      return 1
+    fi
+  fi
 }
 
 validate_nginx_entry_asset_cache
 
-if [[ "$STRICT" -eq 1 ]]; then
+  if [[ "$STRICT" -eq 1 ]]; then
   html_size=$(wc -c < "$HTML_PATH")
   if [[ "$html_size" -lt 1500 ]]; then
     log_warn "index.html is unusually small (${html_size} bytes)"
@@ -163,8 +174,24 @@ if [[ "$STRICT" -eq 1 ]]; then
 
   asset_dir="$(dirname "$HTML_PATH")/assets"
   if [[ -d "$asset_dir" ]]; then
+    if grep -R -nE 'https?://(localhost|127\.0\.0\.1|\[::1\]):54321' "$asset_dir" 2>/dev/null; then
+      log_error "Production assets contain a legacy loopback data URL"
+      exit 1
+    fi
+
     if grep -R -nE 'https?://(localhost|127\.0\.0\.1|\[::1\]):8081' "$asset_dir" 2>/dev/null; then
       log_error "Production assets contain a client-side FileBrowser localhost URL"
+      exit 1
+    fi
+
+    legacy_provider="supa""base"
+    legacy_functions_path="/""functions"
+    legacy_storage_path="/""storage"
+    legacy_rest_path="/""rest"
+    legacy_lead_route="capture""-lead"
+    forbidden_release_pattern="Session expirée|${legacy_lead_route}|${legacy_functions_path}(?:/v1)?/|${legacy_storage_path}/v1/|${legacy_rest_path}/v1/|${legacy_provider}\\.(?:co|in)|@${legacy_provider}|${legacy_provider}-vendor|VITE_${legacy_provider^^}"
+    if grep -R -nE "$forbidden_release_pattern" "$asset_dir" "$HTML_PATH" 2>/dev/null; then
+      log_error "Production assets still contain legacy data-platform or session-expired references"
       exit 1
     fi
 
@@ -176,7 +203,7 @@ if [[ "$STRICT" -eq 1 ]]; then
       VITE_META_ACCESS_TOKEN
       VITE_ONESIGNAL_API_KEY
       VITE_SMS_API_KEY
-      VITE_SUPABASE_SERVICE_ROLE_KEY
+      VITE_DATABASE_SERVICE_ROLE_KEY
       VITE_TELEGRAM_BOT_TOKEN
       VITE_TWILIO_AUTH_TOKEN
       VITE_WHATSAPP_ACCESS_TOKEN
@@ -338,6 +365,18 @@ check_url() {
       "https://*.ingest.us.sentry.io"; do
       if [[ "$content_security_policy" != *"$required_csp_source"* ]]; then
         log_error "$url CSP does not allow $required_csp_source"
+        rm -f "$tmp_body" "$tmp_headers"
+        return 1
+      fi
+    done
+
+    for forbidden_csp_source in \
+      "'unsafe-eval'" \
+      "supa""base.co" \
+      "supa""base.in" \
+      "thykrnoqgylrbfupophs"; do
+      if [[ "$content_security_policy" == *"$forbidden_csp_source"* ]]; then
+        log_error "$url CSP still allows legacy source $forbidden_csp_source"
         rm -f "$tmp_body" "$tmp_headers"
         return 1
       fi

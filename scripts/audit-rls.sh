@@ -15,10 +15,6 @@ read_env() {
   grep -E "^${key}=" "${ENV_FILE}" | tail -n1 | cut -d'=' -f2- | sed 's/^ *//;s/ *$//' || true
 }
 
-if grep -q '^VITE_SUPABASE_MODE=cloud' "${ENV_FILE}" 2>/dev/null; then
-  ENV_FILE="${ROOT_DIR}/.env.server"
-fi
-
 if [ ! -f "${ENV_FILE}" ]; then
   echo "[ERROR] Environment file not found: ${ENV_FILE}" >&2
   exit 1

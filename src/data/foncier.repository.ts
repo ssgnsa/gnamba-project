@@ -1,11 +1,11 @@
 /**
  * DATA LAYER — Foncier Repository
- * Wrapper sur supabaseService existant pour unification progressive (Strangler Fig).
- * Les composants migrent de supabase.from() direct vers foncierRepository.*
+ * Wrapper sur dataService existant pour unification progressive (Strangler Fig).
+ * Les composants migrent de dbClient.from() direct vers foncierRepository.*
  */
 
-import { supabaseService } from '../lib/supabase.service';
-import { dbClient, withRetry } from './client';
+import { dataService } from "../lib/dbClient.service";
+import { dbClient, withRetry } from "./dbClient";
 
 export interface LotSearchParams {
   search?: string;
@@ -14,7 +14,7 @@ export interface LotSearchParams {
   quartier?: string;
   lotissement?: string;
   sort?: string;
-  dir?: 'asc' | 'desc';
+  dir?: "asc" | "desc";
   page?: number;
   limit?: number;
   include_archived?: boolean;
@@ -22,14 +22,14 @@ export interface LotSearchParams {
 
 export const foncierRepository = {
   async searchLots(params: LotSearchParams = {}) {
-    return supabaseService.searchLots({
-      search: params.search ?? '',
-      village: params.village ?? '',
-      quartier: params.quartier ?? '',
-      lotissement: params.lotissement ?? '',
-      statut: params.statut ?? '',
-      sort: params.sort ?? 'created_at',
-      dir: params.dir ?? 'desc',
+    return dataService.searchLots({
+      search: params.search ?? "",
+      village: params.village ?? "",
+      quartier: params.quartier ?? "",
+      lotissement: params.lotissement ?? "",
+      statut: params.statut ?? "",
+      sort: params.sort ?? "created_at",
+      dir: params.dir ?? "desc",
       page: params.page ?? 1,
       limit: params.limit ?? 20,
       include_archived: params.include_archived ?? false,
@@ -37,27 +37,27 @@ export const foncierRepository = {
   },
 
   async getLotById(id: string) {
-    return supabaseService.getLotById(id);
+    return dataService.getLotById(id);
   },
 
   async saveLot(data: Record<string, unknown>, isUpdate = false) {
-    return supabaseService.saveLot(data as any, isUpdate);
+    return dataService.saveLot(data as any, isUpdate);
   },
 
-  async softDeleteLot(id: string, reason = 'archivage') {
-    return supabaseService.softDeleteLot(id, reason);
+  async softDeleteLot(id: string, reason = "archivage") {
+    return dataService.softDeleteLot(id, reason);
   },
 
   async restoreLot(id: string) {
-    return supabaseService.restoreLot(id);
+    return dataService.restoreLot(id);
   },
 
   async getVillages() {
-    return supabaseService.getVillages();
+    return dataService.getVillages();
   },
 
   async getVillageStats(includeArchived = false) {
-    return supabaseService.getVillageStats(includeArchived);
+    return dataService.getVillageStats(includeArchived);
   },
 
   async checkDuplicate(params: {
@@ -67,7 +67,7 @@ export const foncierRepository = {
     lot: string;
     exclude_lot_id?: string | null;
   }) {
-    return supabaseService.checkLotDuplicate(params);
+    return dataService.checkLotDuplicate(params);
   },
 
   async ensureHierarchy(params: {
@@ -75,27 +75,31 @@ export const foncierRepository = {
     lotissement: string;
     ilot: string;
   }) {
-    return supabaseService.ensureHierarchy(params);
+    return dataService.ensureHierarchy(params);
   },
 
   async getLatestAttestation(lotId: string, includeArchived = false) {
-    return supabaseService.getLatestAttestationForLot(lotId, includeArchived);
+    return dataService.getLatestAttestationForLot(lotId, includeArchived);
   },
 
   async createAttestation(payload: Record<string, unknown>) {
-    return supabaseService.createAttestationAtomic(payload);
+    return dataService.createAttestationAtomic(payload);
   },
 
-  async getAudit(params: { page: number; pageSize: number; actionFilter?: string }) {
-    return supabaseService.getAudit(params);
+  async getAudit(params: {
+    page: number;
+    pageSize: number;
+    actionFilter?: string;
+  }) {
+    return dataService.getAudit(params);
   },
 
   async getVillagesList() {
     return withRetry(() =>
       dbClient
-        .from('foncier_villages')
-        .select('id, name, logo_url, region, commune, departement')
-        .order('name'),
+        .from("foncier_villages")
+        .select("id, nom, logo_url, region, commune, departement")
+        .order("nom"),
     );
   },
 };

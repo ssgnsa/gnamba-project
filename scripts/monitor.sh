@@ -49,13 +49,13 @@ COMMANDES:
     report          Générer un rapport de monitoring
 
 OPTIONS:
-    --env <env>     Environnement spécifique (local-dev, local-server, cloud-prod)
+    --env <env>     Environnement spécifique (local-dev, local-server)
     --interval <s>  Intervalle de surveillance en secondes (défaut: 300)
     --webhook <url> URL webhook pour les notifications
 
 EXEMPLES:
     $0 status
-    $0 watch --env cloud-prod
+    $0 watch --env local-server
     $0 health --env local-server
     $0 report
 
@@ -145,23 +145,10 @@ get_db_status() {
             fi
             ;;
         local-server)
-            # Test de connexion au serveur local
-            if nc -z 192.168.1.58 5432 2>/dev/null; then
-                echo "✅ Serveur"
+            if supabase status 2>/dev/null | grep -q "running"; then
+                echo "✅ Tunnel"
             else
-                echo "❌ Serveur"
-            fi
-            ;;
-        cloud-prod)
-            # Test de connexion cloud
-            local api_url="https://thykrnoqgylrbfupophs.supabase.co"
-            local api_key
-            api_key=$(grep "VITE_SUPABASE_ANON_KEY" "$ROOT_DIR/.env.server" | cut -d'=' -f2 || echo "")
-
-            if [[ -n "$api_key" ]] && curl -s --max-time 5 "$api_url/rest/v1/" -H "apikey: $api_key" >/dev/null 2>&1; then
-                echo "✅ Cloud"
-            else
-                echo "❌ Cloud"
+                echo "❌ Tunnel"
             fi
             ;;
         *)
@@ -305,22 +292,22 @@ test_supabase_api() {
 
     case "$env" in
         local-dev)
-            local api_url="http://localhost:54321"
+            local api_url="${VITE_SUPABASE_LOCAL_URL:-http://localhost:54321}"
             if curl -s --max-time 5 "$api_url/rest/v1/" >/dev/null 2>&1; then
                 echo "✅ API locale accessible"
             else
                 echo "❌ API locale inaccessible"
             fi
             ;;
-        local-server|cloud-prod)
-            local api_url="https://thykrnoqgylrbfupophs.supabase.co"
+        local-server)
+            local api_url="${VITE_SUPABASE_LOCAL_URL:-http://localhost:54321}"
             local api_key
-            api_key=$(grep "VITE_SUPABASE_ANON_KEY" "$ROOT_DIR/.env.server" | cut -d'=' -f2 || echo "")
+            api_key=$(grep "VITE_SUPABASE_LOCAL_ANON_KEY" "$ROOT_DIR/.env.server" | cut -d'=' -f2 || echo "")
 
             if [[ -n "$api_key" ]] && curl -s --max-time 5 "$api_url/rest/v1/" -H "apikey: $api_key" >/dev/null 2>&1; then
-                echo "✅ API cloud accessible"
+                echo "✅ API tunnel accessible"
             else
-                echo "❌ API cloud inaccessible"
+                echo "❌ API tunnel inaccessible"
             fi
             ;;
         *)
@@ -342,20 +329,10 @@ test_database() {
             fi
             ;;
         local-server)
-            # Test de connexion au serveur PostgreSQL
-            if nc -z 192.168.1.58 5432 2>/dev/null; then
-                echo "✅ DB serveur accessible"
+            if supabase status 2>/dev/null | grep -q "running"; then
+                echo "✅ DB tunnel opérationnelle"
             else
-                echo "❌ DB serveur inaccessible"
-            fi
-            ;;
-        cloud-prod)
-            # Test de connexion cloud
-            local db_url="${ENV_CONFIG["cloud-prod:db_url"]}"
-            if [[ -n "$db_url" ]] && pg_isready "$db_url" 2>/dev/null; then
-                echo "✅ DB cloud accessible"
-            else
-                echo "❌ DB cloud inaccessible"
+                echo "❌ DB tunnel arrêtée"
             fi
             ;;
         *)
@@ -372,8 +349,7 @@ test_critical_features() {
     local login_url
     case "$env" in
         local-dev) login_url="http://localhost:8080/login" ;;
-        local-server) login_url="http://192.168.1.58/login" ;;
-        cloud-prod) login_url="https://gnambaservices.ci/login" ;;
+        local-server) login_url="http://localhost/login" ;;
         *) return ;;
     esac
 
@@ -394,8 +370,7 @@ test_performance() {
 
     case "$env" in
         local-dev) url="http://localhost:8080" ;;
-        local-server) url="http://192.168.1.58" ;;
-        cloud-prod) url="https://gnambaservices.ci" ;;
+        local-server) url="https://gnambaservices.ci" ;;
         *) return ;;
     esac
 

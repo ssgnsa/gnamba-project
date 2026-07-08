@@ -92,6 +92,8 @@ export default function BrandAssetsManager() {
       setSaved(type);
       setTimeout(() => setSaved(null), 2500);
       await refreshSettings();
+    } else {
+      window.alert(`Échec de l'enregistrement de l'actif de marque: ${error}`);
     }
     setSaving(null);
     setPicking(null);

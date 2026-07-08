@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================================
 # generate-types.sh — Génère les types TypeScript depuis la DB Supabase
-# Usage: bash scripts/generate-types.sh [--local|--cloud]
+# Usage: bash scripts/generate-types.sh [--local|--remote]
 # ============================================================================
 set -euo pipefail
 
@@ -43,9 +43,9 @@ if [ "$MODE" = "--local" ]; then
     exit 1
   }
 
-elif [ "$MODE" = "--cloud" ]; then
+elif [ "$MODE" = "--remote" ]; then
   echo ""
-  echo "☁️  Connexion à Supabase Cloud..."
+  echo "🔗 Connexion à la base distante..."
 
   # Try to get DB password from environment or prompt
   source .env.server 2>/dev/null || true

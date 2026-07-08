@@ -5,7 +5,7 @@
 Ce workflow assure une **synchronisation parfaite** entre les environnements EGS :
 
 - **Développement Local** : `http://localhost:8080/login`
-- **Serveur Local** : `http://192.168.1.58/login`
+  -- **Serveur Local** : `http://REDACTED_LEGACY_HOST/login`
 - **Production Cloud** : `https://gnambaservices.ci/`
 
 **Principe** : Toujours travailler en **local first**, puis synchroniser vers les autres environnements.
@@ -14,11 +14,11 @@ Ce workflow assure une **synchronisation parfaite** entre les environnements EGS
 
 ### Scripts Principaux
 
-| Script | Description | Usage |
-|--------|-------------|-------|
+| Script                     | Description                          | Usage                               |
+| -------------------------- | ------------------------------------ | ----------------------------------- |
 | `scripts/sync-workflow.sh` | Synchronisation entre environnements | `./scripts/sync-workflow.sh status` |
-| `scripts/deploy.sh` | Déploiement automatisé | `./scripts/deploy.sh local-dev` |
-| `scripts/monitor.sh` | Monitoring et surveillance | `./scripts/monitor.sh status` |
+| `scripts/deploy.sh`        | Déploiement automatisé               | `./scripts/deploy.sh local-dev`     |
+| `scripts/monitor.sh`       | Monitoring et surveillance           | `./scripts/monitor.sh status`       |
 
 ### Commandes Rapides
 
@@ -103,7 +103,7 @@ npm test
 ```bash
 # Déploiements par environnement
 ./scripts/deploy.sh local-dev           # Développement local
-./scripts/deploy.sh local-server        # Serveur local (192.168.1.58)
+./scripts/deploy.sh local-server        # Serveur local (REDACTED_LEGACY_HOST)
 ./scripts/deploy.sh cloud-prod          # Production cloud
 
 # Options
@@ -212,6 +212,7 @@ Développement Local → Serveur Local → Production Cloud
 ### Rapports
 
 Générés automatiquement dans `reports/` :
+
 - État des environnements
 - Historique des synchronisations
 - Logs d'erreurs
@@ -222,6 +223,7 @@ Générés automatiquement dans `reports/` :
 ### Problèmes Courants
 
 #### "Environnement inaccessible"
+
 ```bash
 # Vérifier la connectivité
 ./scripts/monitor.sh health --env <environment>
@@ -231,6 +233,7 @@ Générés automatiquement dans `reports/` :
 ```
 
 #### "Synchronisation échoue"
+
 ```bash
 # Vérifier les permissions
 ls -la .env*
@@ -240,6 +243,7 @@ ls -la .env*
 ```
 
 #### "Build échoue"
+
 ```bash
 # Nettoyer et rebuild
 npm run dev:clean
@@ -303,11 +307,13 @@ npm run backup:run             # → ./scripts/sync-workflow.sh backup cloud-pro
 ### Migration depuis l'ancien système
 
 1. **Évaluer l'état actuel**
+
    ```bash
    ./scripts/sync-workflow.sh status
    ```
 
 2. **Migrer progressivement**
+
    ```bash
    # Commencer par le développement
    ./scripts/deploy.sh local-dev
@@ -333,5 +339,5 @@ npm run backup:run             # → ./scripts/sync-workflow.sh backup cloud-pro
 - [ ] Monitoring activé
 - [ ] Plan de rollback prêt
 
-**Rappel** : Toujours tester en `local-dev` avant de déployer sur `local-server`, puis sur `cloud-prod`. 
+**Rappel** : Toujours tester en `local-dev` avant de déployer sur `local-server`, puis sur `cloud-prod`.
 <parameter name="filePath">/home/soma/gnamba-project/SYNC_WORKFLOW_README.md

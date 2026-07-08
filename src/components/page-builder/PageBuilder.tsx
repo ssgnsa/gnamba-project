@@ -15,7 +15,7 @@ import {
   Check,
   Loader2,
 } from "lucide-react";
-import { supabase } from "../../lib/supabase";
+import dbClient from "../../data/tableClient";
 import {
   PageSection,
   SectionType,
@@ -57,7 +57,7 @@ export default function PageBuilder() {
   const loadLayout = useCallback(async (slug: string) => {
     setLoading(true);
     setSelectedId(null);
-    const { data } = await supabase
+    const { data } = await dbClient
       .from("page_layouts")
       .select("*")
       .eq("page_slug", slug)
@@ -165,16 +165,14 @@ export default function PageBuilder() {
 
   const saveLayout = async () => {
     setSaving(true);
-    const { error } = await supabase
-      .from("page_layouts")
-      .upsert(
-        {
-          page_slug: currentSlug,
-          layout_json: sections,
-          is_published: isPublished,
-        },
-        { onConflict: "page_slug" },
-      );
+    const { error } = await dbClient.from("page_layouts").upsert(
+      {
+        page_slug: currentSlug,
+        layout_json: sections,
+        is_published: isPublished,
+      },
+      { onConflict: "page_slug" },
+    );
     setSaving(false);
     if (!error) {
       setSaved(true);
@@ -184,17 +182,15 @@ export default function PageBuilder() {
 
   const publishLayout = async () => {
     setPublishing(true);
-    const { error } = await supabase
-      .from("page_layouts")
-      .upsert(
-        {
-          page_slug: currentSlug,
-          layout_json: sections,
-          is_published: true,
-          published_at: new Date().toISOString(),
-        },
-        { onConflict: "page_slug" },
-      );
+    const { error } = await dbClient.from("page_layouts").upsert(
+      {
+        page_slug: currentSlug,
+        layout_json: sections,
+        is_published: true,
+        published_at: new Date().toISOString(),
+      },
+      { onConflict: "page_slug" },
+    );
     setPublishing(false);
     if (!error) {
       setIsPublished(true);

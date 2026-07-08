@@ -15,6 +15,7 @@ const pageTitles: Record<Page, string> = {
   projets: "Projets BTP",
   immobilier: "Gestion Immobilière",
   foncier: "Dossiers Fonciers",
+  "catalogue-lots": "Catalogue Commercial",
   fournitures: "Gestion des Fournitures",
   finances: "Gestion Financière",
   employes: "Ressources Humaines",
@@ -26,6 +27,7 @@ const pageTitles: Record<Page, string> = {
   statistiques: "Statistiques",
   parametres: "Paramètres",
   "site-editor": "Éditeur du Site Vitrine",
+  "codex-assistant": "Assistant Codex",
   registre: "Registre Visiteur",
   leads: "Leads & Campagnes",
 };

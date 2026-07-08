@@ -1,4 +1,6 @@
-import { supabase } from "./supabase";
+import { apiClient } from "../api/client";
+import { isSelfHostedMode } from "./selfHosted";
+import dbClient from "../data/tableClient";
 import type {
   MediaFile,
   MediaUsage,
@@ -13,7 +15,9 @@ export async function logMediaAction(
   actorId: string | null,
   metadata: Record<string, unknown> = {},
 ): Promise<void> {
-  await supabase.from("media_audit_logs").insert({
+  if (isSelfHostedMode()) return;
+
+  await dbClient.from("media_audit_logs").insert({
     media_id: mediaId,
     action,
     actor_id: actorId,
@@ -22,7 +26,15 @@ export async function logMediaAction(
 }
 
 export async function getMediaUsages(mediaId: string): Promise<MediaUsage[]> {
-  const { data } = await supabase
+  if (isSelfHostedMode()) {
+    const result = await apiClient.request<MediaUsage[]>(
+      `/api/v1/media/usage?media_id=${encodeURIComponent(mediaId)}`,
+    );
+    if (result.error || !result.data) return [];
+    return result.data;
+  }
+
+  const { data } = await dbClient
     .from("media_usage")
     .select("*")
     .eq("media_id", mediaId)
@@ -37,9 +49,24 @@ export async function assignMedia(
   usageType: string,
   label?: string,
 ): Promise<{ error: string | null }> {
-  // FIX: Use .eq() instead of .is() when entityId is defined to prevent duplicates
-  // .is() is for NULL checks only, .eq() is for value matching
-  let query = supabase
+  if (isSelfHostedMode()) {
+    const result = await apiClient.request<{
+      status: string;
+      message?: string;
+    }>("/api/v1/media/usage", {
+      method: "POST",
+      body: JSON.stringify({
+        media_id: mediaId,
+        entity_type: entityType,
+        entity_id: entityId,
+        usage_type: usageType,
+        label: label || "",
+      }),
+    });
+    return { error: result.error || null };
+  }
+
+  let query = dbClient
     .from("media_usage")
     .select("id")
     .eq("entity_type", entityType)
@@ -54,14 +81,14 @@ export async function assignMedia(
   const existing = await query;
 
   if (existing.data && existing.data.length > 0) {
-    const { error } = await supabase
+    const { error } = await dbClient
       .from("media_usage")
       .update({ media_id: mediaId, label: label || "" })
       .eq("id", existing.data[0].id);
     return { error: error?.message || null };
   }
 
-  const { error } = await supabase.from("media_usage").insert({
+  const { error } = await dbClient.from("media_usage").insert({
     media_id: mediaId,
     entity_type: entityType,
     entity_id: entityId,
@@ -71,15 +98,37 @@ export async function assignMedia(
   return { error: error?.message || null };
 }
 
-export async function removeAssignment(usageId: string): Promise<{ error: string | null }> {
-  const { error } = await supabase.from("media_usage").delete().eq("id", usageId);
+export async function removeAssignment(
+  usageId: string,
+): Promise<{ error: string | null }> {
+  if (isSelfHostedMode()) {
+    const result = await apiClient.request<{ status: string }>(
+      `/api/v1/media/usage/${encodeURIComponent(usageId)}`,
+      { method: "DELETE" },
+    );
+    return { error: result.error || null };
+  }
+
+  const { error } = await dbClient
+    .from("media_usage")
+    .delete()
+    .eq("id", usageId);
   return { error: error?.message || null };
 }
 
 export async function getBrandAsset(
   type: BrandAssetType,
 ): Promise<MediaFile | null> {
-  const { data } = await supabase
+  if (isSelfHostedMode()) {
+    const result = await apiClient.request<MediaFile[]>(
+      "/api/v1/media/brand-assets",
+    );
+    if (result.error || !result.data) return null;
+    const match = result.data.find((item) => item.brand_asset_type === type);
+    return match ? ({ ...match, url: match.url || "" } as MediaFile) : null;
+  }
+
+  const { data } = await dbClient
     .from("media_files")
     .select("*")
     .eq("is_brand_asset", true)
@@ -95,7 +144,6 @@ export async function setBrandAsset(
   type: BrandAssetType,
   userId: string,
 ): Promise<{ error: string | null }> {
-  void userId;
   const settingsKeyByType: Record<BrandAssetType, string> = {
     logo_principal: "logo_url",
     logo_secondaire: "brand_logo_dark",
@@ -103,12 +151,55 @@ export async function setBrandAsset(
     watermark: "brand_watermark_url",
   };
 
-  await supabase
+  if (isSelfHostedMode()) {
+    const clear = await apiClient.request<MediaFile[]>("/api/v1/media");
+    if (clear.data) {
+      const previous = clear.data.filter((item) => item.brand_asset_type === type);
+      for (const item of previous) {
+        await apiClient.media.update(item.id, {
+          is_brand_asset: false,
+          brand_asset_type: null,
+        });
+      }
+    }
+
+    const assign = await apiClient.media.update(mediaId, {
+      is_brand_asset: true,
+      brand_asset_type: type,
+    });
+
+    if (assign.error || !assign.data) {
+      return { error: assign.error || "Impossible d'assigner l'actif de marque." };
+    }
+
+    const settingKey = settingsKeyByType[type];
+    if (settingKey) {
+      const setting = await apiClient.settings.upsert([
+        { key: settingKey, value: assign.data.url || "" },
+      ]);
+      if (setting.error) return { error: setting.error };
+    }
+
+    const usage = await assignMedia(
+      mediaId,
+      "brand",
+      null,
+      type,
+      type.replace("_", " "),
+    );
+    return { error: usage.error };
+  }
+
+  const { error: clearError } = await dbClient
     .from("media_files")
     .update({ is_brand_asset: false, brand_asset_type: null })
     .eq("brand_asset_type", type);
 
-  const { error } = await supabase
+  if (clearError) {
+    return { error: clearError.message };
+  }
+
+  const { error: assignError } = await dbClient
     .from("media_files")
     .update({
       is_brand_asset: true,
@@ -117,23 +208,53 @@ export async function setBrandAsset(
     })
     .eq("id", mediaId);
 
-  if (error) return { error: error.message };
+  if (assignError) {
+    return { error: assignError.message };
+  }
 
-  const { data: file } = await supabase
+  const { data: file, error: fileError } = await dbClient
     .from("media_files")
     .select("url")
     .eq("id", mediaId)
     .maybeSingle();
 
-  const settingKey = settingsKeyByType[type];
-  if (file && settingKey) {
-    await supabase
-      .from("app_settings")
-      .upsert({ key: settingKey, value: file.url }, { onConflict: "key" });
+  if (fileError) {
+    return { error: fileError.message };
   }
 
-  await assignMedia(mediaId, "brand", null, type, type.replace("_", " "));
-  await logMediaAction("metadata_update", mediaId, userId, { brand_asset_type: type });
+  const settingKey = settingsKeyByType[type];
+  if (file && settingKey) {
+    const { error: settingsError } = await dbClient
+      .from("app_settings")
+      .upsert({ key: settingKey, value: file.url }, { onConflict: "key" });
+
+    if (settingsError) {
+      return { error: settingsError.message };
+    }
+  }
+
+  const { error: usageError } = await assignMedia(
+    mediaId,
+    "brand",
+    null,
+    type,
+    type.replace("_", " "),
+  );
+
+  if (usageError) {
+    return { error: usageError };
+  }
+
+  try {
+    await logMediaAction("metadata_update", mediaId, userId, {
+      brand_asset_type: type,
+    });
+  } catch (logError) {
+    if (import.meta.env.DEV) {
+      console.warn("Impossible d'enregistrer l'audit du média:", logError);
+    }
+  }
+
   return { error: null };
 }
 
@@ -142,7 +263,15 @@ export async function getUsageForSlot(
   entityId: string | null,
   usageType: string,
 ): Promise<MediaFile | null> {
-  let query = supabase
+  if (isSelfHostedMode()) {
+    const result = await apiClient.request<MediaFile[]>(
+      `/api/v1/media/usage?entity_type=${encodeURIComponent(entityType)}&usage_type=${encodeURIComponent(usageType)}${entityId ? `&entity_id=${encodeURIComponent(entityId)}` : ""}`,
+    );
+    if (result.error || !result.data || result.data.length === 0) return null;
+    return result.data[0] || null;
+  }
+
+  let query = dbClient
     .from("media_usage")
     .select("media_id, media_files!inner(*)")
     .eq("entity_type", entityType)
@@ -157,8 +286,11 @@ export async function getUsageForSlot(
 
   const { data } = await query.maybeSingle();
   if (!data) return null;
-  const file = (data as unknown as { media_files: MediaFile & { public_url?: string } }).media_files;
-  if (!file || (file as MediaFile & { deleted_at?: string | null }).deleted_at) return null;
+  const file = (
+    data as unknown as { media_files: MediaFile & { public_url?: string } }
+  ).media_files;
+  if (!file || (file as MediaFile & { deleted_at?: string | null }).deleted_at)
+    return null;
   // Compatibilité ancien schéma : certaines images ont public_url mais url vide
   if (!file.url && (file as { public_url?: string }).public_url) {
     file.url = (file as { public_url?: string }).public_url!;
@@ -169,7 +301,11 @@ export async function getUsageForSlot(
 export async function getMediaVersions(
   mediaId: string,
 ): Promise<MediaVersion[]> {
-  const { data } = await supabase
+  if (isSelfHostedMode()) {
+    return [];
+  }
+
+  const { data } = await dbClient
     .from("media_versions")
     .select("*")
     .eq("media_id", mediaId)
@@ -182,7 +318,15 @@ export async function replaceMediaFile(
   newFile: File,
   userId: string,
 ): Promise<{ data: MediaFile | null; error: string | null }> {
-  const { data: existing } = await supabase
+  if (isSelfHostedMode()) {
+    const result = await apiClient.media.replace(mediaId, newFile);
+    return {
+      data: result.data ?? null,
+      error: result.error || null,
+    };
+  }
+
+  const { data: existing } = await dbClient
     .from("media_files")
     .select("*")
     .eq("id", mediaId)
@@ -190,7 +334,7 @@ export async function replaceMediaFile(
 
   if (!existing) return { data: null, error: "Media not found" };
 
-  const { data: versionsData } = await supabase
+  const { data: versionsData } = await dbClient
     .from("media_versions")
     .select("version_number")
     .eq("media_id", mediaId)
@@ -202,7 +346,7 @@ export async function replaceMediaFile(
     ((versionsData as { version_number: number } | null)?.version_number || 0) +
     1;
 
-  await supabase.from("media_versions").insert({
+  await dbClient.from("media_versions").insert({
     media_id: mediaId,
     version_number: nextVersion,
     old_url: existing.url,
@@ -213,17 +357,21 @@ export async function replaceMediaFile(
   const ext = newFile.name.split(".").pop();
   const newFilename = `${existing.category}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
 
-  const { error: uploadError } = await supabase.storage
+  const { error: uploadError } = await dbClient.storage
     .from("media")
-    .upload(newFilename, newFile, { cacheControl: "31536000", upsert: false, contentType: newFile.type });
+    .upload(newFilename, newFile, {
+      cacheControl: "31536000",
+      upsert: false,
+      contentType: newFile.type,
+    });
 
   if (uploadError) return { data: null, error: uploadError.message };
 
   const {
     data: { publicUrl },
-  } = supabase.storage.from("media").getPublicUrl(newFilename);
+  } = dbClient.storage.from("media").getPublicUrl(newFilename);
 
-  const { data: updated, error: dbError } = await supabase
+  const { data: updated, error: dbError } = await dbClient
     .from("media_files")
     .update({
       filename: newFilename,
@@ -238,7 +386,7 @@ export async function replaceMediaFile(
 
   if (dbError) {
     // ROLLBACK : supprimer le nouveau fichier du Storage car la DB a échoué
-    await supabase.storage.from("media").remove([newFilename]);
+    await dbClient.storage.from("media").remove([newFilename]);
     return { data: null, error: dbError.message };
   }
 
@@ -252,7 +400,7 @@ export async function replaceMediaFile(
     const assetType = existing.brand_asset_type as BrandAssetType;
     const settingKey = settingsKeyByType[assetType];
     if (settingKey) {
-      await supabase
+      await dbClient
         .from("app_settings")
         .upsert({ key: settingKey, value: publicUrl }, { onConflict: "key" });
     }

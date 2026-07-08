@@ -128,9 +128,6 @@ export default function PublicVerification({
   const primary = settings.primary_color || "#166534";
   const holderName =
     [data?.titulaire?.prenom, data?.titulaire?.nom].filter(Boolean).join(" ") ||
-    [data?.lot?.proprietaire_prenom, data?.lot?.proprietaire_nom]
-      .filter(Boolean)
-      .join(" ") ||
     "—";
   const villageName = data?.village_info?.village || data?.lot?.village || "—";
   const lotissementName =
@@ -139,6 +136,9 @@ export default function PublicVerification({
     data?.village_info?.numero_lot || data?.lot?.numero_lot || "—";
   const surface = data?.parcelle?.superficie_m2 ?? data?.lot?.superficie;
   const gps = data?.parcelle?.coordonnees_gps;
+  const hasPrivateDetails = Boolean(
+    data?.titulaire || (data?.temoins && data.temoins.length > 0),
+  );
 
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#eef6f0_48%,#f8fafc_100%)] px-4 py-10 sm:px-6 lg:px-8">
@@ -342,29 +342,36 @@ export default function PublicVerification({
                 <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
                   <section className="rounded-[26px] border border-slate-200 bg-white p-5 sm:p-6">
                     <div className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                      Identité du bénéficiaire
+                      Données personnelles
                     </div>
-                    <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                      <StatBlock label="Nom complet" value={holderName} />
-                      <StatBlock
-                        label="Téléphone"
-                        value={data.titulaire?.telephone || "—"}
-                      />
-                      <StatBlock
-                        label="Profession"
-                        value={data.titulaire?.profession || "—"}
-                      />
-                      <StatBlock
-                        label="CNI"
-                        value={data.titulaire?.cni_numero || "—"}
-                      />
-                      <div className="sm:col-span-2">
+                    {hasPrivateDetails ? (
+                      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                        <StatBlock label="Nom complet" value={holderName} />
                         <StatBlock
-                          label="Domicile"
-                          value={data.titulaire?.domicile || "—"}
+                          label="Téléphone"
+                          value={data.titulaire?.telephone || "—"}
                         />
+                        <StatBlock
+                          label="Profession"
+                          value={data.titulaire?.profession || "—"}
+                        />
+                        <StatBlock
+                          label="CNI"
+                          value={data.titulaire?.cni_numero || "—"}
+                        />
+                        <div className="sm:col-span-2">
+                          <StatBlock
+                            label="Domicile"
+                            value={data.titulaire?.domicile || "—"}
+                          />
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-600">
+                        Les données personnelles détaillées ne sont pas publiées
+                        dans cette vue de vérification.
+                      </div>
+                    )}
                   </section>
 
                   <section className="rounded-[26px] border border-slate-200 bg-white p-5 sm:p-6">
@@ -494,8 +501,9 @@ export default function PublicVerification({
                           </div>
                         ))
                       ) : (
-                        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-500">
-                          Aucun témoin publié dans le dossier de vérification.
+                        <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-500">
+                          Les témoins détaillés restent visibles dans le dossier
+                          interne.
                         </div>
                       )}
                     </div>

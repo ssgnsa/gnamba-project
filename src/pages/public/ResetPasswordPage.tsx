@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { Eye, EyeOff, CheckCircle, AlertCircle, Lock } from "lucide-react";
-import { supabase } from "../../lib/supabase";
 import { useSettings } from "../../context/SettingsContext";
 import BrandLogo from "../../components/BrandLogo";
+import { OFFICIAL_CONTACT } from "../../lib/officialContact";
+import { apiClient } from "../../api/client";
 
 interface Props {
   onSuccess: () => void;
@@ -19,7 +20,7 @@ export default function ResetPasswordPage({ onSuccess }: Props) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
-  const companyName = settings.app_company || "Gnamba Services";
+  const companyName = OFFICIAL_CONTACT.companyName;
   const appTitle = settings.app_title || "EGS";
   const logoInitials = companyName
     .split(" ")
@@ -61,14 +62,18 @@ export default function ResetPasswordPage({ onSuccess }: Props) {
     setSaving(true);
     setError("");
 
-    const { error: updateError } = await supabase.auth.updateUser({
-      password: password,
-    });
+    const result = await apiClient.request<{ message?: string }>(
+      "/api/v1/auth/reset-password",
+      {
+        method: "POST",
+        body: JSON.stringify({ password }),
+      },
+    );
 
     setSaving(false);
 
-    if (updateError) {
-      setError(updateError.message);
+    if (result.error) {
+      setError(result.error);
     } else {
       setSuccess(true);
       setTimeout(() => {

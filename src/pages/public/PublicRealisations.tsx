@@ -8,7 +8,7 @@ import {
   Calendar,
   Search,
 } from "lucide-react";
-import { supabase } from "../../lib/supabase";
+import dbClient from "../../data/tableClient";
 
 interface Realisation {
   id: string;
@@ -78,7 +78,7 @@ export default function PublicRealisations() {
     setLoading(true);
     void (async () => {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await dbClient
           .from("site_realisations")
           .select("*")
           .order("featured", { ascending: false })

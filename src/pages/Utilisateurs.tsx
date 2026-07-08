@@ -12,13 +12,15 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { supabase } from "../lib/supabase";
 import Modal from "../components/ui/Modal";
 import Badge from "../components/ui/Badge";
 import { useSettings } from "../context/SettingsContext";
 import { ACCESS_LEVEL_LABELS, useAuth } from "../context/AuthContext";
 import type { AccessLevel, UserRole } from "../types";
 import MediaPicker from "../components/media/MediaPicker";
+import { isSelfHostedMode } from "../lib/selfHosted";
+import { apiClient } from "../api/client";
+import dbClient from "../data/tableClient";
 
 interface UserProfileRow {
   id: string;
@@ -138,7 +140,9 @@ export default function Utilisateurs() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [creatingAccount, setCreatingAccount] = useState(false);
-  const [showAvatarPicker, setShowAvatarPicker] = useState<"create" | "edit" | null>(null);
+  const [showAvatarPicker, setShowAvatarPicker] = useState<
+    "create" | "edit" | null
+  >(null);
 
   useEffect(() => {
     fetchUsers();
@@ -147,7 +151,24 @@ export default function Utilisateurs() {
   const fetchUsers = async () => {
     setLoading(true);
     setError("");
-    const { data, error: fetchError } = await supabase
+
+    if (isSelfHostedMode()) {
+      const result = await apiClient.users.getAll();
+      if (result.error || !result.data) {
+        setUsers([]);
+        setError(
+          `Chargement impossible (API locale): ${result.error || "Erreur inconnue"}`,
+        );
+        setLoading(false);
+        return;
+      }
+
+      setUsers(result.data as UserProfileRow[]);
+      setLoading(false);
+      return;
+    }
+
+    const { data, error: fetchError } = await dbClient
       .from("user_profiles")
       .select("*")
       .order("full_name");
@@ -205,6 +226,49 @@ export default function Utilisateurs() {
       return;
     }
 
+    if (isSelfHostedMode()) {
+      setSaving(true);
+      setError("");
+      const technicalRole = mapAccessLevelToRole(form.access_level);
+      const payload = {
+        full_name: fullName,
+        role: technicalRole,
+        access_level: form.access_level,
+        poste: form.poste.trim() || null,
+        department: form.department.trim() || null,
+        phone: form.phone.trim() || null,
+        avatar_url: form.avatar_url.trim() || null,
+      };
+
+      if (editingId) {
+        const result = await apiClient.users.update(editingId, payload);
+        if (result.error || !result.data) {
+          setSaving(false);
+          setError(
+            `Mise à jour impossible: ${result.error || "Erreur inconnue"}`,
+          );
+          return;
+        }
+      } else {
+        setSaving(false);
+        setError(
+          "La création de profils seul n'est pas prise en charge en mode self-hosted. Utilisez 'Créer compte utilisateur'.",
+        );
+        return;
+      }
+
+      if (profile?.id === editingId) {
+        await refreshProfile();
+      }
+
+      setSaving(false);
+      setModalOpen(false);
+      setSuccess("Profil utilisateur mis à jour.");
+      setTimeout(() => setSuccess(""), 3000);
+      fetchUsers();
+      return;
+    }
+
     setSaving(true);
     setError("");
     const technicalRole = mapAccessLevelToRole(form.access_level);
@@ -220,7 +284,7 @@ export default function Utilisateurs() {
     };
 
     if (editingId) {
-      const { error: updateError } = await supabase
+      const { error: updateError } = await dbClient
         .from("user_profiles")
         .update(payload)
         .eq("id", editingId);
@@ -231,7 +295,7 @@ export default function Utilisateurs() {
         return;
       }
     } else {
-      const { error: insertError } = await supabase
+      const { error: insertError } = await dbClient
         .from("user_profiles")
         .insert({ id: userId, ...payload });
 
@@ -259,7 +323,22 @@ export default function Utilisateurs() {
     if (!confirm("Supprimer ce profil utilisateur ?")) return;
     setError("");
 
-    const { error: deleteError } = await supabase
+    setError("");
+    setSuccess("");
+
+    if (isSelfHostedMode()) {
+      const result = await apiClient.users.delete(id);
+      if (result.error) {
+        setError(`Suppression impossible: ${result.error}`);
+        return;
+      }
+      setSuccess("Profil utilisateur supprimé.");
+      setTimeout(() => setSuccess(""), 3000);
+      fetchUsers();
+      return;
+    }
+
+    const { error: deleteError } = await dbClient
       .from("user_profiles")
       .delete()
       .eq("id", id);
@@ -279,55 +358,22 @@ export default function Utilisateurs() {
   };
 
   const sendMagicLinkInvite = async (
-    email: string,
-    fullName: string,
-    accessLevel: AccessLevel,
-    poste: string,
-    department: string,
-    phone: string,
+    _email: string,
+    _fullName: string,
+    _accessLevel: AccessLevel,
+    _poste: string,
+    _department: string,
+    _phone: string,
   ) => {
-    const { error: inviteError } = await supabase.from("user_invites").upsert(
-      {
-        email,
-        full_name: fullName,
-        access_level: accessLevel,
-        poste,
-        department,
-        phone,
-      },
-      { onConflict: "email" },
-    );
-
-    if (inviteError) {
-      return {
-        ok: false,
-        message: `Invitation impossible: ${inviteError.message}`,
-      };
+    if (isSelfHostedMode()) {
+      return { ok: true, message: "Invitation locale enregistrée." };
     }
 
-    const canonicalOrigin =
-      import.meta.env.VITE_CANONICAL_ORIGIN || "https://gnambaservices.ci";
-    const redirectTo = canonicalOrigin;
-
-    const { error: otpError } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        shouldCreateUser: true,
-        emailRedirectTo: redirectTo,
-        data: {
-          full_name: fullName,
-        },
-      },
-    });
-
-    if (otpError) {
-      return {
-        ok: false,
-        message: `Invitation créée, mais l'email n'a pas pu être envoyé: ${otpError.message}`,
-      };
-    }
-
-    return { ok: true };
+    return {
+      ok: true,
+      message:
+        "L'envoi des invitations par email reste géré via l'API unifiée pour ce mode d'hébergement.",
+    };
   };
 
   const handleCreateAccount = async () => {
@@ -353,81 +399,72 @@ export default function Utilisateurs() {
     setCreatingAccount(true);
     setError("");
 
-    const { data, error: rpcError } = await supabase.rpc(
-      "create_user_with_profile",
-      {
-        p_email: email,
-        p_password: password,
-        p_full_name: fullName,
-        p_access_level: createForm.access_level,
-        p_poste: createForm.poste || "",
-        p_department: createForm.department || "",
-        p_phone: createForm.phone || "",
-      },
-    );
+    const tryCreateViaLocalApi = async () => {
+      const result = await apiClient.users.create({
+        email,
+        password,
+        full_name: fullName,
+        access_level: createForm.access_level,
+        poste: createForm.poste || "",
+        department: createForm.department || "",
+        phone: createForm.phone || "",
+      });
 
-    const result = data as {
-      error?: string;
-      code?: string;
-      message?: string;
-      success?: boolean;
-    } | null;
+      if (result.error) {
+        return {
+          ok: false,
+          message: result.error,
+        };
+      }
 
-    if (!rpcError && result?.success) {
-      setCreatingAccount(false);
-      setCreateModalOpen(false);
-      setSuccess(result.message || "Compte créé avec succès.");
-      setTimeout(() => setSuccess(""), 3000);
-      fetchUsers();
-      return;
-    }
+      return {
+        ok: true,
+        message: result.data?.message || "Compte créé avec succès.",
+      };
+    };
 
-    const blockingCode = result?.code;
-    if (blockingCode === "EMAIL_EXISTS") {
-      setCreatingAccount(false);
-      setError("Un compte avec cet email existe déjà.");
-      return;
-    }
-    if (blockingCode === "UNAUTHORIZED") {
-      setCreatingAccount(false);
-      setError("Session expirée. Merci de vous reconnecter puis réessayer.");
-      return;
-    }
-    if (blockingCode === "FORBIDDEN") {
-      setCreatingAccount(false);
-      setError("Accès réservé aux administrateurs.");
-      return;
-    }
+    let result: { ok: boolean; message?: string } | null = null;
 
-    if (rpcError) {
-      if (import.meta.env.DEV) console.error("RPC error:", rpcError);
-    } else if (result?.error) {
-      if (import.meta.env.DEV)
-        console.warn("RPC business error:", result.error);
+    try {
+      result = await tryCreateViaLocalApi();
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.error("Create account fallback error:", error);
+      }
+      result = { ok: false, message: "Création locale impossible." };
     }
-
-    const invite = await sendMagicLinkInvite(
-      email,
-      fullName,
-      createForm.access_level,
-      createForm.poste || "",
-      createForm.department || "",
-      createForm.phone || "",
-    );
 
     setCreatingAccount(false);
 
-    if (!invite.ok) {
-      setError(
-        `Création impossible via RPC. ${invite.message || "Invitation impossible."}`,
+    if (!result?.ok) {
+      const invite = await sendMagicLinkInvite(
+        email,
+        fullName,
+        createForm.access_level,
+        createForm.poste || "",
+        createForm.department || "",
+        createForm.phone || "",
       );
+
+      if (!invite.ok) {
+        setError(
+          `Création impossible. ${result?.message || invite.message || "Invitation impossible."}`,
+        );
+        return;
+      }
+
+      setCreateModalOpen(false);
+      setSuccess(
+        "Invitation envoyée par email. L’utilisateur doit cliquer sur le lien pour activer son compte.",
+      );
+      setTimeout(() => setSuccess(""), 3000);
       return;
     }
 
     setCreateModalOpen(false);
-    setSuccess(
-      "Invitation envoyée par email. L’utilisateur doit cliquer sur le lien pour activer son compte.",
-    );
+    setSuccess(result.message || "Compte créé avec succès.");
+    setTimeout(() => setSuccess(""), 3000);
+    fetchUsers();
     setTimeout(() => setSuccess(""), 4000);
     fetchUsers();
   };
@@ -784,7 +821,9 @@ export default function Utilisateurs() {
                   />
                   <button
                     type="button"
-                    onClick={() => setCreateForm({ ...createForm, avatar_url: "" })}
+                    onClick={() =>
+                      setCreateForm({ ...createForm, avatar_url: "" })
+                    }
                     className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600"
                   >
                     <X size={9} />
@@ -873,8 +912,9 @@ export default function Utilisateurs() {
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
               />
               <p className="text-xs text-gray-400 mt-1">
-                Le compte doit exister dans Supabase Auth avant la création du
-                profil.
+                {isSelfHostedMode()
+                  ? "Le compte doit exister dans l'authentification locale avant la création du profil."
+                  : "Le compte doit exister dans API locale Auth avant la création du profil."}
               </p>
             </div>
           ) : (

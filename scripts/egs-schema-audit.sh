@@ -5,7 +5,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC_DIR="$ROOT_DIR/src"
 MIGRATIONS_DIR="$ROOT_DIR/supabase/migrations"
-CLOUD_MANIFEST="$ROOT_DIR/supabase/generated/egs-cloud-schema.json"
+SCHEMA_MANIFEST="$ROOT_DIR/supabase/generated/egs-schema.json"
 
 if [ ! -d "$SRC_DIR" ] || [ ! -d "$MIGRATIONS_DIR" ]; then
   echo "Expected directories not found." >&2
@@ -25,10 +25,10 @@ mapfile -t migration_tables < <(
     | sort -u
 )
 
-cloud_objects=()
-if [ -f "$CLOUD_MANIFEST" ]; then
-  mapfile -t cloud_objects < <(
-    python3 - <<'PY' "$CLOUD_MANIFEST"
+schema_objects=()
+if [ -f "$SCHEMA_MANIFEST" ]; then
+  mapfile -t schema_objects < <(
+    python3 - <<'PY' "$SCHEMA_MANIFEST"
 import json
 import sys
 
@@ -54,10 +54,10 @@ contains_item() {
 echo "EGS schema audit"
 echo "code_tables=${#app_tables[@]}"
 echo "migration_tables=${#migration_tables[@]}"
-if [ "${#cloud_objects[@]}" -gt 0 ]; then
-  echo "cloud_objects=${#cloud_objects[@]}"
+if [ "${#schema_objects[@]}" -gt 0 ]; then
+  echo "schema_objects=${#schema_objects[@]}"
 else
-  echo "cloud_objects=unknown"
+  echo "schema_objects=unknown"
 fi
 
 missing=0
@@ -68,23 +68,23 @@ for table in "${app_tables[@]}"; do
   fi
 done
 
-cloud_missing=0
-if [ "${#cloud_objects[@]}" -gt 0 ]; then
+schema_missing=0
+if [ "${#schema_objects[@]}" -gt 0 ]; then
   for table in "${app_tables[@]}"; do
-    if ! contains_item "$table" "${cloud_objects[@]}"; then
-      echo "missing_in_cloud_snapshot: $table"
-      cloud_missing=1
+    if ! contains_item "$table" "${schema_objects[@]}"; then
+      echo "missing_in_schema_snapshot: $table"
+      schema_missing=1
     fi
   done
 
-  for object in "${cloud_objects[@]}"; do
+  for object in "${schema_objects[@]}"; do
     if ! contains_item "$object" "${migration_tables[@]}"; then
-      echo "cloud_only_missing_in_migrations: $object"
+      echo "schema_only_missing_in_migrations: $object"
     fi
   done
 fi
 
-if [ "$missing" -eq 0 ] && [ "$cloud_missing" -eq 0 ]; then
+if [ "$missing" -eq 0 ] && [ "$schema_missing" -eq 0 ]; then
   echo "status=ok"
 else
   echo "status=drift"

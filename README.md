@@ -1,6 +1,6 @@
 # EGS
 
-EGS (Enterprise Gnamba System) est l'ERP de Gnamba Services. Le frontend est une SPA React/Vite en francais qui consomme Supabase Cloud en production, avec un mode local optionnel pour le developpement.
+EGS (Enterprise Gnamba System) est l'ERP de Gnamba Services. Le frontend est une SPA React/Vite en francais qui consomme Supabase local expose via Cloudflare Tunnel.
 
 ## Stack
 
@@ -39,27 +39,22 @@ supabase db push
 npm run supabase:migrations:sync
 ```
 
-## Coexistence EGS / SomAgro
+## Workspace EGS
 
-Ce workspace heberge deux applications distinctes qui ne doivent pas partager la meme base locale :
+EGS est le seul projet actif dans ce dépôt. Le frontend React/Vite consomme le stack Supabase local expose via tunnel Cloudflare.
 
-- `EGS` : projet Supabase `gnamba-project`, ports `54321/54322/54323/54324`, frontend `8080`
-- `SomAgro` : projet Supabase `somagro-erp`, ports `55321/55322/55323/55324`, frontend `8082`
-
-Propriete des migrations :
+Propriété des migrations :
 
 - `EGS` : [supabase/migrations](/home/soma/gnamba-project/supabase/migrations)
-- `SomAgro` : [somagro-erp/supabase/migrations](/home/soma/gnamba-project/somagro-erp/supabase/migrations)
-- `supabase-migrations/egs` et `supabase-migrations/somagro` ne sont plus que des sources legacy archivees
+- `supabase-migrations/egs` reste une source legacy archivée pendant la remise en cohérence du schéma
 
-La regle de coherence est simple :
+Règles de cohérence :
 
-- on ne fusionne pas les schemas metier
-- on n'utilise jamais `supabase db push` sans cibler explicitement le bon projet
-- on bascule le mode de chaque app via son fichier d'environnement, pas en recopiant des exemples a l'aveugle
-- `README.md` et `scripts/workspace-stack.sh` sont la source de verite operatoire; les rapports d'audit ne sont que des instantanes
+- on n'utilise jamais `supabase db push` sans cibler explicitement EGS
+- on bascule le mode via le fichier d'environnement, pas en recopiant des exemples à l'aveugle
+- `README.md` et `scripts/workspace-stack.sh` sont la source de vérité opérationnelle
 
-Commandes exactes :
+Commandes utiles :
 
 ```bash
 # Etat global
@@ -71,20 +66,14 @@ bash scripts/workspace-doctor.sh
 # Audit statique du schema EGS versionne vs tables utilisees par le frontend
 bash scripts/egs-schema-audit.sh
 
-# Regenerer le snapshot du schema cloud EGS
-bash scripts/refresh-egs-cloud-schema.sh
+# Regenerer le snapshot du schema EGS
+bash scripts/refresh-egs-schema.sh
 
 # Voir les ports reserves
 bash scripts/workspace-stack.sh ports
 
 # Demarrer EGS local
 bash scripts/workspace-stack.sh egs start-local
-
-# Demarrer SomAgro local
-bash scripts/workspace-stack.sh somagro start-local
-
-# Demarrer les deux stacks locaux
-bash scripts/workspace-stack.sh dual start-local
 
 # Simuler une application de migrations EGS sans rien ecrire
 bash scripts/workspace-stack.sh egs db-push --dry-run
@@ -95,69 +84,36 @@ bash scripts/workspace-stack.sh egs db-push --apply
 # Basculer EGS vers Supabase local
 bash scripts/workspace-stack.sh egs set-mode local
 
-# Basculer EGS vers Supabase cloud
-bash scripts/workspace-stack.sh egs set-mode cloud
-
-# Basculer SomAgro vers Supabase local
-bash scripts/workspace-stack.sh somagro set-mode local
-
-# Basculer SomAgro vers Supabase cloud
-bash scripts/workspace-stack.sh somagro set-mode cloud
-
-# Arreter chaque stack sans toucher l'autre
+# Arreter EGS local
 bash scripts/workspace-stack.sh egs stop-local
-bash scripts/workspace-stack.sh somagro stop-local
 ```
 
 Les scripts `npm run ops:*` exposent les memes actions via `package.json`.
 
-## Modes Cloud / Local
+## Mode Unique
 
-Le frontend choisit son endpoint avec `VITE_SUPABASE_MODE` :
+Le frontend et les scripts utilisent uniquement le mode local expose via tunnel Cloudflare :
 
-- `cloud` : utilise `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY`
-- `local` : utilise `VITE_SUPABASE_LOCAL_URL` et `VITE_SUPABASE_LOCAL_ANON_KEY`
-- `auto` : prefere cloud, sinon local
+- `VITE_SUPABASE_MODE=local`
+- `VITE_SUPABASE_LOCAL_URL=https://api.gnambaservices.ci`
+- `VITE_SUPABASE_LOCAL_ANON_KEY`
 
 Fichiers d'exemple :
 
 - `.env.example`
 - `.env.local.example`
-- `.env.cloud`
-- `.env.template`
+- `.env.server.example`
 
 ## Configuration
 
-Ce projet utilise désormais `.env.template` comme source de vérité des variables d'environnement. Copiez ce fichier vers `.env` ou `.env.server` puis remplissez les valeurs secrètes avant de lancer l'application.
+Le fichier `.env` est la source de vérité pour le build frontend local/tunnel. Copiez un des exemples vers `.env` ou `.env.server` puis remplissez les valeurs secrètes avant de lancer l'application.
 
 Pour le développement local :
 
 - `VITE_SUPABASE_MODE=local`
-- `VITE_SUPABASE_LOCAL_URL=http://localhost:54321`
+- `VITE_SUPABASE_LOCAL_URL=https://api.gnambaservices.ci`
 - `VITE_SUPABASE_LOCAL_ANON_KEY` doit être défini
 - `POSTGRES_PASSWORD` et `JWT_SECRET` doivent exister
-
-Pour la production cloud :
-
-- `VITE_SUPABASE_MODE=cloud`
-- `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY` doivent être définis
-- `SUPABASE_DB_PASSWORD` ou `SUPABASE_SERVICE_ROLE_KEY` doivent être définis
-
-### Déploiement Supabase Edge Functions via GitHub Actions
-
-Le workflow [.github/workflows/deploy-supabase-functions.yml](/home/soma/gnamba-project/.github/workflows/deploy-supabase-functions.yml) déploie automatiquement `send-payment-notification` sur le projet Supabase quand la fonction change.
-
-Secrets GitHub requis :
-
-- `SUPABASE_ACCESS_TOKEN`
-- `SUPABASE_PROJECT_ID`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `ONESIGNAL_APP_ID`
-- `ONESIGNAL_API_KEY`
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_ANON_KEY`
-
-Le workflow synchronise ensuite ces valeurs comme secrets runtime Supabase avant de lancer `supabase functions deploy send-payment-notification --project-ref "$SUPABASE_PROJECT_ID"`.
 
 Pour démarrer Supabase localement :
 
@@ -190,14 +146,11 @@ docker-compose up -d
 Pour la production nginx :
 
 ```bash
-docker compose -f docker-compose.server.yml up -d egs-web
+bash scripts/deploy-production.sh
 ```
 
 ## Etat du schema
 
-Le depot contient maintenant deux verites complementaires pour EGS :
+Le depot contient la version rejouable localement du schema EGS dans `supabase/migrations/`.
 
-- `supabase/migrations/` : ce qui est rejouable localement aujourd'hui
-- `supabase/generated/egs-cloud.types.ts` et `supabase/generated/egs-cloud-schema.json` : snapshot du schema cloud reel, regenere via `bash scripts/refresh-egs-cloud-schema.sh`
-
-Le schema Cloud historique d'EGS n'est pas encore retroporte completement dans Git sous forme de migrations SQL rejouables. Le snapshot cloud permet toutefois de verifier les derives et d'eliminer les confusions sur les objets existants avant la formalisation SQL complete.
+Les anciens snapshots historiques restent dans le dépôt pour reference, mais le chemin supporte et documente est maintenant le flux local expose via tunnel Cloudflare.

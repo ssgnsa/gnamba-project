@@ -14,10 +14,11 @@ import type {
   TextProps,
 } from "../page-builder/types";
 import { useSettings } from "../../context/SettingsContext";
-import { supabase } from "../../lib/supabase";
+import dbClient from "../../data/tableClient";
 import BrandLogo from "../BrandLogo";
 import type { PublicPage } from "../../lib/publicRoutes";
 import { getPublicPageFromHref } from "../../lib/publicRoutes";
+import { OFFICIAL_CONTACT } from "../../lib/officialContact";
 
 const textAlignClass = {
   left: "text-left",
@@ -90,7 +91,7 @@ function HeroSection({
 }) {
   const { settings } = useSettings();
   const primaryColor = settings.primary_color || "#1e40af";
-  const companyName = settings.app_company || "Gnamba Services";
+  const companyName = OFFICIAL_CONTACT.companyName;
 
   return (
     <section
@@ -315,7 +316,7 @@ function ContactSection({ props }: { props: ContactProps }) {
     setSending(true);
     setError("");
 
-    const { error: insertError } = await supabase
+    const { error: insertError } = await dbClient
       .from("contact_messages")
       .insert({
         name: form.name,
@@ -506,7 +507,6 @@ function FooterSection({
   props: FooterProps;
   onNavigate: (page: PublicPage) => void;
 }) {
-  const { settings } = useSettings();
   const links = props.links || [];
 
   return (
@@ -518,7 +518,7 @@ function FooterSection({
               {props.logo_url ? (
                 <img
                   src={props.logo_url}
-                  alt={`Logo ${settings.app_company || "Gnamba Services"} - BTP Immobilier Foncier`}
+                  alt={`Logo ${OFFICIAL_CONTACT.companyName} - BTP Immobilier Foncier`}
                   crossOrigin="anonymous"
                   className="h-12 w-12 rounded-2xl object-cover bg-white"
                   loading="eager"
@@ -529,7 +529,7 @@ function FooterSection({
                 <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-white">
                   <BrandLogo
                     tone="dark"
-                    alt={`Logo ${settings.app_company || "Gnamba Services"} - BTP Immobilier Foncier`}
+                    alt={`Logo ${OFFICIAL_CONTACT.companyName} - BTP Immobilier Foncier`}
                     className="h-full w-full object-cover"
                     fallback={
                       <span className="text-sm font-bold text-slate-900">
@@ -540,9 +540,7 @@ function FooterSection({
                 </div>
               )}
               <div>
-                <p className="font-semibold">
-                  {settings.app_company || "Gnamba Services"}
-                </p>
+                <p className="font-semibold">{OFFICIAL_CONTACT.companyName}</p>
                 {props.tagline && (
                   <p className="text-sm text-white/60">{props.tagline}</p>
                 )}

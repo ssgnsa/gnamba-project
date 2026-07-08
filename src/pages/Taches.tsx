@@ -15,13 +15,13 @@ import {
   AlertOctagon,
   BarChart3,
 } from "lucide-react";
-import { supabase } from "../lib/supabase";
+import dbClient from "../data/tableClient";
 import { Task, Employee, Project } from "../types";
 import Modal from "../components/ui/Modal";
 import Badge from "../components/ui/Badge";
 import KPICard from "../components/dashboard/KPICard";
 import { useSettings } from "../context/SettingsContext";
-import { useAuth } from "../context/AuthContext";
+import { resolveAccessLevel, useAuth } from "../context/AuthContext";
 import {
   getDemoBlockMessage,
   shouldBlockDestructiveAction,
@@ -60,6 +60,7 @@ const emptyForm = {
 export default function Taches() {
   const { settings } = useSettings();
   const { user, profile } = useAuth();
+  const accessLevel = resolveAccessLevel(profile?.role, profile?.access_level);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [employees, setEmployees] = useState<
     Array<Pick<Employee, "id" | "nom" | "prenom">>
@@ -90,7 +91,7 @@ export default function Taches() {
   useEffect(() => {
     const findUserEmployee = async () => {
       if (!user?.email) return;
-      const { data } = await supabase
+      const { data } = await dbClient
         .from("employees")
         .select("id")
         .ilike("email", user.email)
@@ -127,7 +128,7 @@ export default function Taches() {
     setLoading(true);
 
     // Construire la requête pour filtrer par employé si nécessaire
-    let taskQuery = supabase
+    let taskQuery = dbClient
       .from("tasks")
       .select("*, employees(nom, prenom), projects(nom)");
 
@@ -135,8 +136,9 @@ export default function Taches() {
     const canViewAll =
       profile?.role === "admin" ||
       profile?.role === "gestionnaire" ||
-      profile?.access_level === "admin" ||
-      profile?.access_level === "gerant";
+      accessLevel === "admin" ||
+      accessLevel === "gerant" ||
+      accessLevel === "gestionnaire";
     const shouldFilter = userEmployeeId && !showAllTasks && !canViewAll;
 
     if (shouldFilter) {
@@ -148,12 +150,12 @@ export default function Taches() {
 
     const [taskRes, empRes, projRes] = await Promise.all([
       taskQuery.order("created_at", { ascending: false }),
-      supabase
+      dbClient
         .from("employees")
         .select("id, nom, prenom")
         .eq("statut", "actif")
         .order("nom"),
-      supabase.from("projects").select("id, nom").order("nom"),
+      dbClient.from("projects").select("id, nom").order("nom"),
     ]);
     setTasks(taskRes.data || []);
     setEmployees(
@@ -161,7 +163,7 @@ export default function Taches() {
     );
     setProjects((projRes.data as Array<Pick<Project, "id" | "nom">>) || []);
     setLoading(false);
-  }, [profile?.access_level, profile?.role, showAllTasks, userEmployeeId]);
+  }, [accessLevel, profile?.role, showAllTasks, userEmployeeId]);
 
   useEffect(() => {
     void fetchData();
@@ -237,14 +239,14 @@ export default function Taches() {
       };
 
       if (editingId) {
-        const { error } = await supabase
+        const { error } = await dbClient
           .from("tasks")
           .update(payload)
           .eq("id", editingId);
         if (error) throw error;
         setPageNotice("✅ Tâche modifiée avec succès");
       } else {
-        const { error } = await supabase.from("tasks").insert(payload);
+        const { error } = await dbClient.from("tasks").insert(payload);
         if (error) throw error;
         setPageNotice("✅ Tâche créée avec succès");
       }
@@ -267,13 +269,16 @@ export default function Taches() {
       return;
     }
     if (!confirm("Supprimer cette tâche ?")) return;
-    const { error } = await supabase.from("tasks").delete().eq("id", id);
-    if (error) { setFormError(error.message); return; }
+    const { error } = await dbClient.from("tasks").delete().eq("id", id);
+    if (error) {
+      setFormError(error.message);
+      return;
+    }
     fetchData();
   };
 
   const handleQuickStatus = async (id: string, statut: Task["statut"]) => {
-    await supabase
+    await dbClient
       .from("tasks")
       .update({ statut, updated_at: new Date().toISOString() })
       .eq("id", id);
@@ -461,8 +466,9 @@ export default function Taches() {
           {/* Toggle pour voir toutes les tâches (admin/gestionnaire) */}
           {(profile?.role === "admin" ||
             profile?.role === "gestionnaire" ||
-            profile?.access_level === "admin" ||
-            profile?.access_level === "gerant") && (
+            accessLevel === "admin" ||
+            accessLevel === "gerant" ||
+            accessLevel === "gestionnaire") && (
             <button
               onClick={() => setShowAllTasks(!showAllTasks)}
               className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-opacity ${

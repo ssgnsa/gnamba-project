@@ -30,9 +30,9 @@ TELEGRAM_CHAT_ID="${TELEGRAM_CHAT_ID:-}"
 DISK_THRESHOLD="${DISK_THRESHOLD:-90}"
 BACKUP_MAX_AGE="${BACKUP_MAX_AGE:-24}" # heures
 GIT_ALERT_THRESHOLD="${GIT_ALERT_THRESHOLD:-100}"
-SUPABASE_MODE="${SUPABASE_MODE:-}"
-SUPABASE_URL="${SUPABASE_URL:-}"
-SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:-}"
+SUPABASE_MODE="${SUPABASE_MODE:-local}"
+SUPABASE_URL="${SUPABASE_URL:-${VITE_SUPABASE_LOCAL_URL:-http://localhost:54321}}"
+SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:-${VITE_SUPABASE_LOCAL_ANON_KEY:-}}"
 MONITOR_CONTAINERS="${MONITOR_CONTAINERS:-egs-frontend egs-nginx-proxy egs-filebrowser}"
 MONITOR_CRITICAL_TABLES="${MONITOR_CRITICAL_TABLES:-app_settings user_profiles foncier_lots properties}"
 
@@ -78,17 +78,9 @@ get_env_value() {
 }
 
 resolve_supabase_config() {
-    if [ -z "${SUPABASE_MODE}" ]; then
-        SUPABASE_MODE="$(get_env_value VITE_SUPABASE_MODE cloud)"
-    fi
-
-    if [ "${SUPABASE_MODE}" = "cloud" ]; then
-        [ -n "${SUPABASE_URL}" ] || SUPABASE_URL="$(get_env_value VITE_SUPABASE_URL)"
-        [ -n "${SUPABASE_ANON_KEY}" ] || SUPABASE_ANON_KEY="$(get_env_value VITE_SUPABASE_ANON_KEY)"
-    else
-        [ -n "${SUPABASE_URL}" ] || SUPABASE_URL="$(get_env_value VITE_SUPABASE_LOCAL_URL http://localhost:54321)"
-        [ -n "${SUPABASE_ANON_KEY}" ] || SUPABASE_ANON_KEY="$(get_env_value VITE_SUPABASE_LOCAL_ANON_KEY)"
-    fi
+    SUPABASE_MODE="local"
+    [ -n "${SUPABASE_URL}" ] || SUPABASE_URL="$(get_env_value VITE_SUPABASE_LOCAL_URL http://localhost:54321)"
+    [ -n "${SUPABASE_ANON_KEY}" ] || SUPABASE_ANON_KEY="$(get_env_value VITE_SUPABASE_LOCAL_ANON_KEY)"
 }
 
 supabase_health_code() {
@@ -99,14 +91,9 @@ supabase_health_code() {
         return 0
     fi
 
-    if [ "${SUPABASE_MODE}" = "cloud" ]; then
-        curl -sS -o /dev/null -w "%{http_code}" --max-time 15 \
-            "${SUPABASE_URL%/}/auth/v1/health" \
-            -H "apikey: ${SUPABASE_ANON_KEY}" 2>/dev/null || printf '000'
-    else
-        curl -sS -o /dev/null -w "%{http_code}" --max-time 10 \
-            "${SUPABASE_URL%/}/health" 2>/dev/null || printf '000'
-    fi
+    curl -sS -o /dev/null -w "%{http_code}" --max-time 15 \
+        "${SUPABASE_URL%/}/auth/v1/health" \
+        -H "apikey: ${SUPABASE_ANON_KEY}" 2>/dev/null || printf '000'
 }
 
 # Créer les répertoires de logs
@@ -219,46 +206,22 @@ check_supabase_services() {
 
     resolve_supabase_config
 
-    if [ "${SUPABASE_MODE}" = "cloud" ]; then
-        if [ -z "${SUPABASE_URL}" ] || [ -z "${SUPABASE_ANON_KEY}" ]; then
-            error "Configuration Supabase Cloud incomplète"
-            alert "Supabase Cloud monitoring misconfigured"
-            return 1
-        fi
-
-        local code
-        code="$(supabase_health_code)"
-        if [ "${code}" = "200" ]; then
-            success "Supabase Cloud Auth health opérationnel (${SUPABASE_URL})"
-            return 0
-        fi
-
-        error "Supabase Cloud Auth health inaccessible (HTTP ${code})"
-        alert "Supabase Cloud health failed - HTTP ${code}"
+    if [ -z "${SUPABASE_URL}" ] || [ -z "${SUPABASE_ANON_KEY}" ]; then
+        error "Configuration Supabase locale incomplète"
+        alert "Supabase local monitoring misconfigured"
         return 1
     fi
 
-    if curl -s -f "${SUPABASE_URL%/}/health" >/dev/null 2>&1; then
-        success "Supabase local API opérationnelle"
-    else
-        error "Supabase local API inaccessible"
-        alert "Supabase local API down - ${SUPABASE_URL%/}/health inaccessible"
-        return 1
+    local code
+    code="$(supabase_health_code)"
+    if [ "${code}" = "200" ]; then
+        success "Supabase local auth health opérationnel (${SUPABASE_URL})"
+        return 0
     fi
 
-    if command -v supabase >/dev/null 2>&1; then
-        if supabase status >/dev/null 2>&1; then
-            success "Supabase local actif"
-        else
-            error "Supabase local arrêté"
-            alert "Supabase local is not running"
-            return 1
-        fi
-    else
-        warning "CLI Supabase non installé - impossible de vérifier le statut détaillé"
-    fi
-
-    return 0
+    error "Supabase local auth health inaccessible (HTTP ${code})"
+    alert "Supabase local health failed - HTTP ${code}"
+    return 1
 }
 
 check_database_tables() {
@@ -271,37 +234,30 @@ check_database_tables() {
     local unreachable_tables=()
 
     for table in "${critical_tables[@]}"; do
-        if [ "${SUPABASE_MODE}" = "cloud" ]; then
-            local code
-            code="$(
-                curl -sS -o /dev/null -w "%{http_code}" --max-time 20 \
-                    "${SUPABASE_URL%/}/rest/v1/${table}?select=*&limit=1" \
-                    -H "apikey: ${SUPABASE_ANON_KEY}" \
-                    -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" 2>/dev/null || printf '000'
-            )"
+        local code
+        code="$(
+            curl -sS -o /dev/null -w "%{http_code}" --max-time 20 \
+                "${SUPABASE_URL%/}/rest/v1/${table}?select=*&limit=1" \
+                -H "apikey: ${SUPABASE_ANON_KEY}" \
+                -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" 2>/dev/null || printf '000'
+        )"
 
-            case "${code}" in
-                200|206)
-                    success "Table ${table} exposée via REST (HTTP ${code})"
-                    ;;
-                401|403)
-                    success "Table ${table} existe mais accès REST restreint (HTTP ${code})"
-                    ;;
-                404)
-                    error "Table ${table} manquante ou non exposée (HTTP 404)"
-                    missing_tables+=("${table}")
-                    ;;
-                *)
-                    error "Table ${table} inaccessible (HTTP ${code})"
-                    unreachable_tables+=("${table}:${code}")
-                    ;;
-            esac
-        elif supabase sql "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name='${table}');" 2>/dev/null | grep -q "t"; then
-            success "Table ${table} existe"
-        else
-            error "Table ${table} manquante"
-            missing_tables+=("${table}")
-        fi
+        case "${code}" in
+            200|206)
+                success "Table ${table} exposée via REST tunnel (HTTP ${code})"
+                ;;
+            401|403)
+                success "Table ${table} existe mais accès REST restreint (HTTP ${code})"
+                ;;
+            404)
+                error "Table ${table} manquante ou non exposée (HTTP 404)"
+                missing_tables+=("${table}")
+                ;;
+            *)
+                error "Table ${table} inaccessible (HTTP ${code})"
+                unreachable_tables+=("${table}:${code}")
+                ;;
+        esac
     done
 
     if [ ${#missing_tables[@]} -gt 0 ]; then
@@ -415,12 +371,7 @@ generate_report() {
     local supabase_api_status
     supabase_api_status="$(supabase_health_code)"
 
-    local database_status
-    if [ "${SUPABASE_MODE}" = "cloud" ]; then
-        database_status="Cloud REST/Auth ${supabase_api_status}"
-    else
-        database_status="$(supabase sql "SELECT 1;" 2>/dev/null && echo "OK" || echo "ERROR")"
-    fi
+    local database_status="REST/Auth ${supabase_api_status}"
 
     local last_backup
     last_backup="$(

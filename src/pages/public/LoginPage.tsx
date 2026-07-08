@@ -3,8 +3,9 @@ import { Eye, EyeOff, LogIn, AlertCircle, Lock, Mail } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useSettings } from "../../context/SettingsContext";
 import BrandLogo from "../../components/BrandLogo";
-import { supabase } from "../../lib/supabase";
 import Turnstile from "react-turnstile";
+import { OFFICIAL_CONTACT } from "../../lib/officialContact";
+import { apiClient } from "../../api/client";
 
 interface Props {
   onSuccess: () => void;
@@ -26,13 +27,16 @@ export default function LoginPage({ onSuccess, onForgotPassword }: Props) {
   });
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileError, setTurnstileError] = useState("");
-  const turnstileSiteKey = import.meta.env.VITE_CLOUDFLARE_TURNSTILE_SITE_KEY;
+  const turnstileSiteKey =
+    import.meta.env.VITE_ENABLE_TURNSTILE === "true"
+      ? import.meta.env.VITE_CLOUDFLARE_TURNSTILE_SITE_KEY
+      : "";
 
   const RATE_LIMIT_MAX = 5;
   const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
   const RATE_LIMIT_KEY = "egs:login_rate_limit";
 
-  const companyName = settings.app_company || "Gnamba Services";
+  const companyName = OFFICIAL_CONTACT.companyName;
   const appTitle = settings.app_title || "EGS";
   const appSubtitle = settings.app_subtitle || "Enterprise System";
   const logoInitials = companyName
@@ -51,6 +55,9 @@ export default function LoginPage({ onSuccess, onForgotPassword }: Props) {
       window.localStorage.removeItem("egs:logout_reason");
     }
   }, []);
+
+  const normalizeCredential = (value: string) =>
+    value.replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
 
   const getRateLimit = () => {
     if (typeof window === "undefined") return { count: 0, windowStart: 0 };
@@ -102,7 +109,10 @@ export default function LoginPage({ onSuccess, onForgotPassword }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) return;
+    const normalizedEmail = normalizeCredential(email).toLowerCase();
+    const normalizedPassword = normalizeCredential(password);
+
+    if (!normalizedEmail || !normalizedPassword) return;
     const rateLimit = checkRateLimit();
     if (!rateLimit.allowed) {
       setError(
@@ -120,13 +130,8 @@ export default function LoginPage({ onSuccess, onForgotPassword }: Props) {
         setError("Veuillez confirmer que vous n’êtes pas un robot.");
         return;
       }
-      const { data, error: verifyError } = await supabase.functions.invoke(
-        "verify-turnstile",
-        {
-          body: { token: turnstileToken },
-        },
-      );
-      if (verifyError || !data?.success) {
+      const verified = await apiClient.verifyTurnstile(turnstileToken);
+      if (!verified) {
         setLoading(false);
         setError("Vérification anti-bot échouée. Réessayez.");
         return;
@@ -140,17 +145,49 @@ export default function LoginPage({ onSuccess, onForgotPassword }: Props) {
       );
     }
 
-    const { error: err } = await signIn(email, password);
+    const { error: err, code } = await signIn(
+      normalizedEmail,
+      normalizedPassword,
+    );
     setLoading(false);
     if (err) {
       recordFailedAttempt();
-      if (err.startsWith("EMAIL_NOT_CONFIRMED")) {
+      if (
+        code === "email_not_confirmed" ||
+        err.startsWith("EMAIL_NOT_CONFIRMED")
+      ) {
         setError(
-          "Compte non confirmé. Vérifiez l'email d'activation ou faites confirmer le compte dans Supabase avant de réessayer.",
+          "Compte non confirmé. Vérifiez l'email d'activation ou faites confirmer le compte dans API locale avant de réessayer.",
         );
         return;
       }
-      setError("Email ou mot de passe incorrect. Vérifiez vos identifiants.");
+      if (code === "invalid_credentials") {
+        setError(
+          "Email ou mot de passe incorrect. Vérifiez vos identifiants, et supprimez tout espace au début ou à la fin si vous avez copié-collé.",
+        );
+        return;
+      }
+      if (code === "over_request_rate_limit") {
+        setError(
+          "Trop de tentatives de connexion. Attendez quelques minutes avant de réessayer.",
+        );
+        return;
+      }
+      if (code === "captcha_failed") {
+        setError(
+          "La vérification anti-bot a échoué. Rechargez la page puis réessayez.",
+        );
+        return;
+      }
+      if (code === "request_timeout") {
+        setError(
+          "Le serveur d'authentification met trop de temps à répondre. Vérifiez que API locale local est bien démarré.",
+        );
+        return;
+      }
+      setError(
+        `Connexion impossible (${code || "erreur"}). Réessayez ou vérifiez la configuration API locale.`,
+      );
       return;
     }
     clearRateLimit();
@@ -371,16 +408,22 @@ export default function LoginPage({ onSuccess, onForgotPassword }: Props) {
                     }}
                     onExpire={() => {
                       setTurnstileToken("");
-                      setTurnstileError("La vérification anti-bot a expiré. Relancez la vérification.");
+                      setTurnstileError(
+                        "La vérification anti-bot a expiré. Relancez la vérification.",
+                      );
                     }}
                     onError={() => {
                       setTurnstileToken("");
-                      setTurnstileError("La vérification anti-bot n'a pas pu se charger. Vérifiez votre connexion puis réessayez.");
+                      setTurnstileError(
+                        "La vérification anti-bot n'a pas pu se charger. Vérifiez votre connexion puis réessayez.",
+                      );
                     }}
                     options={{ size: "flexible" }}
                   />
                   {turnstileError && (
-                    <p className="mt-3 text-xs text-red-600">{turnstileError}</p>
+                    <p className="mt-3 text-xs text-red-600">
+                      {turnstileError}
+                    </p>
                   )}
                 </div>
               )}
@@ -404,9 +447,36 @@ export default function LoginPage({ onSuccess, onForgotPassword }: Props) {
               </button>
             </form>
 
+            {import.meta.env.DEV && (
+              <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <div className="flex items-start gap-2.5">
+                  <AlertCircle
+                    size={16}
+                    className="text-amber-600 mt-0.5 flex-shrink-0"
+                  />
+                  <div className="text-sm text-amber-900">
+                    <p className="font-semibold">Compte administrateur local</p>
+                    <p className="mt-1">
+                      Email:{" "}
+                      <span className="font-mono">ssgnabia@gmail.com</span>
+                    </p>
+                    <p>
+                      Mot de passe:{" "}
+                      <span className="font-mono">deadsoulja28@</span>
+                    </p>
+                    <p className="mt-2 text-xs text-amber-800">
+                      Si ce compte n’apparaît pas, relancez `dbClient db reset`
+                      puis `dbClient start` pour rejouer le seed local.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="mt-6 pt-5 border-t border-gray-100 text-center">
               <p className="text-xs text-gray-400">
-                Accès réservé aux administrateurs, employés et collaborateurs autorisés de {companyName}.
+                Accès réservé aux administrateurs, employés et collaborateurs
+                autorisés de {companyName}.
               </p>
               <p className="text-xs text-gray-400 mt-1">
                 Contactez votre administrateur pour obtenir vos identifiants.

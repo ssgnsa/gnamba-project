@@ -74,7 +74,7 @@ export default function PublicServices({ onNavigate }: Props) {
         "Suivi et contrôle de chantier rigoureux",
         "Génie civil et travaux d'infrastructure",
         "Aménagement intérieur et décoration",
-        "Études techniques et architecturales",
+        "Études et conception de projets",
       ],
       examples: [
         "Villa R+2 à Cocody",
@@ -110,7 +110,7 @@ export default function PublicServices({ onNavigate }: Props) {
     {
       id: "foncier",
       icon: Map,
-      title: get("services", "foncier_title", "Foncier"),
+      title: get("services", "foncier_title", "Foncier sécurisé"),
       subtitle: "Sécurisez votre patrimoine foncier",
       color: "emerald",
       description: get(
@@ -138,7 +138,7 @@ export default function PublicServices({ onNavigate }: Props) {
       title: get(
         "services",
         "fournitures_title",
-        "Fournitures Professionnelles",
+        "Fournitures professionnelles",
       ),
       subtitle: "Équipez votre activité sans perdre de temps",
       color: "amber",

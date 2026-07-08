@@ -40,7 +40,7 @@ const parseSentryDsn = (dsn: string) => {
 
     if (!publicKey || !projectId) return "";
 
-    return `${url.origin}/api/${projectId}/envelope/?sentry_key=${publicKey}`;
+    return `${url.origin}/api/v1/${projectId}/envelope/?sentry_key=${publicKey}`;
   } catch {
     return "";
   }
@@ -67,18 +67,31 @@ const getStoredSentryUser = () => {
 const initSentry = () => {
   if (sentryDsn) return; // Already initialized
 
+  const selfHostedEnabled = import.meta.env.VITE_SELFHOSTED_MODE === "true";
   sentryDsn = import.meta.env.VITE_SENTRY_DSN || "";
   sentryEnvelopeUrl = parseSentryDsn(sentryDsn);
-  sentryEnabled = !!sentryEnvelopeUrl && import.meta.env.PROD;
+  sentryEnabled =
+    !!sentryEnvelopeUrl &&
+    import.meta.env.PROD &&
+    !selfHostedEnabled &&
+    import.meta.env.VITE_ENABLE_SENTRY !== "false";
 
-  if (sentryEnabled) {
-    if (import.meta.env.DEV) console.info("[Sentry] Error monitoring enabled");
+  if (!sentryEnabled && import.meta.env.DEV) {
+    console.info("[Sentry] Error monitoring disabled or not configured");
   }
 };
 
 // Send error to Sentry via HTTP (no SDK needed — lightweight)
 const sendToSentry = async (event: SentryEvent) => {
   if (!sentryEnabled) return;
+
+  if (typeof window === "undefined" || typeof navigator === "undefined") return;
+
+  const isBlockedByClient =
+    typeof navigator !== "undefined" &&
+    /block|adblock|privacy/i.test(navigator.userAgent || "");
+
+  if (isBlockedByClient) return;
 
   try {
     // Sentry envelope protocol (no SDK required)
@@ -101,7 +114,7 @@ const sendToSentry = async (event: SentryEvent) => {
         ...(event.tags ?? {}),
         module: event.module,
         severity: event.severity,
-        supabase_mode: import.meta.env.VITE_SUPABASE_MODE || "unknown",
+        api_mode: import.meta.env.VITE_API_MODE || "unknown",
       },
       user: getStoredSentryUser(),
       contexts: {
@@ -177,8 +190,8 @@ export const captureErrorBoundary = (
   sendToSentry(event);
 };
 
-// Capture a Supabase error
-export const captureSupabaseError = (
+// Capture a API locale error
+export const captureApiError = (
   operation: string,
   table: string,
   error: { message?: string; code?: string; details?: string } | null,
@@ -186,8 +199,8 @@ export const captureSupabaseError = (
   initSentry();
 
   const event: SentryEvent = {
-    module: `Supabase/${operation}`,
-    error: error?.message || "Unknown Supabase error",
+    module: `API locale/${operation}`,
+    error: error?.message || "Unknown API locale error",
     url: window.location.href,
     timestamp: new Date().toISOString(),
     severity: "error",

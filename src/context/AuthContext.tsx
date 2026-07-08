@@ -7,8 +7,12 @@ import {
   ReactNode,
   useCallback,
 } from "react";
-import { User, Session } from "@supabase/supabase-js";
-import { supabase } from "../lib/supabase";
+import { isSelfHostedMode } from "../lib/selfHosted";
+import {
+  apiClient,
+  clearStoredLocalAuthToken,
+  persistLocalAuthToken,
+} from "../api/client";
 import type { UserProfile, UserRole, AccessLevel } from "../types";
 
 export const ACCESS_LEVEL_LABELS: Record<AccessLevel, string> = {
@@ -21,6 +25,10 @@ export const ACCESS_LEVEL_LABELS: Record<AccessLevel, string> = {
   employe: "Employé",
 };
 
+const ACCESS_LEVEL_SET = new Set<AccessLevel>(
+  Object.keys(ACCESS_LEVEL_LABELS) as AccessLevel[],
+);
+
 const ACCESS_LEVEL_MODULES: Record<AccessLevel, string[]> = {
   admin: ["*"],
   gerant: [
@@ -29,6 +37,7 @@ const ACCESS_LEVEL_MODULES: Record<AccessLevel, string[]> = {
     "projets",
     "immobilier",
     "foncier",
+    "catalogue-lots",
     "fournitures",
     "finances",
     "employes",
@@ -51,6 +60,7 @@ const ACCESS_LEVEL_MODULES: Record<AccessLevel, string[]> = {
     "registre",
     "immobilier",
     "foncier",
+    "catalogue-lots",
   ],
   ouvrier: ["dashboard", "projets", "taches", "documents", "media", "registre"],
   visiteur: ["dashboard", "registre"],
@@ -60,6 +70,7 @@ const ACCESS_LEVEL_MODULES: Record<AccessLevel, string[]> = {
     "projets",
     "immobilier",
     "foncier",
+    "catalogue-lots",
     "fournitures",
     "finances",
     "employes",
@@ -77,14 +88,14 @@ const ACCESS_LEVEL_MODULES: Record<AccessLevel, string[]> = {
 // UserProfile is now imported from ../types
 
 interface AuthContextType {
-  user: User | null;
-  session: Session | null;
+  user: UserProfile | null;
+  session: null;
   profile: UserProfile | null;
   loading: boolean;
   signIn: (
     email: string,
     password: string,
-  ) => Promise<{ error: string | null }>;
+  ) => Promise<{ error: string | null; code: string | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: string | null }>;
@@ -95,51 +106,101 @@ const AuthContext = createContext<AuthContextType>({
   session: null,
   profile: null,
   loading: true,
-  signIn: async () => ({ error: null }),
+  signIn: async () => ({ error: null, code: null }),
   signOut: async () => {},
   refreshProfile: async () => {},
   resetPassword: async () => ({ error: null }),
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [session, setSession] = useState<null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const IDLE_TIMEOUT_MINUTES = Number(
-    import.meta.env.VITE_IDLE_TIMEOUT_MINUTES ?? 30,
+    import.meta.env.VITE_IDLE_TIMEOUT_MINUTES ?? 0,
   );
   const IDLE_TIMEOUT_MS = Number.isFinite(IDLE_TIMEOUT_MINUTES)
     ? IDLE_TIMEOUT_MINUTES * 60 * 1000
     : 0;
   const LAST_ACTIVITY_KEY = "egs:last_activity_at";
 
-  const fetchProfile = async (userId: string) => {
-    const { data } = await supabase
-      .from("user_profiles")
-      .select("*")
-      .eq("id", userId)
-      .maybeSingle();
-    if (data) setProfile(data as UserProfile);
-    else setProfile(null);
+  const getAccessTokenExpiryMs = (): number | null => {
+    if (typeof window === "undefined") return null;
+    const token = window.localStorage.getItem("egs:local_auth_token");
+    if (!token) return null;
+    try {
+      const [, payload] = token.split(".");
+      const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+      const padded = normalized.padEnd(
+        normalized.length + ((4 - (normalized.length % 4)) % 4),
+        "=",
+      );
+      const parsed = JSON.parse(window.atob(padded));
+      return typeof parsed.exp === "number" ? parsed.exp * 1000 : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const refreshLocalSession = useCallback(async () => {
+    if (typeof window === "undefined") return false;
+
+    const refreshToken = window.localStorage.getItem("egs:local_refresh_token");
+    if (!refreshToken) return false;
+
+    try {
+      const result = await apiClient.auth.refresh(refreshToken);
+      if (result.error || !result.data?.access_token) {
+        clearStoredLocalAuthToken();
+        return false;
+      }
+
+      persistLocalAuthToken(
+        result.data.access_token,
+        result.data.refresh_token,
+      );
+      return true;
+    } catch {
+      clearStoredLocalAuthToken();
+      return false;
+    }
+  }, []);
+
+  const mapLocalUser = (payload: Record<string, any>): UserProfile => ({
+    id: payload.id,
+    email: payload.email,
+    full_name: payload.full_name ?? payload.email,
+    role: payload.role ?? "employe",
+    access_level: payload.access_level ?? "employe",
+    poste: payload.poste ?? null,
+    department: payload.department ?? null,
+    phone: payload.phone ?? null,
+    avatar_url: payload.avatar_url ?? null,
+  });
+
+  const fetchProfile = async (_userId: string) => {
+    if (isSelfHostedMode()) {
+      const token = window.localStorage.getItem("egs:local_auth_token");
+      if (!token) {
+        setProfile(null);
+        return;
+      }
+
+      const result = await apiClient.auth.me();
+      if (!result.error && result.data?.user) {
+        setProfile(result.data.user as UserProfile);
+      } else {
+        setProfile(null);
+      }
+      return;
+    }
+
+    setProfile(null);
   };
 
   const refreshProfile = async () => {
     if (user) await fetchProfile(user.id);
-  };
-
-  const purgeCorruptedSession = () => {
-    try {
-      const keysToRemove: string[] = [];
-      for (let i = 0; i < window.localStorage.length; i++) {
-        const k = window.localStorage.key(i);
-        if (k && (k.startsWith('sb-') || k.includes('supabase') || k === 'egs-supabase-auth')) keysToRemove.push(k);
-      }
-      keysToRemove.forEach(k => {
-        window.localStorage.removeItem(k);
-        window.sessionStorage.removeItem(k);
-      });
-    } catch { /* SSR */ }
   };
 
   useEffect(() => {
@@ -147,32 +208,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const init = async () => {
       try {
-        // getSession() est local (lit le storage) — pas de requête réseau
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (isSelfHostedMode()) {
+          const token = window.localStorage.getItem("egs:local_auth_token");
+          if (!token) {
+            if (!cancelled) setLoading(false);
+            return;
+          }
 
-        if (sessionError || !session) {
-          // Pas de session en storage → pas de token, pas de call réseau
-          if (!cancelled) setLoading(false);
+          let result = await apiClient.auth.me();
+
+          if (result.status === 401) {
+            const refreshed = await refreshLocalSession();
+            if (refreshed) {
+              result = await apiClient.auth.me();
+            }
+          }
+
+          if (result.error || !result.data?.user) {
+            clearStoredLocalAuthToken();
+            if (!cancelled) setLoading(false);
+            return;
+          }
+
+          const payload = result.data;
+          if (cancelled) return;
+          setSession(null);
+          setUser(mapLocalUser(payload.user as Record<string, any>));
+          setProfile(payload.user as UserProfile);
           return;
         }
 
-        // Session présente → valider côté serveur via getUser()
-        const { data: { user: serverUser }, error: userError } = await supabase.auth.getUser();
-
-        if (userError) {
-          // Token invalide ou expiré → purger le storage corrompu
-          purgeCorruptedSession();
-          await supabase.auth.signOut({ scope: 'local' });
-          if (!cancelled) setLoading(false);
-          return;
-        }
-
-        if (cancelled) return;
-        setSession(session);
-        setUser(serverUser ?? null);
-        if (serverUser) {
-          await fetchProfile(serverUser.id);
-        }
+        if (!cancelled) setLoading(false);
+        return;
       } catch {
         // ignore
       } finally {
@@ -182,24 +249,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     void init();
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT' || (event === 'TOKEN_REFRESHED' && !session)) {
-        purgeCorruptedSession();
-      }
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        void fetchProfile(session.user.id);
-      } else {
-        setProfile(null);
-      }
-    });
-
     return () => {
       cancelled = true;
-      subscription.unsubscribe();
     };
   }, []);
 
@@ -207,42 +258,82 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (
       email: string,
       password: string,
-    ): Promise<{ error: string | null }> => {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (error) {
-        if (error.code === "email_not_confirmed") {
+    ): Promise<{ error: string | null; code: string | null }> => {
+      if (isSelfHostedMode()) {
+        const payload = await apiClient.auth.login(email, password);
+        if (payload.error || !payload.access_token) {
           return {
-            error:
-              "EMAIL_NOT_CONFIRMED: Ce compte existe mais n'est pas encore confirmé.",
+            code: payload.code ?? null,
+            error: payload.error || "Identifiants invalides",
           };
         }
-        return { error: error.message };
+
+        persistLocalAuthToken(payload.access_token, payload.refresh_token);
+        setUser(mapLocalUser(payload.user as Record<string, any>));
+        setSession(null);
+        setProfile(payload.user as UserProfile);
+        return { error: null, code: null };
       }
-      return { error: null };
+
+      return {
+        error: "Le mode self-hosted est requis pour l’API locale.",
+        code: null,
+      };
     },
     [],
   );
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
+    if (isSelfHostedMode()) {
+      await apiClient.auth.logout().catch(() => undefined);
+      clearStoredLocalAuthToken();
+      setUser(null);
+      setSession(null);
+      setProfile(null);
+      return;
+    }
     setUser(null);
     setSession(null);
     setProfile(null);
   }, []);
 
   const resetPassword = useCallback(
-    async (email: string): Promise<{ error: string | null }> => {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
-      if (error) return { error: error.message };
-      return { error: null };
+    async (_email: string): Promise<{ error: string | null }> => {
+      if (isSelfHostedMode()) {
+        return {
+          error: "La réinitialisation locale n'est pas encore implémentée.",
+        };
+      }
+
+      return {
+        error: "La réinitialisation locale n'est pas encore implémentée.",
+      };
     },
     [],
   );
+
+  useEffect(() => {
+    if (!user || !isSelfHostedMode()) return;
+    if (typeof window === "undefined") return;
+
+    const refreshIfNeeded = async () => {
+      const expiryMs = getAccessTokenExpiryMs();
+      if (!expiryMs) return;
+      if (expiryMs - Date.now() > 10 * 60 * 1000) return;
+
+      const refreshed = await refreshLocalSession();
+      if (!refreshed) {
+        setUser(null);
+        setSession(null);
+        setProfile(null);
+      }
+    };
+
+    void refreshIfNeeded();
+    const interval = window.setInterval(refreshIfNeeded, 5 * 60 * 1000);
+
+    return () => window.clearInterval(interval);
+  }, [user, refreshLocalSession]);
 
   useEffect(() => {
     if (!user || !IDLE_TIMEOUT_MS || IDLE_TIMEOUT_MS <= 0) return;
@@ -312,11 +403,16 @@ export function useAuth() {
 
 export function resolveAccessLevel(
   role: UserRole | undefined,
-  accessLevel?: AccessLevel,
+  accessLevel?: string | null,
 ): AccessLevel {
-  if (accessLevel) return accessLevel;
   if (role === "admin") return "admin";
   if (role === "gestionnaire") return "gestionnaire";
+  if (
+    typeof accessLevel === "string" &&
+    ACCESS_LEVEL_SET.has(accessLevel as AccessLevel)
+  ) {
+    return accessLevel as AccessLevel;
+  }
   return "employe";
 }
 

@@ -4,15 +4,15 @@
 # ============================================
 # Usage: ./backup-manager.sh [command] [options]
 # Commands:
-#   backup   [cloud|local] [--full|--schema|--data]  Effectuer un backup
-#   restore  <file> [--to-cloud|--to-local]          Restaurer un backup
+#   backup   [remote|local] [--full|--schema|--data]  Effectuer un backup
+#   restore  <file> [--to-remote|--to-local]          Restaurer un backup
 #   verify   <file>                                  Vérifier un backup
 #   list                                             Lister les backups
 #   cleanup  [--dry-run]                             Nettoyer anciens backups
 #
 # Examples:
-#   ./backup-manager.sh backup cloud --full
-#   ./backup-manager.sh restore backups/egs_20240115_120000.sql --to-cloud
+#   ./backup-manager.sh backup remote --full
+#   ./backup-manager.sh restore backups/egs_20240115_120000.sql --to-remote
 #   ./backup-manager.sh verify backups/egs_20240115_120000.sql
 #   ./backup-manager.sh cleanup --dry-run
 # ============================================
@@ -60,11 +60,9 @@ error() {
 load_env() {
     local env_file=""
     
-    # Priority: .env.server > .env.cloud > .env
+    # Priority: .env.server > .env
     if [ -f "${PROJECT_DIR}/.env.server" ]; then
         env_file="${PROJECT_DIR}/.env.server"
-    elif [ -f "${PROJECT_DIR}/.env.cloud" ]; then
-        env_file="${PROJECT_DIR}/.env.cloud"
     elif [ -f "${PROJECT_DIR}/.env" ]; then
         env_file="${PROJECT_DIR}/.env"
     else
@@ -79,7 +77,7 @@ load_env() {
 # ============================================
 # Resolve Database Connection
 # ============================================
-resolve_cloud_connection() {
+resolve_remote_connection() {
     local url="${VITE_SUPABASE_URL:-}"
     if [ -z "$url" ]; then
         error "VITE_SUPABASE_URL not set"
@@ -105,7 +103,7 @@ resolve_cloud_connection() {
         exit 1
     fi
     
-    log "Cloud DB: ${DB_HOST}:${DB_PORT}/${DB_NAME}"
+    log "Remote DB: ${DB_HOST}:${DB_PORT}/${DB_NAME}"
 }
 
 resolve_local_connection() {
@@ -122,17 +120,17 @@ resolve_local_connection() {
 # Backup Functions
 # ============================================
 cmd_backup() {
-    local target="${1:-cloud}"
+    local target="${1:-remote}"
     local mode="${2:---full}"
     local timestamp
     timestamp=$(date +"%Y%m%d_%H%M%S")
     
     load_env
     
-    if [ "$target" = "cloud" ]; then
-        resolve_cloud_connection
-        local backup_dir="${BACKUP_ROOT}/cloud"
-        local prefix="egs_cloud"
+    if [ "$target" = "remote" ]; then
+        resolve_remote_connection
+        local backup_dir="${BACKUP_ROOT}/remote"
+        local prefix="egs_remote"
     else
         resolve_local_connection
         local backup_dir="${BACKUP_ROOT}/local"
@@ -195,7 +193,7 @@ cmd_backup() {
 # ============================================
 cmd_restore() {
     local file="$1"
-    local target="${2:---to-cloud}"
+    local target="${2:---to-remote}"
     
     if [ ! -f "$file" ]; then
         error "Backup file not found: $file"
@@ -204,8 +202,8 @@ cmd_restore() {
     
     load_env
     
-    if [ "$target" = "--to-cloud" ]; then
-        resolve_cloud_connection
+    if [ "$target" = "--to-remote" ]; then
+        resolve_remote_connection
     else
         resolve_local_connection
     fi
@@ -289,11 +287,11 @@ cmd_verify() {
 cmd_list() {
     log "Available backups:"
     
-    echo -e "\n${BLUE}=== CLOUD BACKUPS ===${NC}"
-    if [ -d "${BACKUP_ROOT}/cloud" ]; then
-        ls -lah "${BACKUP_ROOT}/cloud"/*.sql* 2>/dev/null | tail -10 || echo "No cloud backups"
+    echo -e "\n${BLUE}=== REMOTE BACKUPS ===${NC}"
+    if [ -d "${BACKUP_ROOT}/remote" ]; then
+        ls -lah "${BACKUP_ROOT}/remote"/*.sql* 2>/dev/null | tail -10 || echo "No remote backups"
     else
-        echo "No cloud backup directory"
+        echo "No remote backup directory"
     fi
     
     echo -e "\n${BLUE}=== LOCAL BACKUPS ===${NC}"
@@ -317,7 +315,7 @@ cmd_cleanup() {
     
     log "Starting cleanup (retention: ${RETENTION_DAYS} days)"
     
-    for backup_dir in "${BACKUP_ROOT}/cloud" "${BACKUP_ROOT}/local"; do
+    for backup_dir in "${BACKUP_ROOT}/remote" "${BACKUP_ROOT}/local"; do
         if [ ! -d "$backup_dir" ]; then
             continue
         fi
@@ -368,17 +366,17 @@ EGS Backup Manager
 Usage: $0 <command> [options]
 
 Commands:
-  backup [cloud|local] [--full|--schema|--data]  Create backup
-  restore <file> [--to-cloud|--to-local]          Restore backup
+  backup [remote|local] [--full|--schema|--data]  Create backup
+  restore <file> [--to-remote|--to-local]         Restore backup
   verify <file>                                   Verify backup integrity
   list                                            List all backups
   cleanup [--dry-run]                             Remove old backups
 
 Examples:
-  $0 backup cloud --full                    # Full cloud backup
+  $0 backup remote --full                   # Full remote backup
   $0 backup local --schema                  # Local schema only
-  $0 restore backups/cloud/egs_xxx.sql.gz   # Restore from file
-  $0 verify backups/cloud/latest.sql.gz     # Verify latest backup
+  $0 restore backups/remote/egs_xxx.sql.gz  # Restore from file
+  $0 verify backups/remote/latest.sql.gz    # Verify latest backup
   $0 cleanup --dry-run                       # Preview cleanup
 
 Configuration:

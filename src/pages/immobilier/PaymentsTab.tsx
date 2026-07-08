@@ -13,7 +13,6 @@ import {
   AlertCircle,
   Clock,
 } from "lucide-react";
-import { supabase } from "../../lib/supabase";
 import type { RentPayment, Tenant, Property, LeaseContract } from "../../types";
 import Modal from "../../components/ui/Modal";
 import Badge from "../../components/ui/Badge";
@@ -33,6 +32,12 @@ import {
   formatMontantImmo,
 } from "../../lib/immobilier";
 import { formatMontant, formatDate } from "../../utils/reference";
+import {
+  type ManualSyncStatus,
+  normalizeManualStatus,
+  readManualCache,
+  writeManualCache,
+} from "../../lib/manualSyncStore";
 
 const emptyForm = {
   contract_id: "",
@@ -49,6 +54,23 @@ const emptyForm = {
   notes: "",
   reference: "",
 };
+
+const PAYMENTS_CACHE_KEY = "egs.immobilier.payments.local_cache.v1";
+
+type LocalRentPayment = RentPayment & {
+  updated_at: string;
+  sync_status: ManualSyncStatus;
+  sync_error: string | null;
+  deleted_at: string | null;
+};
+
+function sortPayments(items: LocalRentPayment[]): LocalRentPayment[] {
+  return [...items].sort(
+    (a, b) =>
+      new Date(b.date_paiement || b.created_at).getTime() -
+      new Date(a.date_paiement || a.created_at).getTime(),
+  );
+}
 
 interface Props {
   payments: RentPayment[];
@@ -70,7 +92,7 @@ export default function PaymentsTab({
   tenants,
   properties,
   search,
-  tenantIdColumn,
+  tenantIdColumn: _tenantIdColumn,
   onRefresh,
 }: Props) {
   const { settings } = useSettings();
@@ -322,33 +344,47 @@ export default function PaymentsTab({
     const datePaiement =
       datePaiementEffectif || dateEcheance || form.date_paiement || today;
 
-    const payload: Record<string, unknown> = {
-      contract_id: form.contract_id || null,
-      property_id: form.property_id || null,
-      montant: parseFloat(form.montant) || 0,
-      date_paiement: datePaiement,
-      date_echeance: dateEcheance || null,
-      date_paiement_effectif: datePaiementEffectif,
-      mois_concerne: moisLabel || "",
-      mois_concerne_date: monthValue ? `${monthValue}-01` : null,
-      mode_paiement: form.mode_paiement,
-      statut: form.statut,
-      notes: form.notes.trim() || null,
-      reference: form.reference || generateReference("QTT"),
-    };
-    payload[tenantIdColumn] = form.locataire_id || null;
-
     try {
-      if (editingId) {
-        const { error } = await supabase
-          .from("rent_payments")
-          .update(payload)
-          .eq("id", editingId);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("rent_payments").insert(payload);
-        if (error) throw error;
-      }
+      const now = new Date().toISOString();
+      const cached = readManualCache<LocalRentPayment>(PAYMENTS_CACHE_KEY).map(
+        (payment) => ({
+          ...payment,
+          sync_status: normalizeManualStatus(payment.sync_status),
+          sync_error: payment.sync_error ?? null,
+          deleted_at: payment.deleted_at ?? null,
+        }),
+      );
+      const existing = cached.find((payment) => payment.id === editingId);
+      const localPayment: LocalRentPayment = {
+        ...(existing ?? {}),
+        id: existing?.id ?? crypto.randomUUID(),
+        contract_id: form.contract_id || null,
+        property_id: form.property_id || null,
+        montant: parseFloat(form.montant) || 0,
+        date_paiement: datePaiement,
+        date_echeance: dateEcheance || null,
+        date_paiement_effectif: datePaiementEffectif,
+        mois_concerne: moisLabel || "",
+        mois_concerne_date: monthValue ? `${monthValue}-01` : null,
+        mode_paiement: form.mode_paiement,
+        statut: form.statut,
+        notes: form.notes.trim() || null,
+        reference: form.reference || generateReference("QTT"),
+        locataire_id: form.locataire_id || null,
+        created_at: existing?.created_at ?? now,
+        updated_at: now,
+        last_document_type: existing?.last_document_type ?? null,
+        last_document_at: existing?.last_document_at ?? null,
+        last_document_by: existing?.last_document_by ?? null,
+        sync_status: "pending",
+        sync_error: null,
+        deleted_at: null,
+      };
+
+      const next = sortPayments(
+        cached.filter((payment) => payment.id !== localPayment.id).concat(localPayment),
+      );
+      writeManualCache(PAYMENTS_CACHE_KEY, next);
       setModalOpen(false);
       onRefresh();
     } catch (err: any) {
@@ -369,14 +405,27 @@ export default function PaymentsTab({
     if (!confirm("Supprimer ce paiement ? Cette action est irréversible."))
       return;
     try {
-      const { error } = await supabase
-        .from("rent_payments")
-        .delete()
-        .eq("id", id);
-      if (error) throw error;
+      const now = new Date().toISOString();
+      const cached = readManualCache<LocalRentPayment>(PAYMENTS_CACHE_KEY);
+      const next = cached
+        .map((payment) => {
+          if (payment.id !== id) return payment;
+          if (normalizeManualStatus(payment.sync_status) === "pending") {
+            return null;
+          }
+          return {
+            ...payment,
+            sync_status: "deleted" as const,
+            deleted_at: now,
+            updated_at: now,
+            sync_error: null,
+          };
+        })
+        .filter(Boolean) as LocalRentPayment[];
+      writeManualCache(PAYMENTS_CACHE_KEY, sortPayments(next));
       onRefresh();
     } catch (err: any) {
-      alert(`Erreur lors de la suppression: ${err.message}`);
+      alert(`Erreur lors de la suppression locale: ${err.message}`);
     }
   };
 
@@ -385,16 +434,24 @@ export default function PaymentsTab({
     id: string,
     type: "quittance" | "recu",
   ) => {
-    const { data } = await supabase.auth.getUser();
-    const userId = data?.user?.id ?? null;
-    await supabase
-      .from("rent_payments")
-      .update({
-        last_document_type: type,
-        last_document_at: new Date().toISOString(),
-        last_document_by: userId,
-      })
-      .eq("id", id);
+    const cached = readManualCache<LocalRentPayment>(PAYMENTS_CACHE_KEY);
+    const now = new Date().toISOString();
+    const next = cached.map((payment) =>
+      payment.id === id
+        ? {
+            ...payment,
+            last_document_type: type,
+            last_document_at: now,
+            last_document_by: null,
+            updated_at: now,
+            sync_status:
+              normalizeManualStatus(payment.sync_status) === "synced"
+                ? "pending"
+                : normalizeManualStatus(payment.sync_status),
+          }
+        : payment,
+    );
+    writeManualCache(PAYMENTS_CACHE_KEY, sortPayments(next));
   };
 
   // Print functions

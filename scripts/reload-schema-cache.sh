@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================================
 # reload-schema-cache.sh — Force le rechargement du schema cache PostgREST
-# Usage: bash scripts/reload-schema-cache.sh [--local|--cloud]
+# Usage: bash scripts/reload-schema-cache.sh [--local|--remote]
 #
 # Conformément à la doc PostgREST :
 # https://postgrest.org/en/stable/references/schema_cache.html
@@ -22,9 +22,9 @@ echo "============================================"
 if [ "$MODE" = "--local" ]; then
   DB_URL="postgresql://postgres:postgres@localhost:54322/postgres"
   echo "📡 Connexion à Supabase local..."
-elif [ "$MODE" = "--cloud" ]; then
+elif [ "$MODE" = "--remote" ]; then
   echo ""
-  echo "⚠️  Pour Supabase Cloud, deux options :"
+  echo "⚠️  Pour la base distante, deux options :"
   echo ""
   echo "  Option 1 : Via Supabase Dashboard"
   echo "    1. Allez sur https://supabase.com/dashboard"
@@ -33,7 +33,7 @@ elif [ "$MODE" = "--cloud" ]; then
   echo ""
   echo "  Option 2 : Avec le mot de passe PostgreSQL"
   echo "    Renseignez POSTGRES_PASSWORD dans .env.server"
-  echo "    puis relancez : $0 --cloud"
+  echo "    puis relancez : $0 --remote"
   echo ""
   echo "  Option 3 : Via Supabase CLI (si lié)"
   echo "    supabase db execute --db-url <url> -c \"NOTIFY pgrst, 'reload schema';\""

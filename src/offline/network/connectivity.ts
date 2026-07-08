@@ -1,7 +1,10 @@
 /**
- * CONNECTIVITÉ INTELLIGENTE — Ping Supabase + détection réseau fiable
+ * CONNECTIVITÉ INTELLIGENTE — Ping API locale + détection réseau fiable
  * Remplace window.navigator.onLine seul (insuffisant pour terrain Afrique).
  */
+import { getLocalApiBaseUrl } from "../../lib/selfHosted";
+import { isLikelyLoopback } from "../../lib/loopback";
+import apiClient from "../../api/client";
 
 export interface ConnectivityStatus {
   isOnline: boolean;
@@ -10,9 +13,9 @@ export interface ConnectivityStatus {
   error?: string;
 }
 
-class ConnectivityManager {
+class RuntimeConnectivityMonitor {
   private status: ConnectivityStatus = {
-    isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
+    isOnline: typeof navigator !== "undefined" ? navigator.onLine : true,
     lastChecked: new Date().toISOString(),
   };
 
@@ -22,53 +25,49 @@ class ConnectivityManager {
   private readonly handleOnline = () => {
     this.consecutiveFailures = 0;
     this.isDegradedMode = false;
-    this.updateStatus(true, 'browser online');
+    this.updateStatus(true, "browser online");
   };
   private readonly handleOffline = () => {
-    this.updateStatus(false, 'browser offline');
+    this.updateStatus(false, "browser offline");
   };
-  
+
   // Gestion des retries avec backoff
   private consecutiveFailures = 0;
   private readonly MAX_RETRIES = 5;
   private readonly BASE_DELAY = 30_000; // 30s base
   private isDegradedMode = false;
 
-  private resolveSupabaseHealthConfig(): { url?: string; anonKey?: string } {
-    const mode = String(import.meta.env.VITE_SUPABASE_MODE || '').toLowerCase();
-    const cloudUrl = import.meta.env.VITE_SUPABASE_URL;
-    const localUrl = import.meta.env.VITE_SUPABASE_LOCAL_URL;
-    const cloudAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    const localAnonKey = import.meta.env.VITE_SUPABASE_LOCAL_ANON_KEY;
-
-    if (mode === 'local') return { url: localUrl, anonKey: localAnonKey };
-    if (mode === 'cloud') return { url: cloudUrl, anonKey: cloudAnonKey };
-
-    return cloudUrl
-      ? { url: cloudUrl, anonKey: cloudAnonKey }
-      : { url: localUrl, anonKey: localAnonKey };
+  private resolveApiHealthConfig(): { url?: string } {
+    // Centralize API base URL resolution to `getLocalApiBaseUrl`
+    // which enforces loopback/private host rejection and
+    // avoids embedding legacy/local addresses into production bundles.
+    const url = getLocalApiBaseUrl();
+    if (!url) return { url: undefined };
+    // Defensive: ensure loopback-like hosts are not used even if envs slip through
+    if (isLikelyLoopback(url)) return { url: undefined };
+    return { url };
   }
 
   /**
    * Démarrer le monitoring de connectivité
    */
   start(): void {
-    if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+    if (typeof window === "undefined" || typeof navigator === "undefined") {
       return;
     }
     this.isRunning = true;
 
     // Écouter les événements natifs
-    window.addEventListener('online', this.handleOnline);
-    window.addEventListener('offline', this.handleOffline);
+    window.addEventListener("online", this.handleOnline);
+    window.addEventListener("offline", this.handleOffline);
 
     // Ping immédiat
-    void this.pingSupabase();
-    
+    void this.pingApi();
+
     // Programme le prochain ping avec backoff
     this.scheduleNextPing();
   }
-  
+
   /**
    * Programme le prochain ping avec backoff exponentiel
    */
@@ -80,26 +79,29 @@ class ConnectivityManager {
     if (this.pingInterval) {
       clearTimeout(this.pingInterval);
     }
-    
+
     // Calcul du délai avec backoff exponentiel
     let delay = this.BASE_DELAY;
     if (this.consecutiveFailures > 0) {
       // Backoff: 30s, 60s, 120s, 240s, 300s (max 5min)
-      const backoffMultiplier = Math.min(Math.pow(2, this.consecutiveFailures - 1), 10);
+      const backoffMultiplier = Math.min(
+        Math.pow(2, this.consecutiveFailures - 1),
+        10,
+      );
       delay = this.BASE_DELAY * backoffMultiplier;
     }
-    
+
     // En mode dégradé (après MAX_RETRIES), on espace beaucoup plus
     if (this.isDegradedMode) {
       delay = 300_000; // 5 minutes
     }
-    
+
     this.pingInterval = setTimeout(() => {
       if (!this.isRunning) {
         return;
       }
 
-      void this.pingSupabase().then(() => {
+      void this.pingApi().then(() => {
         if (this.isRunning) {
           this.scheduleNextPing();
         }
@@ -111,7 +113,7 @@ class ConnectivityManager {
    * Arrêter le monitoring
    */
   stop(): void {
-    if (typeof window === 'undefined') {
+    if (typeof window === "undefined") {
       return;
     }
 
@@ -121,8 +123,8 @@ class ConnectivityManager {
       clearTimeout(this.pingInterval);
       this.pingInterval = null;
     }
-    window.removeEventListener('online', this.handleOnline);
-    window.removeEventListener('offline', this.handleOffline);
+    window.removeEventListener("online", this.handleOnline);
+    window.removeEventListener("offline", this.handleOffline);
   }
 
   /**
@@ -149,76 +151,81 @@ class ConnectivityManager {
   }
 
   /**
-   * Ping Supabase pour vérifier la connectivité réelle
+   * Ping API locale pour vérifier la connectivité réelle
    * Gère les retries et passe en mode dégradé après MAX_RETRIES échecs
    */
-  async pingSupabase(): Promise<ConnectivityStatus> {
-    if (typeof fetch !== 'function') {
+  async pingApi(): Promise<ConnectivityStatus> {
+    if (typeof fetch !== "function") {
       this.consecutiveFailures++;
-      return this.updateStatus(false, 'fetch indisponible');
+      return this.updateStatus(false, "fetch indisponible");
     }
 
-    const { url: supabaseUrl, anonKey: supabaseAnonKey } = this.resolveSupabaseHealthConfig();
-    
-    if (!supabaseUrl || !supabaseAnonKey) {
+    const { url: apiUrl } = this.resolveApiHealthConfig();
+
+    if (!apiUrl) {
       this.consecutiveFailures++;
-      return this.updateStatus(false, 'Configuration Supabase manquante');
+      return this.updateStatus(false, "Configuration API locale manquante");
     }
 
     // En mode dégradé, on ne spam plus les logs
-    void (this.isDegradedMode ? 'debug' : 'warn'); // logLevel supprimé (TS6133)
+    void (this.isDegradedMode ? "debug" : "warn"); // logLevel supprimé (TS6133)
 
     const startTime = Date.now();
 
     try {
-      // Utiliser un endpoint de santé explicite pour éviter les faux 401 sur /rest/v1/
-      const response = await fetch(`${supabaseUrl}/auth/v1/health`, {
-        method: 'GET',
-        cache: 'no-cache',
-        headers: {
-          apikey: supabaseAnonKey,
-        },
-        signal: AbortSignal.timeout(8_000), // Timeout 8s (adapté 2G/3G)
-      });
+      // Use central apiClient to perform health check (avoids inlining legacy URLs)
+      const result =
+        await apiClient.request<Record<string, unknown>>("/health");
 
-      if (!response.ok) {
-        throw new Error(`Supabase health HTTP ${response.status}`);
+      if (result.error) {
+        throw new Error(
+          result.error || `API health failed status ${result.status}`,
+        );
       }
 
       const latency = Date.now() - startTime;
-      
-      // Reset des compteurs en cas de succès réseau confirmé
+
+      // Reset counters on success
       this.consecutiveFailures = 0;
       this.isDegradedMode = false;
-      
+
       return this.updateStatus(true, undefined, latency);
     } catch (error) {
       this.consecutiveFailures++;
-      
+
       // Passer en mode dégradé après MAX_RETRIES échecs
-      if (this.consecutiveFailures >= this.MAX_RETRIES && !this.isDegradedMode) {
+      if (
+        this.consecutiveFailures >= this.MAX_RETRIES &&
+        !this.isDegradedMode
+      ) {
         this.isDegradedMode = true;
-        console.warn(`[ConnectivityManager] Passage en mode dégradé après ${this.MAX_RETRIES} échecs. Prochains pings espacés de 5min.`);
+        console.warn(
+          `[RuntimeConnectivityMonitor] Passage en mode dégradé après ${this.MAX_RETRIES} échecs. Prochains pings espacés de 5min.`,
+        );
       }
-      
-      let errorMsg = 'Erreur réseau';
+
+      let errorMsg = "Erreur réseau";
       if (error instanceof Error) {
-        if (error.name === 'AbortError') {
-          errorMsg = 'Timeout réseau';
-        } else if (error.message.includes('fetch')) {
-          errorMsg = 'Réseau inaccessible';
+        if (error.name === "AbortError") {
+          errorMsg = "Timeout réseau";
+        } else if (error.message.includes("fetch")) {
+          errorMsg = "Réseau inaccessible";
         } else {
           errorMsg = error.message;
         }
       }
-      
+
       // En production, un seul timeout mobile/Cloudflare isolé ne doit pas polluer la console.
       if (import.meta.env.DEV && this.consecutiveFailures === 1) {
-        console.warn(`[ConnectivityManager] Échec ping #${this.consecutiveFailures}: ${errorMsg}`);
+        console.warn(
+          `[RuntimeConnectivityMonitor] Échec ping #${this.consecutiveFailures}: ${errorMsg}`,
+        );
       } else if (!this.isDegradedMode && this.consecutiveFailures >= 2) {
-        console.warn(`[ConnectivityManager] Échec ping #${this.consecutiveFailures}: ${errorMsg}`);
+        console.warn(
+          `[RuntimeConnectivityMonitor] Échec ping #${this.consecutiveFailures}: ${errorMsg}`,
+        );
       }
-      
+
       return this.updateStatus(false, errorMsg);
     }
   }
@@ -227,13 +234,17 @@ class ConnectivityManager {
    * Forcer une vérification immédiate
    */
   async forceCheck(): Promise<ConnectivityStatus> {
-    return this.pingSupabase();
+    return this.pingApi();
   }
 
   /**
    * Mettre à jour le statut et notifier les listeners
    */
-  private updateStatus(isOnline: boolean, error?: string, latency?: number): ConnectivityStatus {
+  private updateStatus(
+    isOnline: boolean,
+    error?: string,
+    latency?: number,
+  ): ConnectivityStatus {
     this.status = {
       isOnline,
       lastChecked: new Date().toISOString(),
@@ -246,7 +257,7 @@ class ConnectivityManager {
       try {
         callback(this.status);
       } catch (err) {
-        console.error('[ConnectivityManager] Listener error:', err);
+        console.error("[RuntimeConnectivityMonitor] Listener error:", err);
       }
     });
 
@@ -288,19 +299,21 @@ class ConnectivityManager {
     if (this.isDegradedMode) {
       return `Mode dégradé - Connectivité instable (${this.consecutiveFailures} échecs)`;
     }
-    
+
     if (!this.status.isOnline) {
-      return this.status.error ? `Hors ligne (${this.status.error})` : 'Hors ligne';
+      return this.status.error
+        ? `Hors ligne (${this.status.error})`
+        : "Hors ligne";
     }
 
     if (!this.status.latency) {
-      return 'En ligne';
+      return "En ligne";
     }
 
-    if (this.status.latency < 500) return 'En ligne (excellent)';
-    if (this.status.latency < 1500) return 'En ligne (bon)';
-    if (this.status.latency < 3000) return 'En ligne (lent)';
-    return 'En ligne (très lent)';
+    if (this.status.latency < 500) return "En ligne (excellent)";
+    if (this.status.latency < 1500) return "En ligne (bon)";
+    if (this.status.latency < 3000) return "En ligne (lent)";
+    return "En ligne (très lent)";
   }
 
   /**
@@ -330,4 +343,4 @@ class ConnectivityManager {
   }
 }
 
-export const connectivityManager = new ConnectivityManager();
+export const connectivityManager = new RuntimeConnectivityMonitor();

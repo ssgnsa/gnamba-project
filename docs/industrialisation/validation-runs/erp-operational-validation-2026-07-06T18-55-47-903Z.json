@@ -1,0 +1,266 @@
+{
+  "runId": "2026-07-06T18-55-47-903Z",
+  "startedAt": "2026-07-06T18:55:47.904Z",
+  "options": {
+    "apiBaseUrl": "http://127.0.0.1:8000",
+    "webBaseUrl": null,
+    "email": "admin@egs.local",
+    "logicalMinutes": 30,
+    "browser": false
+  },
+  "steps": [
+    {
+      "name": "health",
+      "status": "passed",
+      "details": {
+        "body": {
+          "status": "ok",
+          "service": "egs-local-api"
+        },
+        "durationMs": 29
+      },
+      "at": "2026-07-06T18:55:47.965Z"
+    },
+    {
+      "name": "auth.login",
+      "status": "passed",
+      "details": {
+        "user": "admin@egs.local",
+        "accessType": "access",
+        "refreshType": "refresh",
+        "accessExpiresAt": "2026-07-06T19:55:47.000Z"
+      },
+      "at": "2026-07-06T18:55:47.994Z"
+    },
+    {
+      "name": "auth.me",
+      "status": "passed",
+      "details": {
+        "user": "admin@egs.local"
+      },
+      "at": "2026-07-06T18:55:48.008Z"
+    },
+    {
+      "name": "auth.refresh",
+      "status": "passed",
+      "details": {
+        "refreshedUser": "admin@egs.local"
+      },
+      "at": "2026-07-06T18:55:48.024Z"
+    },
+    {
+      "name": "auth.multi-session",
+      "status": "passed",
+      "details": {
+        "firstUser": "admin@egs.local",
+        "secondUser": "admin@egs.local"
+      },
+      "at": "2026-07-06T18:55:48.057Z"
+    },
+    {
+      "name": "navigation.users-api",
+      "status": "passed",
+      "details": {
+        "endpoint": "/api/v1/users"
+      },
+      "at": "2026-07-06T18:55:48.067Z"
+    },
+    {
+      "name": "crud.projects",
+      "status": "passed",
+      "details": {
+        "id": "f161bdc9-a424-4fc7-a1d0-200d3b0a68c1",
+        "created": "OPS-VALIDATION-2026-07-06T18-55-47-903Z Chantier pilote",
+        "patched": "OPS-VALIDATION-2026-07-06T18-55-47-903Z Chantier pilote",
+        "listCount": 4
+      },
+      "at": "2026-07-06T18:55:48.182Z"
+    },
+    {
+      "name": "crud.employees",
+      "status": "passed",
+      "details": {
+        "id": "fbc51b1e-bd39-46ba-b094-f6f9a77aff3d",
+        "created": "OPS-VALIDATION-2026-07-06T18-55-47-903Z Employe",
+        "patched": "OPS-VALIDATION-2026-07-06T18-55-47-903Z Employe",
+        "listCount": 3
+      },
+      "at": "2026-07-06T18:55:48.303Z"
+    },
+    {
+      "name": "crud.suppliers",
+      "status": "passed",
+      "details": {
+        "id": "e58d70ff-cae5-49f4-b077-d4e91127ac69",
+        "created": "OPS-VALIDATION-2026-07-06T18-55-47-903Z Fournisseur",
+        "patched": "OPS-VALIDATION-2026-07-06T18-55-47-903Z Fournisseur",
+        "listCount": 3
+      },
+      "at": "2026-07-06T18:55:48.413Z"
+    },
+    {
+      "name": "crud.products",
+      "status": "passed",
+      "details": {
+        "id": "73627451-0e96-4a26-a14d-d2df34c65ec6",
+        "created": "OPS-VALIDATION-2026-07-06T18-55-47-903Z Materiau",
+        "patched": "OPS-VALIDATION-2026-07-06T18-55-47-903Z Materiau",
+        "listCount": 3
+      },
+      "at": "2026-07-06T18:55:48.526Z"
+    },
+    {
+      "name": "crud.finance",
+      "status": "passed",
+      "details": {
+        "id": "a78b34ab-a920-4cbf-92fd-03b83bd56d71",
+        "created": "OPS-VALIDATION-2026-07-06T18-55-47-903Z-FIN",
+        "patched": "OPS-VALIDATION-2026-07-06T18-55-47-903Z-FIN",
+        "listCount": 3
+      },
+      "at": "2026-07-06T18:55:48.646Z"
+    },
+    {
+      "name": "navigation.media-api",
+      "status": "passed",
+      "details": {
+        "mediaCount": 15,
+        "brandAssetCount": 0
+      },
+      "at": "2026-07-06T18:55:48.695Z"
+    },
+    {
+      "name": "resilience.expired-or-invalid-access-refresh",
+      "status": "passed",
+      "details": {
+        "recoveredUser": "admin@egs.local"
+      },
+      "at": "2026-07-06T18:55:48.724Z"
+    },
+    {
+      "name": "resilience.api-error-controlled",
+      "status": "passed",
+      "details": {
+        "status": 404,
+        "detail": "Projet introuvable"
+      },
+      "at": "2026-07-06T18:55:48.784Z"
+    },
+    {
+      "name": "resilience.temporary-network-loss",
+      "status": "passed",
+      "details": {
+        "error": "fetch failed"
+      },
+      "at": "2026-07-06T18:55:48.785Z"
+    },
+    {
+      "name": "resilience.network-recovery",
+      "status": "passed",
+      "details": {
+        "endpoint": "/api/v1/auth/me"
+      },
+      "at": "2026-07-06T18:55:48.795Z"
+    },
+    {
+      "name": "usage.continuous-logical-session",
+      "status": "passed",
+      "details": {
+        "logicalMinutes": 30,
+        "requestCount": 30,
+        "maxDurationMs": 31
+      },
+      "at": "2026-07-06T18:55:49.493Z"
+    },
+    {
+      "name": "supabase.source-guard",
+      "status": "passed",
+      "details": {
+        "path": "src"
+      },
+      "at": "2026-07-06T18:55:49.509Z"
+    },
+    {
+      "name": "supabase.build-scan",
+      "status": "passed",
+      "details": {
+        "path": "dist-local",
+        "scannedFiles": 63
+      },
+      "at": "2026-07-06T18:55:49.526Z"
+    },
+    {
+      "name": "validation.abort",
+      "status": "failed",
+      "details": {
+        "error": "Forbidden Supabase pattern found in build files: dist/assets/Documents-xhSHHoiM.js, dist/assets/PublicVerification-D346U_wt.js, dist/assets/index-C1BCILuq.js, dist/assets/supabase-BzJSEYoh.js, dist/assets/supabase-vendor-CMSNY3NE.js, dist/index.html"
+      },
+      "at": "2026-07-06T18:55:49.634Z"
+    },
+    {
+      "name": "cleanup.validation-data",
+      "status": "passed",
+      "details": {
+        "deleted": 5
+      },
+      "at": "2026-07-06T18:55:49.856Z"
+    }
+  ],
+  "risks": [
+    {
+      "level": "critique",
+      "item": "1 validation step(s) failed."
+    }
+  ],
+  "cleanup": [
+    {
+      "collection": "finance",
+      "id": "a78b34ab-a920-4cbf-92fd-03b83bd56d71",
+      "status": 200
+    },
+    {
+      "collection": "products",
+      "id": "73627451-0e96-4a26-a14d-d2df34c65ec6",
+      "status": 200
+    },
+    {
+      "collection": "suppliers",
+      "id": "e58d70ff-cae5-49f4-b077-d4e91127ac69",
+      "status": 200
+    },
+    {
+      "collection": "employees",
+      "id": "fbc51b1e-bd39-46ba-b094-f6f9a77aff3d",
+      "status": 200
+    },
+    {
+      "collection": "projects",
+      "id": "f161bdc9-a424-4fc7-a1d0-200d3b0a68c1",
+      "status": 200
+    }
+  ],
+  "forbiddenNetworkRequests": [],
+  "created": {
+    "projects": [
+      "f161bdc9-a424-4fc7-a1d0-200d3b0a68c1"
+    ],
+    "employees": [
+      "fbc51b1e-bd39-46ba-b094-f6f9a77aff3d"
+    ],
+    "suppliers": [
+      "e58d70ff-cae5-49f4-b077-d4e91127ac69"
+    ],
+    "products": [
+      "73627451-0e96-4a26-a14d-d2df34c65ec6"
+    ],
+    "finance": [
+      "a78b34ab-a920-4cbf-92fd-03b83bd56d71"
+    ],
+    "media": []
+  },
+  "finishedAt": "2026-07-06T18:55:49.856Z",
+  "verdict": {
+    "stableForInternalUse": false,
+    "status": "NON"
+  }
+}

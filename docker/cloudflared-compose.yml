@@ -1,0 +1,12 @@
+version: "3.8"
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    volumes:
+      - ./cloudflared:/etc/cloudflared:ro
+    command: tunnel --no-autoupdate run --config /etc/cloudflared/config.yml
+    environment:
+      # Avoid committing secrets: export CLOUDFLARE_API_TOKEN in the environment when running
+      - CLOUDFLARE_API_TOKEN

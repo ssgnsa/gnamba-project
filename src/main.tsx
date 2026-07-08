@@ -8,7 +8,7 @@ import { connectivityManager } from "./offline/network/connectivity";
 const root = document.getElementById("root");
 
 if (!root) {
-  throw new Error('Root element #root introuvable');
+  throw new Error("Root element #root introuvable");
 }
 
 createRoot(root).render(
@@ -17,14 +17,14 @@ createRoot(root).render(
   </StrictMode>,
 );
 
-// Démarrer le système offline-first sans bloquer le rendu initial
+// Démarrer le système de connectivité uniquement si une API réseau explicite est disponible.
 window.setTimeout(() => {
   try {
     void syncEngineV2.start().catch((error) => {
-      console.error('[bootstrap] syncEngineV2.start failed:', error);
+      console.error("[bootstrap] syncEngineV2.start failed:", error);
     });
     connectivityManager.start();
   } catch (error) {
-    console.error('[bootstrap] Offline bootstrap failed:', error);
+    console.error("[bootstrap] Offline bootstrap failed:", error);
   }
 }, 0);

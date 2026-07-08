@@ -6,12 +6,11 @@
  */
 
 export type LotStatut =
-  | 'disponible'
+  | 'actif'
   | 'reserve'
   | 'vendu'
   | 'litige'
-  | 'indisponible'
-  | 'archive';
+  | 'annule';
 
 export type AttestationStatut =
   | 'brouillon'
@@ -30,11 +29,11 @@ export interface LotForRules {
 
 export const foncierRules = {
   /**
-   * Un lot peut être vendu seulement s'il est disponible, non archivé et vérifié
+   * Un lot peut être vendu seulement s'il est actif, non archivé et vérifié
    */
   canSellLot(lot: LotForRules): boolean {
     return (
-      lot.statut === 'disponible' &&
+      lot.statut === 'actif' &&
       lot.deleted_at == null &&
       lot.is_verified === true
     );
@@ -52,7 +51,7 @@ export const foncierRules = {
    */
   canIssueAttestation(lot: LotForRules): boolean {
     return (
-      lot.statut !== 'archive' &&
+      lot.statut !== 'annule' &&
       lot.deleted_at == null &&
       Boolean(lot.proprietaire_nom?.trim())
     );
@@ -88,12 +87,11 @@ export const foncierRules = {
    */
   statutLabel(statut: LotStatut): string {
     const labels: Record<LotStatut, string> = {
-      disponible: 'Disponible',
+      actif: 'Actif',
       reserve: 'Réservé',
       vendu: 'Vendu',
       litige: 'En litige',
-      indisponible: 'Indisponible',
-      archive: 'Archivé',
+      annule: 'Annulé',
     };
     return labels[statut] ?? statut;
   },
@@ -103,12 +101,11 @@ export const foncierRules = {
    */
   statutBadgeClass(statut: LotStatut): string {
     const classes: Record<LotStatut, string> = {
-      disponible: 'bg-green-100 text-green-800',
+      actif: 'bg-green-100 text-green-800',
       reserve: 'bg-yellow-100 text-yellow-800',
       vendu: 'bg-blue-100 text-blue-800',
       litige: 'bg-red-100 text-red-800',
-      indisponible: 'bg-gray-100 text-gray-600',
-      archive: 'bg-gray-200 text-gray-500',
+      annule: 'bg-gray-200 text-gray-500',
     };
     return classes[statut] ?? 'bg-gray-100 text-gray-600';
   },

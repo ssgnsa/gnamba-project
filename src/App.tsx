@@ -11,7 +11,10 @@ import {
 } from "react";
 import { SettingsProvider, useSettings } from "./context/SettingsContext";
 import { AuthProvider, useAuth, hasAccess } from "./context/AuthContext";
-import { NotificationProvider, useNotifications } from "./context/NotificationContext";
+import {
+  NotificationProvider,
+  useNotifications,
+} from "./context/NotificationContext";
 import ToastContainer from "./components/ui/Toast";
 import { useServiceWorker } from "./lib/useServiceWorker";
 import { WifiOff } from "lucide-react";
@@ -22,17 +25,19 @@ import PublicLayout from "./components/public/PublicLayout";
 import type { Page } from "./components/Sidebar";
 import type { PublicPage } from "./lib/publicRoutes";
 import { PUBLIC_PAGE_PATHS, getPublicPageFromPath } from "./lib/publicRoutes";
-import { supabase } from "./lib/supabase";
+import dbClient from "./data/tableClient";
 import type { PageSection } from "./components/page-builder/types";
 import PublicPageLayoutRenderer from "./components/public/PublicPageLayoutRenderer";
 import PublicSocialWall from "./components/public/PublicSocialWall";
-import OneSignal from 'react-onesignal';
+import { OFFICIAL_CONTACT } from "./lib/officialContact";
+import OneSignal from "react-onesignal";
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Clients = lazy(() => import("./pages/Clients"));
 const Projets = lazy(() => import("./pages/Projets"));
 const Immobilier = lazy(() => import("./pages/Immobilier"));
 const Foncier = lazy(() => import("./pages/Foncier"));
+const CatalogueLots = lazy(() => import("./pages/CatalogueLots"));
 const Fournitures = lazy(() => import("./pages/Fournitures"));
 const Finances = lazy(() => import("./pages/Finances"));
 const Employes = lazy(() => import("./pages/Employes"));
@@ -42,6 +47,7 @@ const Documents = lazy(() => import("./pages/Documents"));
 const Taches = lazy(() => import("./pages/Taches"));
 const Statistiques = lazy(() => import("./pages/Statistiques"));
 const Parametres = lazy(() => import("./pages/Parametres"));
+const CodexAssistant = lazy(() => import("./pages/CodexAssistant"));
 const SiteEditor = lazy(() => import("./pages/admin/SiteEditor"));
 const Media = lazy(() => import("./pages/Media"));
 const AccueilEmploye = lazy(() => import("./pages/AccueilEmploye"));
@@ -54,10 +60,24 @@ const VerificationAttestation = lazy(
 const PublicHome = lazy(() => import("./pages/public/PublicHome"));
 const PublicAbout = lazy(() => import("./pages/public/PublicAbout"));
 const PublicServices = lazy(() => import("./pages/public/PublicServices"));
+const PublicImmobilier = lazy(() => import("./pages/public/PublicImmobilier"));
+const PublicFoncier = lazy(() => import("./pages/public/PublicFoncier"));
+const PublicLotissement = lazy(
+  () => import("./pages/public/PublicLotissement"),
+);
+const PublicBtpConstruction = lazy(
+  () => import("./pages/public/PublicBtpConstruction"),
+);
 const PublicRealisations = lazy(
   () => import("./pages/public/PublicRealisations"),
 );
+const PublicTestimonials = lazy(
+  () => import("./pages/public/PublicTestimonials"),
+);
+const PublicBlog = lazy(() => import("./pages/public/PublicBlog"));
 const PublicContact = lazy(() => import("./pages/public/PublicContact"));
+const PublicFAQ = lazy(() => import("./pages/public/PublicFAQ"));
+const PublicLegal = lazy(() => import("./pages/public/PublicLegal"));
 const LoginPage = lazy(() => import("./pages/public/LoginPage"));
 const ForgotPasswordPage = lazy(
   () => import("./pages/public/ForgotPasswordPage"),
@@ -85,6 +105,7 @@ const dashboardPages: Record<Page, PageComponent> = {
   projets: Projets,
   immobilier: Immobilier,
   foncier: Foncier,
+  "catalogue-lots": CatalogueLots,
   fournitures: Fournitures,
   finances: Finances,
   employes: Employes,
@@ -94,6 +115,7 @@ const dashboardPages: Record<Page, PageComponent> = {
   taches: Taches,
   statistiques: Statistiques,
   parametres: Parametres,
+  "codex-assistant": CodexAssistant,
   "site-editor": SiteEditor,
   media: Media,
   registre: RegistreVisiteur,
@@ -102,20 +124,52 @@ const dashboardPages: Record<Page, PageComponent> = {
 
 const PublicAboutPage: ComponentType<{
   onNavigate: (page: PublicPage) => void;
-}> = () => <PublicAbout />;
+}> = (_props) => <PublicAbout />;
+const PublicImmobilierPage: ComponentType<{
+  onNavigate: (page: PublicPage) => void;
+}> = (props) => <PublicImmobilier onNavigate={props.onNavigate} />;
+const PublicFoncierPage: ComponentType<{
+  onNavigate: (page: PublicPage) => void;
+}> = (props) => <PublicFoncier onNavigate={props.onNavigate} />;
+const PublicLotissementPage: ComponentType<{
+  onNavigate: (page: PublicPage) => void;
+}> = (props) => <PublicLotissement onNavigate={props.onNavigate} />;
+const PublicBtpConstructionPage: ComponentType<{
+  onNavigate: (page: PublicPage) => void;
+}> = (props) => <PublicBtpConstruction onNavigate={props.onNavigate} />;
 const PublicRealisationsPage: ComponentType<{
   onNavigate: (page: PublicPage) => void;
-}> = () => <PublicRealisations />;
+}> = (_props) => <PublicRealisations />;
+const PublicTestimonialsPage: ComponentType<{
+  onNavigate: (page: PublicPage) => void;
+}> = (props) => <PublicTestimonials onNavigate={props.onNavigate} />;
+const PublicBlogPage: ComponentType<{
+  onNavigate: (page: PublicPage) => void;
+}> = (props) => <PublicBlog onNavigate={props.onNavigate} />;
 const PublicContactPage: ComponentType<{
   onNavigate: (page: PublicPage) => void;
-}> = () => <PublicContact />;
+}> = (_props) => <PublicContact />;
+const PublicFAQPage: ComponentType<{
+  onNavigate: (page: PublicPage) => void;
+}> = (props) => <PublicFAQ onNavigate={props.onNavigate} />;
+const PublicLegalPage: ComponentType<{
+  onNavigate: (page: PublicPage) => void;
+}> = (_props) => <PublicLegal />;
 
 const publicPages: Record<string, PublicPageComponent> = {
   home: PublicHome,
   about: PublicAboutPage,
   services: PublicServices,
+  immobilier: PublicImmobilierPage,
+  foncier: PublicFoncierPage,
+  lotissement: PublicLotissementPage,
+  "btp-construction": PublicBtpConstructionPage,
   realisations: PublicRealisationsPage,
+  temoignages: PublicTestimonialsPage,
+  blog: PublicBlogPage,
   contact: PublicContactPage,
+  faq: PublicFAQPage,
+  "mentions-legales": PublicLegalPage,
   verification: PublicVerification,
   lots: PublicLots,
 };
@@ -134,6 +188,7 @@ const DASHBOARD_PAGE_PATHS: Record<Page, string> = {
   projets: "/projets",
   immobilier: "/immobilier",
   foncier: "/foncier",
+  "catalogue-lots": "/lots-a-vendre",
   fournitures: "/fournitures",
   finances: "/finances",
   employes: "/employes",
@@ -143,6 +198,7 @@ const DASHBOARD_PAGE_PATHS: Record<Page, string> = {
   taches: "/taches",
   statistiques: "/statistiques",
   parametres: "/parametres",
+  "codex-assistant": "/codex-assistant",
   "site-editor": "/site-editor",
   media: "/media",
   registre: "/registre",
@@ -281,46 +337,102 @@ type SeoConfig = {
 
 const PUBLIC_SEO_CONFIG: Partial<Record<PublicPage, SeoConfig>> = {
   home: {
-    title: "BTP, immobilier, foncier et solutions commerciales",
+    title: "GNAMBA SERVICES | Immobilier, Foncier & BTP en Côte d'Ivoire",
     description:
-      "BTP, immobilier, foncier et fournitures en Côte d'Ivoire. Devis rapides, suivi terrain et accompagnement commercial par Gnamba Services.",
+      "GNAMBA SERVICES, votre expert foncier, immobilier et BTP à Sikensi. Achat de terrain sécurisé, construction de villa, lotissement. Devis gratuit 48h.",
     keywords:
-      "BTP Côte d'Ivoire, immobilier Abidjan, foncier sécurisé, lots à vendre, construction villas, gestion locative, fournitures professionnelles, devis BTP, Gnamba Services",
+      "achat terrain Sikensi, terrain à vendre Côte d'Ivoire, sécurisation foncière Côte d'Ivoire, lotissement Agnéby-Tiassa, construction villa Abidjan, GNAMBA SERVICES",
   },
   about: {
-    title: "À propos de Gnamba Services",
+    title: "À propos de GNAMBA SERVICES | Expert Foncier & Immobilier Sikensi",
     description:
-      "Découvrez Gnamba Services, votre partenaire multiservices en Côte d'Ivoire pour la construction, l'immobilier, le foncier et les fournitures.",
+      "Fondée en 2021, GNAMBA SERVICES accompagne particuliers et entreprises en Côte d'Ivoire. Foncier, immobilier, BTP, lotissement. Transparence et expertise.",
     keywords:
-      "Gnamba Services, entreprise BTP Abidjan, immobilier Côte d'Ivoire, foncier, histoire, équipe, expertise",
+      "GNAMBA SERVICES, expert foncier Sikensi, entreprise immobilière Côte d'Ivoire, BTP, lotissement, équipe, expertise",
   },
   services: {
-    title: "Services BTP, immobilier, foncier et fournitures",
+    title: "Services Foncier, Immobilier, Lotissement & BTP | GNAMBA SERVICES",
     description:
-      "Construction, rénovation, gestion immobilière, sécurisation foncière et fournitures professionnelles en Côte d'Ivoire.",
+      "Immobilier, foncier sécurisé, lotissement, BTP & construction et fournitures professionnelles en Côte d'Ivoire. Un seul interlocuteur, devis rapide.",
     keywords:
-      "services BTP, construction Abidjan, gestion immobilière, foncier villageois, fournitures pro, Côte d'Ivoire",
+      "services immobiliers, sécurisation foncière, lotissement Sikensi, BTP Côte d'Ivoire, fournitures professionnelles, GNAMBA SERVICES",
   },
   realisations: {
-    title: "Réalisations et références terrain",
+    title: "Réalisations de GNAMBA SERVICES | Projets terrain en Côte d'Ivoire",
     description:
       "Parcourez nos réalisations pour évaluer notre savoir-faire en BTP, immobilier, foncier et fournitures en Côte d'Ivoire.",
     keywords:
-      "réalisations BTP, références immobilières, projets fonciers, portfolio Côte d'Ivoire, Gnamba Services",
+      "réalisations BTP, références immobilières, projets fonciers, portfolio Côte d'Ivoire, GNAMBA SERVICES",
+  },
+  immobilier: {
+    title: "Immobilier | Gestion, vente et valorisation | GNAMBA SERVICES",
+    description:
+      "Gestion locative, vente, achat et accompagnement immobilier en Côte d'Ivoire. GNAMBA SERVICES vous aide à valoriser votre patrimoine.",
+    keywords:
+      "immobilier Côte d'Ivoire, gestion locative, vente de biens, estimation immobilière, GNAMBA SERVICES",
+  },
+  foncier: {
+    title: "Foncier | Sécurisation et suivi des dossiers | GNAMBA SERVICES",
+    description:
+      "Sécurisation foncière, bornage, régularisation et constitution de dossiers pour vos terrains. Une approche claire et opérationnelle.",
+    keywords:
+      "foncier Côte d'Ivoire, sécurisation terrain, bornage, régularisation foncière, GNAMBA SERVICES",
+  },
+  lotissement: {
+    title: "Lotissement | Parcelles et commercialisation | GNAMBA SERVICES",
+    description:
+      "Lotissement, découpage et mise en marché de parcelles à vendre avec une présentation claire et commerciale.",
+    keywords:
+      "lotissement Côte d'Ivoire, parcelles à vendre, commercialisation foncière, GNAMBA SERVICES",
+  },
+  "btp-construction": {
+    title:
+      "BTP & Construction | Chantier, rénovation et suivi | GNAMBA SERVICES",
+    description:
+      "Construction, rénovation et suivi de chantier avec une équipe orientée résultat et un accompagnement de proximité.",
+    keywords:
+      "BTP Côte d'Ivoire, construction villa, rénovation, suivi de chantier, GNAMBA SERVICES",
   },
   contact: {
-    title: "Contact, devis et rappel WhatsApp",
+    title:
+      "Contact & Devis Gratuit — BTP, Immobilier, Foncier Sikensi | GNAMBA SERVICES",
     description:
-      "Contactez Gnamba Services à Abidjan pour un devis rapide, un rappel WhatsApp ou un rendez-vous sur vos projets BTP, immobilier et foncier.",
+      "Contactez GNAMBA SERVICES pour un devis gratuit. Téléphone, WhatsApp (+225 07 77 96 01 49) ou email. Réponse sous 48h ouvrées.",
     keywords:
-      "contact Gnamba Services, devis BTP, WhatsApp entreprise, Abidjan, Côte d'Ivoire, immobilier, foncier",
+      "contact GNAMBA SERVICES, devis BTP, WhatsApp entreprise, Sikensi, Côte d'Ivoire, immobilier, foncier",
+  },
+  faq: {
+    title: "FAQ Lots à vendre et services | GNAMBA SERVICES",
+    description:
+      "Retrouvez les réponses aux questions fréquentes sur nos lots à vendre, la réservation, les documents et le suivi commercial.",
+    keywords:
+      "FAQ lots à vendre, questions fréquentes, réservation terrain, GNAMBA SERVICES",
+  },
+  temoignages: {
+    title: "Témoignages clients | GNAMBA SERVICES",
+    description:
+      "Retours clients sur nos services BTP, immobilier et foncier en Côte d'Ivoire.",
+    keywords:
+      "témoignages clients, avis GNAMBA SERVICES, retours expérience, BTP, immobilier, foncier",
+  },
+  blog: {
+    title: "Blog conseils | GNAMBA SERVICES",
+    description:
+      "Conseils pratiques et contenus utiles autour du foncier, de l'immobilier et du BTP.",
+    keywords: "blog immobilier, conseils foncier, blog BTP, GNAMBA SERVICES",
+  },
+  "mentions-legales": {
+    title: "Mentions légales | GNAMBA SERVICES",
+    description:
+      "Consultez les informations légales officielles de GNAMBA SERVICES, ainsi que nos coordonnées et références administratives.",
+    keywords: "mentions légales, GNAMBA SERVICES, RCCM, NCC, Côte d'Ivoire",
   },
   lots: {
-    title: "Lots fonciers disponibles",
+    title: "Lots à Vendre Sikensi, Bingerville, Grand-Bassam | GNAMBA SERVICES",
     description:
-      "Consultez nos lots fonciers disponibles pour investir, acheter ou revendre avec un accompagnement commercial et terrain.",
+      "Parcelles vérifiées, bornées et documentées à vendre en Côte d'Ivoire. Consultez nos lots disponibles ou contactez-nous pour des offres privées.",
     keywords:
-      "lots fonciers, terrain à vendre, investissement foncier, Abidjan, Côte d'Ivoire, Gnamba Services",
+      "lots fonciers, terrain à vendre, investissement foncier, Sikensi, Côte d'Ivoire, GNAMBA SERVICES",
   },
 };
 
@@ -386,22 +498,39 @@ function AppContent() {
   const { user, profile, loading: authLoading } = useAuth();
   const sw = useServiceWorker();
   const oneSignalInitializedRef = useRef(false);
+  const oneSignalBlockedRef = useRef(false);
   const [view, setView] = useState<AppView>("public");
   const [publicPage, setPublicPage] = useState<PublicPage>("home");
   const [dashPage, setDashPage] = useState<Page>("dashboard");
+
+  const isOneSignalAllowedByCsp = useCallback(() => {
+    if (typeof document === "undefined") return false;
+    const cspMeta = document.querySelector(
+      'meta[http-equiv="Content-Security-Policy"]',
+    ) as HTMLMetaElement | null;
+    if (!cspMeta) return true;
+    const content = cspMeta.getAttribute("content") || "";
+    return (
+      /https:\/\/cdn\.onesignal\.com/.test(content) ||
+      /https:\/\/static\.cloudflareinsights\.com/.test(content) ||
+      /https:\/\/cloudflareinsights\.com/.test(content)
+    );
+  }, []);
   const [publishedLayoutSections, setPublishedLayoutSections] = useState<
     PageSection[] | null
   >(null);
   const [publishedLayoutLoading, setPublishedLayoutLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [, setOneSignalBlocked] = useState(false);
   // État pour page d'accueil employé
   // Initialisé à true pour afficher la page d'accueil par défaut après connexion
   const [showAccueil, setShowAccueil] = useState(true);
   const POST_LOGIN_PATH_KEY = "egs:post_login_path";
-  const isLocalhost =
-    typeof window !== "undefined"
-      ? ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname)
-      : false;
+  // Local/dev detection is controlled by build-time env to avoid embedding
+  // literal private hostnames in the production bundle.
+  const isLocalhost = import.meta.env.DEV
+    ? import.meta.env.VITE_ENABLE_LOCAL_DEV === "true"
+    : false;
   const showProdBanner = import.meta.env.PROD && isLocalhost;
   const buildTime = __BUILD_TIME__;
   const themeCss = useMemo(
@@ -445,7 +574,7 @@ function AppContent() {
   // GESTION DYNAMIQUE DU TITRE DE L'ONGLET
   // ============================================
   useEffect(() => {
-    const fallbackTitle = `${settings.app_company || "Gnamba Services"} - BTP, Immobilier & Foncier`;
+    const fallbackTitle = `${settings.app_company || OFFICIAL_CONTACT.companyName} - BTP, Immobilier & Foncier`;
     const baseTitle = settings.app_title || fallbackTitle;
 
     // Build page-specific title
@@ -458,6 +587,7 @@ function AppContent() {
         projets: "Projets BTP",
         immobilier: "Gestion Immobilière",
         foncier: "Dossiers Fonciers",
+        "catalogue-lots": "Catalogue Commercial",
         fournitures: "Fournitures",
         finances: "Finances",
         employes: "Employés",
@@ -469,6 +599,7 @@ function AppContent() {
         statistiques: "Statistiques",
         parametres: "Paramètres",
         "site-editor": "Site Vitrine",
+        "codex-assistant": "Assistant Codex",
         registre: "Registre Visiteur",
         leads: "Leads & Campagnes",
       };
@@ -478,11 +609,19 @@ function AppContent() {
         home: "Accueil",
         about: "À Propos",
         services: "Services",
+        immobilier: "Immobilier",
+        foncier: "Foncier",
+        lotissement: "Lotissement",
+        "btp-construction": "BTP & Construction",
         realisations: "Réalisations",
+        temoignages: "Témoignages",
+        blog: "Blog",
         contact: "Contact",
+        faq: "FAQ",
+        "mentions-legales": "Mentions légales",
         login: "Connexion",
         verification: "Vérification",
-        lots: "Lots Foncier",
+        lots: "Lots à vendre",
       };
       pageTitle = `${publicPageTitles[publicPage]} - `;
     }
@@ -496,9 +635,14 @@ function AppContent() {
   useEffect(() => {
     const canonicalHost = "gnambaservices.ci";
     const currentPath =
-      typeof window !== "undefined" ? normalizePath(window.location.pathname) : "/";
+      typeof window !== "undefined"
+        ? normalizePath(window.location.pathname)
+        : "/";
 
-    const brandName = settings.app_company || "Gnamba Services";
+    const brandName =
+      view === "public"
+        ? OFFICIAL_CONTACT.companyName
+        : settings.app_company || OFFICIAL_CONTACT.companyName;
     const publicSeo: SeoConfig =
       PUBLIC_SEO_CONFIG[publicPage] ?? PUBLIC_SEO_CONFIG.home!;
     const internalSeo =
@@ -556,18 +700,18 @@ function AppContent() {
 
     const canonicalPath =
       view === "public"
-        ? currentPath === "/forgot-password" || currentPath === "/reset-password"
+        ? publicPage === "login"
           ? "/login"
-          : currentPath || "/"
+          : publicPage === "verification"
+            ? "/verification-attestation"
+            : PUBLIC_PAGE_PATHS[publicPage] || currentPath || "/"
         : currentPath;
     const canonicalUrl = `https://${canonicalHost}${canonicalPath}`;
 
     ensureLink("canonical").href = canonicalUrl;
 
     const ogImage =
-      settings.brand_logo_dark ||
-      settings.brand_favicon_url ||
-      "/og-image.png";
+      settings.brand_logo_dark || settings.brand_favicon_url || "/og-image.png";
     const ogImageUrl = (() => {
       try {
         return new URL(ogImage, canonicalUrl).toString();
@@ -646,20 +790,25 @@ function AppContent() {
   useEffect(() => {
     const initOneSignal = async () => {
       const appId = import.meta.env.VITE_ONESIGNAL_APP_ID;
+      const selfHostedEnabled = import.meta.env.VITE_SELFHOSTED_MODE === "true";
       if (
         !user ||
         oneSignalInitializedRef.current ||
+        oneSignalBlockedRef.current ||
         !appId ||
-        typeof window === 'undefined' ||
-        typeof navigator === 'undefined'
+        selfHostedEnabled ||
+        import.meta.env.VITE_ENABLE_ONESIGNAL === "false" ||
+        typeof window === "undefined" ||
+        typeof navigator === "undefined" ||
+        !isOneSignalAllowedByCsp()
       ) {
         return;
       }
 
       const supportsPush =
-        'serviceWorker' in navigator &&
-        'PushManager' in window &&
-        'Notification' in window;
+        "serviceWorker" in navigator &&
+        "PushManager" in window &&
+        "Notification" in window;
 
       if (!supportsPush) {
         return;
@@ -671,29 +820,30 @@ function AppContent() {
           allowLocalhostAsSecureOrigin: true,
           notifyButton: {
             enable: true,
-            size: 'medium',
-            position: 'bottom-right',
+            size: "medium",
+            position: "bottom-right",
             prenotify: false,
             showCredit: false,
             text: {
-              'dialog.blocked.message': "Activez les notifications dans votre navigateur.",
-              'dialog.blocked.title': "Notifications bloquées",
-              'dialog.main.button.subscribe': "S'abonner",
-              'dialog.main.button.unsubscribe': "Se désabonner",
-              'dialog.main.title': "Recevoir les notifications",
-              'message.action.resubscribed': "Vous êtes de nouveau abonné.",
-              'message.action.subscribed': "Abonnement activé.",
-              'message.action.subscribing': "Abonnement en cours...",
-              'message.action.unsubscribed': "Abonnement désactivé.",
-              'message.prenotify': "Recevez les alertes importantes.",
-              'tip.state.blocked': "Notifications bloquées",
-              'tip.state.subscribed': "Abonné",
-              'tip.state.unsubscribed': "Non abonné",
-            }
-          }
+              "dialog.blocked.message":
+                "Activez les notifications dans votre navigateur.",
+              "dialog.blocked.title": "Notifications bloquées",
+              "dialog.main.button.subscribe": "S'abonner",
+              "dialog.main.button.unsubscribe": "Se désabonner",
+              "dialog.main.title": "Recevoir les notifications",
+              "message.action.resubscribed": "Vous êtes de nouveau abonné.",
+              "message.action.subscribed": "Abonnement activé.",
+              "message.action.subscribing": "Abonnement en cours...",
+              "message.action.unsubscribed": "Abonnement désactivé.",
+              "message.prenotify": "Recevez les alertes importantes.",
+              "tip.state.blocked": "Notifications bloquées",
+              "tip.state.subscribed": "Abonné",
+              "tip.state.unsubscribed": "Non abonné",
+            },
+          },
         });
         oneSignalInitializedRef.current = true;
-        
+
         // Capturer le player_id quand l'utilisateur s'abonne
         OneSignal.User.PushSubscription.addEventListener("change", (change) => {
           if (change.current.optedIn && user) {
@@ -701,7 +851,7 @@ function AppContent() {
             if (playerId) {
               // Sauvegarder playerId pour les propriétés de l'utilisateur
               // Note: Cette logique peut être adaptée selon vos besoins
-              console.log('OneSignal playerId:', playerId);
+              console.log("OneSignal playerId:", playerId);
             }
           }
         });
@@ -714,16 +864,18 @@ function AppContent() {
           message.includes("blocked by client");
 
         if (isExpectedBlock) {
+          oneSignalBlockedRef.current = true;
+          setOneSignalBlocked(true);
           if (import.meta.env.DEV) {
             console.info("OneSignal bloqué par le navigateur, ignoré.");
           }
           return;
         }
 
-        console.error('Erreur initialisation OneSignal:', error);
+        console.error("Erreur initialisation OneSignal:", error);
       }
     };
-    
+
     initOneSignal();
   }, [user]);
 
@@ -855,6 +1007,10 @@ function AppContent() {
       setPublicPage(publicFromPath);
       setShowForgotPassword(false);
       setShowAccueil(false);
+      const canonicalPublicPath = PUBLIC_PAGE_PATHS[publicFromPath] || "/";
+      if (normalizedPath !== canonicalPublicPath) {
+        syncPublicPath(publicFromPath, "replace");
+      }
       return;
     }
 
@@ -924,7 +1080,7 @@ function AppContent() {
     setPublishedLayoutLoading(true);
 
     void (async () => {
-      const { data, error } = await supabase
+      const { data, error } = await dbClient
         .from("page_layouts")
         .select("layout_json")
         .eq("page_slug", layoutSlug)
@@ -1083,6 +1239,7 @@ function AppContent() {
       projets: "Projets BTP",
       immobilier: "Immobilier",
       foncier: "Foncier",
+      "catalogue-lots": "Catalogue commercial",
       fournitures: "Fournitures",
       finances: "Finances",
       employes: "Employés",
@@ -1093,6 +1250,7 @@ function AppContent() {
       statistiques: "Statistiques",
       parametres: "Paramètres",
       "site-editor": "Site Vitrine",
+      "codex-assistant": "Assistant Codex",
       media: "Média",
       registre: "Registre Visiteur",
       leads: "Leads & Campagnes",

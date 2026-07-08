@@ -1,4 +1,4 @@
-import { supabaseService } from "./supabase.service";
+import { dataService } from "./dbClient.service";
 
 export async function attachPdfMetadataToAttestation(options: {
   attestation_id?: string | null;
@@ -8,15 +8,12 @@ export async function attachPdfMetadataToAttestation(options: {
   verify_url: string;
   printed_by?: string | null;
 }) {
-  return supabaseService.attachAttestationPdfMetadata({
+  return dataService.attachAttestationPdfMetadata({
     attestation_id: options.attestation_id ?? '',
-    pdf_metadata: {
-      ref: options.ref ?? null,
-      pdf_path: options.pdf_path,
-      hash_sha256: options.hash_sha256,
-      verify_url: options.verify_url,
-      pdf_generated_at: new Date().toISOString(),
-      printed_by: options.printed_by ?? null,
-    },
+    pdf_path: options.pdf_path,
+    hash_sha256: options.hash_sha256,
+    verify_url: options.verify_url,
+    pdf_generated_at: new Date().toISOString(),
+    printed_by: options.printed_by ?? null,
   });
 }

@@ -27,7 +27,7 @@ error() { echo -e "${RED}[ERROR]${NC} $1"; }
 # ============================================
 cmd_install() {
     local schedule="${1:-daily}"
-    local target="${2:-cloud}"
+    local target="${2:-remote}"
     
     log "Installing backup schedule: $schedule ($target)"
     
@@ -91,12 +91,12 @@ EGS Backup Scheduler
 Usage: $0 <command> [options]
 
 Commands:
-  install [hourly|daily|weekly] [cloud|local]   Install backup cron job
+  install [hourly|daily|weekly] [remote|local]  Install backup cron job
   remove                                         Remove all backup cron jobs
   status                                         Show current schedule
 
 Examples:
-  $0 install daily cloud     # Daily cloud backup at 2 AM
+  $0 install daily remote    # Daily remote backup at 2 AM
   $0 install weekly local    # Weekly local backup on Sundays
   $0 status                  # Show current schedule
   $0 remove                  # Remove all backup jobs

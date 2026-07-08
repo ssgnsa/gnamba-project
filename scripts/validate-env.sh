@@ -2,51 +2,49 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-TEMPLATE_FILE="${ROOT_DIR}/.env.template"
 TARGET_FILE="${1:-${ROOT_DIR}/.env}"
-
-if [ ! -f "${TEMPLATE_FILE}" ]; then
-  echo "[ERROR] .env.template not found in ${ROOT_DIR}" >&2
-  exit 1
-fi
 
 if [ ! -f "${TARGET_FILE}" ]; then
   echo "[ERROR] Target env file not found: ${TARGET_FILE}" >&2
   exit 1
 fi
 
-parse_keys() {
-  grep -E '^[A-Z0-9_]+=.*' "$1" | sed 's/=.*//' | sort -u
-}
-
 get_value() {
   local file="$1"
   local key="$2"
-  grep -E "^${key}=" "$file" | tail -n1 | cut -d'=' -f2- | sed 's/^ *//;s/ *$//'
+  awk -F= -v key="$key" '
+    $0 ~ "^[[:space:]]*" key "=" {
+      sub(/^[[:space:]]*[^=]+=/, "", $0)
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", $0)
+      gsub(/^"|"$/, "", $0)
+      gsub(/^'\''|'\''$/, "", $0)
+      print $0
+      exit
+    }
+  ' "$file"
 }
 
-read_mode() {
-  grep -E '^VITE_SUPABASE_MODE=' "$TARGET_FILE" | tail -n1 | cut -d'=' -f2- | tr -d '\r' | tr '[:upper:]' '[:lower:]'
-}
-
-mode="$(read_mode)"
+mode="$(get_value "${TARGET_FILE}" "VITE_SUPABASE_MODE" | tr '[:upper:]' '[:lower:]')"
 if [ -z "${mode}" ]; then
-  echo "[ERROR] VITE_SUPABASE_MODE is not defined in ${TARGET_FILE}" >&2
+  mode="$(get_value "${TARGET_FILE}" "SUPABASE_MODE" | tr '[:upper:]' '[:lower:]')"
+fi
+
+if [ -z "${mode}" ]; then
+  echo "[ERROR] VITE_SUPABASE_MODE / SUPABASE_MODE is not defined in ${TARGET_FILE}" >&2
   exit 1
 fi
 
-case "${mode}" in
-  local)
-    required_keys=(VITE_SUPABASE_LOCAL_URL VITE_SUPABASE_LOCAL_ANON_KEY POSTGRES_PASSWORD JWT_SECRET)
-    ;;
-  cloud)
-    required_keys=(VITE_SUPABASE_URL VITE_SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY SUPABASE_DB_PASSWORD)
-    ;;
-  *)
-    echo "[ERROR] Unknown VITE_SUPABASE_MODE: ${mode}. Use 'local' or 'cloud'." >&2
-    exit 1
-    ;;
- esac
+if [ "${mode}" != "local" ]; then
+  echo "[ERROR] This workspace now runs in local mode only. Use VITE_SUPABASE_MODE=local." >&2
+  exit 1
+fi
+
+required_keys=(
+  VITE_SUPABASE_LOCAL_URL
+  VITE_SUPABASE_LOCAL_ANON_KEY
+  POSTGRES_PASSWORD
+  JWT_SECRET
+)
 
 missing=0
 warning=0
@@ -63,10 +61,10 @@ for key in "${required_keys[@]}"; do
     echo "[WARN] Placeholder value detected for ${key}: ${value}"
     warning=1
   fi
- done
+done
 
 if [ "$missing" -eq 0 ]; then
-  echo "✅ OK - No missing variables in ${TARGET_FILE}"
+  echo "✅ OK - Local Supabase env looks complete in ${TARGET_FILE}"
 fi
 
 if [ "$missing" -eq 1 ]; then

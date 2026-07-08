@@ -131,10 +131,10 @@ create_directory_structure() {
     local directories=(
         "backups/local-dev"
         "backups/local-server"
-        "backups/cloud-prod"
+        "backups/local-tunnel"
         "rollbacks/local-dev"
         "rollbacks/local-server"
-        "rollbacks/cloud-prod"
+        "rollbacks/local-tunnel"
         "reports"
         "logs"
         ".sync"
@@ -164,8 +164,8 @@ configure_environments() {
     # Configuration serveur local
     configure_local_server "$force"
 
-    # Configuration production cloud
-    configure_cloud_prod "$force"
+    # Configuration serveur local exposé via tunnel
+    configure_local_tunnel "$force"
 
     log_info "Environnements configures ✓"
 }
@@ -204,13 +204,13 @@ configure_local_server() {
     if [[ -f "$env_file" && "$force" != true ]]; then
         log_info "Fichier .env.server existe deja (utiliser --force pour ecraser)"
     else
-        # Creer un fichier .env.server base sur la configuration cloud
+        # Creer un fichier .env.server base sur la configuration locale via tunnel
         cat > "$env_file" << 'EOF'
 # Configuration Serveur Local EGS
 WEB_PORT=80
-VITE_SUPABASE_MODE=cloud
-VITE_SUPABASE_URL=https://<YOUR_SUPABASE_PROJECT>.supabase.co
-VITE_SUPABASE_ANON_KEY=<YOUR_SUPABASE_ANON_KEY>
+VITE_SUPABASE_MODE=local
+VITE_SUPABASE_LOCAL_URL=https://api.gnambaservices.ci
+VITE_SUPABASE_LOCAL_ANON_KEY=<YOUR_SUPABASE_LOCAL_ANON_KEY>
 
 # Cloudflare Turnstile
 VITE_CLOUDFLARE_TURNSTILE_SITE_KEY=<YOUR_TURNSTILE_SITE_KEY>
@@ -222,7 +222,7 @@ VITE_IDLE_TIMEOUT_MINUTES=30
 # FileBrowser
 VITE_FILEBROWSER_URL=https://fichiers.gnambaservices.ci
 
-# Service Role Key (pour backups)
+# Service Role Key (pour backups locaux)
 SUPABASE_SERVICE_ROLE_KEY=<YOUR_SERVICE_ROLE_KEY>
 SUPABASE_DB_PASSWORD=<YOUR_SUPABASE_DB_PASSWORD>
 EOF
@@ -231,19 +231,19 @@ EOF
     fi
 }
 
-# Configurer l'environnement production cloud
-configure_cloud_prod() {
+# Configurer l'environnement serveur local exposé via tunnel
+configure_local_tunnel() {
     local force="$1"
 
-    log_info "Configuration production cloud..."
+    log_info "Configuration serveur local via tunnel..."
 
-    # La configuration cloud est deja dans .env.server
+    # La configuration locale via tunnel est deja dans .env.server
     # Verifier qu'elle existe
     if [[ ! -f "$ROOT_DIR/.env.server" ]]; then
-        die "Configuration cloud manquante dans .env.server"
+        die "Configuration locale via tunnel manquante dans .env.server"
     fi
 
-    log_info "Configuration cloud OK"
+    log_info "Configuration locale via tunnel OK"
 }
 
 # Configurer les valeurs specifiques d'un fichier .env

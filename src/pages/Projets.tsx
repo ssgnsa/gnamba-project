@@ -9,8 +9,9 @@ import {
   X,
   Users,
 } from "lucide-react";
-import { supabase } from "../lib/supabase";
+import dbClient from "../data/tableClient";
 import { Project, Client } from "../types";
+import { clientsRepository } from "../data/clients.repository";
 import Modal from "../components/ui/Modal";
 import Badge from "../components/ui/Badge";
 import { useSettings } from "../context/SettingsContext";
@@ -82,15 +83,16 @@ export default function Projets() {
   const fetchData = async () => {
     setLoading(true);
     const [projRes, cliRes] = await Promise.all([
-      supabase
+      dbClient
         .from("projects")
         .select("*, clients(nom, prenom)")
         .order("created_at", { ascending: false }),
-      supabase.from("clients").select("id, nom, prenom").order("nom"),
+      clientsRepository.getAll({ limit: 1000 }),
     ]);
     setProjects((projRes.data as Project[]) || []);
     setClients(
-      (cliRes.data as Array<Pick<Client, "id" | "nom" | "prenom">>) || [],
+      (cliRes.data?.items as Array<Pick<Client, "id" | "nom" | "prenom">>) ||
+        [],
     );
     setLoading(false);
   };
@@ -144,13 +146,13 @@ export default function Projets() {
         updated_at: new Date().toISOString(),
       };
       if (editingId) {
-        const { error } = await supabase
+        const { error } = await dbClient
           .from("projects")
           .update(payload)
           .eq("id", editingId);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("projects").insert(payload);
+        const { error } = await dbClient.from("projects").insert(payload);
         if (error) throw error;
       }
       setModalOpen(false);
@@ -172,8 +174,11 @@ export default function Projets() {
       return;
     }
     if (!confirm("Supprimer ce projet ?")) return;
-    const { error } = await supabase.from("projects").delete().eq("id", id);
-    if (error) { setFormError(error.message); return; }
+    const { error } = await dbClient.from("projects").delete().eq("id", id);
+    if (error) {
+      setFormError(error.message);
+      return;
+    }
     fetchData();
   };
 

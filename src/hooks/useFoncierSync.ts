@@ -1,6 +1,6 @@
 import { useCallback } from "react";
-import { supabaseService, withBackoff } from "../lib/supabase.service";
-export { withBackoff } from "../lib/supabase.service";
+import { dataService, withBackoff } from "../lib/dbClient.service";
+export { withBackoff } from "../lib/dbClient.service";
 import type { FoncierLot } from "../types";
 import {
   getCachedLots,
@@ -60,7 +60,7 @@ export function useFoncierSync() {
         return { data: paged, error: null, total };
       }
 
-      const { data, error } = await supabaseService.searchLots({
+      const { data, error } = await dataService.searchLots({
         search: debouncedSearch,
         village: filterVillage,
         quartier: "",
@@ -115,7 +115,7 @@ export function useFoncierSync() {
         return { data: map, error: null };
       }
 
-      const { data, error } = await supabaseService.getVillageStats(
+      const { data, error } = await dataService.getVillageStats(
         showArchived,
       );
 
@@ -149,7 +149,7 @@ export function useFoncierSync() {
       return { data: null, error: "Mode hors-ligne" };
     }
 
-    const { data, error } = await supabaseService.getVillages();
+    const { data, error } = await dataService.getVillages();
 
     if (error) {
       if (import.meta.env.DEV)
@@ -167,7 +167,7 @@ export function useFoncierSync() {
   const refreshCache = useCallback(async (isOnline: boolean) => {
     if (!isOnline) return { error: "Mode hors-ligne" };
 
-    const { data, error } = await supabaseService.searchLots({
+    const { data, error } = await dataService.searchLots({
       search: "",
       village: "",
       quartier: "",

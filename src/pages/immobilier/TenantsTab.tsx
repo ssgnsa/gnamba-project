@@ -7,7 +7,6 @@ import {
   Phone,
   Mail,
 } from "lucide-react";
-import { supabase } from "../../lib/supabase";
 import type { Tenant, LeaseContract } from "../../types";
 import Modal from "../../components/ui/Modal";
 import Badge from "../../components/ui/Badge";
@@ -18,6 +17,12 @@ import {
   shouldBlockDestructiveAction,
 } from "../../lib/demoMode";
 import { isValidEmail, isValidPhone } from "../../lib/immobilier";
+import {
+  type ManualSyncStatus,
+  normalizeManualStatus,
+  readManualCache,
+  writeManualCache,
+} from "../../lib/manualSyncStore";
 
 const emptyForm = {
   nom: "",
@@ -28,6 +33,21 @@ const emptyForm = {
   depot_garantie: "",
   statut: "actif" as Tenant["statut"],
 };
+
+const TENANTS_CACHE_KEY = "egs.immobilier.tenants.local_cache.v1";
+
+type LocalTenant = Tenant & {
+  sync_status: ManualSyncStatus;
+  sync_error: string | null;
+  deleted_at: string | null;
+};
+
+function sortTenants(items: LocalTenant[]): LocalTenant[] {
+  return [...items].sort(
+    (a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  );
+}
 
 interface Props {
   tenants: Tenant[];
@@ -41,7 +61,7 @@ export default function TenantsTab({
   tenants,
   activeContracts,
   search,
-  tenantTableName,
+  tenantTableName: _tenantTableName,
   onRefresh,
 }: Props) {
   const { settings } = useSettings();
@@ -100,28 +120,41 @@ export default function TenantsTab({
     setSaving(true);
     setError(null);
 
-    const payload = {
-      nom: form.nom,
-      prenom: form.prenom,
-      telephone: form.telephone.trim() || null,
-      email: form.email.trim() || null,
-      loyer: parseFloat(form.loyer) || 0,
-      depot_garantie: parseFloat(form.depot_garantie) || 0,
-      statut: form.statut,
-      updated_at: new Date().toISOString(),
-    };
-
     try {
-      if (editingId) {
-        const { error } = await supabase
-          .from(tenantTableName)
-          .update(payload)
-          .eq("id", editingId);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from(tenantTableName).insert(payload);
-        if (error) throw error;
-      }
+      const now = new Date().toISOString();
+      const cached = readManualCache<LocalTenant>(TENANTS_CACHE_KEY).map(
+        (tenant) => ({
+          ...tenant,
+          sync_status: normalizeManualStatus(tenant.sync_status),
+          sync_error: tenant.sync_error ?? null,
+          deleted_at: tenant.deleted_at ?? null,
+        }),
+      );
+      const existing = cached.find((tenant) => tenant.id === editingId);
+      const localTenant: LocalTenant = {
+        ...(existing ?? {}),
+        id: existing?.id ?? crypto.randomUUID(),
+        nom: form.nom.trim(),
+        prenom: form.prenom.trim(),
+        telephone: form.telephone.trim() || null,
+        email: form.email.trim() || null,
+        property_id: existing?.property_id ?? null,
+        date_debut_contrat: existing?.date_debut_contrat ?? null,
+        date_fin_contrat: existing?.date_fin_contrat ?? null,
+        loyer: parseFloat(form.loyer) || 0,
+        depot_garantie: parseFloat(form.depot_garantie) || 0,
+        statut: form.statut,
+        created_at: existing?.created_at ?? now,
+        updated_at: now,
+        sync_status: "pending",
+        sync_error: null,
+        deleted_at: null,
+      };
+
+      const next = sortTenants(
+        cached.filter((tenant) => tenant.id !== localTenant.id).concat(localTenant),
+      );
+      writeManualCache(TENANTS_CACHE_KEY, next);
       setModalOpen(false);
       onRefresh();
     } catch (err: any) {
@@ -145,14 +178,27 @@ export default function TenantsTab({
     )
       return;
     try {
-      const { error } = await supabase
-        .from(tenantTableName)
-        .delete()
-        .eq("id", id);
-      if (error) throw error;
+      const now = new Date().toISOString();
+      const cached = readManualCache<LocalTenant>(TENANTS_CACHE_KEY);
+      const next = cached
+        .map((tenant) => {
+          if (tenant.id !== id) return tenant;
+          if (normalizeManualStatus(tenant.sync_status) === "pending") {
+            return null;
+          }
+          return {
+            ...tenant,
+            sync_status: "deleted" as const,
+            deleted_at: now,
+            updated_at: now,
+            sync_error: null,
+          };
+        })
+        .filter(Boolean) as LocalTenant[];
+      writeManualCache(TENANTS_CACHE_KEY, sortTenants(next));
       onRefresh();
     } catch (err: any) {
-      alert(`Erreur lors de la suppression: ${err.message}`);
+      alert(`Erreur lors de la suppression locale: ${err.message}`);
     }
   };
 

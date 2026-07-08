@@ -56,17 +56,21 @@ if [[ ! "$VITE_SUPABASE_ANON_KEY" =~ ^eyJ ]]; then
 fi
 
 # ============================================
-# 3. Build avec Dockerfile.nofb
+# 3. Build avec Dockerfile.nofb (utiliser VITE_LOCAL_API_URL pour production)
 # ============================================
 echo -e "${YELLOW}[3/5] Build Docker (sans filebrowser)...${NC}"
 cd /home/soma/gnamba-project
 
+# Prefer canonical API variable
+LOCAL_API_URL="${VITE_LOCAL_API_URL:-${VITE_SUPABASE_URL:-}}"
+
 docker build \
-  --build-arg VITE_SUPABASE_MODE="$VITE_SUPABASE_MODE" \
-  --build-arg VITE_SUPABASE_URL="$VITE_SUPABASE_URL" \
-  --build-arg VITE_SUPABASE_ANON_KEY="$VITE_SUPABASE_ANON_KEY" \
-  -t egs-web:nofb \
-  -f Dockerfile.nofb . 2>&1 | tail -20
+    --build-arg VITE_LOCAL_API_URL="$LOCAL_API_URL" \
+    --build-arg VITE_SUPABASE_MODE="$VITE_SUPABASE_MODE" \
+    --build-arg VITE_SUPABASE_URL="$LOCAL_API_URL" \
+    --build-arg VITE_SUPABASE_ANON_KEY="${VITE_SUPABASE_ANON_KEY:-}" \
+    -t egs-web:nofb \
+    -f Dockerfile.nofb . 2>&1 | tail -20
 
 echo -e "${GREEN}   ✅ Build terminé (image: egs-web:nofb)${NC}"
 echo ""
