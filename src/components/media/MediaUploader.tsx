@@ -1,8 +1,9 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Upload, X, CheckCircle, AlertCircle, Image, Tag } from "lucide-react";
-import { supabase } from "../../lib/supabase";
-import { logMediaAction } from "../../lib/mediaUtils";
 import { useAuth } from "../../context/AuthContext";
+import { apiClient } from "../../api/client";
+import { isSelfHostedMode } from "../../lib/selfHosted";
+import dbClient from "../../data/tableClient";
 import type { MediaCategory, MediaFile } from "../../types";
 
 interface UploadItem {
@@ -73,15 +74,29 @@ async function compressToWebP(
       canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
       canvas.toBlob(
         (blob) => {
-          if (!blob) { resolve({ file, width: img.naturalWidth, height: img.naturalHeight }); return; }
+          if (!blob) {
+            resolve({
+              file,
+              width: img.naturalWidth,
+              height: img.naturalHeight,
+            });
+            return;
+          }
           const name = file.name.replace(/\.[^.]+$/, ".webp");
-          resolve({ file: new File([blob], name, { type: "image/webp" }), width, height });
+          resolve({
+            file: new File([blob], name, { type: "image/webp" }),
+            width,
+            height,
+          });
         },
         "image/webp",
         quality,
       );
     };
-    img.onerror = () => { URL.revokeObjectURL(objectUrl); resolve({ file, width: 0, height: 0 }); };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve({ file, width: 0, height: 0 });
+    };
     img.src = objectUrl;
   });
 }
@@ -91,7 +106,7 @@ export default function MediaUploader({
   onUploadComplete,
   onClose,
 }: MediaUploaderProps) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const [dragging, setDragging] = useState(false);
   const [items, setItems] = useState<UploadItem[]>([]);
   const [category, setCategory] = useState<MediaCategory>(defaultCategory);
@@ -100,7 +115,9 @@ export default function MediaUploader({
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [previewUrls, setPreviewUrls] = useState<Map<number, string>>(new Map());
+  const [previewUrls, setPreviewUrls] = useState<Map<number, string>>(
+    new Map(),
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -155,7 +172,7 @@ export default function MediaUploader({
   };
 
   const uploadAll = async () => {
-    if (!user || items.length === 0) return;
+    if (items.length === 0) return;
     setUploading(true);
     const uploaded: MediaFile[] = [];
 
@@ -186,14 +203,59 @@ export default function MediaUploader({
         prev.map((it, idx) => (idx === i ? { ...it, progress: 15 } : it)),
       );
 
+      if (isSelfHostedMode()) {
+        const result = await apiClient.media.upload(mainFile, {
+          category,
+          alt_text: altText,
+          description,
+          tags,
+        });
+
+        if (result.error || !result.data) {
+          setItems((prev) =>
+            prev.map((it, idx) =>
+              idx === i
+                ? {
+                    ...it,
+                    status: "error",
+                    error: result.error || "Échec de l'upload",
+                  }
+                : it,
+            ),
+          );
+          continue;
+        }
+
+        setItems((prev) =>
+          prev.map((it, idx) =>
+            idx === i
+              ? {
+                  ...it,
+                  status: "done",
+                  progress: 100,
+                  result: result.data as MediaFile,
+                }
+              : it,
+          ),
+        );
+        uploaded.push(result.data as MediaFile);
+        continue;
+      }
+
       const ext = mainFile.name.split(".").pop();
       const base = `${category}/${Date.now()}_${Math.random().toString(36).slice(2)}`;
       const filename = `${base}.${ext}`;
 
-      const uploadContentType = canCompress ? "image/webp" : (mainFile.type || "application/octet-stream");
-      const { error: storageError } = await supabase.storage
+      const uploadContentType = canCompress
+        ? "image/webp"
+        : mainFile.type || "application/octet-stream";
+      const { error: storageError } = await dbClient.storage
         .from("media")
-        .upload(filename, mainFile, { cacheControl: "31536000", upsert: false, contentType: uploadContentType });
+        .upload(filename, mainFile, {
+          cacheControl: "31536000",
+          upsert: false,
+          contentType: uploadContentType,
+        });
 
       if (storageError) {
         setItems((prev) =>
@@ -210,18 +272,30 @@ export default function MediaUploader({
         prev.map((it, idx) => (idx === i ? { ...it, progress: 60 } : it)),
       );
 
-      const { data: { publicUrl } } = supabase.storage.from("media").getPublicUrl(filename);
+      const {
+        data: { publicUrl },
+      } = dbClient.storage.from("media").getPublicUrl(filename);
 
       let thumbnailUrl: string | null = null;
       let thumbFilename: string | null = null;
       if (canCompress) {
-        const { file: thumbFile } = await compressToWebP(item.file, THUMB_PX, 0.75);
+        const { file: thumbFile } = await compressToWebP(
+          item.file,
+          THUMB_PX,
+          0.75,
+        );
         thumbFilename = `${base}_thumb.webp`;
-        const { error: thumbErr } = await supabase.storage
+        const { error: thumbErr } = await dbClient.storage
           .from("media")
-          .upload(thumbFilename, thumbFile, { cacheControl: "31536000", upsert: false, contentType: "image/webp" });
+          .upload(thumbFilename, thumbFile, {
+            cacheControl: "31536000",
+            upsert: false,
+            contentType: "image/webp",
+          });
         if (!thumbErr) {
-          const { data: { publicUrl: tUrl } } = supabase.storage.from("media").getPublicUrl(thumbFilename);
+          const {
+            data: { publicUrl: tUrl },
+          } = dbClient.storage.from("media").getPublicUrl(thumbFilename);
           thumbnailUrl = tUrl;
         } else {
           thumbFilename = null;
@@ -232,20 +306,37 @@ export default function MediaUploader({
         prev.map((it, idx) => (idx === i ? { ...it, progress: 85 } : it)),
       );
 
-      // Vérifier que la session est toujours valide avant l'INSERT
-      const { error: sessionError } = await supabase.auth.getUser();
-      if (sessionError) {
-        // Session expirée ou token invalide — rollback storage
-        await supabase.storage.from("media").remove([filename]);
+      if (loading) {
         setItems((prev) =>
           prev.map((it, idx) =>
-            idx === i ? { ...it, status: "error", error: "Session expirée — veuillez vous reconnecter et réessayer." } : it,
+            idx === i
+              ? {
+                  ...it,
+                  status: "error",
+                  error: "Vérification de la session en cours…",
+                }
+              : it,
           ),
         );
         continue;
       }
 
-      const { data: mediaData, error: dbError } = await supabase
+      if (!user?.id) {
+        setItems((prev) =>
+          prev.map((it, idx) =>
+            idx === i
+              ? {
+                  ...it,
+                  status: "error",
+                  error: "Vous devez être connecté pour publier ce fichier.",
+                }
+              : it,
+          ),
+        );
+        continue;
+      }
+
+      const { data: mediaData, error: dbError } = await dbClient
         .from("media_files")
         .insert({
           filename,
@@ -253,7 +344,7 @@ export default function MediaUploader({
           url: publicUrl,
           thumbnail_url: thumbnailUrl,
           category,
-          uploaded_by: user.id,
+          uploaded_by: user?.id ?? null,
           size: mainFile.size,
           type: mainFile.type,
           alt_text: altText,
@@ -266,26 +357,23 @@ export default function MediaUploader({
         .single();
 
       if (dbError) {
-        // ROLLBACK transactionnel : supprimer les fichiers Storage déjà uploadés
         const filesToRollback = [filename];
         if (thumbFilename) filesToRollback.push(thumbFilename);
-        await supabase.storage.from("media").remove(filesToRollback);
+        await dbClient.storage.from("media").remove(filesToRollback);
 
         setItems((prev) =>
           prev.map((it, idx) =>
-            idx === i ? { ...it, status: "error", error: `Erreur base de données — fichier supprimé du stockage. (${dbError.message})` } : it,
+            idx === i
+              ? {
+                  ...it,
+                  status: "error",
+                  error: `Erreur base de données — fichier supprimé du stockage. (${dbError.message})`,
+                }
+              : it,
           ),
         );
         continue;
       }
-
-      void logMediaAction("upload", (mediaData as MediaFile).id, user.id, {
-        filename,
-        original_name: item.file.name,
-        category,
-        size: mainFile.size,
-        type: mainFile.type,
-      });
 
       setItems((prev) =>
         prev.map((it, idx) =>

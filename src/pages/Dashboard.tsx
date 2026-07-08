@@ -15,13 +15,14 @@ import {
   Sparkles,
   Loader2,
   Globe,
-  Database,
   ExternalLink,
-  Server,
+  Bot,
 } from "lucide-react";
-import { supabase } from "../lib/supabase";
-import { useAuth } from "../context/AuthContext";
+import dbClient from "../data/tableClient";
+import { clientsRepository } from "../data/clients.repository";
+import { resolveAccessLevel, useAuth } from "../context/AuthContext";
 import { isOllamaEnabled, ollama } from "../lib/ollama";
+import isLikelyLoopback from "../lib/loopback";
 import KPICard from "../components/dashboard/KPICard";
 import RevenueChart from "../components/dashboard/RevenueChart";
 import CategoryDonutChart from "../components/dashboard/CategoryDonutChart";
@@ -118,40 +119,21 @@ const SERVICES_LINKS: ServiceLink[] = [
     id: "egs-frontend",
     name: "EGS Frontend",
     description: "Interface principale EGS - Enterprise Gnamba System",
-    url: "http://localhost:8080",
+    url: "/",
     icon: Globe,
     color: "blue",
     category: "application",
     status: "online",
   },
   {
-    id: "somagro-frontend",
-    name: "SomAgro Frontend",
-    description: "Application SomAgro - Gestion agricole",
-    url: "http://localhost:8082",
-    icon: Globe,
-    color: "emerald",
-    category: "application",
-    status: "online",
-  },
-  {
-    id: "somagro-supabase-studio",
-    name: "SomAgro Supabase Studio",
-    description: "Interface d'administration base de données SomAgro",
-    url: "http://127.0.0.1:55323",
-    icon: Database,
-    color: "slate",
-    category: "database",
-    status: "online",
-  },
-  {
-    id: "somagro-supabase-api",
-    name: "SomAgro Supabase API",
-    description: "API REST Supabase pour SomAgro",
-    url: "http://127.0.0.1:55321",
-    icon: Server,
-    color: "purple",
-    category: "api",
+    id: "codex-assistant",
+    name: "Assistant Codex",
+    description:
+      "Centre d'orchestration EGS pour le diagnostic et la migration",
+    url: "/codex-assistant",
+    icon: Bot,
+    color: "amber",
+    category: "tool",
     status: "online",
   },
 ];
@@ -167,20 +149,26 @@ export default function Dashboard() {
   const isProduction = !import.meta.env.DEV;
   const serviceLinks = useMemo(() => {
     if (!isProduction) return SERVICES_LINKS;
-    return SERVICES_LINKS.filter(
-      (service) =>
-        !service.url.startsWith("http://localhost") &&
-        !service.url.startsWith("http://127.0.0.1"),
-    );
+    return SERVICES_LINKS.filter((service) => {
+      if (!service.url.startsWith("http")) return true;
+      try {
+        const hostname = new URL(service.url).hostname;
+        return !isLikelyLoopback(hostname);
+      } catch {
+        return false;
+      }
+    });
   }, [isProduction]);
   const [services, setServices] = useState<ServiceLink[]>(serviceLinks);
+  const accessLevel = resolveAccessLevel(profile?.role, profile?.access_level);
 
   // Vérifier les droits d'accès aux finances
   const canViewFinances =
     profile?.role === "admin" ||
     profile?.role === "gestionnaire" ||
-    profile?.access_level === "admin" ||
-    profile?.access_level === "gerant";
+    accessLevel === "admin" ||
+    accessLevel === "gerant" ||
+    accessLevel === "gestionnaire";
 
   const checkServicesStatus = useCallback(async () => {
     const updatedServices = await Promise.all(
@@ -223,30 +211,29 @@ export default function Dashboard() {
 
       // Si l'utilisateur ne peut pas voir les finances, on ne charge que les données non sensibles
       if (!canViewFinances) {
-        const [clients, projets, biens, loyers, taches] = await Promise.all([
-          supabase.from("clients").select("id", { count: "exact", head: true }),
-          supabase
+        const [clientRes, projets, biens, loyers, taches] = await Promise.all([
+          clientsRepository.getAll({ limit: 1000 }),
+          dbClient
             .from("projects")
             .select("id", { count: "exact", head: true })
             .eq("statut", "en_cours"),
-          supabase
+          dbClient
             .from("properties")
             .select("id", { count: "exact", head: true }),
-          supabase
+          dbClient
             .from("rent_payments")
             .select("montant")
             .in("statut", ["en_attente", "retard", "partiel"]),
-          supabase
+          dbClient
             .from("tasks")
             .select("id", { count: "exact", head: true })
             .eq("priorite", "urgente")
             .neq("statut", "termine"),
         ]);
 
-        const loyersEnAttente = (loyers.data || []).reduce(
-          (s, l) => s + Number(l.montant),
-          0,
-        );
+        const loyersEnAttente = (
+          (loyers.data || []) as { montant?: number | string | null }[]
+        ).reduce((s: number, l) => s + Number(l.montant), 0);
 
         const alerts: AlertItem[] = [];
         if (loyersEnAttente > 0)
@@ -277,7 +264,7 @@ export default function Dashboard() {
           currentDepenses: 0,
           prevDepenses: 0,
           beneficeNet: 0,
-          totalClients: clients.count ?? 0,
+          totalClients: clientRes.data?.total ?? 0,
           projetsActifs: projets.count ?? 0,
           biensImmobiliers: biens.count ?? 0,
           loyersEnAttente,
@@ -296,33 +283,33 @@ export default function Dashboard() {
       // Chargement complet pour admin/gerant/gestionnaire
       const [fAll, fPrev, clients, projets, biens, loyers, taches, recentTx] =
         await Promise.all([
-          supabase
+          dbClient
             .from("finances")
             .select("type_transaction,categorie,montant,date_transaction")
             .gte("date_transaction", sixMonths),
-          supabase
+          dbClient
             .from("finances")
             .select("type_transaction,montant")
             .gte("date_transaction", firstPrev)
             .lte("date_transaction", lastPrev),
-          supabase.from("clients").select("id", { count: "exact", head: true }),
-          supabase
+          clientsRepository.getAll({ limit: 1000 }),
+          dbClient
             .from("projects")
             .select("id", { count: "exact", head: true })
             .eq("statut", "en_cours"),
-          supabase
+          dbClient
             .from("properties")
             .select("id", { count: "exact", head: true }),
-          supabase
+          dbClient
             .from("rent_payments")
             .select("montant")
             .in("statut", ["en_attente", "retard", "partiel"]),
-          supabase
+          dbClient
             .from("tasks")
             .select("id", { count: "exact", head: true })
             .eq("priorite", "urgente")
             .neq("statut", "termine"),
-          supabase
+          dbClient
             .from("finances")
             .select(
               "id,type_transaction,description,categorie,montant,date_transaction",
@@ -398,10 +385,9 @@ export default function Dashboard() {
           color: CAT_COLORS_DEP[i % CAT_COLORS_DEP.length],
         }));
 
-      const loyersEnAttente = (loyers.data || []).reduce(
-        (s, l) => s + Number(l.montant),
-        0,
-      );
+      const loyersEnAttente = (
+        (loyers.data || []) as { montant?: number | string | null }[]
+      ).reduce((s: number, l) => s + Number(l.montant), 0);
 
       const alerts: AlertItem[] = [];
       if (loyersEnAttente > 0)
@@ -439,7 +425,7 @@ export default function Dashboard() {
         currentDepenses,
         prevDepenses,
         beneficeNet: currentRecettes - currentDepenses,
-        totalClients: clients.count ?? 0,
+        totalClients: clients.data?.total ?? 0,
         projetsActifs: projets.count ?? 0,
         biensImmobiliers: biens.count ?? 0,
         loyersEnAttente,
@@ -917,6 +903,7 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {services.map((service) => {
                 const IconComponent = service.icon;
+                const isExternal = service.url.startsWith("http");
                 const colorClasses = {
                   blue: "bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100",
                   emerald:
@@ -930,8 +917,8 @@ export default function Dashboard() {
                   <a
                     key={service.id}
                     href={service.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    target={isExternal ? "_blank" : undefined}
+                    rel={isExternal ? "noopener noreferrer" : undefined}
                     className={`group block p-4 rounded-xl border transition-all duration-200 ${colorClasses[service.color as keyof typeof colorClasses]}`}
                   >
                     <div className="flex items-start gap-3">

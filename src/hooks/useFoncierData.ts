@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { supabaseService } from "../lib/supabase.service";
+import { dataService } from "../lib/dbClient.service";
 import type { FoncierLot } from "../types";
 
 /**
@@ -21,7 +21,7 @@ export function useFoncierData() {
         return { data: null, error: "Offline mode not implemented", total: 0 };
       }
 
-      const { data, error } = await supabaseService.searchLots({
+      const { data, error } = await dataService.searchLots({
         search: debouncedSearch,
         village: filterVillage,
         quartier: "",
@@ -59,7 +59,7 @@ export function useFoncierData() {
         return { data: null, error: "Offline mode not implemented" };
       }
 
-      const { data, error } = await supabaseService.getVillageStats(showArchived);
+      const { data, error } = await dataService.getVillageStats(showArchived);
 
       if (error) {
         return { data: null, error };

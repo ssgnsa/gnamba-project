@@ -29,6 +29,7 @@ echo "3️⃣  Application migrations de base..."
 
 # Liste des migrations de base (dans l'ordre)
 BASE_MIGRATIONS=(
+    "20260324000000_create_foncier_base_tables_and_rpc.sql"
     "20260326000000_create_foncier_attestations_tables.sql"
     "20260330000000_fix_unique_constraint.sql"
     "20260401080000_fix_foncier_attestations.sql"
@@ -40,11 +41,7 @@ BASE_MIGRATIONS=(
     "20260405120000_rename_tenants_to_locataires.sql"
     "20260405130000_add_comprehensive_rls_policies.sql"
     "20260405140000_create_lead_capture_system.sql"
-    "20260405150000_create_foncier_base_tables_and_rpc.sql"
     "20260405160000_fix_lease_contracts_fk_and_cleanup_rls.sql"
-    "20260407000000_fix_foncier_lots.sql"
-    "20260408010000_add_foncier_lots_deleted_at.sql"
-    "20260408020000_idx_foncier_lots_deleted_at.sql"
     "20260408030000_current_user_role_fn.sql"
     "20260408040000_rename_tenants_table.sql"
     "20260408050000_rename_lease_contracts_tenant_col.sql"

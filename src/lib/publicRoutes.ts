@@ -2,26 +2,45 @@ export type PublicPage =
   | "home"
   | "about"
   | "services"
+  | "immobilier"
+  | "foncier"
+  | "lotissement"
+  | "btp-construction"
   | "realisations"
+  | "temoignages"
+  | "blog"
   | "contact"
+  | "faq"
+  | "mentions-legales"
   | "login"
   | "verification"
   | "lots";
 
 export const PUBLIC_PAGE_PATHS: Record<PublicPage, string> = {
   home: "/",
-  about: "/about",
+  about: "/a-propos",
   services: "/services",
+  immobilier: "/immobilier",
+  foncier: "/foncier",
+  lotissement: "/lotissement",
+  "btp-construction": "/btp-construction",
   realisations: "/realisations",
+  temoignages: "/temoignages",
+  blog: "/blog",
   contact: "/contact",
+  faq: "/faq",
+  "mentions-legales": "/mentions-legales",
   login: "/login",
   verification: "/verification-attestation",
-  lots: "/lots",
+  lots: "/lots-disponibles",
 };
 
 const PUBLIC_PAGE_ALIASES: Record<string, PublicPage> = {
   "/home": "home",
   "/accueil": "home",
+  "/about": "about",
+  "/lots": "lots",
+  "/faq/questions-frequentes": "faq",
   "/verification": "verification",
   "/forgot-password": "login",
   "/reset-password": "login",

@@ -28,7 +28,7 @@ FAILED=0
 
 # 1. Docker Containers
 echo -e "${YELLOW}1️⃣  Conteneurs Docker${NC}"
-for container in egs-web somagro-web egs-frontend filebrowser; do
+for container in egs-web egs-frontend filebrowser; do
     if docker ps --format "{{.Names}}" | grep -q "^${container}$"; then
         echo -e "  ${GREEN}✅${NC} $container"
         PASSED=$((PASSED + 1))

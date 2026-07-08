@@ -3,6 +3,7 @@ import { ArrowLeft, Mail, CheckCircle, AlertCircle } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useSettings } from "../../context/SettingsContext";
 import BrandLogo from "../../components/BrandLogo";
+import { OFFICIAL_CONTACT } from "../../lib/officialContact";
 
 interface Props {
   onBack: () => void;
@@ -16,7 +17,7 @@ export default function ForgotPasswordPage({ onBack }: Props) {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
 
-  const companyName = settings.app_company || "Gnamba Services";
+  const companyName = OFFICIAL_CONTACT.companyName;
   const appTitle = settings.app_title || "EGS";
   const logoInitials = companyName
     .split(" ")

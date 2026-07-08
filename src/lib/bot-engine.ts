@@ -7,7 +7,8 @@
  * Usage: Call processWorkflows() on schedule or via webhook.
  */
 
-import { supabase } from "../lib/supabase";
+import dbClient from "../data/tableClient";
+import { leadsRepository } from "../data/leads.repository";
 
 // ============================================
 // Configuration — Server credentials must not be read from VITE_* variables.
@@ -282,7 +283,7 @@ async function processAction(lead: any, action: any): Promise<void> {
 
   // Log interaction
   if (result) {
-    await supabase.from("lead_interactions").insert({
+    await dbClient.from("lead_interactions").insert({
       lead_id: lead.id,
       channel: action.channel,
       type: action.workflow_type || "outbound",
@@ -297,7 +298,7 @@ async function processAction(lead: any, action: any): Promise<void> {
 
     // Update lead's last_interaction_at
     if (result.success) {
-      await supabase
+      await dbClient
         .from("leads")
         .update({ last_interaction_at: new Date().toISOString() })
         .eq("id", lead.id);
@@ -318,7 +319,7 @@ export async function processWorkflows(): Promise<{
 
   try {
     // Get all active workflows
-    const { data: workflows, error: wfError } = await supabase
+    const { data: workflows, error: wfError } = await dbClient
       .from("bot_workflows")
       .select("*")
       .eq("status", "active");
@@ -344,25 +345,33 @@ export async function processWorkflows(): Promise<{
           const oneHourAgo = new Date(
             Date.now() - 60 * 60 * 1000,
           ).toISOString();
-          const { data } = await supabase
-            .from("leads")
-            .select("*")
-            .eq("status", "active")
-            .gte("created_at", oneHourAgo)
-            .is("last_interaction_at", null); // Never contacted
-          leads = data || [];
+          const result = await leadsRepository.getAll({
+            statut: "active",
+            limit: CONFIG.batchSize,
+          });
+          const recentLeads = (result.data?.items || []).filter((lead: any) => {
+            const createdAt = lead.created_at ?? lead.createdAt;
+            return (
+              createdAt && createdAt >= oneHourAgo && !lead.last_interaction_at
+            );
+          });
+          leads = recentLeads;
         } else if (trigger_type === "schedule") {
           // Get inactive leads for 30+ days
           const thirtyDaysAgo = new Date(
             Date.now() - 30 * 24 * 60 * 60 * 1000,
           ).toISOString();
-          const { data } = await supabase
-            .from("leads")
-            .select("*")
-            .eq("status", "active")
-            .lt("last_interaction_at", thirtyDaysAgo)
-            .limit(CONFIG.batchSize);
-          leads = data || [];
+          const staleResult = await leadsRepository.getAll({
+            statut: "active",
+            limit: CONFIG.batchSize,
+          });
+          const staleLeads = (staleResult.data?.items || []).filter(
+            (lead: any) => {
+              const lastInteraction = lead.last_interaction_at;
+              return lastInteraction && lastInteraction < thirtyDaysAgo;
+            },
+          );
+          leads = staleLeads;
         }
 
         // Process each lead
@@ -389,7 +398,7 @@ export async function processWorkflows(): Promise<{
         }
 
         // Update workflow execution count
-        await supabase
+        await dbClient
           .from("bot_workflows")
           .update({
             execution_count: (workflow.execution_count || 0) + 1,
@@ -425,7 +434,7 @@ export async function processCampaign(
 
   try {
     // Get campaign
-    const { data: campaign } = await supabase
+    const { data: campaign } = await dbClient
       .from("lead_campaigns")
       .select("*")
       .eq("id", campaignId)
@@ -437,31 +446,35 @@ export async function processCampaign(
       return { sent: 0, failed: 0 };
     }
 
-    // Get matching leads
-    let leadsQuery = supabase.from("leads").select("*").eq("status", "active");
+    const leadsResult = await leadsRepository.getAll({
+      statut: "active",
+      limit: CONFIG.batchSize,
+    });
 
-    // Apply segment filters
-    if (campaign.segment_filter) {
-      const { tags, min_score, source } = campaign.segment_filter;
-      if (tags?.length > 0) {
-        leadsQuery = leadsQuery.overlaps("tags", tags);
-      }
-      if (min_score) {
-        leadsQuery = leadsQuery.gte("score", min_score);
-      }
-      if (source) {
-        leadsQuery = leadsQuery.eq("source", source);
-      }
-    }
+    const filteredLeads = (leadsResult.data?.items || []).filter(
+      (lead: any) => {
+        const segmentFilter = campaign.segment_filter;
+        if (!segmentFilter) return true;
+        const { tags, min_score, source } = segmentFilter;
+        if (
+          tags?.length > 0 &&
+          !tags.every((tag: string) => (lead.tags || []).includes(tag))
+        ) {
+          return false;
+        }
+        if (min_score && Number(lead.score || 0) < Number(min_score))
+          return false;
+        if (source && lead.source !== source) return false;
+        return true;
+      },
+    );
 
-    const { data: leads } = await leadsQuery.limit(CONFIG.batchSize);
-
-    if (!leads || leads.length === 0) {
+    if (!filteredLeads || filteredLeads.length === 0) {
       return { sent: 0, failed: 0 };
     }
 
     // Update campaign status
-    await supabase
+    await dbClient
       .from("lead_campaigns")
       .update({
         status: "running",
@@ -470,16 +483,19 @@ export async function processCampaign(
       .eq("id", campaignId);
 
     // Send to each lead
-    for (const lead of leads) {
+    for (const lead of filteredLeads) {
       try {
         const channels = campaign.channels || ["sms"];
 
         for (const channel of channels) {
-          const template = campaign.template_content?.[channel];
+          const template = campaign.template_content?.[channel as string];
           if (!template) continue;
 
           // Check opt-in
-          if (!lead.channels_optin?.[channel]) continue;
+          if (
+            !lead.channels_optin?.[channel as keyof typeof lead.channels_optin]
+          )
+            continue;
 
           // Personalize and send
           const content = template
@@ -506,7 +522,7 @@ export async function processCampaign(
 
           if (result?.success) {
             sent++;
-            await supabase.from("lead_interactions").insert({
+            await dbClient.from("lead_interactions").insert({
               lead_id: lead.id,
               channel,
               type: "campaign",
@@ -528,7 +544,7 @@ export async function processCampaign(
     }
 
     // Update campaign stats
-    await supabase
+    await dbClient
       .from("lead_campaigns")
       .update({
         stats: {
@@ -541,7 +557,7 @@ export async function processCampaign(
 
     // Check if campaign is complete
     if (!campaign.segment_filter?.repeat) {
-      await supabase
+      await dbClient
         .from("lead_campaigns")
         .update({
           status: "completed",

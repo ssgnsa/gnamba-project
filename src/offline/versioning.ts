@@ -68,14 +68,14 @@ export function prepareOptimisticUpdate<T extends Record<string, unknown>>(
 }
 
 /**
- * Génère une condition WHERE pour les mises à jour Supabase (évite écrasement concurrent)
+ * Génère une condition WHERE pour les mises à jour API locale (évite écrasement concurrent)
  */
 export function versionedWhereClause(version: number): string {
   return `row_version = ${version}`;
 }
 
 /**
- * Wrapper pour les requêtes Supabase avec versioning
+ * Wrapper pour les requêtes API locale avec versioning
  */
 export interface VersionedUpdateResult<T> {
   data: T | null;
@@ -85,7 +85,7 @@ export interface VersionedUpdateResult<T> {
 }
 
 /**
- * Utilitaire pour extraire les champs de versioning d'une réponse Supabase
+ * Utilitaire pour extraire les champs de versioning d'une réponse API locale
  */
 export function extractVersioning<T>(record: T): VersionedEntity {
   const r = record as any;

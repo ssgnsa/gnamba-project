@@ -44,7 +44,8 @@ Le système d'attestation de propriété villageoise est une solution complète 
 ┌─────────────────────────────────────────────────────────────┐
 │              PUBLICVERIFICATION.TSX (Page publique)          │
 │  - Affiche ✅ DOCUMENT AUTHENTIQUE ou ❌ NON RECONNU         │
-│  - Montre tous les détails (bénéficiaire, parcelle, témoins) │
+│  - Montre uniquement la surface publique de verification     │
+│  - Masque les donnees privees absentes de la reponse         │
 │  - Accessible via QR code                                    │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -164,6 +165,7 @@ const result = await fetchAttestationVerification(lookup);
 // ✅ DOCUMENT AUTHENTIQUE (si hash_valide && signature_valide)
 // ❌ DOCUMENT NON RECONNU (si introuvable)
 // ⚠️ VÉRIFICATION INCOMPLÈTE (si hash ou signature invalide)
+// La reponse publique ne renvoie plus les donnees privees par defaut.
 ```
 
 ### 3. Edge Function de vérification
@@ -173,9 +175,16 @@ const result = await fetchAttestationVerification(lookup);
 // 1. Recherche l'attestation par ref, control_number ou hash
 // 2. Vérifie le hash SHA-256
 // 3. Vérifie la signature numérique (si clé publique configurée)
-// 4. Retourne toutes les informations publiques
+// 4. Retourne uniquement la surface publique utile a la verification
 // 5. Rate limiting : 10 requêtes/minute par IP
 ```
+
+### 4. Modèle d'accès
+
+- Les parcours internes utilisent les tables Foncier directement avec RLS.
+- Les utilisateurs sont limites par village via `user_village_access`.
+- La vue publique minimale `v_foncier_attestation_verification` sert de contrat de lecture pour la verification.
+- Les details sensibles restent reserves aux formulaires internes, a l'impression et a l'audit.
 
 ## Sécurité
 

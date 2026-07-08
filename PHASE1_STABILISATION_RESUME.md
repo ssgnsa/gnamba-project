@@ -148,3 +148,9 @@ npm run sync:dev-to-prod       # scripts/sync-workflow.sh sync local-dev cloud-p
 ---
 
 **Infrastructure stabilisée - Prête pour Phase 2 (Normalisation)**
+
+## Complément de session - 2026-06-16
+
+- Les artefacts accidentels `-`, `ubprocess`, `ubprocess.run(...)`, `oh -lc ...` et `.tmp/` ont été supprimés du workspace.
+- Un répertoire `node_modules.corrupt.1780927163/` persiste, mais sa suppression est bloquée par les permissions locales; il faudra le nettoyer depuis le serveur ou la machine qui en possède les droits.
+- La validation front (`npm run typecheck`, `npm run lint`, `npm run build`) n’a pas pu être relancée dans ce shell car `node` et `npm` ne sont pas disponibles ici.

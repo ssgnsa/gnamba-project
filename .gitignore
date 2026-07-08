@@ -1,15 +1,53 @@
-_archive/
-.secrets/
-*.log
-logs/
-backups/
-.env*
-node_modules
+# =====================
+# ENV
+# =====================
+.env
+.env.*
+!.env.example
 
+# =====================
+# NODE / FRONTEND
+# =====================
+node_modules/
 dist/
 dist-local/
-dist_old/
+.vite/
+coverage/
+
+# logs
+logs/
+*.log
+
+# =====================
+# BACKUP / TEMP
+# =====================
+_archive/
+.tmp/
 *.bak
-.env
-.env.server
+*.tmp
+
+# corrupted installs
+node_modules.corrupt.*/
+node_modules.*.corrupt*/
+
+# =====================
+# SUPABASE
+# =====================
+supabase/.branches/
+supabase/.temp/
+supabase/logs/
+supabase/seed/.temp/
+
+# =====================
+# SYSTEM / OS
+# =====================
+.DS_Store
+Thumbs.db
+
+# =====================
+# REPO-SPECIFIC NOISE
+# =====================
+.secrets/
+backups/
+dist_old/
 .sync-config

@@ -9,7 +9,7 @@ import {
   Image,
   X,
 } from "lucide-react";
-import { supabase } from "../lib/supabase";
+import dbClient from "../data/tableClient";
 import { Product } from "../types";
 import Modal from "../components/ui/Modal";
 import Badge from "../components/ui/Badge";
@@ -52,7 +52,7 @@ export default function Fournitures() {
 
   const fetchProducts = async () => {
     setLoading(true);
-    const { data } = await supabase.from("products").select("*").order("nom");
+    const { data } = await dbClient.from("products").select("*").order("nom");
     setProducts((data as Product[]) || []);
     setLoading(false);
   };
@@ -100,13 +100,13 @@ export default function Fournitures() {
         updated_at: new Date().toISOString(),
       };
       if (editingId) {
-        const { error } = await supabase
+        const { error } = await dbClient
           .from("products")
           .update(payload)
           .eq("id", editingId);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("products").insert(payload);
+        const { error } = await dbClient.from("products").insert(payload);
         if (error) throw error;
       }
       setModalOpen(false);
@@ -124,8 +124,11 @@ export default function Fournitures() {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Supprimer ce produit ?")) return;
-    const { error } = await supabase.from("products").delete().eq("id", id);
-    if (error) { setFormError(error.message); return; }
+    const { error } = await dbClient.from("products").delete().eq("id", id);
+    if (error) {
+      setFormError(error.message);
+      return;
+    }
     fetchProducts();
   };
 

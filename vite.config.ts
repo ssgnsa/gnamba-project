@@ -20,18 +20,15 @@ function canUseOutDir(outDir: string): boolean {
 }
 
 function resolveBuildOutDir(): string {
-  const preferredOutDir = process.env.VITE_OUT_DIR ?? "dist";
-  const fallbackOutDir = "dist-local";
+  const outDir = "dist";
 
-  if (canUseOutDir(preferredOutDir)) {
-    return preferredOutDir;
+  if (canUseOutDir(outDir)) {
+    return outDir;
   }
 
-  console.warn(
-    `[vite-config] Dossier de build "${preferredOutDir}" non inscriptible/purgeable. Utilisation de "${fallbackOutDir}".`,
+  throw new Error(
+    `[vite-config] Dossier de build "${outDir}" non inscriptible/purgeable. Le fallback dist-local est interdit.`,
   );
-
-  return fallbackOutDir;
 }
 
 const buildOutDir = resolveBuildOutDir();
@@ -49,6 +46,7 @@ export default defineConfig({
     host: true,
     port: 5173,
     strictPort: true,
+    allowedHosts: ["gnambaservices.ci"],
   },
   build: {
     outDir: buildOutDir,
@@ -65,9 +63,6 @@ export default defineConfig({
             id.includes("node_modules/react-dom")
           ) {
             return "react-vendor";
-          }
-          if (id.includes("node_modules/@supabase/supabase-js")) {
-            return "supabase-vendor";
           }
           if (id.includes("node_modules/lucide-react")) {
             return "icons-vendor";

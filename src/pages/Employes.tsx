@@ -12,7 +12,7 @@ import {
   CalendarOff,
   Banknote,
 } from "lucide-react";
-import { supabase } from "../lib/supabase";
+import dbClient from "../data/tableClient";
 import { Employee } from "../types";
 import Modal from "../components/ui/Modal";
 import Badge from "../components/ui/Badge";
@@ -83,7 +83,7 @@ export default function Employes() {
 
   const fetchEmployees = async () => {
     setLoading(true);
-    const { data } = await supabase.from("employees").select("*").order("nom");
+    const { data } = await dbClient.from("employees").select("*").order("nom");
     setEmployees((data as Employee[]) || []);
     setLoading(false);
   };
@@ -137,13 +137,13 @@ export default function Employes() {
         updated_at: new Date().toISOString(),
       };
       if (editingId) {
-        const { error } = await supabase
+        const { error } = await dbClient
           .from("employees")
           .update(payload)
           .eq("id", editingId);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("employees").insert(payload);
+        const { error } = await dbClient.from("employees").insert(payload);
         if (error) throw error;
       }
       setModalOpen(false);
@@ -165,8 +165,11 @@ export default function Employes() {
       return;
     }
     if (!confirm("Supprimer cet employé ?")) return;
-    const { error } = await supabase.from("employees").delete().eq("id", id);
-    if (error) { setFormError(error.message); return; }
+    const { error } = await dbClient.from("employees").delete().eq("id", id);
+    if (error) {
+      setFormError(error.message);
+      return;
+    }
     fetchEmployees();
   };
 

@@ -30,12 +30,16 @@ docker rm egs-web 2>/dev/null || true
 echo "🔧 Build Docker..."
 cd /home/soma/gnamba-project
 
+# Use canonical local API variable when available
+LOCAL_API_URL="${VITE_LOCAL_API_URL:-${VITE_SUPABASE_URL:-}}"
+
 docker build \
-  --build-arg VITE_SUPABASE_MODE="$VITE_SUPABASE_MODE" \
-  --build-arg VITE_SUPABASE_URL="$VITE_SUPABASE_URL" \
-  --build-arg VITE_SUPABASE_ANON_KEY="$VITE_SUPABASE_ANON_KEY" \
-  -t egs-web:nofb \
-  -f Dockerfile.nofb . 2>&1 | tail -10
+    --build-arg VITE_LOCAL_API_URL="$LOCAL_API_URL" \
+    --build-arg VITE_SUPABASE_MODE="$VITE_SUPABASE_MODE" \
+    --build-arg VITE_SUPABASE_URL="$LOCAL_API_URL" \
+    --build-arg VITE_SUPABASE_ANON_KEY="${VITE_SUPABASE_ANON_KEY:-}" \
+    -t egs-web:nofb \
+    -f Dockerfile.nofb . 2>&1 | tail -10
 
 echo ""
 echo "✅ Build terminé"

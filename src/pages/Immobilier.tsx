@@ -8,17 +8,28 @@ import {
   AlertCircle,
   BarChart3,
 } from "lucide-react";
-import { supabase } from "../lib/supabase";
+import dbClient from "../data/tableClient";
+import { tenantsRepository } from "../data/tenants.repository";
 import type { Property, Tenant, RentPayment, LeaseContract } from "../types";
 import { useSettings } from "../context/SettingsContext";
-import { useRealtimePayments } from "../hooks/useRealtimePayments";
 import PropertiesTab from "./immobilier/PropertiesTab";
 import TenantsTab from "./immobilier/TenantsTab";
 import ContractsTab from "./immobilier/ContractsTab";
 import PaymentsTab from "./immobilier/PaymentsTab";
 import PaymentReportsTab from "./immobilier/PaymentReportsTab";
+import SyncRemoteButton from "../components/ui/SyncRemoteButton";
+import {
+  normalizeManualStatus,
+  readManualCache,
+  writeManualCache,
+} from "../lib/manualSyncStore";
 
 type Tab = "biens" | "locataires" | "contrats" | "paiements" | "rapports";
+
+const PROPERTIES_CACHE_KEY = "egs.immobilier.properties.local_cache.v1";
+const TENANTS_CACHE_KEY = "egs.immobilier.tenants.local_cache.v1";
+const CONTRACTS_CACHE_KEY = "egs.immobilier.contracts.local_cache.v1";
+const PAYMENTS_CACHE_KEY = "egs.immobilier.payments.local_cache.v1";
 
 const tabs: {
   id: Tab;
@@ -32,38 +43,13 @@ const tabs: {
   { id: "rapports", label: "Rapports", icon: BarChart3 },
 ];
 
-const isSchemaMismatchError = (
-  error: {
-    code?: string;
-    message?: string;
-    details?: string;
-    hint?: string;
-  } | null,
-) => {
-  if (!error) return false;
-
-  const combinedMessage = [error.message, error.details, error.hint]
-    .filter(Boolean)
-    .join(" ");
-  return (
-    error.code === "42P01" ||
-    error.code === "PGRST200" ||
-    error.code === "PGRST205" ||
-    /schema cache|could not find a relationship|relation .* does not exist|not found/i.test(
-      combinedMessage,
-    )
-  );
-};
-
 export default function Immobilier() {
   const { settings } = useSettings();
   const [activeTab, setActiveTab] = useState<Tab>("biens");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Activer les notifications en temps réel pour les paiements
-  useRealtimePayments();
+  const [syncing, setSyncing] = useState(false);
 
   const [properties, setProperties] = useState<Property[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -80,34 +66,45 @@ export default function Immobilier() {
     setLoading(true);
     setError(null);
     try {
+      const cachedProperties = readManualCache<Property>(PROPERTIES_CACHE_KEY);
+      const cachedTenants = readManualCache<Tenant>(TENANTS_CACHE_KEY);
+      const cachedContracts =
+        readManualCache<LeaseContract>(CONTRACTS_CACHE_KEY);
+      const cachedPayments = readManualCache<RentPayment>(PAYMENTS_CACHE_KEY);
+
+      const hasLocalCache =
+        cachedProperties.length > 0 ||
+        cachedTenants.length > 0 ||
+        cachedContracts.length > 0 ||
+        cachedPayments.length > 0;
+
+      if (hasLocalCache) {
+        setProperties(cachedProperties);
+        setTenants(cachedTenants);
+        setContracts(cachedContracts);
+        setPayments(cachedPayments);
+        setTenantTableName("locataires");
+        setTenantIdColumn("locataire_id");
+        setLoading(false);
+        return;
+      }
+
       const [propRes, tenantRes] = await Promise.all([
-        supabase
+        dbClient
           .from("properties")
           .select("*")
           .order("created_at", { ascending: false }),
-        supabase.from("locataires").select("*").order("nom"),
+        tenantsRepository.getAll({ limit: 1000 }),
       ]);
 
-      let tenantsData = tenantRes.data ?? [];
-
-      if (isSchemaMismatchError(tenantRes.error)) {
-        const fallbackTenantRes = await supabase
-          .from("tenants")
-          .select("*")
-          .order("nom");
-        if (fallbackTenantRes.error) {
-          setError(`Erreur locataires: ${fallbackTenantRes.error.message}`);
-        } else {
-          tenantsData = fallbackTenantRes.data ?? [];
-        }
-      }
+      const tenantsData: Tenant[] = tenantRes.data?.items ?? [];
 
       const [contractRes, payRes] = await Promise.all([
-        supabase
+        dbClient
           .from("lease_contracts")
           .select("*")
           .order("created_at", { ascending: false }),
-        supabase
+        dbClient
           .from("rent_payments")
           .select("*")
           .order("date_paiement", { ascending: false }),
@@ -121,16 +118,11 @@ export default function Immobilier() {
           (p) => p.tenant_id && !p.locataire_id,
         );
 
-      setTenantTableName(
-        isSchemaMismatchError(tenantRes.error) ? "tenants" : "locataires",
-      );
+      setTenantTableName("locataires");
       setTenantIdColumn(legacyTenantIdField ? "tenant_id" : "locataire_id");
 
       if (propRes.error) {
         setError(`Erreur propriétés: ${propRes.error.message}`);
-      }
-      if (tenantRes.error && !isSchemaMismatchError(tenantRes.error)) {
-        setError(`Erreur locataires: ${tenantRes.error.message}`);
       }
       if (contractRes.error) {
         setError(`Erreur contrats: ${contractRes.error.message}`);
@@ -154,7 +146,10 @@ export default function Immobilier() {
       ) as RentPayment[];
 
       const propertiesById = new Map(
-        (propRes.data || []).map((property) => [property.id, property]),
+        ((propRes.data || []) as Property[]).map((property) => [
+          property.id,
+          property,
+        ]),
       );
       const tenantsById = new Map(
         (tenantsData || []).map((tenant) => [tenant.id, tenant]),
@@ -182,9 +177,10 @@ export default function Immobilier() {
 
       const enrichedPayments = normalizedPayments.map((payment) => ({
         ...payment,
-        properties: propertiesById.get(payment.property_id)
-          ? { adresse: propertiesById.get(payment.property_id)!.adresse }
-          : undefined,
+        properties:
+          payment.property_id && propertiesById.get(payment.property_id)
+            ? { adresse: propertiesById.get(payment.property_id)!.adresse }
+            : undefined,
         locataires:
           payment.locataire_id && tenantsById.get(payment.locataire_id)
             ? {
@@ -202,6 +198,10 @@ export default function Immobilier() {
       setTenants(tenantsData || []);
       setContracts(enrichedContracts);
       setPayments(enrichedPayments);
+      writeManualCache(PROPERTIES_CACHE_KEY, propRes.data || []);
+      writeManualCache(TENANTS_CACHE_KEY, tenantsData || []);
+      writeManualCache(CONTRACTS_CACHE_KEY, enrichedContracts);
+      writeManualCache(PAYMENTS_CACHE_KEY, enrichedPayments);
     } catch {
       setError("Une erreur est survenue lors du chargement des données.");
     } finally {
@@ -223,10 +223,139 @@ export default function Immobilier() {
   ).length;
 
   const totalProperties = properties.length;
-  const occupiedProperties = properties.filter((p) => p.statut === "loue").length;
+  const occupiedProperties = properties.filter(
+    (p) => p.statut === "loue",
+  ).length;
   const availableProperties = properties.filter(
     (p) => p.statut === "disponible",
   ).length;
+
+  const pendingSyncCount = [
+    ...readManualCache<{ sync_status?: string }>(PROPERTIES_CACHE_KEY),
+    ...readManualCache<{ sync_status?: string }>(TENANTS_CACHE_KEY),
+    ...readManualCache<{ sync_status?: string }>(CONTRACTS_CACHE_KEY),
+    ...readManualCache<{ sync_status?: string }>(PAYMENTS_CACHE_KEY),
+  ].filter(
+    (item) => normalizeManualStatus(item.sync_status) !== "synced",
+  ).length;
+
+  const handleSyncToRemote = useCallback(async () => {
+    setError(null);
+    setSyncing(true);
+
+    try {
+      const localProperties = readManualCache<any>(PROPERTIES_CACHE_KEY);
+      const localTenants = readManualCache<any>(TENANTS_CACHE_KEY);
+      const localContracts = readManualCache<any>(CONTRACTS_CACHE_KEY);
+      const localPayments = readManualCache<any>(PAYMENTS_CACHE_KEY);
+
+      let syncedCount = 0;
+      let failedCount = 0;
+
+      const syncCollection = async (
+        items: any[],
+        tableName: string,
+        onSuccess?: (item: any) => void,
+      ) => {
+        const nextItems = [...items];
+        for (const item of items) {
+          const status = normalizeManualStatus(item.sync_status);
+          if (status === "synced") continue;
+
+          if (status === "deleted") {
+            const { error } = await dbClient
+              .from(tableName)
+              .delete()
+              .eq("id", item.id);
+            if (error) {
+              failedCount += 1;
+              const index = nextItems.findIndex(
+                (entry) => entry.id === item.id,
+              );
+              if (index >= 0)
+                nextItems[index] = {
+                  ...nextItems[index],
+                  sync_error: error.message,
+                };
+              continue;
+            }
+            const index = nextItems.findIndex((entry) => entry.id === item.id);
+            if (index >= 0) nextItems.splice(index, 1);
+            syncedCount += 1;
+            continue;
+          }
+
+          const payload = { ...item };
+          delete payload.sync_status;
+          delete payload.sync_error;
+          delete payload.deleted_at;
+
+          const { error } = await dbClient.from(tableName).upsert(payload, {
+            onConflict: "id",
+          });
+          if (error) {
+            failedCount += 1;
+            const index = nextItems.findIndex((entry) => entry.id === item.id);
+            if (index >= 0)
+              nextItems[index] = {
+                ...nextItems[index],
+                sync_error: error.message,
+              };
+            continue;
+          }
+          const index = nextItems.findIndex((entry) => entry.id === item.id);
+          if (index >= 0) {
+            nextItems[index] = {
+              ...nextItems[index],
+              sync_status: "synced",
+              sync_error: null,
+              deleted_at: null,
+            };
+            onSuccess?.(nextItems[index]);
+          }
+          syncedCount += 1;
+        }
+        return nextItems;
+      };
+
+      const syncedProperties = await syncCollection(
+        localProperties,
+        "properties",
+      );
+      writeManualCache(PROPERTIES_CACHE_KEY, syncedProperties);
+
+      const syncedTenants = await syncCollection(localTenants, tenantTableName);
+      writeManualCache(TENANTS_CACHE_KEY, syncedTenants);
+
+      const syncedContracts = await syncCollection(
+        localContracts,
+        "lease_contracts",
+      );
+      writeManualCache(CONTRACTS_CACHE_KEY, syncedContracts);
+
+      const syncedPayments = await syncCollection(
+        localPayments,
+        "rent_payments",
+      );
+      writeManualCache(PAYMENTS_CACHE_KEY, syncedPayments);
+
+      await fetchData();
+
+      if (failedCount > 0) {
+        setError(
+          `${syncedCount} élément(s) synchronisé(s), ${failedCount} en échec.`,
+        );
+      }
+    } catch (syncError) {
+      setError(
+        syncError instanceof Error
+          ? syncError.message
+          : "Synchronisation impossible.",
+      );
+    } finally {
+      setSyncing(false);
+    }
+  }, [fetchData, tenantTableName]);
 
   return (
     <div className="space-y-4">
@@ -272,6 +401,11 @@ export default function Immobilier() {
             className="pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-100)] focus:border-[var(--color-primary-400)] w-full sm:w-72"
           />
         </div>
+        <SyncRemoteButton
+          pendingCount={pendingSyncCount}
+          syncing={syncing}
+          onClick={() => void handleSyncToRemote()}
+        />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -279,28 +413,36 @@ export default function Immobilier() {
           <p className="text-xs text-gray-500 uppercase tracking-[0.16em] mb-2">
             Biens totaux
           </p>
-          <p className="text-3xl font-semibold text-gray-900">{totalProperties}</p>
+          <p className="text-3xl font-semibold text-gray-900">
+            {totalProperties}
+          </p>
           <p className="text-sm text-gray-500 mt-1">Inventaire global</p>
         </div>
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
           <p className="text-xs text-gray-500 uppercase tracking-[0.16em] mb-2">
             Biens loués
           </p>
-          <p className="text-3xl font-semibold text-gray-900">{occupiedProperties}</p>
+          <p className="text-3xl font-semibold text-gray-900">
+            {occupiedProperties}
+          </p>
           <p className="text-sm text-gray-500 mt-1">Locations actives</p>
         </div>
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
           <p className="text-xs text-gray-500 uppercase tracking-[0.16em] mb-2">
             Biens disponibles
           </p>
-          <p className="text-3xl font-semibold text-gray-900">{availableProperties}</p>
+          <p className="text-3xl font-semibold text-gray-900">
+            {availableProperties}
+          </p>
           <p className="text-sm text-gray-500 mt-1">Prêts à être loués</p>
         </div>
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
           <p className="text-xs text-gray-500 uppercase tracking-[0.16em] mb-2">
             Paiements urgents
           </p>
-          <p className="text-3xl font-semibold text-gray-900">{urgentPayments}</p>
+          <p className="text-3xl font-semibold text-gray-900">
+            {urgentPayments}
+          </p>
           <p className="text-sm text-gray-500 mt-1">Retards et partiels</p>
         </div>
       </div>

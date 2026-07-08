@@ -74,5 +74,8 @@
     "**/.git/objects/**": true,
     "**/node_modules/**": true,
     "**/.venv/**": true
+  },
+  "[dockerfile]": {
+    "editor.defaultFormatter": "ms-azuretools.vscode-containers"
   }
 }

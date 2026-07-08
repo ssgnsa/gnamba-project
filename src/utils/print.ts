@@ -1,4 +1,4 @@
-import DOMPurify from 'dompurify';
+import DOMPurify from "dompurify";
 
 export interface AttestationCoutumiereData {
   reference: string;
@@ -138,72 +138,85 @@ const printBase = `
 
 const escapeHtml = (value: string) =>
   value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 
-const safeText = (value: unknown) => escapeHtml(String(value ?? ''));
-const safeUpper = (value: unknown) => escapeHtml(String(value ?? '').toUpperCase());
+const safeText = (value: unknown) => escapeHtml(String(value ?? ""));
+const safeUpper = (value: unknown) =>
+  escapeHtml(String(value ?? "").toUpperCase());
 
 async function fetchAsDataUrl(url: string): Promise<string> {
-  if (!url) return '';
-  if (url.startsWith('data:')) return url;
+  if (!url) return "";
+  if (url.startsWith("data:")) return url;
   try {
-    const resp = await fetch(url, { cache: 'force-cache', mode: 'cors' });
-    console.log('[PRINT] fetch', url.substring(0, 80), '→ status', resp.status, resp.ok);
+    const resp = await fetch(url, { cache: "force-cache", mode: "cors" });
+    console.log(
+      "[PRINT] fetch",
+      url.substring(0, 80),
+      "→ status",
+      resp.status,
+      resp.ok,
+    );
     if (!resp.ok) return url;
     const blob = await resp.blob();
-    console.log('[PRINT] blob type:', blob.type, 'size:', blob.size);
+    console.log("[PRINT] blob type:", blob.type, "size:", blob.size);
     return await new Promise<string>((resolve) => {
       const reader = new FileReader();
       reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = () => { console.error('[PRINT] FileReader error'); resolve(url); };
+      reader.onerror = () => {
+        console.error("[PRINT] FileReader error");
+        resolve(url);
+      };
       reader.readAsDataURL(blob);
     });
   } catch (e) {
-    console.error('[PRINT] fetchAsDataUrl error:', e);
+    console.error("[PRINT] fetchAsDataUrl error:", e);
     return url;
   }
 }
 
 const safeUrl = (value?: string | null) => {
-  if (!value) return '';
+  if (!value) return "";
   try {
-    const base = typeof window !== 'undefined' && window.location ? window.location.origin : 'http://localhost';
+    const base =
+      typeof window !== "undefined" && window.location
+        ? window.location.origin
+        : require("../lib/selfHosted").getLocalApiBaseUrl();
     const parsed = new URL(value, base);
-    if (parsed.protocol === 'data:') {
-      if (value.trim().toLowerCase().startsWith('data:image/')) {
+    if (parsed.protocol === "data:") {
+      if (value.trim().toLowerCase().startsWith("data:image/")) {
         return value;
       }
-      return '';
+      return "";
     }
-    if (['http:', 'https:'].includes(parsed.protocol)) {
+    if (["http:", "https:"].includes(parsed.protocol)) {
       return parsed.toString();
     }
   } catch {
-    return '';
+    return "";
   }
-  return '';
+  return "";
 };
 
 const ITF_PATTERNS: Record<string, string> = {
-  '0': 'nnwwn',
-  '1': 'wnnnw',
-  '2': 'nwnnw',
-  '3': 'wwnnn',
-  '4': 'nnwnw',
-  '5': 'wnwnn',
-  '6': 'nwwnn',
-  '7': 'nnnww',
-  '8': 'wnnwn',
-  '9': 'nwnwn',
+  "0": "nnwwn",
+  "1": "wnnnw",
+  "2": "nwnnw",
+  "3": "wwnnn",
+  "4": "nnwnw",
+  "5": "wnwnn",
+  "6": "nwwnn",
+  "7": "nnnww",
+  "8": "wnnwn",
+  "9": "nwnwn",
 };
 
 const buildItfBarcodeSvg = (value: string) => {
-  const digits = String(value || '').replace(/\D/g, '');
-  if (!digits) return '';
+  const digits = String(value || "").replace(/\D/g, "");
+  if (!digits) return "";
   const padded = digits.length % 2 === 0 ? digits : `0${digits}`;
   const narrow = 2;
   const wide = 6;
@@ -215,11 +228,13 @@ const buildItfBarcodeSvg = (value: string) => {
     rects.push(`<rect x="${x}" y="0" width="${width}" height="${height}" />`);
     x += width;
   };
-  const pushSpace = (width: number) => { x += width; };
-  const widthFor = (symbol: string) => (symbol === 'w' ? wide : narrow);
+  const pushSpace = (width: number) => {
+    x += width;
+  };
+  const widthFor = (symbol: string) => (symbol === "w" ? wide : narrow);
 
   // Start pattern: n n n n (bar/space/bar/space)
-  ['n', 'n', 'n', 'n'].forEach((symbol, idx) => {
+  ["n", "n", "n", "n"].forEach((symbol, idx) => {
     const w = widthFor(symbol);
     if (idx % 2 === 0) pushBar(w);
     else pushSpace(w);
@@ -235,21 +250,23 @@ const buildItfBarcodeSvg = (value: string) => {
   }
 
   // Stop pattern: w n n (bar/space/bar)
-  ['w', 'n', 'n'].forEach((symbol, idx) => {
+  ["w", "n", "n"].forEach((symbol, idx) => {
     const w = widthFor(symbol);
     if (idx % 2 === 0) pushBar(w);
     else pushSpace(w);
   });
 
   const svgWidth = x;
-  return `<svg class="barcode-svg" xmlns="http://www.w3.org/2000/svg" width="${svgWidth}" height="${height}" viewBox="0 0 ${svgWidth} ${height}" role="img" aria-label="Code barre">${rects.join('')}</svg>`;
+  return `<svg class="barcode-svg" xmlns="http://www.w3.org/2000/svg" width="${svgWidth}" height="${height}" viewBox="0 0 ${svgWidth} ${height}" role="img" aria-label="Code barre">${rects.join("")}</svg>`;
 };
 
 // ============================================================================
 // buildAttestationCoutumiereHTML — Document officiel propre
 // NE contient PAS : GPS, limites, témoins (réservés pour l'annexe technique)
 // ============================================================================
-function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string {
+function buildAttestationCoutumiereHTML(
+  data: AttestationCoutumiereData,
+): string {
   const reference = safeText(data.reference);
   const region = safeText(data.region);
   const departement = safeText(data.departement);
@@ -257,11 +274,15 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
   // FIX: village peut contenir "VILLAGE DE KATADJI" ou juste "KATADJI"
   // On extrait le nom pur pour éviter "Village de VILLAGE DE KATADJI"
   const villageRaw = safeText(data.village);
-  const villageNom = villageRaw.replace(/^(VILLAGE\s+DE\s+|VILLAGE\s+)/i, '').trim();
+  const villageNom = villageRaw
+    .replace(/^(VILLAGE\s+DE\s+|VILLAGE\s+)/i, "")
+    .trim();
   const quartier = safeText(data.quartier);
   const lotissement = safeText(data.lotissement);
   const numeroLot = safeText(data.numero_lot);
-  const superficieM2 = Number.isFinite(data.superficie_m2) ? data.superficie_m2 : 0;
+  const superficieM2 = Number.isFinite(data.superficie_m2)
+    ? data.superficie_m2
+    : 0;
   const superficie = safeText(superficieM2);
   const proprietaireNom = safeUpper(data.proprietaire_nom);
   const proprietairePrenom = safeUpper(data.proprietaire_prenom);
@@ -273,24 +294,36 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
   const cniDate = safeText(data.proprietaire_cni_date);
   const cniLieu = safeText(data.proprietaire_cni_lieu);
   const telephone = safeText(data.proprietaire_telephone);
-  const chefNom = safeUpper(data.chef_nom || data.validation_chef_nom || data.chef_village);
+  const chefNom = safeUpper(
+    data.chef_nom || data.validation_chef_nom || data.chef_village,
+  );
   const villageLogoUrl = safeUrl(data.village_logo_url);
-  const attestationType = String(data.attestation_type || '').toLowerCase();
-  const hasCessionPrice = typeof data.prix_cession === 'number' && Number.isFinite(data.prix_cession) && data.prix_cession > 0;
-  const hasCedant = Boolean(data.cedant_nom || data.cedant_prenom || data.cedant_cni_numero);
+  const attestationType = String(data.attestation_type || "").toLowerCase();
+  const hasCessionPrice =
+    typeof data.prix_cession === "number" &&
+    Number.isFinite(data.prix_cession) &&
+    data.prix_cession > 0;
+  const hasCedant = Boolean(
+    data.cedant_nom || data.cedant_prenom || data.cedant_cni_numero,
+  );
   const hasCessionHint = Boolean(data.date_cession) || hasCessionPrice;
-  const isCession = attestationType === 'cession' || hasCedant || hasCessionHint;
+  const isCession =
+    attestationType === "cession" || hasCedant || hasCessionHint;
   const documentTitle = isCession
-    ? 'ATTESTATION DE CESSION DE DROITS COUTUMIERS'
-    : 'ATTESTATION DE PROPRIÉTÉ VILLAGEOISE';
+    ? "ATTESTATION DE CESSION DE DROITS COUTUMIERS"
+    : "ATTESTATION DE PROPRIÉTÉ VILLAGEOISE";
 
   // Cession data
-  const cedantNom = safeUpper(data.cedant_nom || '');
-  const cedantPrenom = safeUpper(data.cedant_prenom || '');
-  const cedantCni = safeText(data.cedant_cni_numero || '');
-  const dateCession = safeText(data.date_cession || '');
+  const cedantNom = safeUpper(data.cedant_nom || "");
+  const cedantPrenom = safeUpper(data.cedant_prenom || "");
+  const cedantCni = safeText(data.cedant_cni_numero || "");
+  const dateCession = safeText(data.date_cession || "");
   // Security elements
-  const barcodeSvg = data.code_barre ? buildItfBarcodeSvg(String(data.code_barre).replace(/\s/g, '').toUpperCase()) : '';
+  const barcodeSvg = data.code_barre
+    ? buildItfBarcodeSvg(
+        String(data.code_barre).replace(/\s/g, "").toUpperCase(),
+      )
+    : "";
   const qrDataUrl = safeUrl(data.qrDataUrl);
   const hashSha256 = safeText(data.hash_sha256);
   const controlNumber = safeText(data.control_number);
@@ -720,17 +753,18 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
     <div class="header">
       <!-- Col 1 : Localisation administrative -->
       <div class="hdr-col">
-        <span class="accent">RÉGION ${region ? region.toUpperCase() : '—'}</span><br>
-        Département de ${departement || '—'}<br>
-        Commune de ${commune || '—'}<br>
+        <span class="accent">RÉGION ${region ? region.toUpperCase() : "—"}</span><br>
+        Département de ${departement || "—"}<br>
+        Commune de ${commune || "—"}<br>
         <strong>Village de ${villageNom.toUpperCase()}</strong>
       </div>
 
       <!-- Col 2 : Logo villageois officiel -->
       <div class="village-logo-wrap">
-        ${villageLogoUrl && villageLogoUrl !== ''
-          ? `<img src="${villageLogoUrl}" alt="Logo ${villageNom}" onerror="this.outerHTML='<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 58 58' width='54' height='54'><circle cx='29' cy='29' r='27' fill='none' stroke='%23C5A467' stroke-width='1.2'/>  <text x='29' y='33' text-anchor='middle' font-family='serif' font-size='14' font-weight='bold' fill='%23C5A467'>${villageNom.charAt(0).toUpperCase()}</text></svg>'"/>`
-          : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 58 58" width="54" height="54">
+        ${
+          villageLogoUrl && villageLogoUrl !== ""
+            ? `<img src="${villageLogoUrl}" alt="Logo ${villageNom}" onerror="this.outerHTML='<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 58 58' width='54' height='54'><circle cx='29' cy='29' r='27' fill='none' stroke='%23C5A467' stroke-width='1.2'/>  <text x='29' y='33' text-anchor='middle' font-family='serif' font-size='14' font-weight='bold' fill='%23C5A467'>${villageNom.charAt(0).toUpperCase()}</text></svg>'"/>`
+            : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 58 58" width="54" height="54">
                <circle cx="29" cy="29" r="27" fill="none" stroke="#C5A467" stroke-width="1.2"/>
                <text x="29" y="34" text-anchor="middle" font-family="Georgia,serif" font-size="18" font-weight="bold" fill="#C5A467">${villageNom.charAt(0).toUpperCase()}</text>
              </svg>`
@@ -786,32 +820,34 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
         </div>
         <table class="dtable">
           <tr><td class="lbl fill">Nom &amp; Prénoms</td><td class="val fill"><strong>${proprietairePrenom} ${proprietaireNom}</strong></td></tr>
-          <tr><td class="lbl">Né(e) le</td><td class="val">${naissanceDate || '—'} à ${naissanceLieu || '—'}</td></tr>
+          <tr><td class="lbl">Né(e) le</td><td class="val">${naissanceDate || "—"} à ${naissanceLieu || "—"}</td></tr>
           ${proprietaireProfession ? `<tr><td class="lbl">Profession</td><td class="val">${proprietaireProfession}</td></tr>` : '<tr><td class="lbl">Profession</td><td class="val">—</td></tr>'}
-          <tr><td class="lbl">CNI N°</td><td class="val">${cniNumero || '—'}${cniDate ? ` — délivrée le ${cniDate}${cniLieu ? ' à ' + cniLieu : ''}` : ''}</td></tr>
-          <tr><td class="lbl">Domicile</td><td class="val">${proprietaireDomicile || '—'}</td></tr>
-          <tr><td class="lbl">Téléphone</td><td class="val">${telephone || '—'}</td></tr>
+          <tr><td class="lbl">CNI N°</td><td class="val">${cniNumero || "—"}${cniDate ? ` — délivrée le ${cniDate}${cniLieu ? " à " + cniLieu : ""}` : ""}</td></tr>
+          <tr><td class="lbl">Domicile</td><td class="val">${proprietaireDomicile || "—"}</td></tr>
+          <tr><td class="lbl">Téléphone</td><td class="val">${telephone || "—"}</td></tr>
         </table>
       </div>
 
       <!-- II/III. DESCRIPTION DE LA PARCELLE — 6 col -->
       <div class="section-card col-6">
         <div class="section-head">
-          <span class="section-num">${isCession ? 'III.' : 'II.'}</span>
+          <span class="section-num">${isCession ? "III." : "II."}</span>
           <span class="section-label">Description Parcellaire</span>
         </div>
         <table class="dtable">
-          <tr><td class="lbl fill">Lot N°</td><td class="val fill"><strong>${numeroLot || '—'}</strong></td></tr>
+          <tr><td class="lbl fill">Lot N°</td><td class="val fill"><strong>${numeroLot || "—"}</strong></td></tr>
           <tr><td class="lbl">Superficie</td><td class="val">${superficie} m²</td></tr>
-          <tr><td class="lbl">Quartier</td><td class="val">${quartier || '—'}</td></tr>
-          <tr><td class="lbl">Lotissement</td><td class="val">${lotissement || '—'}</td></tr>
+          <tr><td class="lbl">Quartier</td><td class="val">${quartier || "—"}</td></tr>
+          <tr><td class="lbl">Lotissement</td><td class="val">${lotissement || "—"}</td></tr>
           <tr><td class="lbl">Village</td><td class="val">${villageNom.toUpperCase()}</td></tr>
-          <tr><td class="lbl">Mode d'acquisition</td><td class="val">${safeText(data.mode_acquisition) || '—'}</td></tr>
+          <tr><td class="lbl">Mode d'acquisition</td><td class="val">${safeText(data.mode_acquisition) || "—"}</td></tr>
         </table>
       </div>
 
       <!-- CESSION (si applicable) — 12 col -->
-      ${isCession ? `
+      ${
+        isCession
+          ? `
       <div class="section-card col-12">
         <div class="section-head">
           <span class="section-num">II.</span>
@@ -820,29 +856,31 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
         <table class="dtable">
           <tr>
             <td class="lbl fill" style="width:20%;">Cédant</td>
-            <td class="val fill"><strong>${cedantPrenom} ${cedantNom}</strong>${cedantCni ? ' &mdash; CNI&nbsp;' + cedantCni : ''}</td>
+            <td class="val fill"><strong>${cedantPrenom} ${cedantNom}</strong>${cedantCni ? " &mdash; CNI&nbsp;" + cedantCni : ""}</td>
             <td class="lbl" style="width:20%;">Date de cession</td>
-            <td class="val">${dateCession || '—'}</td>
+            <td class="val">${dateCession || "—"}</td>
           </tr>
         </table>
-      </div>` : ''}
+      </div>`
+          : ""
+      }
 
     </div><!-- fin .sections-wrap -->
 
     <!-- CODE-BARRES pleine largeur -->
-    ${barcodeSvg ? `<div class="barcode-wrap" style="margin:5px 0;">${barcodeSvg}</div>` : ''}
+    ${barcodeSvg ? `<div class="barcode-wrap" style="margin:5px 0;">${barcodeSvg}</div>` : ""}
 
     <!-- ══ BAS DE PAGE : VISA + SÉCURITÉ ══ -->
     <div class="footer-row">
       <div class="sig-box">
         <div class="sig-box-title">Chef Coutumier du Village</div>
-        <div class="sig-box-name">${chefNom || '—'}</div>
+        <div class="sig-box-name">${chefNom || "—"}</div>
         <div class="sig-box-line">Signature &amp; Sceau</div>
       </div>
       <div class="security-box">
-        ${qrDataUrl ? `<div class="sec-qr"><img src="${qrDataUrl}" alt="Code de vérification"/></div>` : ''}
-        ${controlNumber ? `<div class="sec-ctrl">N° ${controlNumber}</div>` : ''}
-        ${hashSha256 ? `<div class="sec-hash">${hashSha256.substring(0, 32)}</div>` : ''}
+        ${qrDataUrl ? `<div class="sec-qr"><img src="${qrDataUrl}" alt="Code de vérification"/></div>` : ""}
+        ${controlNumber ? `<div class="sec-ctrl">N° ${controlNumber}</div>` : ""}
+        ${hashSha256 ? `<div class="sec-hash">${hashSha256.substring(0, 32)}</div>` : ""}
       </div>
     </div>
 
@@ -855,7 +893,7 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
       </div>
       <div class="footer-date">
         Délivré à ${safeText(data.lieu_signature) || villageNom.toUpperCase()}<br>
-        le ${safeText(data.date_etablissement) || '22/05/2026 — 07:30'}
+        le ${safeText(data.date_etablissement) || "22/05/2026 — 07:30"}
       </div>
     </div>
 
@@ -867,18 +905,28 @@ function buildAttestationCoutumiereHTML(data: AttestationCoutumiereData): string
   return html;
 }
 
-
-export async function printAttestationCoutumiere(data: AttestationCoutumiereData) {
-  console.log('[PRINT] village_logo_url reçu:', data.village_logo_url || '(vide)');
-  console.log('[PRINT] logoUrl reçu:', data.logoUrl || '(vide)');
+export async function printAttestationCoutumiere(
+  data: AttestationCoutumiereData,
+) {
+  console.log(
+    "[PRINT] village_logo_url reçu:",
+    data.village_logo_url || "(vide)",
+  );
+  console.log("[PRINT] logoUrl reçu:", data.logoUrl || "(vide)");
   const resolved = { ...data };
   if (resolved.village_logo_url) {
     resolved.village_logo_url = await fetchAsDataUrl(resolved.village_logo_url);
-    console.log('[PRINT] village_logo_url après fetch:', resolved.village_logo_url?.substring(0, 60));
+    console.log(
+      "[PRINT] village_logo_url après fetch:",
+      resolved.village_logo_url?.substring(0, 60),
+    );
   }
   if (resolved.logoUrl) {
     resolved.logoUrl = await fetchAsDataUrl(resolved.logoUrl);
-    console.log('[PRINT] logoUrl après fetch:', resolved.logoUrl?.substring(0, 60));
+    console.log(
+      "[PRINT] logoUrl après fetch:",
+      resolved.logoUrl?.substring(0, 60),
+    );
   }
   const html = buildAttestationCoutumiereHTML(resolved);
   openPrintWindow(html);
@@ -890,19 +938,31 @@ export async function printAttestationCoutumiere(data: AttestationCoutumiereData
  * À imprimer séparément, au besoin, si les données existent.
  */
 export async function printAttestationAnnex(data: AttestationCoutumiereData) {
-  const hasLimites = data.limites && (data.limites.nord || data.limites.sud || data.limites.est || data.limites.ouest);
-  const hasGps = data.coordonnees_gps && (data.coordonnees_gps.lat != null || data.coordonnees_gps.lng != null);
+  const hasLimites =
+    data.limites &&
+    (data.limites.nord ||
+      data.limites.sud ||
+      data.limites.est ||
+      data.limites.ouest);
+  const hasGps =
+    data.coordonnees_gps &&
+    (data.coordonnees_gps.lat != null || data.coordonnees_gps.lng != null);
   const hasGpsPoints = data.gps_points && data.gps_points.length > 0;
-  const temoins = (data.temoins || []).filter(t => t.nom || t.prenom);
+  const temoins = (data.temoins || []).filter((t) => t.nom || t.prenom);
   const hasTemoins = temoins.length > 0;
 
   if (!hasLimites && !hasGps && !hasGpsPoints && !hasTemoins) {
-    alert('Aucune donnée technique (GPS, limites, témoins) disponible pour cette attestation.');
+    alert(
+      "Aucune donnée technique (GPS, limites, témoins) disponible pour cette attestation.",
+    );
     return;
   }
 
   if (data.village_logo_url) {
-    data = { ...data, village_logo_url: await fetchAsDataUrl(data.village_logo_url) };
+    data = {
+      ...data,
+      village_logo_url: await fetchAsDataUrl(data.village_logo_url),
+    };
   }
   if (data.logoUrl) {
     data = { ...data, logoUrl: await fetchAsDataUrl(data.logoUrl) };
@@ -913,13 +973,17 @@ export async function printAttestationAnnex(data: AttestationCoutumiereData) {
   const proprietairePrenom = safeUpper(data.proprietaire_prenom);
   const proprietaireNom = safeUpper(data.proprietaire_nom);
   const villageRaw = safeText(data.village);
-  const villageNom = villageRaw.replace(/^(VILLAGE\s+DE\s+|VILLAGE\s+)/i, '').trim();
+  const villageNom = villageRaw
+    .replace(/^(VILLAGE\s+DE\s+|VILLAGE\s+)/i, "")
+    .trim();
   const numeroLot = safeText(data.numero_lot);
   const lotissement = safeText(data.lotissement);
-  const superficieM2 = Number.isFinite(data.superficie_m2) ? data.superficie_m2 : 0;
+  const superficieM2 = Number.isFinite(data.superficie_m2)
+    ? data.superficie_m2
+    : 0;
   const dateEtablissement = safeText(data.date_etablissement);
 
-  const limites = data.limites || { nord: '', sud: '', est: '', ouest: '' };
+  const limites = data.limites || { nord: "", sud: "", est: "", ouest: "" };
   const gps = data.coordonnees_gps;
 
   const html = `<!DOCTYPE html>
@@ -1022,28 +1086,38 @@ export async function printAttestationAnnex(data: AttestationCoutumiereData) {
   </div>
 
   <!-- LIMITES -->
-  ${hasLimites ? `
+  ${
+    hasLimites
+      ? `
   <div class="section">
     <div class="section-title">Limites de la parcelle</div>
-    ${limites.nord ? `<div class="field-row"><span class="field-label">Nord :</span><span class="field-value">${safeText(limites.nord)}</span></div>` : ''}
-    ${limites.sud ? `<div class="field-row"><span class="field-label">Sud :</span><span class="field-value">${safeText(limites.sud)}</span></div>` : ''}
-    ${limites.est ? `<div class="field-row"><span class="field-label">Est :</span><span class="field-value">${safeText(limites.est)}</span></div>` : ''}
-    ${limites.ouest ? `<div class="field-row"><span class="field-label">Ouest :</span><span class="field-value">${safeText(limites.ouest)}</span></div>` : ''}
+    ${limites.nord ? `<div class="field-row"><span class="field-label">Nord :</span><span class="field-value">${safeText(limites.nord)}</span></div>` : ""}
+    ${limites.sud ? `<div class="field-row"><span class="field-label">Sud :</span><span class="field-value">${safeText(limites.sud)}</span></div>` : ""}
+    ${limites.est ? `<div class="field-row"><span class="field-label">Est :</span><span class="field-value">${safeText(limites.est)}</span></div>` : ""}
+    ${limites.ouest ? `<div class="field-row"><span class="field-label">Ouest :</span><span class="field-value">${safeText(limites.ouest)}</span></div>` : ""}
   </div>
-  ` : ''}
+  `
+      : ""
+  }
 
   <!-- COORDONNÉES GPS -->
-  ${hasGps ? `
+  ${
+    hasGps
+      ? `
   <div class="section">
     <div class="section-title">Coordonnées GPS centrales</div>
-    <div class="field-row"><span class="field-label">Latitude :</span><span class="field-value">${gps?.lat ?? '—'}</span></div>
-    <div class="field-row"><span class="field-label">Longitude :</span><span class="field-value">${gps?.lng ?? '—'}</span></div>
-    ${gps?.precision ? `<div class="field-row"><span class="field-label">Précision :</span><span class="field-value">${gps.precision} m</span></div>` : ''}
+    <div class="field-row"><span class="field-label">Latitude :</span><span class="field-value">${gps?.lat ?? "—"}</span></div>
+    <div class="field-row"><span class="field-label">Longitude :</span><span class="field-value">${gps?.lng ?? "—"}</span></div>
+    ${gps?.precision ? `<div class="field-row"><span class="field-label">Précision :</span><span class="field-value">${gps.precision} m</span></div>` : ""}
   </div>
-  ` : ''}
+  `
+      : ""
+  }
 
   <!-- GPS DES LIMITES -->
-  ${hasGpsPoints ? `
+  ${
+    hasGpsPoints
+      ? `
   <div class="section">
     <div class="section-title">Coordonnées GPS des sommets</div>
     <table>
@@ -1051,29 +1125,41 @@ export async function printAttestationAnnex(data: AttestationCoutumiereData) {
         <tr><th>Point</th><th>Latitude</th><th>Longitude</th></tr>
       </thead>
       <tbody>
-        ${(data.gps_points || []).map((p, i) => `
+        ${(data.gps_points || [])
+          .map(
+            (p, i) => `
           <tr>
             <td>${safeText(p.label || `Point ${i + 1}`)}</td>
             <td>${p.lat}</td>
             <td>${p.lng}</td>
           </tr>
-        `).join('')}
+        `,
+          )
+          .join("")}
       </tbody>
     </table>
   </div>
-  ` : ''}
+  `
+      : ""
+  }
 
   <!-- PRIX DE CESSION (confidentiel — uniquement en annexe) -->
-  ${typeof data.prix_cession === 'number' && data.prix_cession > 0 ? `
+  ${
+    typeof data.prix_cession === "number" && data.prix_cession > 0
+      ? `
   <div class="section">
     <div class="section-title">Prix de cession (confidentiel)</div>
-    <div class="field-row"><span class="field-label">Montant :</span><span class="field-value">${data.prix_cession.toLocaleString('fr-FR')} FCFA</span></div>
+    <div class="field-row"><span class="field-label">Montant :</span><span class="field-value">${data.prix_cession.toLocaleString("fr-FR")} FCFA</span></div>
     <div class="text" style="font-size:7.5pt;color:#999;font-style:italic;margin-top:4px;">Ce montant est strictement confidentiel et ne figure pas sur l'attestation officielle.</div>
   </div>
-  ` : ''}
+  `
+      : ""
+  }
 
   <!-- TÉMOINS -->
-  ${hasTemoins ? `
+  ${
+    hasTemoins
+      ? `
   <div class="section">
     <div class="section-title">Témoins (${temoins.length})</div>
     <table>
@@ -1081,24 +1167,30 @@ export async function printAttestationAnnex(data: AttestationCoutumiereData) {
         <tr><th>#</th><th>Nom & Prénoms</th><th>Profession</th><th>Téléphone</th><th>CNI</th></tr>
       </thead>
       <tbody>
-        ${temoins.map((t, i) => `
+        ${temoins
+          .map(
+            (t, i) => `
           <tr>
             <td>${i + 1}</td>
             <td>${safeUpper(t.prenom)} ${safeUpper(t.nom)}</td>
-            <td>${safeText(t.profession || '—')}</td>
-            <td>${safeText(t.telephone || '—')}</td>
-            <td>${safeText(t.cni || '—')}</td>
+            <td>${safeText(t.profession || "—")}</td>
+            <td>${safeText(t.telephone || "—")}</td>
+            <td>${safeText(t.cni || "—")}</td>
           </tr>
-        `).join('')}
+        `,
+          )
+          .join("")}
       </tbody>
     </table>
   </div>
-  ` : ''}
+  `
+      : ""
+  }
 
   <div class="notice">
     Cette annexe technique est un document complémentaire à l'attestation officielle.
     Elle ne peut pas être utilisée seule comme preuve de propriété coutumière.
-    Générée le ${new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })} à ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}.
+    Générée le ${new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })} à ${new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}.
   </div>
 
 </div>
@@ -1110,8 +1202,10 @@ export async function printAttestationAnnex(data: AttestationCoutumiereData) {
 
 export function printQuittance(data: QuittanceData) {
   const modeLabels: Record<string, string> = {
-    virement: 'Virement bancaire', especes: 'Espèces',
-    mobile_money: 'Mobile Money', cheque: 'Chèque',
+    virement: "Virement bancaire",
+    especes: "Espèces",
+    mobile_money: "Mobile Money",
+    cheque: "Chèque",
   };
   const reference = safeText(data.reference);
   const appName = safeText(data.appName);
@@ -1121,10 +1215,12 @@ export function printQuittance(data: QuittanceData) {
   const locataireNom = safeText(data.locataire_nom);
   const bienAdresse = safeText(data.bien_adresse);
   const moisConcerne = safeText(data.mois_concerne);
-  const modePaiement = safeText(modeLabels[data.mode_paiement] || data.mode_paiement);
+  const modePaiement = safeText(
+    modeLabels[data.mode_paiement] || data.mode_paiement,
+  );
   const datePaiement = safeText(data.date_paiement);
   const montantValue = Number.isFinite(data.montant) ? data.montant : 0;
-  const montantLabel = safeText(montantValue.toLocaleString('fr-FR'));
+  const montantLabel = safeText(montantValue.toLocaleString("fr-FR"));
 
   const html = `<!DOCTYPE html>
 <html lang="fr">
@@ -1220,8 +1316,10 @@ export function printQuittance(data: QuittanceData) {
 
 export function printRecuLoyer(data: QuittanceData) {
   const modeLabels: Record<string, string> = {
-    virement: 'Virement bancaire', especes: 'Espèces',
-    mobile_money: 'Mobile Money', cheque: 'Chèque',
+    virement: "Virement bancaire",
+    especes: "Espèces",
+    mobile_money: "Mobile Money",
+    cheque: "Chèque",
   };
   const reference = safeText(data.reference);
   const appName = safeText(data.appName);
@@ -1231,10 +1329,12 @@ export function printRecuLoyer(data: QuittanceData) {
   const locataireNom = safeText(data.locataire_nom);
   const bienAdresse = safeText(data.bien_adresse);
   const moisConcerne = safeText(data.mois_concerne);
-  const modePaiement = safeText(modeLabels[data.mode_paiement] || data.mode_paiement);
+  const modePaiement = safeText(
+    modeLabels[data.mode_paiement] || data.mode_paiement,
+  );
   const datePaiement = safeText(data.date_paiement);
   const montantValue = Number.isFinite(data.montant) ? data.montant : 0;
-  const montantLabel = safeText(montantValue.toLocaleString('fr-FR'));
+  const montantLabel = safeText(montantValue.toLocaleString("fr-FR"));
 
   const html = `<!DOCTYPE html>
 <html lang="fr">
@@ -1325,8 +1425,10 @@ export function printRecuLoyer(data: QuittanceData) {
 
 export function printRecu(data: RecuData) {
   const modeLabels: Record<string, string> = {
-    virement: 'Virement bancaire', especes: 'Espèces',
-    mobile_money: 'Mobile Money', cheque: 'Chèque',
+    virement: "Virement bancaire",
+    especes: "Espèces",
+    mobile_money: "Mobile Money",
+    cheque: "Chèque",
   };
   const reference = safeText(data.reference);
   const appName = safeText(data.appName);
@@ -1336,9 +1438,11 @@ export function printRecu(data: RecuData) {
   const clientNom = safeText(data.client_nom);
   const description = safeText(data.description || data.categorie);
   const categorie = safeText(data.categorie);
-  const modePaiement = safeText(modeLabels[data.mode_paiement] || data.mode_paiement);
+  const modePaiement = safeText(
+    modeLabels[data.mode_paiement] || data.mode_paiement,
+  );
   const montantValue = Number.isFinite(data.montant) ? data.montant : 0;
-  const montantLabel = safeText(montantValue.toLocaleString('fr-FR'));
+  const montantLabel = safeText(montantValue.toLocaleString("fr-FR"));
 
   const html = `<!DOCTYPE html>
 <html lang="fr">
@@ -1413,7 +1517,7 @@ export function printAuditReport(data: AuditReportData) {
   const title = safeText(data.title);
   const generatedAt = safeText(data.generated_at);
   const logoUrl = safeUrl(data.logoUrl);
-  const rows = (data.rows || []).map(row => ({
+  const rows = (data.rows || []).map((row) => ({
     date: safeText(row.date_action),
     action: safeText(row.action),
     user: safeText(row.utilisateur_nom),
@@ -1446,7 +1550,7 @@ export function printAuditReport(data: AuditReportData) {
         <div class="title">${title}</div>
         <div class="meta">Généré le ${generatedAt}</div>
       </div>
-      ${logoUrl ? `<img src="${logoUrl}" style="width:50px;height:50px;object-fit:contain;" />` : ''}
+      ${logoUrl ? `<img src="${logoUrl}" style="width:50px;height:50px;object-fit:contain;" />` : ""}
     </div>
     <table>
       <thead>
@@ -1460,7 +1564,9 @@ export function printAuditReport(data: AuditReportData) {
         </tr>
       </thead>
       <tbody>
-        ${rows.map(row => `
+        ${rows
+          .map(
+            (row) => `
           <tr>
             <td>${row.date}</td>
             <td>${row.action}</td>
@@ -1469,7 +1575,9 @@ export function printAuditReport(data: AuditReportData) {
             <td>${row.village}</td>
             <td>${row.details}</td>
           </tr>
-        `).join('')}
+        `,
+          )
+          .join("")}
       </tbody>
     </table>
   </div>
@@ -1480,24 +1588,34 @@ export function printAuditReport(data: AuditReportData) {
 }
 
 function sanitizePrintHtml(html: string): string {
-  if (typeof window === 'undefined') return html;
+  if (typeof window === "undefined") return html;
   try {
     return DOMPurify.sanitize(html, {
       WHOLE_DOCUMENT: true,
       FORCE_BODY: false,
-      ADD_TAGS: ['style', 'link', 'meta', 'title', 'head', 'body', 'html'],
-      FORBID_TAGS: ['script'],
-      FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur'],
+      ADD_TAGS: ["style", "link", "meta", "title", "head", "body", "html"],
+      FORBID_TAGS: ["script"],
+      FORBID_ATTR: [
+        "onerror",
+        "onload",
+        "onclick",
+        "onmouseover",
+        "onfocus",
+        "onblur",
+      ],
     });
   } catch {
-    return html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+    return html.replace(
+      /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
+      "",
+    );
   }
 }
 
 function openPrintWindow(html: string) {
-  const win = window.open('', '_blank', 'width=900,height=700');
+  const win = window.open("", "_blank", "width=900,height=700");
   if (!win) {
-    alert('Veuillez autoriser les fenêtres popup pour imprimer.');
+    alert("Veuillez autoriser les fenêtres popup pour imprimer.");
     return;
   }
   const safeHtml = sanitizePrintHtml(html);
@@ -1508,4 +1626,3 @@ function openPrintWindow(html: string) {
     win.print();
   }, 800);
 }
-

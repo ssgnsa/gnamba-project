@@ -12,7 +12,8 @@ import {
   Download,
   X,
 } from "lucide-react";
-import { supabase } from "../lib/supabase";
+import dbClient from "../data/tableClient";
+import { clientsRepository } from "../data/clients.repository";
 import { Finance, Client, Project } from "../types";
 import Modal from "../components/ui/Modal";
 import Badge from "../components/ui/Badge";
@@ -83,18 +84,21 @@ export default function Finances() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const [finRes, cliRes, projRes] = await Promise.all([
-      supabase
-        .from("finances")
-        .select("*, clients(nom, prenom)")
-        .order("date_transaction", { ascending: false }),
-      supabase.from("clients").select("id, nom, prenom").order("nom"),
-      supabase.from("projects").select("id, nom").order("nom"),
-    ]);
-    setTransactions(finRes.data || []);
-    setClients((cliRes.data as Client[]) || []);
-    setProjects((projRes.data as Project[]) || []);
-    setLoading(false);
+    try {
+      const [finRes, cliRes, projRes] = await Promise.all([
+        dbClient
+          .from("finances")
+          .select("*, clients(nom, prenom)")
+          .order("date_transaction", { ascending: false }),
+        clientsRepository.getAll({ limit: 1000 }),
+        dbClient.from("projects").select("id, nom").order("nom"),
+      ]);
+      setTransactions(finRes.data || []);
+      setClients((cliRes.data?.items as Client[]) || []);
+      setProjects((projRes.data as Project[]) || []);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -154,13 +158,13 @@ export default function Finances() {
 
     try {
       if (editingId) {
-        const { error } = await supabase
+        const { error } = await dbClient
           .from("finances")
           .update(payload)
           .eq("id", editingId);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("finances").insert(payload);
+        const { error } = await dbClient.from("finances").insert(payload);
         if (error) throw error;
       }
 
@@ -181,8 +185,11 @@ export default function Finances() {
       return;
     }
     if (!confirm("Supprimer cette transaction ?")) return;
-    const { error } = await supabase.from("finances").delete().eq("id", id);
-    if (error) { setFormError(error.message); return; }
+    const { error } = await dbClient.from("finances").delete().eq("id", id);
+    if (error) {
+      setFormError(error.message);
+      return;
+    }
     fetchData();
   };
 

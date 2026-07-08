@@ -26,7 +26,7 @@
 - Les fonctions Supabase Edge `attestation-sign`, `attestation-verify` et `verify-turnstile` ont ete publiees le 2026-06-05 apres correction CORS/runtime.
 - Le secret serveur `CLOUDFLARE_TURNSTILE_SECRET_KEY` est configure cote Supabase; `verify-turnstile` retourne maintenant `400 Missing token` sur un appel vide au lieu de `500`.
 - Les warnings Nginx `listen ... http2` deprecation ont ete supprimes dans les configs proxy en utilisant `http2 on;`.
-- Le monitoring `scripts/gnamba-monitor.sh` est aligne sur cloud-prod: conteneurs `egs-*`, Supabase Cloud Auth health, tables REST critiques et sauvegardes non vides.
+- Le monitoring `scripts/gnamba-monitor.sh` est aligne sur le flux local expose via tunnel: conteneurs `egs-*`, Supabase local auth health, tables REST critiques et sauvegardes non vides.
 - Une sauvegarde REST Supabase Cloud fraiche a ete creee: `backups/supabase/20260605_210007_rest/supabase_backup_20260605_210007.json.gz`.
 
 ---
@@ -82,7 +82,7 @@ Les anciens assets critiques retournes par les navigateurs en cache repondent ma
 
 Le test `https://gnambaservices.ci/filebrowser/health` retourne `200` avec `{"status":"OK"}`.
 
-Le monitoring production retourne `6/6` checks reussis. Les anciens faux positifs `localhost:54321`, `filebrowser` sans prefixe et backups vides ont ete corriges. Le statut Git reste un warning attendu pendant cette session de maintenance, sans alerte critique tant que le seuil configure n'est pas depasse.
+Le monitoring de production locale retourne `6/6` checks reussis. Les anciens faux positifs `localhost:54321`, `filebrowser` sans prefixe et backups vides ont ete corriges. Le statut Git reste un warning attendu pendant cette session de maintenance, sans alerte critique tant que le seuil configure n'est pas depasse.
 
 Les tests live non destructifs des fonctions Supabase Edge retournent les erreurs attendues:
 

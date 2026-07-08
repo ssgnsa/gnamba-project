@@ -19,15 +19,18 @@ import {
   FolderOpen,
   Folder,
 } from "lucide-react";
-import { supabase } from "../lib/supabase";
+import dbClient from "../data/tableClient";
+import { clientsRepository } from "../data/clients.repository";
 import { Document, Client, Project } from "../types";
 import Modal from "../components/ui/Modal";
 import Badge from "../components/ui/Badge";
 import { useSettings } from "../context/SettingsContext";
-import { useAuth } from "../context/AuthContext";
+import { resolveAccessLevel, useAuth } from "../context/AuthContext";
 import FileBrowserIntegration from "../components/filebrowser/FileBrowserIntegration";
 import DocumentForm from "../components/documents/DocumentForm";
 import { FILEBROWSER_BASE_URL } from "../lib/filebrowserConfig";
+import { apiClient } from "../api/client";
+import { isSelfHostedMode } from "../lib/selfHosted";
 
 const typeConfig: Record<
   string,
@@ -66,11 +69,6 @@ const getDocumentHref = (rawValue: string) => {
     return value;
   }
 
-  // URL Supabase Storage
-  if (value.includes("supabase.co/storage/v1/object/public/")) {
-    return value;
-  }
-
   // Chemin fichier local (\\\\ ou file://)
   if (/^\\\\/.test(value)) {
     return `file://${encodeURI(value.replace(/^\\\\+/, "").replace(/\\/g, "/"))}`;
@@ -90,6 +88,7 @@ const getDocumentHref = (rawValue: string) => {
 export default function Documents() {
   const { settings } = useSettings();
   const { profile, user } = useAuth();
+  const accessLevel = resolveAccessLevel(profile?.role, profile?.access_level);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -120,7 +119,7 @@ export default function Documents() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const urlInputRef = useRef<HTMLInputElement>(null);
   const fileBrowserUrl = FILEBROWSER_BASE_URL;
-  
+
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -129,22 +128,23 @@ export default function Documents() {
   const canEdit =
     profile?.role === "admin" ||
     profile?.role === "gestionnaire" ||
-    profile?.access_level === "admin" ||
-    profile?.access_level === "gerant" ||
-    profile?.access_level === "secretaire";
+    accessLevel === "admin" ||
+    accessLevel === "gerant" ||
+    accessLevel === "gestionnaire" ||
+    accessLevel === "secretaire";
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     const [docRes, cliRes, projRes] = await Promise.all([
-      supabase
+      dbClient
         .from("documents")
         .select("*, clients(nom, prenom), projects(nom)")
         .order("created_at", { ascending: false }),
-      supabase.from("clients").select("id, nom, prenom").order("nom"),
-      supabase.from("projects").select("id, nom").order("nom"),
+      clientsRepository.getAll({ limit: 1000 }),
+      dbClient.from("projects").select("id, nom").order("nom"),
     ]);
     setDocuments(docRes.data || []);
-    setClients((cliRes.data as Client[]) || []);
+    setClients((cliRes.data?.items as Client[]) || []);
     setProjects((projRes.data as Project[]) || []);
     setLoading(false);
   }, []);
@@ -347,8 +347,25 @@ export default function Documents() {
     setFilePickerOpen(true);
 
     try {
+      if (isSelfHostedMode()) {
+        const result = await apiClient.media.getAll();
+        if (result.error) throw new Error(result.error);
+
+        const files = (result.data || [])
+          .filter((file) => file.category === "documents" && !file.deleted_at)
+          .map((file) => ({
+            name: file.original_name,
+            url: file.url,
+            size: file.size || 0,
+            created_at: file.upload_date || "",
+          }));
+
+        setStorageFiles(files);
+        return;
+      }
+
       // Récupérer les fichiers du bucket documents
-      const { data, error } = await supabase.storage
+      const { data, error } = await dbClient.storage
         .from("documents")
         .list("", {
           limit: 100,
@@ -359,9 +376,13 @@ export default function Documents() {
       if (error) throw error;
 
       // Transformer les données
-      const files = (data || []).map((file) => ({
+      const files = ((data || []) as Array<{
+        name: string;
+        metadata?: { size?: number };
+        created_at?: string;
+      }>).map((file) => ({
         name: file.name,
-        url: supabase.storage.from("documents").getPublicUrl(file.name).data
+        url: dbClient.storage.from("documents").getPublicUrl(file.name).data
           .publicUrl,
         size: file.metadata?.size || 0,
         created_at: file.created_at || "",
@@ -422,12 +443,26 @@ export default function Documents() {
       setUploadProgress(0);
 
       try {
+        if (isSelfHostedMode()) {
+          const result = await apiClient.media.upload(file, {
+            category: "documents",
+          });
+          if (result.error || !result.data)
+            throw new Error(result.error || "Échec de l'upload");
+          setUploadProgress(100);
+          setForm((prev) => ({ ...prev, url: result.data!.url }));
+          setPageNotice("✅ Fichier uploadé avec succès");
+          setTimeout(() => setPageNotice(null), 3000);
+          openFilePicker();
+          return;
+        }
+
         // Nom unique avec timestamp
         const fileExt = file.name.split(".").pop();
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
-        // Upload vers Supabase Storage avec suivi de progression
-        const { error } = await supabase.storage
+        // Upload vers API locale Storage avec suivi de progression
+        const { error } = await dbClient.storage
           .from("documents")
           .upload(fileName, file, {
             cacheControl: "3600",
@@ -440,12 +475,12 @@ export default function Documents() {
         setUploadProgress(100);
 
         // Récupérer l'URL publique
-        const { data: urlData } = supabase.storage
+        const { data: urlData } = dbClient.storage
           .from("documents")
           .getPublicUrl(fileName);
 
         // Indexer dans media_files pour traçabilité centralisée
-        await supabase.from("media_files").insert({
+        await dbClient.from("media_files").insert({
           filename: fileName,
           original_name: file.name,
           url: urlData.publicUrl,
@@ -498,7 +533,7 @@ export default function Documents() {
 
       if (editingId) {
         // UPDATE - Modification d'un document existant
-        const { error } = await supabase
+        const { error } = await dbClient
           .from("documents")
           .update(payload)
           .eq("id", editingId);
@@ -507,7 +542,7 @@ export default function Documents() {
         setPageNotice("✅ Document modifié avec succès");
       } else {
         // INSERT - Création d'un nouveau document
-        const { error } = await supabase.from("documents").insert(payload);
+        const { error } = await dbClient.from("documents").insert(payload);
         if (error) throw error;
         setPageNotice("✅ Document créé avec succès");
       }
@@ -527,8 +562,11 @@ export default function Documents() {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Supprimer ce document ?")) return;
-    const { error } = await supabase.from("documents").delete().eq("id", id);
-    if (error) { setPageNotice(error.message); return; }
+    const { error } = await dbClient.from("documents").delete().eq("id", id);
+    if (error) {
+      setPageNotice(error.message);
+      return;
+    }
     fetchData();
   };
 
@@ -544,7 +582,7 @@ export default function Documents() {
   const totalPages = Math.ceil(filtered.length / itemsPerPage);
   const paginatedDocuments = filtered.slice(
     (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+    currentPage * itemsPerPage,
   );
 
   // Reset to page 1 when search/filter changes
@@ -803,33 +841,39 @@ export default function Documents() {
             {totalPages > 1 && (
               <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
                 <div className="text-sm text-gray-600">
-                  Affichage de {(currentPage - 1) * itemsPerPage + 1} à {Math.min(currentPage * itemsPerPage, filtered.length)} sur {filtered.length} documents
+                  Affichage de {(currentPage - 1) * itemsPerPage + 1} à{" "}
+                  {Math.min(currentPage * itemsPerPage, filtered.length)} sur{" "}
+                  {filtered.length} documents
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
                     className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     Précédent
                   </button>
                   <div className="flex items-center gap-1">
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                      <button
-                        key={page}
-                        onClick={() => setCurrentPage(page)}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                          currentPage === page
-                            ? 'bg-blue-600 text-white'
-                            : 'border border-gray-200 text-gray-600 hover:bg-gray-50'
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    ))}
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                      (page) => (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page)}
+                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                            currentPage === page
+                              ? "bg-blue-600 text-white"
+                              : "border border-gray-200 text-gray-600 hover:bg-gray-50"
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      ),
+                    )}
                   </div>
                   <button
-                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    onClick={() =>
+                      setCurrentPage((p) => Math.min(totalPages, p + 1))
+                    }
                     disabled={currentPage === totalPages}
                     className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
@@ -1081,7 +1125,8 @@ export default function Documents() {
                   Gestionnaire de Fichiers
                 </h3>
                 <p className="text-sm text-gray-500 mt-1">
-                  Accédez à vos fichiers via FileBrowser avec authentification EGS
+                  Accédez à vos fichiers via FileBrowser avec authentification
+                  EGS
                 </p>
               </div>
               <div className="flex gap-2">
@@ -1090,7 +1135,11 @@ export default function Documents() {
                   disabled={!fileBrowserUrl}
                   onClick={() => {
                     if (!fileBrowserUrl) return;
-                    window.open(fileBrowserUrl, "_blank", "noopener,noreferrer");
+                    window.open(
+                      fileBrowserUrl,
+                      "_blank",
+                      "noopener,noreferrer",
+                    );
                   }}
                   className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white hover:opacity-90 transition-opacity disabled:opacity-50"
                   style={{
@@ -1112,7 +1161,8 @@ export default function Documents() {
               <div className="p-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-xs">
                 Renseignez{" "}
                 <code className="font-mono">VITE_FILEBROWSER_URL</code> dans{" "}
-                <code className="font-mono">.env</code> pour activer FileBrowser.
+                <code className="font-mono">.env</code> pour activer
+                FileBrowser.
               </div>
             )}
           </div>

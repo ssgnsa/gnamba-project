@@ -32,7 +32,8 @@ import {
   ExternalLink,
   Trash2,
 } from "lucide-react";
-import { supabase } from "../lib/supabase";
+import dbClient from "../data/tableClient";
+import { apiClient } from "../api/client";
 import { useSettings } from "../context/SettingsContext";
 import { useAuth } from "../context/AuthContext";
 import BrandAssetsManager from "../components/media/BrandAssetsManager";
@@ -218,7 +219,12 @@ function ContrastWarning({ primaryColor }: { primaryColor: string }) {
 // ============================================
 
 export default function Parametres() {
-  const { settings, refreshSettings, updateSettings } = useSettings();
+  const {
+    settings,
+    refreshSettings,
+    updateSettings,
+    error: settingsError,
+  } = useSettings();
   const { user, profile } = useAuth();
   const destructiveActionsDisabled = shouldBlockDestructiveAction(
     user,
@@ -228,9 +234,17 @@ export default function Parametres() {
   const [form, setForm] = useState(settings);
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [loadingAudit, setLoadingAudit] = useState(false);
+  const [releaseInfo, setReleaseInfo] = useState<{
+    git_commit?: string;
+    branch?: string;
+    build_date?: string;
+    build_hash?: string;
+    environment?: string;
+  } | null>(null);
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>(
     [],
   );
@@ -310,9 +324,24 @@ export default function Parametres() {
     }
   }, [activeTab]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const loadReleaseInfo = async () => {
+      const result = await apiClient.version.get();
+      if (!cancelled && !result.error && result.data) {
+        setReleaseInfo(result.data);
+      }
+    };
+
+    void loadReleaseInfo();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const loadAuditLogs = useCallback(async () => {
     setLoadingAudit(true);
-    const { data, error } = await supabase
+    const { data, error } = await dbClient
       .from("settings_audit")
       .select(
         `
@@ -366,6 +395,7 @@ export default function Parametres() {
     }
 
     setSaving(true);
+    setSaveError(null);
     try {
       const updates: Partial<BrandSettings> = {};
       changedKeys.forEach((key) => {
@@ -377,6 +407,9 @@ export default function Parametres() {
       setShowValidationWarnings(false);
       setValidationErrors([]);
     } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Erreur inconnue";
+      setSaveError(`Échec de la sauvegarde: ${message}`);
       if (import.meta.env.DEV)
         console.error("Erreur lors de la sauvegarde:", error);
     } finally {
@@ -551,12 +584,39 @@ export default function Parametres() {
         </div>
       </div>
 
+      {releaseInfo && (
+        <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="font-medium text-gray-700">Release EGS</span>
+            <span className="font-mono text-xs text-gray-500">
+              {releaseInfo.git_commit?.slice(0, 12) ?? "unknown"}
+            </span>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-3 text-xs text-gray-500">
+            <span>Branche: {releaseInfo.branch ?? "unknown"}</span>
+            <span>
+              Build: {releaseInfo.build_hash?.slice(0, 12) ?? "unknown"}
+            </span>
+            <span>Environnement: {releaseInfo.environment ?? "unknown"}</span>
+          </div>
+        </div>
+      )}
+
       {/* Notification de succès */}
       {saved && (
         <div className="flex items-center gap-2 p-4 bg-green-50 border border-green-200 rounded-xl text-green-700">
           <CheckCircle size={16} />
           <span className="text-sm font-medium">
             Paramètres sauvegardés avec succès !
+          </span>
+        </div>
+      )}
+
+      {(saveError || settingsError) && (
+        <div className="flex items-start gap-2 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700">
+          <AlertTriangle size={16} className="mt-0.5" />
+          <span className="text-sm font-medium">
+            {saveError || settingsError}
           </span>
         </div>
       )}
@@ -1152,9 +1212,7 @@ export default function Parametres() {
                     }`}
                   />
                   {getError(key) && (
-                    <p className="text-xs text-red-600 mt-1">
-                      {getError(key)}
-                    </p>
+                    <p className="text-xs text-red-600 mt-1">{getError(key)}</p>
                   )}
                   {key === "social_youtube" && (
                     <p className="mt-1 text-xs text-gray-400">

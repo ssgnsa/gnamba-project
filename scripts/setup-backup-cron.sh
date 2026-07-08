@@ -55,7 +55,7 @@ log "Log file ready: ${LOG_FILE}"
 # Setup cron job
 # ============================================
 cat > "$CRON_FILE" << EOF
-# EGS Supabase Cloud Backup Schedule
+# EGS Supabase distant Backup Schedule
 # Daily backup at 02:00 AM
 0 2 * * * ${CURRENT_USER} ${BACKUP_SCRIPT} >> ${LOG_FILE} 2>&1
 EOF

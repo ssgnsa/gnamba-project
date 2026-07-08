@@ -13,7 +13,7 @@ const WOPI_SECRET = process.env.WOPI_JWT_SECRET || "change-me";
 const WOPI_API_KEY = process.env.WOPI_API_KEY || "change-me";
 const WOPI_DOC_ROOT = process.env.WOPI_DOC_ROOT || "/srv/egs-docs";
 const WOPI_BASE_URL = process.env.WOPI_BASE_URL || "http://localhost:3000";
-const COLLABORA_URL = process.env.COLLABORA_URL || "https://office.gnambaservices.ci";
+const COLLABORA_URL = process.env.COLLABORA_URL || "http://127.0.0.1:9980";
 const LOCK_DIR = path.join(WOPI_DOC_ROOT, ".wopi-locks");
 
 app.use(morgan("combined"));

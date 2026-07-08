@@ -17,6 +17,11 @@ import { PUBLIC_PAGE_PATHS } from "../../lib/publicRoutes";
 import { useSiteContent } from "../../context/SiteContentContext";
 import { useSettings } from "../../context/SettingsContext";
 import BrandLogo from "../BrandLogo";
+import {
+  OFFICIAL_CONTACT,
+  buildGoogleMapsDirectionsUrl,
+  buildWhatsAppUrl,
+} from "../../lib/officialContact";
 
 interface PublicFooterProps {
   onNavigate: (page: PublicPage) => void;
@@ -35,21 +40,20 @@ export default function PublicFooter({ onNavigate }: PublicFooterProps) {
   const copyright = get(
     "footer",
     "copyright",
-    `© ${new Date().getFullYear()} ${settings.app_company || "Gnamba Services"}. Tous droits réservés.`,
+    `© ${new Date().getFullYear()} ${OFFICIAL_CONTACT.companyName}. Tous droits réservés.`,
   );
 
   // Utiliser les paramètres de contact en priorité, sinon fallback sur site_content
-  const footerAddress =
-    settings.contact_address ||
-    get("contact", "address", "Abidjan, Côte d'Ivoire");
-  const footerPhone = settings.contact_phone || get("contact", "phone", "");
-  const footerEmail =
-    settings.contact_email ||
-    get("contact", "email", "contact@gnambaservices.ci");
-  const footerHours =
-    settings.contact_hours || get("contact", "hours", "Lun-Ven : 08h – 18h");
+  const footerAddress = OFFICIAL_CONTACT.address;
+  const footerPhone = OFFICIAL_CONTACT.phone;
+  const footerEmail = OFFICIAL_CONTACT.email;
+  const footerHours = OFFICIAL_CONTACT.hours;
+  const whatsappUrl = buildWhatsAppUrl(OFFICIAL_CONTACT.phone);
+  const mapsDirectionsUrl = buildGoogleMapsDirectionsUrl(
+    OFFICIAL_CONTACT.physicalAddress || OFFICIAL_CONTACT.address,
+  );
   const footerSignature = get("footer", "signature", "");
-  const logoInitials = (settings.app_company || "Gnamba Services")
+  const logoInitials = OFFICIAL_CONTACT.companyName
     .split(" ")
     .filter(Boolean)
     .map((word) => word[0])
@@ -128,7 +132,7 @@ export default function PublicFooter({ onNavigate }: PublicFooterProps) {
               >
                 <BrandLogo
                   tone="dark"
-                  alt={`Logo ${settings.app_company || "Gnamba Services"} - BTP Immobilier Foncier`}
+                  alt={`Logo ${OFFICIAL_CONTACT.companyName} - BTP Immobilier Foncier`}
                   className="w-full h-full object-cover"
                   fallback={
                     <span className="text-white font-bold text-sm">
@@ -139,7 +143,7 @@ export default function PublicFooter({ onNavigate }: PublicFooterProps) {
               </div>
               <div>
                 <div className="font-bold text-white text-sm">
-                  {settings.app_company || "Gnamba Services"}
+                  {OFFICIAL_CONTACT.companyName}
                 </div>
                 <div
                   className="text-xs"
@@ -176,19 +180,35 @@ export default function PublicFooter({ onNavigate }: PublicFooterProps) {
             </h4>
             <ul className="space-y-1">
               {[
-                "BTP & Construction",
-                "Gestion Immobilière",
-                "Foncier Sécurisé",
-                "Fournitures Pro",
-              ].map((s) => (
-                <li key={s}>
+                {
+                  label: "BTP & Construction",
+                  page: "btp-construction" as PublicPage,
+                  href: PUBLIC_PAGE_PATHS["btp-construction"],
+                },
+                {
+                  label: "Immobilier",
+                  page: "immobilier" as PublicPage,
+                  href: PUBLIC_PAGE_PATHS.immobilier,
+                },
+                {
+                  label: "Foncier sécurisé",
+                  page: "foncier" as PublicPage,
+                  href: PUBLIC_PAGE_PATHS.foncier,
+                },
+                {
+                  label: "Lotissement",
+                  page: "lotissement" as PublicPage,
+                  href: PUBLIC_PAGE_PATHS.lotissement,
+                },
+              ].map((item) => (
+                <li key={item.label}>
                   <a
-                    href={PUBLIC_PAGE_PATHS.services}
-                    onClick={(event) => handleLinkClick(event, "services")}
+                    href={item.href}
+                    onClick={(event) => handleLinkClick(event, item.page)}
                     className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors min-h-[44px] py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 rounded-lg"
                   >
                     <ChevronRight size={12} />
-                    {s}
+                    {item.label}
                   </a>
                 </li>
               ))}
@@ -217,9 +237,34 @@ export default function PublicFooter({ onNavigate }: PublicFooterProps) {
                   href: PUBLIC_PAGE_PATHS.realisations,
                 },
                 {
+                  label: "Témoignages",
+                  page: "temoignages" as PublicPage,
+                  href: PUBLIC_PAGE_PATHS.temoignages,
+                },
+                {
+                  label: "Blog",
+                  page: "blog" as PublicPage,
+                  href: PUBLIC_PAGE_PATHS.blog,
+                },
+                {
                   label: "Contact",
                   page: "contact" as PublicPage,
                   href: PUBLIC_PAGE_PATHS.contact,
+                },
+                {
+                  label: "Lots à vendre",
+                  page: "lots" as PublicPage,
+                  href: PUBLIC_PAGE_PATHS.lots,
+                },
+                {
+                  label: "FAQ",
+                  page: "faq" as PublicPage,
+                  href: PUBLIC_PAGE_PATHS.faq,
+                },
+                {
+                  label: "Mentions légales",
+                  page: "mentions-legales" as PublicPage,
+                  href: PUBLIC_PAGE_PATHS["mentions-legales"],
                 },
                 {
                   label: "Connexion",
@@ -254,6 +299,21 @@ export default function PublicFooter({ onNavigate }: PublicFooterProps) {
                 />
                 <span className="text-sm text-slate-400">{footerAddress}</span>
               </li>
+              <li className="flex items-start gap-2.5">
+                <MapPin
+                  size={14}
+                  className="mt-0.5 flex-shrink-0"
+                  style={{ color: primaryColor }}
+                />
+                <a
+                  href={mapsDirectionsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-slate-400 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 rounded"
+                >
+                  Ouvrir sur Google Maps
+                </a>
+              </li>
               {footerPhone && (
                 <li className="flex items-start gap-2.5">
                   <Phone
@@ -262,7 +322,7 @@ export default function PublicFooter({ onNavigate }: PublicFooterProps) {
                     style={{ color: primaryColor }}
                   />
                   <a
-                    href={`tel:${footerPhone}`}
+                    href={`tel:${footerPhone.replace(/\s+/g, "")}`}
                     className="text-sm text-slate-400 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 rounded"
                   >
                     {footerPhone}
@@ -280,6 +340,21 @@ export default function PublicFooter({ onNavigate }: PublicFooterProps) {
                   className="text-sm text-slate-400 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 rounded"
                 >
                   {footerEmail}
+                </a>
+              </li>
+              <li className="flex items-start gap-2.5">
+                <Phone
+                  size={14}
+                  className="mt-0.5 flex-shrink-0"
+                  style={{ color: primaryColor }}
+                />
+                <a
+                  href={whatsappUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-slate-400 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 rounded"
+                >
+                  WhatsApp {OFFICIAL_CONTACT.phone}
                 </a>
               </li>
               <li className="flex items-start gap-2.5">

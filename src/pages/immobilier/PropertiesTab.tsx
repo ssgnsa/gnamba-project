@@ -8,7 +8,6 @@ import {
   History,
   X,
 } from "lucide-react";
-import { supabase } from "../../lib/supabase";
 import type { Property, LeaseContract } from "../../types";
 import Modal from "../../components/ui/Modal";
 import Badge from "../../components/ui/Badge";
@@ -18,6 +17,12 @@ import {
   getDemoBlockMessage,
   shouldBlockDestructiveAction,
 } from "../../lib/demoMode";
+import {
+  type ManualSyncStatus,
+  normalizeManualStatus,
+  readManualCache,
+  writeManualCache,
+} from "../../lib/manualSyncStore";
 import {
   getTenantName,
   getPropertyStatusConfig,
@@ -35,6 +40,21 @@ const emptyForm = {
   statut: "disponible" as Property["statut"],
   description: "",
 };
+
+const PROPERTIES_CACHE_KEY = "egs.immobilier.properties.local_cache.v1";
+
+type LocalProperty = Property & {
+  sync_status: ManualSyncStatus;
+  sync_error: string | null;
+  deleted_at: string | null;
+};
+
+function sortProperties(items: LocalProperty[]): LocalProperty[] {
+  return [...items].sort(
+    (a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  );
+}
 
 interface Props {
   properties: Property[];
@@ -98,28 +118,39 @@ export default function PropertiesTab({
     setSaving(true);
     setError(null);
 
-    const payload = {
-      type_bien: form.type_bien,
-      adresse: form.adresse,
-      proprietaire: form.proprietaire.trim() || null,
-      valeur: parseFloat(form.valeur) || 0,
-      loyer_mensuel: parseFloat(form.loyer_mensuel) || 0,
-      statut: form.statut,
-      description: form.description.trim() || null,
-      updated_at: new Date().toISOString(),
-    };
-
     try {
-      if (editingId) {
-        const { error } = await supabase
-          .from("properties")
-          .update(payload)
-          .eq("id", editingId);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("properties").insert(payload);
-        if (error) throw error;
-      }
+      const now = new Date().toISOString();
+      const cached = readManualCache<LocalProperty>(PROPERTIES_CACHE_KEY).map(
+        (property) => ({
+          ...property,
+          sync_status: normalizeManualStatus(property.sync_status),
+          sync_error: property.sync_error ?? null,
+          deleted_at: property.deleted_at ?? null,
+        }),
+      );
+      const existing = cached.find((property) => property.id === editingId);
+      const localProperty: LocalProperty = {
+        ...(existing ?? {}),
+        id: existing?.id ?? crypto.randomUUID(),
+        type_bien: form.type_bien,
+        adresse: form.adresse.trim(),
+        proprietaire: form.proprietaire.trim() || null,
+        valeur: parseFloat(form.valeur) || 0,
+        loyer_mensuel: parseFloat(form.loyer_mensuel) || 0,
+        statut: form.statut,
+        description: form.description.trim() || null,
+        cover_image_url: existing?.cover_image_url ?? null,
+        created_at: existing?.created_at ?? now,
+        updated_at: now,
+        sync_status: "pending",
+        sync_error: null,
+        deleted_at: null,
+      };
+
+      const next = sortProperties(
+        cached.filter((property) => property.id !== localProperty.id).concat(localProperty),
+      );
+      writeManualCache(PROPERTIES_CACHE_KEY, next);
       setModalOpen(false);
       onRefresh();
     } catch (err: any) {
@@ -141,11 +172,27 @@ export default function PropertiesTab({
     )
       return;
     try {
-      const { error } = await supabase.from("properties").delete().eq("id", id);
-      if (error) throw error;
+      const now = new Date().toISOString();
+      const cached = readManualCache<LocalProperty>(PROPERTIES_CACHE_KEY);
+      const next = cached
+        .map((property) => {
+          if (property.id !== id) return property;
+          if (normalizeManualStatus(property.sync_status) === "pending") {
+            return null;
+          }
+          return {
+            ...property,
+            sync_status: "deleted" as const,
+            deleted_at: now,
+            updated_at: now,
+            sync_error: null,
+          };
+        })
+        .filter(Boolean) as LocalProperty[];
+      writeManualCache(PROPERTIES_CACHE_KEY, sortProperties(next));
       onRefresh();
     } catch (err: any) {
-      alert(`Erreur lors de la suppression: ${err.message}`);
+      alert(`Erreur lors de la suppression locale: ${err.message}`);
     }
   };
 

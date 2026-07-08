@@ -218,7 +218,10 @@ export const syncQueueWithConflicts = async (): Promise<{
 
     if (aPriority !== bPriority) return bPriority - aPriority;
 
-    return new Date(a.client_updated_at).getTime() - new Date(b.client_updated_at).getTime();
+    return (
+      new Date(a.client_updated_at).getTime() -
+      new Date(b.client_updated_at).getTime()
+    );
   });
 
   for (const item of items) {
@@ -265,22 +268,26 @@ export const syncQueueWithConflicts = async (): Promise<{
 /**
  * Process queue item with conflict resolution
  */
-const processQueueItemWithConflictResolution = async (item: OfflineQueueItem): Promise<void> => {
-  const { supabase } = await import("../lib/supabase");
+const processQueueItemWithConflictResolution = async (
+  item: OfflineQueueItem,
+): Promise<void> => {
+  const dbClient = (await import("../data/tableClient")).default;
 
   switch (item.op) {
     case "upsert_lot":
-      await supabase.from("foncier_lots").upsert(item.payload);
+      await dbClient.from("foncier_lots").upsert(item.payload);
       break;
     case "soft_delete_lot":
-      await supabase.rpc("soft_delete_foncier_lot", { p_lot_id: item.payload.id });
+      await dbClient.rpc("soft_delete_foncier_lot", {
+        p_lot_id: item.payload.id,
+      });
       break;
     case "restore_lot":
-      await supabase.rpc("restore_foncier_lot", { p_lot_id: item.payload.id });
+      await dbClient.rpc("restore_foncier_lot", { p_lot_id: item.payload.id });
       break;
     case "audit_log": {
       const { logFoncierAudit } = await import("../lib/foncierAudit");
-      await logFoncierAudit(supabase, item.payload);
+      await logFoncierAudit(dbClient, item.payload);
       break;
     }
     default:
@@ -293,7 +300,7 @@ const processQueueItemWithConflictResolution = async (item: OfflineQueueItem): P
  */
 const resolveConflict = async (
   item: OfflineQueueItem,
-  _error: any
+  _error: any,
 ): Promise<ConflictResolution[] | null> => {
   // This is a simplified conflict resolution
   // In a real implementation, you'd compare server vs local data
@@ -301,12 +308,14 @@ const resolveConflict = async (
 
   if (item.op === "upsert_lot") {
     // For lot updates, server version usually wins unless explicitly overridden
-    return [{
-      field: "general",
-      local_value: item.payload,
-      server_value: null, // Would need to fetch server version
-      resolution: "server",
-    }];
+    return [
+      {
+        field: "general",
+        local_value: item.payload,
+        server_value: null, // Would need to fetch server version
+        resolution: "server",
+      },
+    ];
   }
 
   return null;

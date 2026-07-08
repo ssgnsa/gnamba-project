@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Plus, Search, CreditCard as Edit, Trash2, Truck } from "lucide-react";
-import { supabase } from "../lib/supabase";
+import dbClient from "../data/tableClient";
 import { Supplier } from "../types";
 import Modal from "../components/ui/Modal";
 import Badge from "../components/ui/Badge";
@@ -44,7 +44,7 @@ export default function Fournisseurs() {
 
   const fetchSuppliers = async () => {
     setLoading(true);
-    const { data } = await supabase.from("suppliers").select("*").order("nom");
+    const { data } = await dbClient.from("suppliers").select("*").order("nom");
     setSuppliers(data || []);
     setLoading(false);
   };
@@ -81,13 +81,13 @@ export default function Fournisseurs() {
     try {
       const payload = { ...form, updated_at: new Date().toISOString() };
       if (editingId) {
-        const { error } = await supabase
+        const { error } = await dbClient
           .from("suppliers")
           .update(payload)
           .eq("id", editingId);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("suppliers").insert(payload);
+        const { error } = await dbClient.from("suppliers").insert(payload);
         if (error) throw error;
       }
       setModalOpen(false);
@@ -109,8 +109,11 @@ export default function Fournisseurs() {
       return;
     }
     if (!confirm("Supprimer ce fournisseur ?")) return;
-    const { error } = await supabase.from("suppliers").delete().eq("id", id);
-    if (error) { setFormError(error.message); return; }
+    const { error } = await dbClient.from("suppliers").delete().eq("id", id);
+    if (error) {
+      setFormError(error.message);
+      return;
+    }
     fetchSuppliers();
   };
 

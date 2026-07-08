@@ -7,8 +7,9 @@ import {
   ReactNode,
   useCallback,
 } from "react";
-import { supabase } from "../lib/supabase";
+import { apiClient } from "../api/client";
 import { BrandSettings } from "../types";
+import { OFFICIAL_CONTACT } from "../lib/officialContact";
 
 // ============================================
 // CONSTANTES ET CACHE
@@ -25,10 +26,10 @@ const defaultSettings: BrandSettings = {
   secondary_color: "#16a34a",
   logo_url: "",
   // Contact
-  contact_address: "Abidjan, Côte d'Ivoire",
-  contact_phone: "+225 XX XX XX XX XX",
-  contact_email: "contact@gnambaservices.ci",
-  contact_hours: "Lun-Ven : 08h – 18h",
+  contact_address: OFFICIAL_CONTACT.address,
+  contact_phone: OFFICIAL_CONTACT.phone,
+  contact_email: OFFICIAL_CONTACT.email,
+  contact_hours: OFFICIAL_CONTACT.hours,
   // Social media
   social_facebook: "",
   social_youtube: "",
@@ -156,40 +157,26 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     try {
       setError(null);
 
-      // Charger les paramètres de base
-      const { data: settingsData, error: settingsError } = await supabase
-        .from("app_settings")
-        .select("key, value");
-
-      if (settingsError) {
+      const settingsResult = await apiClient.settings.getAll();
+      if (settingsResult.error) {
         if (import.meta.env.DEV)
           console.error(
             "Erreur lors du chargement des paramètres:",
-            settingsError,
+            settingsResult.error,
           );
-        setError(`Erreur de chargement: ${settingsError.message}`);
+        setError(`Erreur de chargement: ${settingsResult.error}`);
         return;
       }
 
       const map: Record<string, string> = {};
-      settingsData?.forEach((row) => {
+      (settingsResult.data ?? []).forEach((row) => {
         map[row.key] = row.value || "";
       });
 
       // Charger les assets de marque depuis la media library (requête unique optimisée)
-      const { data: mediaData } = await supabase
-        .from("media_files")
-        .select("url, brand_asset_type")
-        .in("brand_asset_type", [
-          "logo_principal",
-          "favicon",
-          "watermark",
-          "logo_secondaire",
-        ])
-        .eq("is_brand_asset", true);
-
+      const mediaResult = await apiClient.media.getBrandAssets();
       const mediaMap: Record<string, string> = {};
-      mediaData?.forEach((item) => {
+      (mediaResult.data ?? []).forEach((item) => {
         if (!mediaMap[item.brand_asset_type]) {
           mediaMap[item.brand_asset_type] = item.url;
         }
@@ -253,18 +240,16 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const updateSetting = async (key: keyof BrandSettings, value: string) => {
     setError(null);
 
-    const { error } = await supabase
-      .from("app_settings")
-      .upsert(
-        { key, value, updated_at: new Date().toISOString() },
-        { onConflict: "key" },
-      );
+    const result = await apiClient.settings.upsert([{ key, value }]);
 
-    if (error) {
+    if (result.error) {
       if (import.meta.env.DEV)
-        console.error("Erreur lors de la mise à jour du paramètre:", error);
-      setError(`Erreur de sauvegarde: ${error.message}`);
-      throw error;
+        console.error(
+          "Erreur lors de la mise à jour du paramètre:",
+          result.error,
+        );
+      setError(`Erreur de sauvegarde: ${result.error}`);
+      throw new Error(result.error);
     }
 
     await refreshSettings();
@@ -286,15 +271,18 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
     if (updatesList.length === 0) return;
 
-    const { error } = await supabase
-      .from("app_settings")
-      .upsert(updatesList, { onConflict: "key" });
+    const result = await apiClient.settings.upsert(
+      updatesList.map(({ key, value }) => ({ key, value: value as string })),
+    );
 
-    if (error) {
+    if (result.error) {
       if (import.meta.env.DEV)
-        console.error("Erreur lors de la mise à jour des paramètres:", error);
-      setError(`Erreur de sauvegarde: ${error.message}`);
-      throw error;
+        console.error(
+          "Erreur lors de la mise à jour des paramètres:",
+          result.error,
+        );
+      setError(`Erreur de sauvegarde: ${result.error}`);
+      throw new Error(result.error);
     }
 
     await refreshSettings();

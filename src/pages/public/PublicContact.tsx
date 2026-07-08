@@ -7,11 +7,17 @@ import {
   Send,
   CheckCircle2,
   MessageSquare,
+  MessageCircle,
 } from "lucide-react";
-import { supabase } from "../../lib/supabase";
+import dbClient from "../../data/tableClient";
 import { useSiteContent } from "../../context/SiteContentContext";
-import { useSettings } from "../../context/SettingsContext";
 import DOMPurify from "dompurify";
+import {
+  OFFICIAL_CONTACT,
+  buildGoogleMapsDirectionsUrl,
+  buildGoogleMapsEmbedUrl,
+  buildWhatsAppUrl,
+} from "../../lib/officialContact";
 
 const subjects = [
   "BTP & Construction",
@@ -25,19 +31,6 @@ const subjects = [
 
 export default function PublicContact() {
   const { get } = useSiteContent();
-  const { settings } = useSettings();
-  const normalizePhoneForWhatsApp = (value: string) => {
-    const digits = value.replace(/\D/g, "");
-    if (!digits) return "";
-    if (digits.startsWith("225")) return digits;
-    if (digits.startsWith("0") && digits.length === 10) {
-      return `225${digits.slice(1)}`;
-    }
-    if (digits.length === 8) {
-      return `225${digits}`;
-    }
-    return digits;
-  };
   const [form, setForm] = useState({
     name: "",
     phone: "",
@@ -108,20 +101,19 @@ export default function PublicContact() {
     }
   };
 
-  const address =
-    settings.contact_address ||
-    get("contact", "address", "Abidjan, Côte d'Ivoire");
-  const phone = settings.contact_phone || get("contact", "phone", "");
-  const email =
-    settings.contact_email ||
-    get("contact", "email", "contact@gnambaservices.ci");
-  const hours =
-    settings.contact_hours ||
-    get("contact", "hours", "Lun-Ven : 08h00 - 18h00 | Sam : 09h00 - 13h00");
+  const address = OFFICIAL_CONTACT.address;
+  const phone = OFFICIAL_CONTACT.phone;
+  const email = OFFICIAL_CONTACT.email;
+  const hours = OFFICIAL_CONTACT.hours;
   const mapsEmbed = get("contact", "maps_embed", "");
-  const whatsappLink = phone
-    ? `https://wa.me/${normalizePhoneForWhatsApp(phone)}`
-    : "";
+  const defaultMapsEmbed = buildGoogleMapsEmbedUrl(
+    OFFICIAL_CONTACT.physicalAddress || OFFICIAL_CONTACT.address,
+  );
+  const mapsDirectionsUrl = buildGoogleMapsDirectionsUrl(
+    OFFICIAL_CONTACT.physicalAddress || OFFICIAL_CONTACT.address,
+  );
+  const whatsappLink = buildWhatsAppUrl(phone);
+  const quoteEmail = OFFICIAL_CONTACT.quoteEmail;
 
   // FIX: Sanitize mapsEmbed HTML to prevent XSS attacks
   // Only allow safe iframe tags from Google Maps
@@ -148,8 +140,19 @@ export default function PublicContact() {
           /^(https?:\/\/(www\.)?(google\.com|maps\.google\.com)|about:blank)/i,
       });
       setSanitizedMapsEmbed(clean);
+    } else {
+      setSanitizedMapsEmbed("");
     }
   }, [mapsEmbed]);
+
+  const extractIframeSrc = (iframeHtml: string): string => {
+    const match = iframeHtml.match(/src=["']([^"']+)["']/i);
+    return match?.[1] || "";
+  };
+
+  const mapsSrc = sanitizedMapsEmbed
+    ? extractIframeSrc(sanitizedMapsEmbed) || defaultMapsEmbed
+    : defaultMapsEmbed;
 
   const contactInfo = [
     { icon: MapPin, label: "Adresse", value: address },
@@ -174,7 +177,7 @@ export default function PublicContact() {
     setSending(true);
     setError("");
     // FIX: Removed console.log with PII (name, email) for production security
-    const { error: err } = await supabase
+    const { error: err } = await dbClient
       .from("contact_messages")
       .insert({
         name: form.name,
@@ -231,6 +234,61 @@ export default function PublicContact() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
             {/* Contact info */}
             <div className="space-y-5">
+              <div className="bg-white rounded-2xl p-5 border border-blue-100 shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-600 mb-2">
+                  Réponse rapide
+                </p>
+                <h2 className="text-xl font-bold text-gray-900">
+                  Contact & Devis gratuit
+                </h2>
+                <p className="text-sm text-gray-500 mt-2 leading-relaxed">
+                  Notre équipe répond sous {OFFICIAL_CONTACT.responseTime} par
+                  téléphone, WhatsApp ou email selon votre besoin.
+                </p>
+                <div className="mt-4 grid gap-3">
+                  <a
+                    href={whatsappLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600"
+                  >
+                    <MessageCircle size={15} />
+                    WhatsApp
+                  </a>
+                  <a
+                    href={`tel:${phone.replace(/\s+/g, "")}`}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+                  >
+                    <Phone size={15} />
+                    Appeler maintenant
+                  </a>
+                  <a
+                    href={`mailto:${email}`}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-teal-700"
+                  >
+                    <Mail size={15} />
+                    Envoyer un email
+                  </a>
+                  <a
+                    href="#formulaire-devis"
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600"
+                  >
+                    <Send size={15} />
+                    Demander un devis
+                  </a>
+                </div>
+                <p className="mt-3 text-xs leading-5 text-gray-500">
+                  Pour un devis écrit, vous pouvez aussi écrire à{" "}
+                  <a
+                    href={`mailto:${quoteEmail}`}
+                    className="font-semibold text-orange-600 hover:text-orange-700"
+                  >
+                    {quoteEmail}
+                  </a>
+                  .
+                </p>
+              </div>
+
               <div>
                 <h2 className="text-xl font-bold text-gray-900 mb-1">
                   Nos coordonnées
@@ -256,7 +314,7 @@ export default function PublicContact() {
                       </div>
                       {info.label === "Téléphone" ? (
                         <a
-                          href={`tel:${info.value}`}
+                          href={`tel:${info.value.replace(/\s+/g, "")}`}
                           className="text-gray-700 font-medium text-sm hover:text-blue-700 transition-colors"
                         >
                           {info.value}
@@ -283,8 +341,8 @@ export default function PublicContact() {
                 <h3 className="font-bold mb-2">Réponse rapide garantie</h3>
                 <p className="text-blue-200 text-sm leading-relaxed">
                   Nous nous engageons à répondre à toutes les demandes dans un
-                  délai de 24h ouvrées, avec un retour orienté devis ou
-                  rendez-vous selon votre besoin.
+                  délai de {OFFICIAL_CONTACT.responseTime}, avec un retour
+                  orienté devis ou rendez-vous selon votre besoin.
                 </p>
               </div>
 
@@ -309,30 +367,46 @@ export default function PublicContact() {
 
               <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
                 <h3 className="font-bold text-gray-900 mb-3">Localisation</h3>
-                {sanitizedMapsEmbed ? (
-                  <div
-                    className="h-40 rounded-xl overflow-hidden"
-                    dangerouslySetInnerHTML={{ __html: sanitizedMapsEmbed }}
+                <div className="overflow-hidden rounded-xl border border-gray-100">
+                  <iframe
+                    title="Google Maps GNAMBA SERVICES"
+                    src={mapsSrc}
+                    className="h-56 w-full border-0"
+                    loading="lazy"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    allowFullScreen
                   />
-                ) : (
-                  <div className="h-40 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl flex items-center justify-center">
-                    <div className="text-center">
-                      <MapPin
-                        size={28}
-                        className="text-blue-700 mx-auto mb-2"
-                      />
-                      <p className="text-sm text-blue-700 font-medium">
-                        {address}
-                      </p>
-                    </div>
-                  </div>
-                )}
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <a
+                    href={mapsDirectionsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800"
+                  >
+                    <MapPin size={15} />
+                    Ouvrir Google Maps
+                  </a>
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                      OFFICIAL_CONTACT.address,
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:border-blue-300 hover:text-blue-700"
+                  >
+                    Itinéraire
+                  </a>
+                </div>
               </div>
             </div>
 
             {/* Contact form */}
             <div className="lg:col-span-2">
-              <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
+              <div
+                id="formulaire-devis"
+                className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100"
+              >
                 {sent ? (
                   <div className="text-center py-12">
                     <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-5">
@@ -389,7 +463,7 @@ export default function PublicContact() {
                             onChange={(e) =>
                               setForm({ ...form, name: e.target.value })
                             }
-                          placeholder="Votre nom complet"
+                            placeholder="Votre nom complet"
                             className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition"
                             required
                           />
@@ -403,7 +477,7 @@ export default function PublicContact() {
                             onChange={(e) =>
                               setForm({ ...form, phone: e.target.value })
                             }
-                          placeholder="+225 XX XX XX XX XX"
+                            placeholder="+225 XX XX XX XX XX"
                             className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition"
                           />
                         </div>

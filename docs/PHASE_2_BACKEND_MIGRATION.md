@@ -32,24 +32,29 @@ Frontend (React)           Backend (Edge Functions)      Database
 ## Functions to Migrate (9 total)
 
 ### Priority 1: Core Data Access (4 functions)
+
 - `attestation-verify/index.ts` — Queries `v_foncier_attestation_verification` table
 - `auto-assign-agent/index.ts` — Query and update operations
 - `create-user-with-profile/index.ts` — User creation with transaction
 - `calculate-lead-score/index.ts` — Analytics/scoring logic
 
 ### Priority 2: Notifications & Communication (3 functions)
+
 - `send-payment-notification/index.ts` — Email/SMS notifications
 - `send-welcome-message/index.ts` — Onboarding messages
 - `capture-lead/index.ts` — Lead tracking
 
 ### Priority 3: Crypto & Validation (2 functions)
+
 - `attestation-sign/index.ts` — Digital signature generation
 - `verify-turnstile/index.ts` — Captcha verification (minimal DB access)
 
 ## Implementation Strategy
 
 ### Step 1: PostgreSQL Module (DONE)
+
 ✅ Created `supabase/functions/_shared/db.ts` with:
+
 - `QueryBuilder` class mimicking Supabase API
 - `.select()`, `.eq()`, `.order()`, `.limit()`, `.maybeSingle()`
 - Direct PostgreSQL connection using Deno drivers
@@ -57,6 +62,7 @@ Frontend (React)           Backend (Edge Functions)      Database
 ### Step 2: Function Migration Template
 
 Replace Supabase client pattern:
+
 ```typescript
 // OLD (Supabase)
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
@@ -65,23 +71,29 @@ const { data, error } = await supabase.from("table").select("*").eq("id", 1);
 
 // NEW (PostgreSQL Direct)
 import { from } from "../_shared/db.ts";
-const { data, error } = await from("table").select("*").eq("id", 1).maybeSingle();
+const { data, error } = await from("table")
+  .select("*")
+  .eq("id", 1)
+  .maybeSingle();
 ```
 
 ### Step 3: Refactor Functions (Sequential)
 
 #### Iteration 1: attestation-verify (PoC)
+
 1. Replace `createClient()` with PostgreSQL connection
 2. Update query patterns to use `QueryBuilder`
 3. Test with staging database
 4. Validate cryptography logic remains intact
 
 #### Iteration 2-9: Remaining Functions
+
 Follow same pattern with decreasing complexity
 
 ### Step 4: Environment Configuration
 
 Add to `supabase/config.toml` or `.env` (for local development):
+
 ```bash
 DATABASE_URL=postgres://user:pass@localhost:5432/egs
 # OR individual components:
@@ -93,6 +105,7 @@ POSTGRES_DB=egs
 ```
 
 For Deno Edge Functions (Supabase hosted or local):
+
 ```bash
 # Set secrets via Supabase dashboard or:
 supabase secrets set DATABASE_URL "postgres://..."
@@ -101,29 +114,32 @@ supabase secrets set DATABASE_URL "postgres://..."
 ## Testing Strategy
 
 ### Unit Tests
+
 - Test QueryBuilder with mock data
 - Verify error handling (connection failures, timeouts)
 - Validate query construction
 
 ### Integration Tests
+
 - Run functions against local PostgreSQL
 - Test with real data (anonymized)
 - Measure performance vs Supabase
 
 ### Staging Validation
+
 - Deploy to staging environment
 - Run 24h observation period
 - Monitor error logs and response times
 
 ## Risk Mitigation
 
-| Risk | Mitigation |
-|------|-----------|
-| Connection pool exhaustion | Implement connection reuse and timeout handling |
+| Risk                          | Mitigation                                          |
+| ----------------------------- | --------------------------------------------------- |
+| Connection pool exhaustion    | Implement connection reuse and timeout handling     |
 | Query performance degradation | Add database indexing where needed, profile queries |
-| Transaction failures | Implement retry logic with exponential backoff |
-| Secrets exposure | Use environment variables with restricted access |
-| Lateral attacks | Validate all inputs, use parameterized queries |
+| Transaction failures          | Implement retry logic with exponential backoff      |
+| Secrets exposure              | Use environment variables with restricted access    |
+| Lateral attacks               | Validate all inputs, use parameterized queries      |
 
 ## Rollback Plan
 

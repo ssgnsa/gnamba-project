@@ -1,0 +1,17 @@
+[Unit]
+Description=cloudflared Tunnel for Gnamba Services (example)
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+ExecStart=/usr/local/bin/cloudflared tunnel run --config /etc/cloudflared/config.yml
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
+
+# Usage: copy to /etc/systemd/system/cloudflared.service, adjust ExecStart path and User, then:
+# sudo systemctl daemon-reload
+# sudo systemctl enable --now cloudflared

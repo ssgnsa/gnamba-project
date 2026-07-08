@@ -62,17 +62,18 @@ check_command ss
 
 check_docker_container egs-frontend
 check_docker_container egs-web
-check_docker_container somagro-web
 check_docker_container filebrowser
 
-for port in 8080 8081 8082 54321 54322 54323 54324; do
+for port in 8080 8081 54321 54322 54323 54324; do
   check_port "$port"
 done
 
-if curl -fsS --max-time 5 http://localhost:54321/health >/dev/null 2>&1; then
-  report_ok "Supabase local health endpoint OK"
+SUPABASE_LOCAL_URL="${VITE_SUPABASE_LOCAL_URL:-http://localhost:54321}"
+
+if curl -fsS --max-time 5 "${SUPABASE_LOCAL_URL%/}/health" >/dev/null 2>&1; then
+  report_ok "Supabase local tunnel health endpoint OK"
 else
-  report_warn "Supabase local /health endpoint unreachable"
+  report_warn "Supabase local tunnel /health endpoint unreachable"
 fi
 
 if [ -d "${ROOT_DIR}/backups/supabase/latest" ]; then

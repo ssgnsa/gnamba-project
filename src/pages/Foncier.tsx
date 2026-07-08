@@ -18,7 +18,7 @@ import {
   CheckCircle,
   Files,
 } from "lucide-react";
-import { supabase } from "../lib/supabase";
+import dbClient from "../data/tableClient";
 import {
   FoncierLot,
   FoncierAttestation,
@@ -42,19 +42,24 @@ import {
   configFields as _configFields,
   createAttestationForm,
   createEmptyForm,
-  emptyConfig,
   getLocalDateInput,
   gpsBoundaryFields as _gpsBoundaryFields,
   isMissingColumnError,
   parseAttestationSnapshot,
+  villages as fallbackVillages,
 } from "../components/foncier/FoncierConstants";
 import { useSettings } from "../context/SettingsContext";
 import { useAuth, resolveAccessLevel } from "../context/AuthContext";
-import { withBackoff } from "../lib/supabase.service";
+import { withBackoff } from "../lib/dbClient.service";
+import { apiClient } from "../api/client";
 import { useFoncierState } from "../hooks/useFoncierState";
 import { useFoncierSync } from "../hooks/useFoncierSync";
 import { useFoncierLogic } from "../hooks/useFoncierLogic";
 import { useFoncierAudit } from "../hooks/useFoncierAudit";
+import {
+  loadVillageConfig,
+  saveVillageConfig,
+} from "../lib/foncierVillageConfig";
 import {
   generateFoncierReference,
   formatDateLong,
@@ -65,6 +70,7 @@ import {
   generateUUID,
   sha256Hex,
 } from "../utils/reference";
+import { getLocalApiBaseUrl } from "../lib/selfHosted";
 import {
   printAttestationCoutumiere,
   printAttestationAnnex,
@@ -74,10 +80,12 @@ import {
   logFoncierAudit,
   logFoncierAuditFromPayload,
 } from "../lib/foncierAudit";
+import { validateAttestationForm } from "../lib/foncierValidation";
 import {
-  validateAttestationForm,
-} from "../lib/foncierValidation";
-import { buildAttestationRpcParams } from "../lib/foncierAttestation";
+  buildAttestationRpcParams,
+  FONCIER_ATTESTATION_SELECT,
+  FONCIER_ATTESTATION_WITH_TEMOINS_SELECT,
+} from "../lib/foncierAttestation";
 import { getUsageForSlot } from "../lib/mediaUtils";
 import {
   addQueueItem,
@@ -86,7 +94,6 @@ import {
   getQueueItems,
   OFFLINE_STORAGE_FULL,
   removeQueueItem,
-  upsertCachedLot,
   upsertCachedLots,
 } from "../lib/foncierOffline";
 
@@ -100,17 +107,6 @@ const statutConfig: Record<
   reserve: { label: "Réservé", color: "orange" },
   annule: { label: "Annulé", color: "gray" },
 };
-
-const villages = [
-  "Sikensi",
-  "Katadji",
-  "Élibou",
-  "Sahuyé",
-  "Gomon",
-  "Bécédi",
-  "Braffouéby",
-  "Badasso",
-];
 
 const getAttestationStatusInfo = (record: AttestationHistoryItem | null) => {
   if (!record) return { label: "—", color: "gray" as const };
@@ -149,7 +145,7 @@ const buildAttestationVerificationUrl = ({
   const origin =
     typeof window !== "undefined" && window.location
       ? window.location.origin
-      : "http://localhost";
+      : getLocalApiBaseUrl();
   const fallbackUrl = new URL("/verification-attestation", origin);
 
   let targetUrl = fallbackUrl;
@@ -321,9 +317,12 @@ const buildAttestationPrintData = (
   };
 };
 
-const buildVillageStats = (rows: FoncierLot[]) => {
+const buildVillageStats = (rows: FoncierLot[], showArchived: boolean) => {
   const map: Record<string, { total: number; count: number }> = {};
   rows.forEach((lot) => {
+    if (!showArchived && lot.deleted_at) {
+      return;
+    }
     const key = lot.village || "—";
     if (!map[key]) {
       map[key] = { total: 0, count: 0 };
@@ -345,62 +344,118 @@ export default function Foncier() {
 
   // Extract state for easier access
   const {
-    lots, setLots,
-    loading, setLoading,
-    search, setSearch,
-    filterStatut, setFilterStatut,
-    filterVillage, setFilterVillage,
-    modalOpen, setModalOpen,
-    configModalOpen, setConfigModalOpen,
-    editingId, setEditingId,
-    form, setForm,
-    saving, setSaving,
-    configForm, setConfigForm,
-    configCache, setConfigCache,
-    configLoaded, setConfigLoaded,
-    configLoadedVillage, setConfigLoadedVillage,
-    configVillage, setConfigVillage,
-    villageOptions, setVillageOptions,
-    villageOptionsLoaded, setVillageOptionsLoaded,
-    villageStats, setVillageStats,
-    statsLoading, setStatsLoading,
-    statsError, setStatsError,
-    savingConfig, setSavingConfig,
-    activeTab, setActiveTab,
-    pageError, setPageError,
-    modalError, setModalError,
-    configError, setConfigError,
-    attestationModalOpen, setAttestationModalOpen,
-    attestationLot, setAttestationLot,
-    attestationForm, setAttestationForm,
-    attestationSaving, setAttestationSaving,
-    attestationError, setAttestationError,
-    attestationHasDeletedAt, setAttestationHasDeletedAt,
-    workflowModalOpen, setWorkflowModalOpen,
-    workflowSelectedLot, setWorkflowSelectedLot,
-    attestationHistoryOpen, setAttestationHistoryOpen,
-    attestationHistoryLot, setAttestationHistoryLot,
-    attestationHistoryRecords, setAttestationHistoryRecords,
-    attestationHistoryLoading, setAttestationHistoryLoading,
-    attestationHistoryError, setAttestationHistoryError,
-    attestationHistoryScans, setAttestationHistoryScans,
-    auditModalOpen, setAuditModalOpen,
-    auditRecords, setAuditRecords,
-    auditLoading, setAuditLoading,
-    auditPage, setAuditPage,
-    auditTotal, setAuditTotal,
-    auditActionFilter, setAuditActionFilter,
-    auditError, setAuditError,
-    page, setPage,
-    totalCount, setTotalCount,
-    debouncedSearch, setDebouncedSearch,
-    isOnline, setIsOnline,
-    syncing, setSyncing,
-    syncPending, setSyncPending,
-    syncProgress, setSyncProgress,
-    syncError, setSyncError,
-    showArchived, setShowArchived,
-    pageNotice, setPageNotice,
+    lots,
+    setLots,
+    loading,
+    setLoading,
+    search,
+    setSearch,
+    filterStatut,
+    setFilterStatut,
+    filterVillage,
+    setFilterVillage,
+    modalOpen,
+    setModalOpen,
+    configModalOpen,
+    setConfigModalOpen,
+    editingId,
+    setEditingId,
+    form,
+    setForm,
+    saving,
+    setSaving,
+    configForm,
+    setConfigForm,
+    configCache,
+    setConfigCache,
+    configLoaded,
+    setConfigLoaded,
+    configLoadedVillage,
+    setConfigLoadedVillage,
+    configVillage,
+    setConfigVillage,
+    villageOptions,
+    setVillageOptions,
+    villageOptionsLoaded,
+    setVillageOptionsLoaded,
+    villageStats,
+    setVillageStats,
+    statsLoading,
+    setStatsLoading,
+    statsError,
+    setStatsError,
+    savingConfig,
+    setSavingConfig,
+    activeTab,
+    setActiveTab,
+    pageError,
+    setPageError,
+    modalError,
+    setModalError,
+    configError,
+    setConfigError,
+    attestationModalOpen,
+    setAttestationModalOpen,
+    attestationLot,
+    setAttestationLot,
+    attestationForm,
+    setAttestationForm,
+    attestationSaving,
+    setAttestationSaving,
+    attestationError,
+    setAttestationError,
+    attestationHasDeletedAt,
+    setAttestationHasDeletedAt,
+    workflowModalOpen,
+    setWorkflowModalOpen,
+    workflowSelectedLot,
+    setWorkflowSelectedLot,
+    attestationHistoryOpen,
+    setAttestationHistoryOpen,
+    attestationHistoryLot,
+    setAttestationHistoryLot,
+    attestationHistoryRecords,
+    setAttestationHistoryRecords,
+    attestationHistoryLoading,
+    setAttestationHistoryLoading,
+    attestationHistoryError,
+    setAttestationHistoryError,
+    attestationHistoryScans,
+    setAttestationHistoryScans,
+    auditModalOpen,
+    setAuditModalOpen,
+    auditRecords,
+    setAuditRecords,
+    auditLoading,
+    setAuditLoading,
+    auditPage,
+    setAuditPage,
+    auditTotal,
+    setAuditTotal,
+    auditActionFilter,
+    setAuditActionFilter,
+    auditError,
+    setAuditError,
+    page,
+    setPage,
+    totalCount,
+    setTotalCount,
+    debouncedSearch,
+    setDebouncedSearch,
+    isOnline,
+    setIsOnline,
+    syncing,
+    setSyncing,
+    syncPending,
+    setSyncPending,
+    syncProgress,
+    setSyncProgress,
+    syncError,
+    setSyncError,
+    showArchived,
+    setShowArchived,
+    pageNotice,
+    setPageNotice,
     pageSize,
     auditPageSize,
   } = state;
@@ -409,7 +464,7 @@ export default function Foncier() {
 
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const logic = useFoncierLogic(sync.deviceId, profile, attestationHasDeletedAt, setAttestationHasDeletedAt);
+  const logic = useFoncierLogic(sync.deviceId, profile);
 
   const accessLevel = resolveAccessLevel(profile?.role, profile?.access_level);
   const canManage =
@@ -534,7 +589,7 @@ export default function Foncier() {
     const { paged, total } = applyLocalFilters(cached);
     setLots(paged);
     setTotalCount(total);
-    setVillageStats(buildVillageStats(cached));
+    setVillageStats(buildVillageStats(cached, showArchived));
     setStatsError(null);
   };
 
@@ -546,26 +601,26 @@ export default function Foncier() {
   const loadVillages = async () => {
     if (!isOnline) {
       // En mode hors-ligne, utiliser la liste statique de fallback
-      setVillageOptions(villages);
+      setVillageOptions(fallbackVillages);
       setVillageOptionsLoaded(false);
       return;
     }
 
     const { data, error } = await withBackoff(() =>
-      supabase
+      dbClient
         .from("foncier_villages")
-        .select("name")
-        .order("name", { ascending: true }),
+        .select("nom")
+        .order("nom", { ascending: true }),
     );
 
     if (error) {
       if (import.meta.env.DEV)
         console.error("loadVillages: échec du chargement", error);
       // Fallback sur la liste statique en cas d'erreur
-      setVillageOptions(villages);
+      setVillageOptions(fallbackVillages);
       setVillageOptionsLoaded(false);
     } else if (data) {
-      setVillageOptions(data.map((row: { name: string }) => row.name));
+      setVillageOptions(data.map((row: { nom: string }) => row.nom));
       setVillageOptionsLoaded(true);
     }
   };
@@ -573,13 +628,13 @@ export default function Foncier() {
   const fetchVillageStats = async () => {
     if (!isOnline) {
       const cached = await getCachedLots();
-      setVillageStats(buildVillageStats(cached));
+      setVillageStats(buildVillageStats(cached, showArchived));
       return;
     }
     setStatsLoading(true);
     setStatsError(null);
     const { data, error } = await withBackoff(() =>
-      supabase.rpc("foncier_stats_by_village", {
+      dbClient.rpc("foncier_stats_by_village", {
         p_include_archived: showArchived,
       }),
     );
@@ -607,7 +662,7 @@ export default function Foncier() {
   const refreshCache = async () => {
     if (!navigator.onLine) return;
     const { data, error } = await withBackoff(() =>
-      supabase.rpc("search_foncier_lots", {
+      dbClient.rpc("search_foncier_lots", {
         p_search: "",
         p_village: "",
         p_quartier: "",
@@ -645,7 +700,7 @@ export default function Foncier() {
     }
 
     const { data, error } = await withBackoff(() =>
-      supabase.rpc("search_foncier_lots", {
+      dbClient.rpc("search_foncier_lots", {
         p_search: debouncedSearch,
         p_village: filterVillage,
         p_quartier: "",
@@ -696,7 +751,7 @@ export default function Foncier() {
       auditPage,
       auditPageSize,
       auditActionFilter,
-      isOnline
+      isOnline,
     );
 
     if (error) {
@@ -733,7 +788,7 @@ export default function Foncier() {
           let payload = item.payload as Partial<FoncierLot> & { id: string };
           if (!payload.lotissement_id || !payload.ilot_id) {
             const { data, error } = await withBackoff(() =>
-              supabase.rpc("ensure_foncier_hierarchy", {
+              dbClient.rpc("ensure_foncier_hierarchy", {
                 p_village: payload.village || "",
                 p_lotissement: payload.nom_lotissement || "",
                 p_ilot: payload.numero_ilot || "",
@@ -758,7 +813,7 @@ export default function Foncier() {
             }
           }
           const { data: server, error: fetchError } = await withBackoff(() =>
-            supabase
+            dbClient
               .from("foncier_lots")
               .select("id, updated_at, client_updated_at, row_version")
               .eq("id", payload.id)
@@ -816,7 +871,7 @@ export default function Foncier() {
           let syncError;
           if (server) {
             const { error } = await withBackoff(() =>
-              supabase
+              dbClient
                 .from("foncier_lots")
                 .update(payload)
                 .eq("id", payload.id)
@@ -825,7 +880,7 @@ export default function Foncier() {
             syncError = error;
           } else {
             const { error } = await withBackoff(() =>
-              supabase.from("foncier_lots").insert(payload),
+              dbClient.from("foncier_lots").insert(payload),
             );
             syncError = error;
           }
@@ -846,9 +901,8 @@ export default function Foncier() {
             deleted_reason?: string;
           };
           const { error } = await withBackoff(() =>
-            supabase.rpc("soft_delete_foncier_lot", {
+            dbClient.rpc("soft_delete_foncier_lot", {
               p_lot_id: payload.id,
-              p_reason: payload.deleted_reason || "archivage",
             }),
           );
           if (error) {
@@ -863,7 +917,7 @@ export default function Foncier() {
         if (item.op === "restore_lot") {
           const payload = item.payload as { id: string };
           const { error } = await withBackoff(() =>
-            supabase.rpc("restore_foncier_lot", { p_lot_id: payload.id }),
+            dbClient.rpc("restore_foncier_lot", { p_lot_id: payload.id }),
           );
           if (error) {
             if (import.meta.env.DEV)
@@ -876,7 +930,7 @@ export default function Foncier() {
 
         if (item.op === "audit_log") {
           const { error } = await withBackoff(() =>
-            logFoncierAuditFromPayload(supabase, item.payload),
+            logFoncierAuditFromPayload(dbClient, item.payload),
           );
           if (error) {
             if (import.meta.env.DEV)
@@ -914,7 +968,7 @@ export default function Foncier() {
 
           const { data: existingAtt, error: fetchAttError } = await withBackoff(
             () =>
-              supabase
+              dbClient
                 .from("foncier_attestations")
                 .select("id, signature_numerique, statut, version")
                 .eq("id", attestation.id)
@@ -930,7 +984,7 @@ export default function Foncier() {
 
           const { data: versionRows, error: versionError } = await withBackoff(
             () =>
-              supabase
+              dbClient
                 .from("foncier_attestations")
                 .select("version")
                 .eq("lot_id", attestation.lot_id)
@@ -980,10 +1034,10 @@ export default function Foncier() {
           if (!existingAtt) {
             const { error: insertError, data: insertData } = await withBackoff(
               () =>
-                supabase
+                dbClient
                   .from("foncier_attestations")
                   .insert(attestation)
-                  .select()
+                  .select(FONCIER_ATTESTATION_SELECT)
                   .single(),
             );
             if (insertError) {
@@ -1006,7 +1060,7 @@ export default function Foncier() {
           } else {
             const { error: updateError, data: updateData } = await withBackoff(
               () =>
-                supabase
+                dbClient
                   .from("foncier_attestations")
                   .update({
                     qr_payload: payloadSignedJson,
@@ -1021,7 +1075,7 @@ export default function Foncier() {
                     last_modified_device_id: deviceId,
                   })
                   .eq("id", attestation.id)
-                  .select()
+                  .select(FONCIER_ATTESTATION_SELECT)
                   .single(),
             );
             if (updateError) {
@@ -1042,7 +1096,7 @@ export default function Foncier() {
           }
 
           const { data: existingTemoins } = await withBackoff(() =>
-            supabase
+            dbClient
               .from("foncier_attestation_temoins")
               .select("id")
               .eq("attestation_id", attestation.id)
@@ -1050,7 +1104,7 @@ export default function Foncier() {
           );
           if (!existingTemoins || existingTemoins.length === 0) {
             const { error: temoinsError } = await withBackoff(() =>
-              supabase.from("foncier_attestation_temoins").insert(temoins),
+              dbClient.from("foncier_attestation_temoins").insert(temoins),
             );
             if (temoinsError) {
               if (import.meta.env.DEV)
@@ -1080,7 +1134,7 @@ export default function Foncier() {
               continue;
             }
             const { error: updateError } = await withBackoff(() =>
-              supabase
+              dbClient
                 .from("foncier_attestations")
                 .update({
                   qr_payload: payloadSignedJson,
@@ -1104,7 +1158,7 @@ export default function Foncier() {
             }
 
             await withBackoff(() =>
-              logFoncierAudit(supabase, {
+              logFoncierAudit(dbClient, {
                 lotId: attestation.lot_id,
                 action: "VALIDATION_CHEF",
                 details: {
@@ -1117,7 +1171,7 @@ export default function Foncier() {
 
           if (desiredStatus !== "valide") {
             await withBackoff(() =>
-              logFoncierAudit(supabase, {
+              logFoncierAudit(dbClient, {
                 lotId: attestation.lot_id,
                 action: "SOUMISSION_CHEF",
                 details: {
@@ -1175,7 +1229,7 @@ export default function Foncier() {
       return;
     }
     const { data, error } = await withBackoff(() =>
-      supabase
+      dbClient
         .from("media_usage")
         .select("entity_id, media_files!inner(url, original_name)")
         .eq("entity_type", "foncier_attestation")
@@ -1220,7 +1274,7 @@ export default function Foncier() {
 
     const runQuery = (includeDeletedAt: boolean) =>
       withBackoff(() =>
-        supabase
+        dbClient
           .from("foncier_attestations")
           .select(includeDeletedAt ? selectWithDeleted : selectFallback)
           .eq("lot_id", lot.id)
@@ -1321,22 +1375,13 @@ export default function Foncier() {
       setConfigError("Mode hors-ligne : configuration non actualisée.");
       return configCache;
     }
-    const { data, error } = await withBackoff(() =>
-      supabase
-        .from("foncier_village_config")
-        .select("key, value")
-        .eq("village", villageName),
-    );
-    if (error) {
+
+    const map = await loadVillageConfig(villageName);
+    if (!map) {
       setConfigError("Impossible de charger la configuration du village.");
       return null;
     }
-    const map: FoncierConfigMap = { ...emptyConfig, village: villageName };
-    (data || []).forEach((r: { key: string; value: string | null }) => {
-      if (Object.prototype.hasOwnProperty.call(map, r.key)) {
-        map[r.key as FoncierConfigKey] = r.value || "";
-      }
-    });
+
     setConfigCache(map);
     setConfigLoaded(true);
     setConfigLoadedVillage(villageName);
@@ -1355,12 +1400,12 @@ export default function Foncier() {
     lotId: string,
     options?: { includeArchived?: boolean; select?: string },
   ) => {
-    const select = options?.select || "*, foncier_attestation_temoins(*)";
+    const select = options?.select || FONCIER_ATTESTATION_WITH_TEMOINS_SELECT;
     const includeArchived = options?.includeArchived ?? false;
 
     const runQuery = (supportsDeletedAt: boolean) =>
       withBackoff(() => {
-        let query = supabase
+        let query = dbClient
           .from("foncier_attestations")
           .select(select)
           .eq("lot_id", lotId)
@@ -1449,8 +1494,8 @@ export default function Foncier() {
       arrete_date: lot.arrete_date,
       statut: lot.statut,
       publier_sur_vitrine: lot.publier_sur_vitrine || false,
-      date_cession: lot.date_cession || getLocalDateInput(),
-      prix_cession: String(lot.prix_cession),
+      date_cession: lot.date_cession || "",
+      prix_cession: String(lot.prix_cession ?? ""),
       notes: lot.notes,
     });
     setEditingId(lot.id);
@@ -1506,15 +1551,10 @@ export default function Foncier() {
   ) => {
     try {
       const { data, error } = await withBackoff(() =>
-        supabase.functions.invoke("attestation-sign", {
-          body: {
-            attestation_id: attestationId,
-            payload: JSON.stringify(payload),
-          },
-        }),
+        apiClient.foncier.signAttestation(attestationId, payload),
       );
       if (error) return "";
-      return (data as { signature?: string })?.signature || "";
+      return data?.signature || "";
     } catch {
       return "";
     }
@@ -1706,7 +1746,7 @@ export default function Foncier() {
 
     const { data: attestationRows, error: attestationError } =
       await withBackoff(() =>
-        supabase.rpc("create_foncier_attestation_atomic", attestationPayload),
+        dbClient.rpc("create_foncier_attestation_atomic", attestationPayload),
       );
 
     const createdAttestation = (
@@ -1744,7 +1784,7 @@ export default function Foncier() {
 
     // Audit logs pour création
     await withBackoff(() =>
-      logFoncierAudit(supabase, {
+      logFoncierAudit(dbClient, {
         lotId: lot.id,
         action: "SOUMISSION_CHEF",
         details: {
@@ -1756,7 +1796,7 @@ export default function Foncier() {
 
     if (isCessionAttestation && baseAttestation) {
       await withBackoff(() =>
-        logFoncierAudit(supabase, {
+        logFoncierAudit(dbClient, {
           lotId: lot.id,
           action: "ARCHIVAGE_ATTESTATION",
           details: {
@@ -1767,7 +1807,7 @@ export default function Foncier() {
       );
 
       await withBackoff(() =>
-        logFoncierAudit(supabase, {
+        logFoncierAudit(dbClient, {
           lotId: lot.id,
           action: "REEMISSION_CESSION",
           details: {
@@ -1842,11 +1882,19 @@ export default function Foncier() {
     agentName: string,
     chefName: string,
   ) => {
-    const villageKey = (lot.village || '').replace(/^(VILLAGE\s+DE\s+|VILLAGE\s+)/i, '').trim();
+    const villageKey = (lot.village || "")
+      .replace(/^(VILLAGE\s+DE\s+|VILLAGE\s+)/i, "")
+      .trim();
     const printVillageLogoMedia = villageKey
-      ? await getUsageForSlot('foncier_village', villageKey, 'logo').catch(() => null)
+      ? await getUsageForSlot("foncier_village", villageKey, "logo").catch(
+          () => null,
+        )
       : null;
-    const printVillageLogoUrl = printVillageLogoMedia?.url || config.village_logo_url || config.logo_url || '';
+    const printVillageLogoUrl =
+      printVillageLogoMedia?.url ||
+      config.village_logo_url ||
+      config.logo_url ||
+      "";
 
     const onlinePrintData = buildAttestationPrintData(
       {
@@ -1879,7 +1927,7 @@ export default function Foncier() {
       };
       // Call client-side RPC (requires service role; best-effort)
       await withBackoff(() =>
-        supabase.rpc("attach_foncier_attestation_pdf_metadata", {
+        dbClient.rpc("attach_foncier_attestation_pdf_metadata", {
           p_attestation_id: pdfMeta.attestation_id,
           p_hash_sha256: pdfMeta.hash_sha256,
           p_verify_url: pdfMeta.verify_url,
@@ -1893,7 +1941,7 @@ export default function Foncier() {
     }
 
     const { error: printAuditError } = await withBackoff(() =>
-      logFoncierAudit(supabase, {
+      logFoncierAudit(dbClient, {
         lotId: lot.id,
         action: "IMPRESSION",
         details: {
@@ -1939,7 +1987,9 @@ export default function Foncier() {
       isOnline,
     );
     if (!validationResult.success) {
-      setAttestationError(validationResult.error || "Erreur de validation inconnue");
+      setAttestationError(
+        validationResult.error || "Erreur de validation inconnue",
+      );
       return;
     }
 
@@ -1960,7 +2010,9 @@ export default function Foncier() {
 
       if (!creationResult.success) {
         setAttestationSaving(false);
-        setAttestationError(creationResult.error || "Erreur de création inconnue");
+        setAttestationError(
+          creationResult.error || "Erreur de création inconnue",
+        );
         return;
       }
 
@@ -2011,6 +2063,9 @@ export default function Foncier() {
 
     if (!result.success) {
       setModalError(result.error || "Erreur inconnue");
+      if (result.newRef) {
+        setForm((prev) => ({ ...prev, reference: result.newRef as string }));
+      }
       setSaving(false);
       return;
     }
@@ -2022,7 +2077,15 @@ export default function Foncier() {
     } else {
       setPageNotice(result.message || "Lot sauvegardé.");
       await sync.refreshCache(isOnline);
-      await sync.fetchData(debouncedSearch, filterVillage, filterStatut, showArchived, page, 20, isOnline);
+      await sync.fetchData(
+        debouncedSearch,
+        filterVillage,
+        filterStatut,
+        showArchived,
+        page,
+        pageSize,
+        isOnline,
+      );
     }
 
     setSaving(false);
@@ -2030,9 +2093,6 @@ export default function Foncier() {
     setForm(logic.createEmptyForm());
     setEditingId(null);
   };
-
-
-
 
   const handleArchive = async (lot: FoncierLot) => {
     if (!canManage) {
@@ -2043,47 +2103,20 @@ export default function Foncier() {
     }
     if (!confirm("Archiver ce lot foncier ?")) return;
     setPageError(null);
-    const nowIso = new Date().toISOString();
-
-    if (!isOnline) {
-      const payload = {
-        ...lot,
-        deleted_at: nowIso,
-        deleted_reason: "archivage",
-        client_updated_at: nowIso,
-      };
-      try {
-        await upsertCachedLot(payload as FoncierLot);
-        await addQueueItem({
-          id: generateUUID(),
-          op: "soft_delete_lot",
-          payload: { id: lot.id, deleted_reason: "archivage" },
-          client_updated_at: nowIso,
-        });
-        await refreshQueueCount();
-        setPageNotice("Lot archivé hors-ligne. Synchronisation en attente.");
-        await loadCachedLots();
-        return;
-      } catch (err: any) {
-        setPageError(
-          err?.code === OFFLINE_STORAGE_FULL
-            ? "Stockage local plein. Archivage hors-ligne impossible."
-            : "Archivage hors-ligne impossible.",
-        );
-        return;
-      }
-    }
-
-    const { error } = await withBackoff(() =>
-      supabase.rpc("soft_delete_foncier_lot", {
-        p_lot_id: lot.id,
-        p_reason: "archivage",
-      }),
-    );
-    if (error) {
-      setPageError("Archivage impossible. Vérifiez vos droits ou réessayez.");
+    const result = await logic.archiveLot(lot, isOnline);
+    if (!result.success) {
+      setPageError(result.error || "Archivage impossible. Réessayez.");
       return;
     }
+
+    if (result.offline) {
+      await refreshQueueCount();
+      setPageNotice(result.message || "Lot archivé hors-ligne.");
+      await loadCachedLots();
+      return;
+    }
+
+    setPageNotice(result.message || "Lot archivé.");
     await refreshCache();
     void fetchData();
   };
@@ -2097,46 +2130,21 @@ export default function Foncier() {
     }
     if (!confirm("Restaurer ce lot foncier ?")) return;
     setPageError(null);
-    const nowIso = new Date().toISOString();
 
-    if (!isOnline) {
-      const payload = {
-        ...lot,
-        deleted_at: null,
-        deleted_reason: null,
-        client_updated_at: nowIso,
-      };
-      try {
-        await upsertCachedLot(payload as FoncierLot);
-        await addQueueItem({
-          id: generateUUID(),
-          op: "restore_lot",
-          payload: { id: lot.id },
-          client_updated_at: nowIso,
-        });
-        await refreshQueueCount();
-        setPageNotice("Lot restauré hors-ligne. Synchronisation en attente.");
-        await loadCachedLots();
-        return;
-      } catch (err: any) {
-        setPageError(
-          err?.code === OFFLINE_STORAGE_FULL
-            ? "Stockage local plein. Restauration hors-ligne impossible."
-            : "Restauration hors-ligne impossible.",
-        );
-        return;
-      }
-    }
-
-    const { error } = await withBackoff(() =>
-      supabase.rpc("restore_foncier_lot", { p_lot_id: lot.id }),
-    );
-    if (error) {
-      setPageError(
-        "Restauration impossible. Vérifiez vos droits ou réessayez.",
-      );
+    const result = await logic.restoreLot(lot, isOnline);
+    if (!result.success) {
+      setPageError(result.error || "Restauration impossible. Réessayez.");
       return;
     }
+
+    if (result.offline) {
+      await refreshQueueCount();
+      setPageNotice(result.message || "Lot restauré hors-ligne.");
+      await loadCachedLots();
+      return;
+    }
+
+    setPageNotice(result.message || "Lot restauré.");
     await refreshCache();
     void fetchData();
   };
@@ -2154,23 +2162,14 @@ export default function Foncier() {
     }
     setSavingConfig(true);
     setConfigError(null);
-    const payload = (
-      Object.entries(configForm) as [FoncierConfigKey, string][]
-    ).map(([key, value]) => ({
-      village: configVillage,
-      key,
-      value,
-      updated_at: new Date().toISOString(),
-    }));
-    const { error } = await withBackoff(() =>
-      supabase
-        .from("foncier_village_config")
-        .upsert(payload, { onConflict: "village,key" }),
-    );
-    if (error) {
+    try {
+      await saveVillageConfig(configVillage, configForm);
+    } catch (error) {
       setSavingConfig(false);
       setConfigError(
-        "Sauvegarde impossible. Vérifiez vos droits ou réessayez.",
+        error instanceof Error
+          ? error.message
+          : "Sauvegarde impossible. Réessayez.",
       );
       return;
     }
@@ -2194,7 +2193,7 @@ export default function Foncier() {
 
     const { data, error } = await fetchLatestAttestationForLot(lot.id, {
       includeArchived: false,
-      select: "*, foncier_attestation_temoins(*)",
+      select: FONCIER_ATTESTATION_WITH_TEMOINS_SELECT,
     });
 
     if (error) {
@@ -2266,11 +2265,16 @@ export default function Foncier() {
           }))
         : temoinsPrint;
 
-    const villageKey2 = (lot.village || '').replace(/^(VILLAGE\s+DE\s+|VILLAGE\s+)/i, '').trim();
+    const villageKey2 = (lot.village || "")
+      .replace(/^(VILLAGE\s+DE\s+|VILLAGE\s+)/i, "")
+      .trim();
     const villageLogoMedia = villageKey2
-      ? await getUsageForSlot('foncier_village', villageKey2, 'logo').catch(() => null)
+      ? await getUsageForSlot("foncier_village", villageKey2, "logo").catch(
+          () => null,
+        )
       : null;
-    const resolvedVillageLogoUrl = villageLogoMedia?.url || config.village_logo_url || config.logo_url || '';
+    const resolvedVillageLogoUrl =
+      villageLogoMedia?.url || config.village_logo_url || config.logo_url || "";
 
     printAttestationCoutumiere({
       reference: attestation.reference,
@@ -2431,7 +2435,7 @@ export default function Foncier() {
 
     if (isOnline) {
       const { error: auditError } = await withBackoff(() =>
-        logFoncierAudit(supabase, {
+        logFoncierAudit(dbClient, {
           lotId: lot.id,
           action: "IMPRESSION",
           details: {
@@ -2477,7 +2481,7 @@ export default function Foncier() {
 
     const { data, error } = await fetchLatestAttestationForLot(lot.id, {
       includeArchived: false,
-      select: "*, foncier_attestation_temoins(*)",
+      select: FONCIER_ATTESTATION_WITH_TEMOINS_SELECT,
     });
 
     if (error) {
@@ -2535,11 +2539,19 @@ export default function Foncier() {
           }))
         : temoinsPrint;
 
-    const villageKey3 = (lot.village || '').replace(/^(VILLAGE\s+DE\s+|VILLAGE\s+)/i, '').trim();
+    const villageKey3 = (lot.village || "")
+      .replace(/^(VILLAGE\s+DE\s+|VILLAGE\s+)/i, "")
+      .trim();
     const annexVillageLogoMedia = villageKey3
-      ? await getUsageForSlot('foncier_village', villageKey3, 'logo').catch(() => null)
+      ? await getUsageForSlot("foncier_village", villageKey3, "logo").catch(
+          () => null,
+        )
       : null;
-    const annexVillageLogoUrl = annexVillageLogoMedia?.url || config.village_logo_url || config.logo_url || '';
+    const annexVillageLogoUrl =
+      annexVillageLogoMedia?.url ||
+      config.village_logo_url ||
+      config.logo_url ||
+      "";
 
     printAttestationAnnex({
       reference: attestation.reference,
@@ -2695,131 +2707,174 @@ export default function Foncier() {
   ];
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 flex-1 w-full">
-          <div className="relative w-full sm:w-auto sm:min-w-[240px]">
-            <Search
-              size={16}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-            />
-            <input
-              ref={searchInputRef}
-              type="text"
-              placeholder="Réf, lot, propriétaire..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 w-full sm:w-64"
-            />
-          </div>
-          <select
-            value={filterStatut}
-            onChange={(e) => setFilterStatut(e.target.value)}
-            className="px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none bg-white w-full sm:w-auto"
-          >
-            <option value="">Tous statuts</option>
-            {Object.entries(statutConfig).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v.label}
-              </option>
-            ))}
-          </select>
-          <select
-            value={filterVillage}
-            onChange={(e) => setFilterVillage(e.target.value)}
-            className="px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none bg-white w-full sm:w-auto"
-          >
-            <option value="">Tous villages</option>
-            {villageOptions.map((village) => (
-              <option key={village} value={village}>
-                {village}
-              </option>
-            ))}
-          </select>
-          {!villageOptionsLoaded && isOnline && (
-            <span className="text-xs text-orange-600 flex items-center gap-1">
-              <RefreshCcw size={12} className="animate-spin" /> Chargement...
-            </span>
-          )}
-          <label className="inline-flex items-center gap-2 px-2 text-xs text-gray-600">
-            <input
-              type="checkbox"
-              checked={showArchived}
-              onChange={(e) => setShowArchived(e.target.checked)}
-            />
-            Afficher archivés
-          </label>
-        </div>
-        <div className="flex gap-2">
-          <div
-            className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-medium ${isOnline ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}
-          >
-            {isOnline ? <Wifi size={14} /> : <WifiOff size={14} />}
-            {isOnline ? "En ligne" : "Hors ligne"}
-          </div>
-          <button
-            onClick={() => void syncQueue()}
-            disabled={!isOnline || syncing || syncPending === 0}
-            title={
-              !isOnline
-                ? "Hors ligne"
-                : syncPending === 0
-                  ? "Aucune synchronisation en attente"
-                  : undefined
-            }
-            className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors ${disabledButtonClass}`}
-          >
-            <RefreshCcw size={16} className={syncing ? "animate-spin" : ""} />
-            {syncing ? "Sync..." : `Sync (${syncPending})`}
-          </button>
-
-          {/* Progress indicator pour la synchronisation */}
-          {syncProgress && syncProgress.total > 0 && (
-            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-blue-50 text-blue-700 text-xs font-medium">
-              <div className="flex items-center gap-1">
-                <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                <span>
-                  Sync: {syncProgress.current}/{syncProgress.total}
-                </span>
+    <div className="space-y-5">
+      <section className="overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 text-white shadow-sm">
+        <div className="px-5 py-6 sm:px-7 sm:py-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-3xl">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-white/80">
+                <Map size={14} />
+                Foncier
               </div>
-              <div className="flex-1 w-24 h-2 bg-blue-200 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-blue-600 transition-all duration-300"
-                  style={{
-                    width: `${(syncProgress.current / syncProgress.total) * 100}%`,
-                  }}
-                />
+              <h2 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">
+                Gestion des lots, attestations et contrôles
+              </h2>
+              <p className="mt-3 max-w-2xl text-sm leading-7 text-white/75 sm:text-base">
+                Une interface plus claire pour retrouver, vérifier, imprimer et
+                synchroniser les dossiers fonciers sans perdre la hiérarchie du
+                travail.
+              </p>
+            </div>
+            <div className="grid grid-cols-3 gap-3 sm:gap-4">
+              <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-center backdrop-blur-sm">
+                <div className="text-[11px] uppercase tracking-[0.18em] text-white/50">
+                  Lots
+                </div>
+                <div className="mt-1 text-2xl font-bold">{totalCount}</div>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-center backdrop-blur-sm">
+                <div className="text-[11px] uppercase tracking-[0.18em] text-white/50">
+                  Sync
+                </div>
+                <div className="mt-1 text-2xl font-bold">{syncPending}</div>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/8 px-4 py-3 text-center backdrop-blur-sm">
+                <div className="text-[11px] uppercase tracking-[0.18em] text-white/50">
+                  Villages
+                </div>
+                <div className="mt-1 text-2xl font-bold">
+                  {Object.keys(villageStats).length}
+                </div>
               </div>
             </div>
-          )}
-          <button
-            onClick={openAudit}
-            disabled={!canManage}
-            title={!canManage ? "Accès réservé" : undefined}
-            className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors ${disabledButtonClass}`}
-          >
-            <History size={16} /> Audit
-          </button>
-          <button
-            onClick={openConfig}
-            disabled={!canManage}
-            title={!canManage ? "Accès réservé" : undefined}
-            className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors ${disabledButtonClass}`}
-          >
-            <Settings2 size={16} /> Config Village
-          </button>
-          <button
-            onClick={openAdd}
-            disabled={!canManage}
-            title={!canManage ? "Accès réservé" : undefined}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm font-medium hover:opacity-90 transition-opacity ${disabledButtonClass}`}
-            style={{
-              backgroundColor: settings.primary_color,
-              color: "var(--color-on-primary)",
-            }}
-          >
-            <Plus size={16} /> Nouveau Lot
-          </button>
+          </div>
+        </div>
+      </section>
+
+      <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap flex-1 w-full">
+            <div className="relative w-full sm:w-auto sm:min-w-[260px]">
+              <Search
+                size={16}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Réf, lot, propriétaire..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-9 pr-4 text-sm outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100 sm:w-64"
+              />
+            </div>
+            <select
+              value={filterStatut}
+              onChange={(e) => setFilterStatut(e.target.value)}
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100 sm:w-auto"
+            >
+              <option value="">Tous statuts</option>
+              {Object.entries(statutConfig).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v.label}
+                </option>
+              ))}
+            </select>
+            <select
+              value={filterVillage}
+              onChange={(e) => setFilterVillage(e.target.value)}
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100 sm:w-auto"
+            >
+              <option value="">Tous villages</option>
+              {villageOptions.map((village) => (
+                <option key={village} value={village}>
+                  {village}
+                </option>
+              ))}
+            </select>
+            {!villageOptionsLoaded && isOnline && (
+              <span className="inline-flex items-center gap-1 text-xs text-amber-600">
+                <RefreshCcw size={12} className="animate-spin" /> Chargement...
+              </span>
+            )}
+            <label className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-medium text-slate-600">
+              <input
+                type="checkbox"
+                checked={showArchived}
+                onChange={(e) => setShowArchived(e.target.checked)}
+              />
+              Afficher archivés
+            </label>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <div
+              className={`flex items-center gap-1.5 rounded-2xl px-3 py-2.5 text-xs font-medium ${isOnline ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}
+            >
+              {isOnline ? <Wifi size={14} /> : <WifiOff size={14} />}
+              {isOnline ? "En ligne" : "Hors ligne"}
+            </div>
+            <button
+              onClick={() => void syncQueue()}
+              disabled={!isOnline || syncing || syncPending === 0}
+              title={
+                !isOnline
+                  ? "Hors ligne"
+                  : syncPending === 0
+                    ? "Aucune synchronisation en attente"
+                    : undefined
+              }
+              className={`inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 ${disabledButtonClass}`}
+            >
+              <RefreshCcw size={16} className={syncing ? "animate-spin" : ""} />
+              {syncing ? "Sync..." : `Sync (${syncPending})`}
+            </button>
+            {syncProgress && syncProgress.total > 0 && (
+              <div className="flex items-center gap-2 rounded-2xl bg-blue-50 px-3 py-2.5 text-xs font-medium text-blue-700">
+                <div className="flex items-center gap-1">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+                  <span>
+                    Sync: {syncProgress.current}/{syncProgress.total}
+                  </span>
+                </div>
+                <div className="h-2 w-24 overflow-hidden rounded-full bg-blue-200">
+                  <div
+                    className="h-full bg-blue-600 transition-all duration-300"
+                    style={{
+                      width: `${(syncProgress.current / syncProgress.total) * 100}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+            <button
+              onClick={openAudit}
+              disabled={!canManage}
+              title={!canManage ? "Accès réservé" : undefined}
+              className={`inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 ${disabledButtonClass}`}
+            >
+              <History size={16} /> Audit
+            </button>
+            <button
+              onClick={openConfig}
+              disabled={!canManage}
+              title={!canManage ? "Accès réservé" : undefined}
+              className={`inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 ${disabledButtonClass}`}
+            >
+              <Settings2 size={16} /> Config Village
+            </button>
+            <button
+              onClick={openAdd}
+              disabled={!canManage}
+              title={!canManage ? "Accès réservé" : undefined}
+              className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-95 ${disabledButtonClass}`}
+              style={{
+                backgroundColor: settings.primary_color,
+                color: "var(--color-on-primary)",
+              }}
+            >
+              <Plus size={16} /> Nouveau Lot
+            </button>
+          </div>
         </div>
       </div>
 
@@ -3681,17 +3736,68 @@ export default function Foncier() {
             <label className="block text-xs font-medium text-gray-600 mb-1">
               Village
             </label>
-            <select
-              value={configVillage}
-              onChange={(e) => void handleConfigVillageChange(e.target.value)}
-              className={inputClass}
-            >
-              {villageOptions.map((village) => (
-                <option key={village} value={village}>
-                  {village}
-                </option>
-              ))}
-            </select>
+            <div className="flex gap-2 items-center">
+              <select
+                value={configVillage}
+                onChange={(e) => void handleConfigVillageChange(e.target.value)}
+                className={inputClass}
+              >
+                {villageOptions.map((village) => (
+                  <option key={village} value={village}>
+                    {village}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!canManage) {
+                    setConfigError(
+                      "Accès refusé. Vous ne pouvez pas ajouter de village.",
+                    );
+                    return;
+                  }
+                  const name = window.prompt("Nom du nouveau village :");
+                  if (!name || !name.trim()) return;
+                  if (!isOnline) {
+                    setConfigError(
+                      "Connexion requise pour ajouter un village.",
+                    );
+                    return;
+                  }
+                  setConfigError(null);
+                  try {
+                    const result = await withBackoff(() =>
+                      dbClient.from("foncier_villages").insert({
+                        nom: name.trim(),
+                        region: configForm.region || null,
+                        commune: configForm.commune || null,
+                        departement: configForm.departement || null,
+                      }),
+                    );
+                    if ((result as any)?.error) {
+                      setConfigError(
+                        "Impossible d'ajouter le village. Vérifiez vos droits.",
+                      );
+                      return;
+                    }
+                    // Mettre à jour la liste locale sans recharger
+                    setVillageOptions((prev) => {
+                      const next = Array.from(new Set([...prev, name.trim()]));
+                      return next.sort();
+                    });
+                    setConfigVillage(name.trim());
+                    setVillageOptionsLoaded(true);
+                  } catch (e) {
+                    console.error(e);
+                    setConfigError("Erreur lors de l'ajout du village.");
+                  }
+                }}
+                className={`px-3 py-2 text-xs rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 ${disabledButtonClass}`}
+              >
+                + Ajouter
+              </button>
+            </div>
           </div>
           {configError && (
             <div
@@ -3871,38 +3977,50 @@ export default function Foncier() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-3 text-sm text-blue-900">
                 <div>
-                  <div className="text-xs font-medium text-blue-600 mb-1">Référence</div>
+                  <div className="text-xs font-medium text-blue-600 mb-1">
+                    Référence
+                  </div>
                   <div className="font-semibold text-blue-950">
                     {attestationLot?.reference || "—"}
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs font-medium text-blue-600 mb-1">Propriétaire</div>
+                  <div className="text-xs font-medium text-blue-600 mb-1">
+                    Propriétaire
+                  </div>
                   <div className="font-semibold text-blue-950">
                     {attestationLot?.proprietaire_prenom || "—"}{" "}
                     {attestationLot?.proprietaire_nom || ""}
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs font-medium text-blue-600 mb-1">Village</div>
+                  <div className="text-xs font-medium text-blue-600 mb-1">
+                    Village
+                  </div>
                   <div className="font-semibold text-blue-950">
                     {attestationLot?.village || "—"}
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs font-medium text-blue-600 mb-1">Lotissement</div>
+                  <div className="text-xs font-medium text-blue-600 mb-1">
+                    Lotissement
+                  </div>
                   <div className="font-semibold text-blue-950">
                     {attestationLot?.nom_lotissement || "—"}
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs font-medium text-blue-600 mb-1">Numéro lot</div>
+                  <div className="text-xs font-medium text-blue-600 mb-1">
+                    Numéro lot
+                  </div>
                   <div className="font-semibold text-blue-950">
                     {attestationLot?.numero_lot || "—"}
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs font-medium text-blue-600 mb-1">Superficie</div>
+                  <div className="text-xs font-medium text-blue-600 mb-1">
+                    Superficie
+                  </div>
                   <div className="font-semibold text-blue-950">
                     {attestationLot?.superficie
                       ? `${attestationLot.superficie} m²`
@@ -4493,7 +4611,9 @@ export default function Foncier() {
               disabled={attestationSaving || !canManage}
               className="flex-1 px-4 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {attestationSaving ? "⏳ Traitement..." : "✓ Soumettre & Imprimer"}
+              {attestationSaving
+                ? "⏳ Traitement..."
+                : "✓ Soumettre & Imprimer"}
             </button>
           </div>
         </div>

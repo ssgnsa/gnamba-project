@@ -11,6 +11,7 @@ import {
   emptyConfig,
   createEmptyForm,
   createAttestationForm,
+  villages as fallbackVillages,
 } from "../components/foncier/FoncierConstants";
 
 /**
@@ -56,8 +57,7 @@ export function useFoncierState() {
 
   // ============ VILLAGES ============
   const [villageOptions, setVillageOptions] = useState<string[]>([
-    "Sikensi",
-    "Katadji",
+    ...fallbackVillages,
   ]);
   const [villageOptionsLoaded, setVillageOptionsLoaded] = useState(false);
   const [villageStats, setVillageStats] = useState<

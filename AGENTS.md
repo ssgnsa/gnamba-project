@@ -32,8 +32,7 @@ Migrations are in `supabase/migrations/` as sequential SQL files. The schema use
 In this shared workspace:
 
 - EGS owns `supabase/migrations/`
-- SomAgro owns `somagro-erp/supabase/migrations/`
-- Do not mix the two migration chains
+- Do not mix active EGS migrations with archived references
 
 ### Docker
 

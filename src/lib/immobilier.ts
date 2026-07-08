@@ -7,7 +7,7 @@ import type { Tenant, Property, LeaseContract, RentPayment } from "../types";
 
 /**
  * Résout le nom complet d'un locataire depuis différents contextes
- * Gère les jointures Supabase et les données nullable
+ * Gère les jointures API locale et les données nullable
  */
 export function getTenantName(
   tenant:
@@ -83,14 +83,14 @@ export function getPropertyAddress(
 }
 
 /**
- * Extrait le locataire d'un contrat (jointure Supabase)
+ * Extrait le locataire d'un contrat (jointure API locale)
  */
 export function getTenantFromContract(contract: LeaseContract): Tenant | null {
   return (contract.locataires as unknown as Tenant) || null;
 }
 
 /**
- * Extrait la propriété d'un contrat (jointure Supabase)
+ * Extrait la propriété d'un contrat (jointure API locale)
  */
 export function getPropertyFromContract(
   contract: LeaseContract,
@@ -99,14 +99,14 @@ export function getPropertyFromContract(
 }
 
 /**
- * Extrait le locataire d'un paiement (jointure Supabase)
+ * Extrait le locataire d'un paiement (jointure API locale)
  */
 export function getTenantFromPayment(payment: RentPayment): Tenant | null {
   return (payment.locataires as unknown as Tenant) || null;
 }
 
 /**
- * Extrait la propriété d'un paiement (jointure Supabase)
+ * Extrait la propriété d'un paiement (jointure API locale)
  */
 export function getPropertyFromPayment(payment: RentPayment): Property | null {
   return (payment.properties as unknown as Property) || null;

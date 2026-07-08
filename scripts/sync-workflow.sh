@@ -2,11 +2,10 @@
 
 # ============================================
 # WORKFLOW DE SYNCHRONISATION EGS
-# Synchronisation parfaite entre Local ↔ Cloud
+# Synchronisation parfaite entre Développement Local ↔ Serveur Local via tunnel
 # ============================================
 # URLs cibles:
-# - https://gnambaservices.ci/ (Production Cloud)
-# - http://192.168.1.58/login (Serveur Local)
+# - http://localhost/ (Serveur local)
 # - http://localhost:8080/login (Développement Local)
 # ============================================
 
@@ -31,8 +30,7 @@ NC='\033[0m'
 # Configuration des environnements
 declare -A ENVIRONMENTS=(
     ["local-dev"]="http://localhost:8080/login"
-    ["local-server"]="http://192.168.1.58/login"
-    ["cloud-prod"]="https://gnambaservices.ci/"
+    ["local-server"]="http://localhost/login"
 )
 
 # Fonctions utilitaires
@@ -48,7 +46,7 @@ die() {
 
 usage() {
     cat <<EOF
-Workflow de synchronisation EGS - Local ↔ Cloud
+Workflow de synchronisation EGS - Local ↔ Tunnel
 
 USAGE:
     $0 <command> [options]
@@ -63,14 +61,13 @@ COMMANDES:
 
 ENVIRONMENTS:
     local-dev           http://localhost:8080/login (développement)
-    local-server        http://192.168.1.58/login (serveur local)
-    cloud-prod          https://gnambaservices.ci/ (production)
+    local-server        https://gnambaservices.ci/login (serveur local)
 
 EXEMPLES:
     $0 status
-    $0 sync local-dev cloud-prod
+    $0 sync local-dev local-server
     $0 deploy local-server
-    $0 backup cloud-prod
+    $0 backup local-server
     $0 verify
 
 EOF
@@ -121,28 +118,19 @@ show_status() {
     fi
     echo
 
-    # État du serveur local
-    echo "🏠 SERVEUR LOCAL (192.168.1.58)"
-    if server_reachable "192.168.1.58" 80; then
+    # État du serveur local exposé via tunnel
+    echo "🏠 SERVEUR LOCAL (gnambaservices.ci)"
+    if server_reachable "gnambaservices.ci" 443; then
         echo "   ✅ Serveur: Accessible"
     else
         echo "   ❌ Serveur: Inaccessible"
     fi
     echo
 
-    # État de la production cloud
-    echo "☁️  PRODUCTION CLOUD (gnambaservices.ci)"
-    if cloud_reachable; then
-        echo "   ✅ Cloud: Accessible"
-    else
-        echo "   ❌ Cloud: Inaccessible"
-    fi
-    echo
-
     # État des bases de données
     echo "🗄️  BASES DE DONNÉES"
     echo "   Local: $(get_db_status "local")"
-    echo "   Cloud: $(get_db_status "cloud")"
+    echo "   Tunnel: $(get_db_status "local-server")"
     echo
 
     # Dernières synchronisations
@@ -169,7 +157,7 @@ server_reachable() {
 
 # Vérifie si le cloud est accessible
 cloud_reachable() {
-    curl -s --max-time 10 "https://gnambaservices.ci/" >/dev/null 2>&1
+    curl -s --max-time 10 "http://localhost/" >/dev/null 2>&1
 }
 
 # Vérifie l'état des bases de données
@@ -198,19 +186,6 @@ supabase_local_running() {
     supabase status 2>/dev/null | grep -q "running"
 }
 
-# Vérifie si la DB cloud est accessible
-cloud_db_reachable() {
-    # Test de connexion à la DB cloud via les credentials
-    # Cette fonction devrait être implémentée selon vos credentials
-    curl -s --max-time 5 "https://thykrnoqgylrbfupophs.supabase.co/rest/v1/" \
-         -H "apikey: $(get_cloud_api_key)" >/dev/null 2>&1
-}
-
-# Récupère la clé API cloud depuis .env.server
-get_cloud_api_key() {
-    grep "VITE_SUPABASE_ANON_KEY" "$ROOT_DIR/.env.server" | cut -d'=' -f2
-}
-
 # Synchronise les données entre environnements
 sync_data() {
     local source="$1"
@@ -223,7 +198,8 @@ sync_data() {
     validate_environment "$target"
 
     if [[ "$source" == "$target" ]]; then
-        die "Source et target ne peuvent pas être identiques"
+        log_info "Source et target identiques: aucun transfert requis"
+        return 0
     fi
 
     # Créer un backup de la source
@@ -234,18 +210,6 @@ sync_data() {
     case "$source-$target" in
         "local-dev-local-server")
             sync_local_to_server
-            ;;
-        "local-dev-cloud-prod")
-            sync_local_to_cloud
-            ;;
-        "local-server-cloud-prod")
-            sync_server_to_cloud
-            ;;
-        "cloud-prod-local-dev")
-            sync_cloud_to_local
-            ;;
-        "cloud-prod-local-server")
-            sync_cloud_to_server
             ;;
         "local-server-local-dev")
             sync_server_to_local
@@ -286,28 +250,9 @@ create_backup() {
             # Backup de la DB locale
             supabase db dump -f "$backup_file"
             ;;
-        cloud-prod)
-            # Backup de la DB cloud
-            backup_cloud_db "$backup_file"
-            ;;
     esac
 
     log_info "Backup créé: $backup_file"
-}
-
-# Backup de la DB cloud
-backup_cloud_db() {
-    local output_file="$1"
-
-    # Utiliser pg_dump avec les credentials cloud
-    local db_url
-    db_url=$(get_cloud_db_url)
-
-    if [[ -z "$db_url" ]]; then
-        die "URL de base de données cloud non configurée"
-    fi
-
-    pg_dump "$db_url" > "$output_file"
 }
 
 # Trim whitespace, quotes and trailing semicolons
@@ -359,25 +304,6 @@ get_local_db_url() {
     echo "postgresql://postgres:${password}@localhost:54322/postgres"
 }
 
-get_cloud_db_url() {
-    local supabase_url
-    local password
-    supabase_url=$(read_env_value "$ROOT_DIR/.env.server" "VITE_SUPABASE_URL" || true)
-    password=$(read_env_value "$ROOT_DIR/.env.server" "SUPABASE_DB_PASSWORD" || true)
-
-    if [[ -z "$supabase_url" || -z "$password" ]]; then
-        die "VITE_SUPABASE_URL ou SUPABASE_DB_PASSWORD introuvable dans .env.server"
-    fi
-
-    local project_ref
-    project_ref=$(parse_project_ref_from_url "$supabase_url")
-    if [[ -z "$project_ref" ]]; then
-        die "Impossible de parser le project ref depuis VITE_SUPABASE_URL"
-    fi
-
-    echo "postgresql://postgres:${password}@db.${project_ref}.supabase.co:5432/postgres"
-}
-
 dump_remote_database() {
     local db_url="$1"
     local output_file="$2"
@@ -421,54 +347,12 @@ sync_local_to_server() {
     stop_local_server
     start_local_server
 
-    log_info "Aucun transfert de base de données requis : local-server utilise déjà la base cloud"
-}
-
-sync_local_to_cloud() {
-    log_info "Synchronisation développement local → production cloud"
-
-    build_for_production
-    if ! supabase_local_running; then
-        supabase start
-    fi
-
-    local dump_file="$ROOT_DIR/.sync/local-to-cloud-$(date +%Y%m%d_%H%M%S).sql"
-    dump_remote_database "$(get_local_db_url)" "$dump_file"
-    restore_database "$(get_cloud_db_url)" "$dump_file"
-
-    deploy_to_cloud
-}
-
-sync_server_to_cloud() {
-    log_info "Synchronisation serveur local → production cloud"
-    log_info "Le serveur local utilise déjà la base cloud. Le déploiement cloud sera exécuté."
-    build_for_production
-    deploy_to_cloud
-}
-
-sync_cloud_to_local() {
-    log_info "Synchronisation production cloud → développement local"
-
-    if ! supabase_local_running; then
-        supabase start
-    fi
-
-    local dump_file="$ROOT_DIR/.sync/cloud-to-local-$(date +%Y%m%d_%H%M%S).sql"
-    dump_remote_database "$(get_cloud_db_url)" "$dump_file"
-    restore_database "$(get_local_db_url)" "$dump_file"
-}
-
-sync_cloud_to_server() {
-    log_info "Synchronisation production cloud → serveur local"
-    log_info "La base de données est partagée ; redéploiement du frontend local-server."
-    build_for_production
-    stop_local_server
-    start_local_server
+    log_info "Aucun transfert de base de données requis : local-server utilise déjà la base locale"
 }
 
 sync_server_to_local() {
     log_info "Synchronisation serveur local → développement local"
-    sync_cloud_to_local
+    sync_local_to_server
 }
 
 # Fonctions de gestion du serveur local
@@ -525,47 +409,6 @@ build_for_production() {
 }
 
 # Déploiement cloud
-deploy_to_cloud() {
-    log_info "Déploiement vers le cloud..."
-
-    local deploy_method="${ENV_CONFIG["cloud-prod:deploy_method"]:-manual}"
-    case "$deploy_method" in
-        rsync)
-            deploy_cloud_via_rsync
-            ;;
-        ftp)
-            deploy_cloud_via_ftp
-            ;;
-        manual|*)
-            log_warn "Déploiement cloud manuel requis"
-            log_info "Fichiers buildés dans: $ROOT_DIR/dist/"
-            log_info "Déployez manuellement vers gnambaservices.ci"
-            ;;
-    esac
-}
-
-deploy_cloud_via_rsync() {
-    local host="${ENV_CONFIG["cloud-prod:deploy_host"]:-}"
-    local path="${ENV_CONFIG["cloud-prod:deploy_path"]:-}"
-    local user="${ENV_CONFIG["cloud-prod:deploy_user"]:-}"
-
-    if [[ -z "$host" || -z "$path" ]]; then
-        die "cloud-prod:deploy_host ou cloud-prod:deploy_path non configuré dans .sync-config"
-    fi
-
-    if [[ -z "$user" ]]; then
-        user="$USER"
-    fi
-
-    log_info "Déploiement cloud via rsync vers $user@$host:$path"
-    rsync -avz --delete --exclude='.git' --exclude='node_modules' "$ROOT_DIR/dist/" "$user@$host:$path"
-}
-
-deploy_cloud_via_ftp() {
-    log_warn "Déploiement FTP non configuré"
-    log_info "Ajoutez les paramètres FTP dans .sync-config pour activer cette option."
-}
-
 # Enregistre une synchronisation
 log_sync() {
     local source="$1"
@@ -589,9 +432,6 @@ deploy_to_env() {
         local-server)
             deploy_local_server
             ;;
-        cloud-prod)
-            deploy_cloud_prod
-            ;;
         *)
             die "Environnement de déploiement inconnu: $env"
             ;;
@@ -613,14 +453,14 @@ deploy_local_dev() {
 
     # Configurer pour le mode local
     export VITE_SUPABASE_MODE=local
-    export VITE_SUPABASE_LOCAL_URL=http://localhost:54321
+    export VITE_SUPABASE_LOCAL_URL="${VITE_SUPABASE_LOCAL_URL:-http://localhost:54321}"
 
     if [[ -z "${VITE_SUPABASE_LOCAL_ANON_KEY:-}" ]]; then
         log_warn "VITE_SUPABASE_LOCAL_ANON_KEY n'est pas défini. Assurez-vous que .env local contient la clé appropriée."
     fi
 
     # Démarrer le serveur de développement
-    npm run dev
+    bash -lc 'export NVM_DIR="$HOME/.nvm"; [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"; nvm use 20 >/dev/null 2>&1 || true; npm run dev'
 }
 
 deploy_local_server() {
@@ -632,22 +472,11 @@ deploy_local_server() {
 
     # Configurer pour le serveur local
     export WEB_PORT=80
-    export VITE_SUPABASE_MODE=cloud  # Le serveur local utilise le cloud
+    export VITE_SUPABASE_MODE=local
+    export VITE_SUPABASE_LOCAL_URL="${VITE_SUPABASE_LOCAL_URL:-https://api.gnambaservices.ci}"
 
     # Démarrer le container serveur
     start_local_server
-}
-
-deploy_cloud_prod() {
-    log_info "Déploiement production cloud..."
-    cd "$ROOT_DIR"
-
-    # Build pour production
-    build_for_production
-
-    # Déployer les fichiers (manuel pour l'instant)
-    log_warn "Déploiement cloud manuel requis vers gnambaservices.ci"
-    log_info "Fichiers buildés dans: $ROOT_DIR/dist/"
 }
 
 # Vérifie la cohérence entre environnements
@@ -707,11 +536,11 @@ check_configurations() {
     # Vérifier les clés API
     local local_key
     local server_key
-    local_key=$(grep "VITE_SUPABASE_ANON_KEY" "$local_env" | cut -d'=' -f2 || echo "")
-    server_key=$(grep "VITE_SUPABASE_ANON_KEY" "$server_env" | cut -d'=' -f2 || echo "")
+    local_key=$(grep "VITE_SUPABASE_LOCAL_ANON_KEY" "$local_env" | cut -d'=' -f2 || echo "")
+    server_key=$(grep "VITE_SUPABASE_LOCAL_ANON_KEY" "$server_env" | cut -d'=' -f2 || echo "")
 
     if [[ "$local_key" != "$server_key" ]]; then
-        log_warn "Clés API différentes entre local et serveur"
+        log_warn "Clés API locales différentes entre local et serveur"
         return 1
     fi
 
@@ -728,15 +557,9 @@ check_accessibility() {
         ((accessible++))
     fi
 
-    # Tester 192.168.1.58
-    if ! server_reachable "192.168.1.58" 80; then
-        log_warn "192.168.1.58:80 non accessible"
-        ((accessible++))
-    fi
-
-    # Tester gnambaservices.ci
-    if ! cloud_reachable; then
-        log_warn "gnambaservices.ci non accessible"
+    # Tester le serveur local exposé via tunnel
+    if ! server_reachable "gnambaservices.ci" 443; then
+        log_warn "gnambaservices.ci:443 non accessible"
         ((accessible++))
     fi
 

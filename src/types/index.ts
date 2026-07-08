@@ -1,3 +1,32 @@
+// ============================================
+// AUTH TYPES (replaces API locale types)
+// ============================================
+
+/**
+ * Represents an authenticated user session
+ * Replaces API locale User type
+ */
+export interface AuthUser {
+  id: string;
+  email?: string;
+  phone?: string;
+  user_metadata?: Record<string, any>;
+  app_metadata?: Record<string, any>;
+  aud?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface LiveDataChange<T = any> {
+  type: "INSERT" | "UPDATE" | "DELETE";
+  table: string;
+  schema: string;
+  record: T | null;
+  old_record: T | null;
+  new_record: T | null;
+  errors?: string[] | null;
+}
+
 export interface AppSettings {
   id: string;
   key: string;
@@ -259,6 +288,7 @@ export interface FoncierLot {
   nom_lotissement: string;
   quartier: string;
   village: string;
+  village_id?: string | null;
   lotissement_id?: string | null;
   ilot_id?: string | null;
   commune: string;
@@ -311,6 +341,34 @@ export interface FoncierLot {
   total_count?: number;
 }
 
+export interface VitrineLot {
+  id: string;
+  reference: string;
+  titre: string;
+  description: string;
+  village: string;
+  quartier: string;
+  commune: string;
+  departement: string;
+  region: string;
+  superficie: number;
+  prix_vente: number;
+  statut: "disponible" | "reserve" | "vendu";
+  documents: string;
+  caracteristiques: string[];
+  image_url: string;
+  image_alt: string;
+  contact_phone: string;
+  contact_email: string;
+  publier_sur_vitrine: boolean;
+  ordre_affichage: number;
+  notes: string;
+  created_by?: string | null;
+  updated_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface FoncierGpsPoint {
   label: string;
   lat: number;
@@ -349,6 +407,7 @@ export interface FoncierAttestation {
   qr_payload?: string | null;
   signature_numerique?: string | null;
   hash_sha256?: string | null;
+  reference_sequence?: number | null;
   control_number?: string | null;
   signature_nonce?: string | null;
   signature_issued_at?: string | null;
@@ -368,6 +427,12 @@ export interface FoncierAttestation {
   revoke_reason?: string | null; // Motif de révocation
   revoked_at?: string | null; // Date de révocation
   revoked_by?: string | null; // ID utilisateur révocation
+  verify_url?: string | null;
+  pdf_path?: string | null;
+  pdf_generated_at?: string | null;
+  printed_by?: string | null;
+  printed_at?: string | null;
+  print_count?: number | null;
   created_by?: string | null;
   created_at: string;
   updated_at: string;
@@ -394,7 +459,8 @@ export interface FoncierConfig {
 }
 
 export interface FoncierVillage {
-  name: string;
+  id: string;
+  nom: string;
   code: string;
   region: string;
   departement: string;

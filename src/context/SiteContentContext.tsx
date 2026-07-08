@@ -6,7 +6,7 @@ import {
   useState,
   ReactNode,
 } from "react";
-import { supabase } from "../lib/supabase";
+import { apiClient } from "../api/client";
 
 interface SiteContentRow {
   section: string;
@@ -32,14 +32,15 @@ export function SiteContentProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     void (async () => {
       try {
-        const { data, error } = await supabase
-          .from("site_content")
-          .select("section, key, value");
+        const result = await apiClient.siteContent.getAll();
 
         if (cancelled) return;
-        if (data) setRows(data);
-        if (error && import.meta.env.DEV)
-          console.error("SiteContentContext: error loading content", error);
+        if (result.data) setRows(result.data);
+        if (result.error && import.meta.env.DEV)
+          console.error(
+            "SiteContentContext: error loading content",
+            result.error,
+          );
       } finally {
         if (!cancelled) setLoading(false);
       }

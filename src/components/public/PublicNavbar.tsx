@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, type MouseEvent } from "react";
-import { Menu, X, LogIn } from "lucide-react";
+import { Menu, X, LogIn, MessageCircle } from "lucide-react";
 import { useSettings } from "../../context/SettingsContext";
 import BrandLogo from "../BrandLogo";
 import { PUBLIC_PAGE_PATHS, type PublicPage } from "../../lib/publicRoutes";
+import { OFFICIAL_CONTACT, buildWhatsAppUrl } from "../../lib/officialContact";
 
 interface PublicNavbarProps {
   activePage: PublicPage;
@@ -18,7 +19,7 @@ const navLinks: { id: PublicPage; label: string; href: string }[] = [
     label: "Réalisations",
     href: PUBLIC_PAGE_PATHS.realisations,
   },
-  { id: "lots", label: "Lots fonciers", href: PUBLIC_PAGE_PATHS.lots },
+  { id: "lots", label: "Lots à vendre", href: PUBLIC_PAGE_PATHS.lots },
   { id: "contact", label: "Contact", href: PUBLIC_PAGE_PATHS.contact },
 ];
 
@@ -82,7 +83,8 @@ export default function PublicNavbar({
 
   // Déterminer la couleur à utiliser
   const primaryColor = settings.primary_color || "#1e40af";
-  const appCompany = settings.app_company || "Gnamba Services";
+  const appCompany = OFFICIAL_CONTACT.companyName;
+  const whatsappUrl = buildWhatsAppUrl(OFFICIAL_CONTACT.phone);
   const logoInitials = appCompany
     .split(" ")
     .filter(Boolean)
@@ -131,7 +133,7 @@ export default function PublicNavbar({
               <div
                 className={`text-xs leading-tight transition-colors ${scrolled || menuOpen ? "text-blue-600" : "text-blue-200"}`}
               >
-                BTP · Immobilier · Foncier
+                Immobilier · Foncier sécurisé · Lotissement · Lots à vendre · BTP
               </div>
             </div>
           </a>
@@ -162,6 +164,16 @@ export default function PublicNavbar({
           </nav>
 
           <div className="hidden lg:flex items-center gap-3">
+            <a
+              href={whatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-semibold transition-all duration-200 shadow-sm hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+              style={{ backgroundColor: "#25D366" }}
+            >
+              <MessageCircle size={15} />
+              WhatsApp
+            </a>
             <a
               href={PUBLIC_PAGE_PATHS.login}
               onClick={(event) => handleLinkClick(event, "login")}
@@ -206,6 +218,16 @@ export default function PublicNavbar({
             </a>
           ))}
           <div className="pt-2 border-t border-gray-100 mt-2">
+            <a
+              href={whatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-white rounded-xl text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 mb-2"
+              style={{ backgroundColor: "#25D366" }}
+            >
+              <MessageCircle size={15} />
+              WhatsApp
+            </a>
             <a
               href={PUBLIC_PAGE_PATHS.login}
               onClick={(event) => handleLinkClick(event, "login")}

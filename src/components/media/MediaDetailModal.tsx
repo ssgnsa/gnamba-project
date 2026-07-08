@@ -13,7 +13,9 @@ import {
   MapPin,
   Save,
 } from "lucide-react";
-import { supabase } from "../../lib/supabase";
+import { apiClient } from "../../api/client";
+import { isSelfHostedMode } from "../../lib/selfHosted";
+import dbClient from "../../data/tableClient";
 import { useAuth } from "../../context/AuthContext";
 import {
   getMediaUsages,
@@ -111,7 +113,20 @@ export default function MediaDetailModal({
     }
     setSaving(true);
     setSaveError(null);
-    const { data, error } = await supabase
+    if (isSelfHostedMode()) {
+      const result = await apiClient.media.update(file.id, {
+        alt_text: altText,
+        description,
+        tags,
+        updated_at: new Date().toISOString(),
+      });
+      if (result.error) setSaveError(result.error);
+      else if (result.data) onUpdate(result.data as MediaFile);
+      setSaving(false);
+      return;
+    }
+
+    const { data, error } = await dbClient
       .from("media_files")
       .update({
         alt_text: altText,
@@ -156,7 +171,9 @@ export default function MediaDetailModal({
       <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl p-8 text-center">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-700 mx-auto mb-4" />
-          <p className="text-sm text-gray-500">Vérification de l'authentification...</p>
+          <p className="text-sm text-gray-500">
+            Vérification de l'authentification...
+          </p>
         </div>
       </div>
     );
@@ -166,7 +183,9 @@ export default function MediaDetailModal({
     return (
       <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl p-8 text-center">
-          <h3 className="text-lg font-semibold text-amber-900 mb-2">Accès refusé</h3>
+          <h3 className="text-lg font-semibold text-amber-900 mb-2">
+            Accès refusé
+          </h3>
           <p className="text-sm text-amber-700 mb-4">
             Vous devez être connecté pour voir les détails de ce média.
           </p>
@@ -438,7 +457,9 @@ export default function MediaDetailModal({
                   </div>
 
                   {saveError && (
-                    <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{saveError}</p>
+                    <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                      {saveError}
+                    </p>
                   )}
                   <div className="pt-3 flex justify-end">
                     <button

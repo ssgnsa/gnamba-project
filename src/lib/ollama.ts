@@ -62,8 +62,16 @@ export interface OllamaModel {
   };
 }
 
-const isLocalHost = (host: string): boolean =>
-  ["localhost", "127.0.0.1", "::1"].includes(host);
+import { isLikelyLoopback } from "./loopback";
+
+const isLocalHost = (host: string): boolean => {
+  if (!import.meta.env.DEV) return false;
+  try {
+    return isLikelyLoopback(host);
+  } catch {
+    return false;
+  }
+};
 
 const shouldSkipLocalEndpoint = (baseUrl: string): boolean => {
   if (typeof window === "undefined") return false;
@@ -78,9 +86,12 @@ const shouldSkipLocalEndpoint = (baseUrl: string): boolean => {
   }
 };
 
-const defaultOllamaUrl =
-  import.meta.env.VITE_OLLAMA_URL || "http://localhost:11434";
-const runtimeAllowsEndpoint = !shouldSkipLocalEndpoint(defaultOllamaUrl);
+const defaultOllamaUrl = import.meta.env.DEV
+  ? import.meta.env.VITE_OLLAMA_URL || "http://ollama.local:11434"
+  : import.meta.env.VITE_OLLAMA_URL || "";
+const runtimeAllowsEndpoint = defaultOllamaUrl
+  ? !shouldSkipLocalEndpoint(defaultOllamaUrl)
+  : false;
 export const isOllamaEnabled =
   import.meta.env.VITE_ENABLE_OLLAMA === "true" && runtimeAllowsEndpoint;
 
@@ -89,8 +100,7 @@ class OllamaClient {
   private defaultModel: string;
 
   constructor(baseUrl?: string, defaultModel?: string) {
-    this.baseUrl =
-      baseUrl || import.meta.env.VITE_OLLAMA_URL || "http://localhost:11434";
+    this.baseUrl = baseUrl || import.meta.env.VITE_OLLAMA_URL || "";
     this.defaultModel =
       defaultModel || import.meta.env.VITE_OLLAMA_MODEL || "llama3.1:8b";
   }
@@ -388,7 +398,7 @@ Réponds UNIQUEMENT avec ce format JSON:
    * Pre-built prompt for natural language query to database
    */
   createDatabaseQueryPrompt(question: string): string {
-    return `Tu es un assistant qui traduit les questions en français vers des requêtes Supabase.
+    return `Tu es un assistant qui traduit les questions en français vers des requêtes API locale.
 
 Question: "${question}"
 

@@ -1,0 +1,44 @@
+BEGIN
+SELECT 4
+SELECT 4
+SELECT 4
+                       note                        
+---------------------------------------------------
+ *** SANS EMAIL NI TELEPHONE (creation forcee) ***
+(1 row)
+
+ count 
+-------
+     0
+(1 row)
+
+              note               
+---------------------------------
+ *** PARTIES UNIQUES A CREER ***
+(1 row)
+
+ count 
+-------
+     4
+(1 row)
+
+                             note                              
+---------------------------------------------------------------
+ *** LIGNES FUSIONNEES (rattachees a une partie existante) ***
+(1 row)
+
+ count 
+-------
+     0
+(1 row)
+
+                             note                             
+--------------------------------------------------------------
+ *** DOUBLONS INTER-TABLES (le vrai signal qu on cherche) ***
+(1 row)
+
+ merge_key | nb_tables | nb_lignes 
+-----------+-----------+-----------
+(0 rows)
+
+ROLLBACK

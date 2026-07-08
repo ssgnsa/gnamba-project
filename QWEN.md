@@ -137,7 +137,7 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 docker-compose up -d
 ```
 
-### Serveur production (192.168.1.58)
+### Serveur production (REDACTED_LEGACY_HOST)
 
 ```bash
 # .env avec Supabase Cloud

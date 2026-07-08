@@ -3,6 +3,18 @@ import type { AttestationForm } from "../components/foncier/FoncierConstants";
 import type { FoncierLot } from "../types";
 import { parseNumberInput } from "../utils/reference";
 
+export const FONCIER_ATTESTATION_TEMOIN_SELECT =
+  "id, attestation_id, nom, prenom, profession, telephone, cni, empreinte_url, created_at";
+
+export const FONCIER_ATTESTATION_SELECT =
+  "id, lot_id, reference, version, type, statut, date_etablissement, date_expiration, mode_acquisition, historique_possession, domicile, cedant_nom, cedant_prenom, cedant_cni_numero, cedant_telephone, cedant_domicile, limites_nord, limites_sud, limites_est, limites_ouest, gps_lat, gps_lng, gps_precision, gps_points, registre_volume, registre_page, registre_ligne, numero_enregistrement, qr_payload, signature_numerique, hash_sha256, reference_sequence, control_number, signature_nonce, signature_issued_at, validation_agent_nom, validation_agent_id, validation_agent_date, validation_chef_nom, validation_chef_id, validation_chef_date, proprietaire_photo_url, proprietaire_empreinte_url, chef_signature_manuscrite_requise, chef_empreinte_url, temoin_empreinte_urls, revoke_reason, revoked_at, revoked_by, verify_url, pdf_path, pdf_generated_at, printed_by, printed_at, print_count, created_by, created_at, updated_at, client_updated_at, last_modified_device_id, deleted_at";
+
+export const FONCIER_ATTESTATION_WITH_TEMOINS_SELECT =
+  `${FONCIER_ATTESTATION_SELECT}, foncier_attestation_temoins(${FONCIER_ATTESTATION_TEMOIN_SELECT})`;
+
+export const FONCIER_LOT_SELECT =
+  "id, reference, numero_lot, numero_ilot, ilot, nom_lotissement, quartier, village, village_id, lotissement_id, ilot_id, commune, departement, region, superficie, code_barre, latitude, longitude, gps_precision, limite_nord_lat, limite_nord_lng, limite_sud_lat, limite_sud_lng, limite_est_lat, limite_est_lng, limite_ouest_lat, limite_ouest_lng, proprietaire_nom, proprietaire_prenom, proprietaire_naissance_date, proprietaire_naissance_lieu, proprietaire_cni_numero, proprietaire_cni_date, proprietaire_cni_lieu, proprietaire_profession, proprietaire_telephone, chef_village, arrete_prefectoral, arrete_date, statut, publier_sur_vitrine, date_cession, prix_cession, notes, created_at, updated_at, deleted_at, deleted_by, deleted_reason, client_updated_at, last_modified_device_id, row_version, retention_until";
+
 export const sanitizeText = (value: string | null | undefined): string => {
   if (!value) return "";
   return DOMPurify.sanitize(value.trim(), {

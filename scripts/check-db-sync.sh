@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================================
 # check-db-sync.sh — Vérifie la cohérence entre le code React et la base DB
-# Usage: bash scripts/check-db-sync.sh [--local|--cloud]
+# Usage: bash scripts/check-db-sync.sh [--local|--remote]
 # ============================================================================
 set -euo pipefail
 
@@ -38,7 +38,7 @@ echo "🗄️  Vérification dans la base de données..."
 
 if [ "$MODE" = "--local" ]; then
   DB_URL="postgresql://postgres:postgres@localhost:54322/postgres"
-elif [ "$MODE" = "--cloud" ]; then
+elif [ "$MODE" = "--remote" ]; then
   # Read from .env
   source .env 2>/dev/null || true
   if [ -n "${SUPABASE_DB_PASSWORD:-}" ]; then

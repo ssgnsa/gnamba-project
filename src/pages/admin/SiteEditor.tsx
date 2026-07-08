@@ -12,7 +12,7 @@ import {
   Check,
   Layers,
 } from "lucide-react";
-import { supabase } from "../../lib/supabase";
+import dbClient from "../../data/tableClient";
 import MediaPicker from "../../components/media/MediaPicker";
 import PageBuilder from "../../components/page-builder/PageBuilder";
 
@@ -81,9 +81,9 @@ export default function SiteEditor() {
 
   const fetchAll = async () => {
     const [c, r, m] = await Promise.all([
-      supabase.from("site_content").select("*").order("section").order("key"),
-      supabase.from("site_realisations").select("*").order("sort_order"),
-      supabase
+      dbClient.from("site_content").select("*").order("section").order("key"),
+      dbClient.from("site_realisations").select("*").order("sort_order"),
+      dbClient
         .from("contact_messages")
         .select("*")
         .order("created_at", { ascending: false }),
@@ -106,7 +106,7 @@ export default function SiteEditor() {
     try {
       const toSave = contents.filter((c) => c.section === activeSection);
       for (const item of toSave) {
-        const { error } = await supabase
+        const { error } = await dbClient
           .from("site_content")
           .update({ value: item.value, updated_at: new Date().toISOString() })
           .eq("id", item.id);
@@ -146,13 +146,13 @@ export default function SiteEditor() {
       };
 
       if (editingReal.id) {
-        const { error } = await supabase
+        const { error } = await dbClient
           .from("site_realisations")
           .update(payload)
           .eq("id", editingReal.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("site_realisations").insert({
+        const { error } = await dbClient.from("site_realisations").insert({
           ...payload,
           sort_order: realisations.length + 1,
         });
@@ -173,13 +173,19 @@ export default function SiteEditor() {
 
   const deleteRealisation = async (id: string) => {
     if (!confirm("Supprimer cette réalisation ?")) return;
-    const { error } = await supabase.from("site_realisations").delete().eq("id", id);
-    if (error) { setSaveError(error.message); return; }
+    const { error } = await dbClient
+      .from("site_realisations")
+      .delete()
+      .eq("id", id);
+    if (error) {
+      setSaveError(error.message);
+      return;
+    }
     setRealisations((prev) => prev.filter((r) => r.id !== id));
   };
 
   const markMessageRead = async (id: string) => {
-    await supabase
+    await dbClient
       .from("contact_messages")
       .update({ status: "read" })
       .eq("id", id);
@@ -743,7 +749,7 @@ export default function SiteEditor() {
                   <a
                     href={`mailto:${selectedMsg.email}?subject=Re: ${selectedMsg.subject || "Votre message"}`}
                     onClick={() =>
-                      supabase
+                      dbClient
                         .from("contact_messages")
                         .update({ status: "replied" })
                         .eq("id", selectedMsg.id)

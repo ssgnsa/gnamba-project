@@ -33,113 +33,98 @@ ensure_command() {
 
 ensure_app() {
   case "${1:-}" in
-    egs|somagro) ;;
-    *) die "Application invalide: ${1:-<vide>} (attendu: egs | somagro)" ;;
+    egs) ;;
+    *) die "Application invalide: ${1:-<vide>} (attendu: egs)" ;;
   esac
 }
 
 app_label() {
   case "$1" in
     egs) echo "EGS" ;;
-    somagro) echo "SomAgro" ;;
   esac
 }
 
 app_dir() {
   case "$1" in
     egs) echo "$WORKSPACE_ROOT" ;;
-    somagro) echo "$WORKSPACE_ROOT/somagro-erp" ;;
   esac
 }
 
 app_project_id() {
   case "$1" in
     egs) echo "gnamba-project" ;;
-    somagro) echo "somagro-erp" ;;
   esac
 }
 
 app_mode_key() {
   case "$1" in
     egs) echo "VITE_SUPABASE_MODE" ;;
-    somagro) echo "SOMAGRO_SUPABASE_MODE" ;;
   esac
 }
 
 app_mode_legacy_key() {
   case "$1" in
     egs) echo "SUPABASE_MODE" ;;
-    somagro) echo "" ;;
   esac
 }
 
 app_env_file() {
   case "$1" in
     egs) echo "$WORKSPACE_ROOT/.env" ;;
-    somagro) echo "$WORKSPACE_ROOT/somagro-erp/.env.server" ;;
   esac
 }
 
 app_env_example() {
   case "$1" in
     egs) echo "$WORKSPACE_ROOT/.env.local.example ou $WORKSPACE_ROOT/.env.example" ;;
-    somagro) echo "$WORKSPACE_ROOT/somagro-erp/.env.server.example" ;;
   esac
 }
 
 app_api_port() {
   case "$1" in
     egs) echo "54321" ;;
-    somagro) echo "55321" ;;
   esac
 }
 
 app_db_port() {
   case "$1" in
     egs) echo "54322" ;;
-    somagro) echo "55322" ;;
   esac
 }
 
 app_studio_port() {
   case "$1" in
     egs) echo "54323" ;;
-    somagro) echo "55323" ;;
   esac
 }
 
 app_inbucket_port() {
   case "$1" in
     egs) echo "54324" ;;
-    somagro) echo "55324" ;;
   esac
 }
 
 app_frontend_port() {
   case "$1" in
     egs) echo "8080" ;;
-    somagro) echo "8082" ;;
   esac
 }
 
 app_frontend_compose() {
   case "$1" in
     egs) echo "$WORKSPACE_ROOT/docker-compose.server.yml" ;;
-    somagro) echo "$WORKSPACE_ROOT/docker-compose.somagro.server.yml" ;;
   esac
 }
 
 app_migrations_dir() {
   case "$1" in
     egs) echo "$WORKSPACE_ROOT/supabase/migrations" ;;
-    somagro) echo "$WORKSPACE_ROOT/somagro-erp/supabase/migrations" ;;
   esac
 }
 
 app_db_container() {
   case "$1" in
     egs) echo "supabase_db_gnamba-project" ;;
-    somagro) echo "supabase_db_somagro-erp" ;;
   esac
 }
 
@@ -259,9 +244,8 @@ assert_mode_allowed() {
   local mode="$2"
 
   case "$app:$mode" in
-    egs:local|egs:cloud|egs:auto) ;;
-    somagro:local|somagro:cloud|somagro:hybrid) ;;
-    *) die "Mode invalide pour $(app_label "$app"): $mode" ;;
+    egs:local) ;;
+    *) die "Mode invalide pour $(app_label "$app"): $mode (mode local uniquement)" ;;
   esac
 }
 

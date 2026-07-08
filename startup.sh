@@ -11,15 +11,25 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
+# Charger NVM pour garantir que node/npm sont disponibles même hors shell interactif.
+export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+if [ -s "$NVM_DIR/nvm.sh" ]; then
+    # shellcheck disable=SC1090
+    . "$NVM_DIR/nvm.sh"
+fi
+if command -v nvm >/dev/null 2>&1; then
+    nvm use 20 >/dev/null 2>&1 || true
+fi
+
 # Charger les variables d'environnement
 if [ -f "/home/soma/gnamba-project/.env" ]; then
     export $(grep -v '^#' /home/soma/gnamba-project/.env | xargs)
 fi
 
 # Valeurs par défaut
-VITE_SUPABASE_URL="${VITE_SUPABASE_URL:-https://thykrnoqgylrbfupophs.supabase.co}"
-VITE_SUPABASE_ANON_KEY="${VITE_SUPABASE_ANON_KEY:-sb_publishable_K2AvUraEL_URgy91DbLcyQ_wDPtmWuu}"
-VITE_SUPABASE_MODE="${VITE_SUPABASE_MODE:-cloud}"
+VITE_SUPABASE_LOCAL_URL="${VITE_SUPABASE_LOCAL_URL:-${VITE_LOCAL_API_URL:-}}"
+VITE_SUPABASE_LOCAL_ANON_KEY="${VITE_SUPABASE_LOCAL_ANON_KEY:-}"
+VITE_SUPABASE_MODE="${VITE_SUPABASE_MODE:-local}"
 
 echo -e "${BLUE}╔════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║     🚀 DÉMARRAGE EGS + FILEBROWSER + SERVICES          ║${NC}"
@@ -61,9 +71,12 @@ echo -e "${BLUE}[3/7] Démarrage Filebrowser...${NC}"
 if docker ps | grep -q "filebrowser"; then
     echo -e "${GREEN}✅ Filebrowser déjà démarré${NC}"
 else
-    # Créer la DB si elle n'existe pas
-    if [ ! -f "/home/soma/filebrowser.db" ]; then
-        touch /home/soma/filebrowser.db
+    # Stocker la base Filebrowser dans un répertoire dédié et writable.
+    FILEBROWSER_DATA_DIR="/home/soma/.filebrowser"
+    FILEBROWSER_DB="$FILEBROWSER_DATA_DIR/filebrowser.db"
+    mkdir -p "$FILEBROWSER_DATA_DIR"
+    if [ ! -f "$FILEBROWSER_DB" ]; then
+        touch "$FILEBROWSER_DB"
     fi
     # Créer le dossier partage si besoin
     if [ ! -d "/home/soma/partage" ]; then
@@ -76,7 +89,7 @@ else
         --restart unless-stopped \
         -p 8081:80 \
         -v /home/soma/partage:/srv \
-        -v /home/soma/filebrowser.db:/database.db \
+        -v "$FILEBROWSER_DB:/database.db" \
         -e FB_DATABASE=/database.db \
         -e FB_ROOT=/srv \
         filebrowser/filebrowser:latest
@@ -113,8 +126,8 @@ docker run -d \
     --network gnamba-network \
     --restart unless-stopped \
     -p 8080:80 \
-    -e VITE_SUPABASE_URL="$VITE_SUPABASE_URL" \
-    -e VITE_SUPABASE_ANON_KEY="$VITE_SUPABASE_ANON_KEY" \
+    -e VITE_SUPABASE_LOCAL_URL="$VITE_SUPABASE_LOCAL_URL" \
+    -e VITE_SUPABASE_LOCAL_ANON_KEY="$VITE_SUPABASE_LOCAL_ANON_KEY" \
     -e VITE_SUPABASE_MODE="$VITE_SUPABASE_MODE" \
     egs-web:runtime
 

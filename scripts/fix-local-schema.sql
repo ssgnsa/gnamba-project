@@ -1,5 +1,5 @@
 -- ============================================
--- Fix Schema Local pour matcher Cloud
+-- Fix Schema Local pour matcher le schéma distant
 -- À exécuter dans Supabase SQL Editor (local)
 -- ============================================
 

@@ -2,7 +2,7 @@
  * FilebrowserIframe - Intégration Filebrowser via iframe
  * 
  * Architecture: Filebrowser comme composant technique, pas système maître
- * - Authentification déléguée à EGS (Supabase Auth)
+ * - Authentification déléguée à EGS (API locale Auth)
  * - Filebrowser accessible uniquement si utilisateur EGS authentifié
  * - Pas de double authentification
  */

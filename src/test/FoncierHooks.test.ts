@@ -2,21 +2,27 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 
 // Mock des dépendances
-vi.mock("../lib/supabase", () => ({
-  supabase: {
-    rpc: vi.fn(),
-    from: vi.fn(() => ({
-      select: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          order: vi.fn(() => ({
-            range: vi.fn(() => ({
-              count: vi.fn(),
-            })),
+const mockDataClient = {
+  rpc: vi.fn(),
+  from: vi.fn(() => ({
+    select: vi.fn(() => ({
+      eq: vi.fn(() => ({
+        order: vi.fn(() => ({
+          range: vi.fn(() => ({
+            count: vi.fn(),
           })),
         })),
       })),
     })),
-  },
+  })),
+};
+
+vi.mock("../lib/dbClient", () => ({
+  dbClient: mockDataClient,
+}));
+
+vi.mock("../data/tableClient", () => ({
+  default: mockDataClient,
 }));
 
 vi.mock("../hooks/useFoncierSync", () => ({
@@ -31,7 +37,7 @@ describe("Foncier Hooks Tests", () => {
   describe("useFoncierData", () => {
     it("should fetch lots successfully", async () => {
       const { useFoncierData } = await import("../hooks/useFoncierData");
-      const { supabase } = await import("../lib/supabase");
+      const dbClient = (await import("../data/tableClient")).default;
       const { withBackoff } = await import("../hooks/useFoncierSync");
 
       const mockLots = [
@@ -46,7 +52,7 @@ describe("Foncier Hooks Tests", () => {
         },
       ];
 
-      (supabase.rpc as any).mockResolvedValue({
+      (dbClient.rpc as any).mockResolvedValue({
         data: mockLots,
         error: null,
       });
@@ -67,7 +73,7 @@ describe("Foncier Hooks Tests", () => {
       expect(result.error).toBeNull();
       expect(result.data).toEqual(mockLots);
       expect(result.total).toBe(1);
-      expect(supabase.rpc).toHaveBeenCalledWith("search_foncier_lots", {
+      expect(dbClient.rpc).toHaveBeenCalledWith("search_foncier_lots", {
         p_search: "",
         p_village: "",
         p_quartier: "",
@@ -83,7 +89,7 @@ describe("Foncier Hooks Tests", () => {
 
     it("should fetch village stats successfully", async () => {
       const { useFoncierData } = await import("../hooks/useFoncierData");
-      const { supabase } = await import("../lib/supabase");
+      const dbClient = (await import("../data/tableClient")).default;
       const { withBackoff } = await import("../hooks/useFoncierSync");
 
       const mockStats = [
@@ -94,7 +100,7 @@ describe("Foncier Hooks Tests", () => {
         },
       ];
 
-      (supabase.rpc as any).mockResolvedValue({
+      (dbClient.rpc as any).mockResolvedValue({
         data: mockStats,
         error: null,
       });
@@ -112,12 +118,12 @@ describe("Foncier Hooks Tests", () => {
 
     it("should handle fetch errors", async () => {
       const { useFoncierData } = await import("../hooks/useFoncierData");
-      const { supabase } = await import("../lib/supabase");
+      const dbClient = (await import("../data/tableClient")).default;
       const { withBackoff } = await import("../hooks/useFoncierSync");
 
       const mockError = { message: "Database error" };
 
-      (supabase.rpc as any).mockResolvedValue({
+      (dbClient.rpc as any).mockResolvedValue({
         data: null,
         error: mockError,
       });
@@ -144,7 +150,7 @@ describe("Foncier Hooks Tests", () => {
   describe("useFoncierAudit", () => {
     it("should fetch audit records successfully", async () => {
       const { useFoncierAudit } = await import("../hooks/useFoncierAudit");
-      const { supabase } = await import("../lib/supabase");
+      const dbClient = (await import("../data/tableClient")).default;
       const { withBackoff } = await import("../hooks/useFoncierSync");
 
       const mockAuditData = [
@@ -154,13 +160,15 @@ describe("Foncier Hooks Tests", () => {
           action: "create",
           performed_by: "user-1",
           performed_at: "2024-01-01T00:00:00Z",
-          foncier_lots: { reference: "TEST-001", numero_lot: "25", village: "Sikensi" },
+          foncier_lots: {
+            reference: "TEST-001",
+            numero_lot: "25",
+            village: "Sikensi",
+          },
         },
       ];
 
-      const mockProfilesData = [
-        { id: "user-1", full_name: "Test User" },
-      ];
+      const mockProfilesData = [{ id: "user-1", full_name: "Test User" }];
 
       const mockQuery = {
         order: vi.fn().mockReturnThis(),
@@ -180,7 +188,7 @@ describe("Foncier Hooks Tests", () => {
         }),
       };
 
-      (supabase.from as any).mockReturnValue({
+      (dbClient.from as any).mockReturnValue({
         select: vi.fn().mockReturnValue(mockQuery),
       });
 
@@ -201,7 +209,9 @@ describe("Foncier Hooks Tests", () => {
       const { result: hookResult } = renderHook(() => useFoncierAudit());
       const result = await hookResult.current.fetchAudit(1, 20, "", false);
 
-      expect(result.error).toBe("Mode hors-ligne : journal d'audit indisponible.");
+      expect(result.error).toBe(
+        "Mode hors-ligne : journal d'audit indisponible.",
+      );
       expect(result.data).toBeNull();
       expect(result.total).toBe(0);
     });

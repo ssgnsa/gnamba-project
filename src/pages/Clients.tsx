@@ -9,17 +9,30 @@ import {
   ChevronRight,
   HardHat,
 } from "lucide-react";
-import { supabase } from "../lib/supabase";
+import { clientsRepository } from "../data/clients.repository";
 import { Client } from "../types";
 import Modal from "../components/ui/Modal";
 import Badge from "../components/ui/Badge";
+import SyncRemoteButton from "../components/ui/SyncRemoteButton";
 import { useSettings } from "../context/SettingsContext";
 import MobileCard from "../components/ui/MobileCard";
+import { useNotifications } from "../context/NotificationContext";
 import { useAuth } from "../context/AuthContext";
 import {
   getDemoBlockMessage,
   shouldBlockDestructiveAction,
 } from "../lib/demoMode";
+import {
+  type ManualSyncMeta,
+  isPendingSync,
+  normalizeManualStatus,
+  readManualCache,
+  writeManualCache,
+} from "../lib/manualSyncStore";
+
+const CLIENTS_CACHE_KEY = "egs.clients.local_cache.v1";
+
+type LocalClient = Client & ManualSyncMeta;
 
 const CLIENTS_PER_PAGE = 20;
 
@@ -51,6 +64,25 @@ const emptyForm = {
   notes: "",
 };
 
+function toLocalClient(
+  client: Client,
+  syncStatus: ManualSyncMeta["sync_status"] = "synced",
+): LocalClient {
+  return {
+    ...client,
+    sync_status: syncStatus,
+    sync_error: null,
+    deleted_at: null,
+  };
+}
+
+function sortClients(items: LocalClient[]): LocalClient[] {
+  return [...items].sort(
+    (a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  );
+}
+
 // Validation helpers
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const IVORIAN_PHONE_REGEX =
@@ -80,7 +112,8 @@ function validatePhone(phone: string): string | null {
 export default function Clients() {
   const { settings } = useSettings();
   const { user, profile } = useAuth();
-  const [clients, setClients] = useState<Client[]>([]);
+  const { showToast } = useNotifications();
+  const [clients, setClients] = useState<LocalClient[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("");
@@ -88,6 +121,7 @@ export default function Clients() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const destructiveActionsDisabled = shouldBlockDestructiveAction(
@@ -101,13 +135,42 @@ export default function Clients() {
 
   const fetchClients = async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from("clients")
-      .select("*")
-      .order("created_at", { ascending: false });
-    setClients(data || []);
-    setLoading(false);
+    const cached = sortClients(
+      readManualCache<LocalClient>(CLIENTS_CACHE_KEY).map((client) => ({
+        ...client,
+        sync_status: normalizeManualStatus(client.sync_status),
+        sync_error: client.sync_error ?? null,
+        deleted_at: client.deleted_at ?? null,
+      })),
+    );
+
+    if (cached.length > 0) {
+      setClients(cached);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const result = await clientsRepository.getAll({ limit: 100 });
+      const seeded = sortClients(
+        (result.data?.items || []).map((client: Client) => toLocalClient(client)),
+      );
+      setClients(seeded);
+      writeManualCache(CLIENTS_CACHE_KEY, seeded);
+    } catch (error) {
+      console.error("Error fetching clients:", error);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const persistClients = (items: LocalClient[]) => {
+    const next = sortClients(items);
+    setClients(next);
+    writeManualCache(CLIENTS_CACHE_KEY, next);
+  };
+
+  const pendingSyncCount = clients.filter(isPendingSync).length;
 
   const openAdd = () => {
     setForm(emptyForm);
@@ -148,19 +211,32 @@ export default function Clients() {
 
     setSaving(true);
     setFormError(null);
+
     try {
-      if (editingId) {
-        const { error } = await supabase
-          .from("clients")
-          .update({ ...form, updated_at: new Date().toISOString() })
-          .eq("id", editingId);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("clients").insert(form);
-        if (error) throw error;
-      }
+      const now = new Date().toISOString();
+      const existing = clients.find((client) => client.id === editingId);
+      const localClient: LocalClient = {
+        ...(existing ?? {}),
+        id: existing?.id ?? crypto.randomUUID(),
+        nom: form.nom.trim(),
+        prenom: form.prenom.trim(),
+        telephone: form.telephone.trim(),
+        email: form.email.trim(),
+        adresse: form.adresse.trim(),
+        type_client: form.type_client,
+        notes: form.notes.trim(),
+        created_at: existing?.created_at ?? now,
+        updated_at: now,
+        sync_status: "pending",
+        sync_error: null,
+        deleted_at: null,
+      };
+
+      const nextClients = clients
+        .filter((client) => client.id !== localClient.id)
+        .concat(localClient);
+      persistClients(nextClients);
       setModalOpen(false);
-      fetchClients();
     } catch (error) {
       setFormError(
         error instanceof Error
@@ -172,15 +248,123 @@ export default function Clients() {
     }
   };
 
+  const handleSyncToRemote = async () => {
+    if (!user) {
+      setFormError("Vous devez être connecté pour synchroniser.");
+      return;
+    }
+
+    const pending = clients.filter(isPendingSync);
+    if (pending.length === 0) {
+      setFormError("Aucun client local à synchroniser.");
+      return;
+    }
+
+    setSyncing(true);
+    setFormError(null);
+
+    const next = [...clients];
+    let syncedCount = 0;
+    let failedCount = 0;
+
+    try {
+      for (const client of clients) {
+        if (client.sync_status === "synced") continue;
+
+        if (client.sync_status === "deleted") {
+          try {
+            await clientsRepository.delete(client.id);
+            const index = next.findIndex((item) => item.id === client.id);
+            if (index >= 0) next.splice(index, 1);
+            syncedCount += 1;
+          } catch (error) {
+            failedCount += 1;
+            const index = next.findIndex((item) => item.id === client.id);
+            if (index >= 0)
+              next[index] = {
+                ...next[index],
+                sync_error:
+                  error instanceof Error ? error.message : "Erreur inconnue",
+              };
+          }
+          continue;
+        }
+
+        const payload = {
+          nom: client.nom,
+          prenom: client.prenom,
+          telephone: client.telephone,
+          email: client.email,
+          adresse: client.adresse,
+          type_client: client.type_client,
+          notes: client.notes,
+        };
+
+        try {
+          if (editingId === client.id) {
+            // Update existing
+            await clientsRepository.update(client.id, payload);
+          } else {
+            // Create new
+            await clientsRepository.create(payload);
+          }
+          const index = next.findIndex((item) => item.id === client.id);
+          if (index >= 0) {
+            next[index] = {
+              ...next[index],
+              sync_status: "synced",
+              sync_error: null,
+            };
+          }
+          syncedCount += 1;
+        } catch (error) {
+          failedCount += 1;
+          const index = next.findIndex((item) => item.id === client.id);
+          if (index >= 0)
+            next[index] = {
+              ...next[index],
+              sync_error:
+                error instanceof Error ? error.message : "Erreur inconnue",
+            };
+        }
+      }
+
+      persistClients(next.filter((client) => client.sync_status !== "deleted"));
+      setModalOpen(false);
+      showToast(
+        failedCount === 0 ? "success" : "error",
+        failedCount === 0
+          ? "Synchronisation terminée"
+          : "Synchronisation partielle",
+        failedCount === 0
+          ? `${syncedCount} client${syncedCount > 1 ? "s" : ""} synchronisé${syncedCount > 1 ? "s" : ""} vers le serveur distant.`
+          : `${syncedCount} client${syncedCount > 1 ? "s" : ""} synchronisé${syncedCount > 1 ? "s" : ""}, ${failedCount} en échec.`,
+      );
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (destructiveActionsDisabled) {
       window.alert(getDemoBlockMessage());
       return;
     }
     if (!confirm("Supprimer ce client ?")) return;
-    const { error } = await supabase.from("clients").delete().eq("id", id);
-    if (error) { setFormError(error.message); return; }
-    fetchClients();
+    const now = new Date().toISOString();
+    const next = clients
+      .map((client) => {
+        if (client.id !== id) return client;
+        if (client.sync_status === "pending") return null;
+        return {
+          ...client,
+          sync_status: "deleted" as const,
+          deleted_at: now,
+          updated_at: now,
+        };
+      })
+      .filter(Boolean) as LocalClient[];
+    persistClients(next);
   };
 
   const navigateToProjets = useCallback((clientId: string) => {
@@ -252,7 +436,20 @@ export default function Clients() {
         >
           <Plus size={16} /> Nouveau Client
         </button>
+        <SyncRemoteButton
+          pendingCount={pendingSyncCount}
+          syncing={syncing}
+          onClick={() => void handleSyncToRemote()}
+          className="w-full sm:w-auto"
+        />
       </div>
+
+      {(pendingSyncCount > 0 || syncing) && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          {pendingSyncCount} client{pendingSyncCount > 1 ? "s" : ""} en attente
+          de synchronisation.
+        </div>
+      )}
 
       <div className="egs-panel overflow-hidden">
         {loading ? (

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabase";
+import dbClient from "../data/tableClient";
+import { clientsRepository } from "../data/clients.repository";
 import { useSettings } from "../context/SettingsContext";
 import {
   TrendingUp,
@@ -56,30 +57,34 @@ export default function Statistiques() {
         supRes,
         projStatRes,
       ] = await Promise.all([
-        supabase.from("clients").select("id", { count: "exact", head: true }),
-        supabase.from("projects").select("id", { count: "exact", head: true }),
-        supabase
+        clientsRepository.getAll({ limit: 1000 }),
+        dbClient.from("projects").select("id", { count: "exact", head: true }),
+        dbClient
           .from("properties")
           .select("id", { count: "exact", head: true }),
-        supabase.from("products").select("id", { count: "exact", head: true }),
-        supabase
+        dbClient.from("products").select("id", { count: "exact", head: true }),
+        dbClient
           .from("finances")
           .select("montant, type_transaction, date_transaction"),
-        supabase.from("employees").select("id", { count: "exact", head: true }),
-        supabase.from("suppliers").select("id", { count: "exact", head: true }),
-        supabase.from("projects").select("statut"),
+        dbClient.from("employees").select("id", { count: "exact", head: true }),
+        dbClient.from("suppliers").select("id", { count: "exact", head: true }),
+        dbClient.from("projects").select("statut"),
       ]);
 
-      const finances = finRes.data || [];
+      const finances = (finRes.data || []) as Array<{
+        montant?: number | string | null;
+        type_transaction?: string | null;
+        date_transaction?: string | null;
+      }>;
       const totalRecettes = finances
         .filter((f) => f.type_transaction === "recette")
-        .reduce((s, f) => s + Number(f.montant || 0), 0);
+        .reduce((s: number, f) => s + Number(f.montant || 0), 0);
       const totalDepenses = finances
         .filter((f) => f.type_transaction === "depense")
-        .reduce((s, f) => s + Number(f.montant || 0), 0);
+        .reduce((s: number, f) => s + Number(f.montant || 0), 0);
 
       setTotals({
-        clients: cliRes.count || 0,
+        clients: cliRes.data?.total || 0,
         projects: projRes.count || 0,
         properties: propRes.count || 0,
         products: prodRes.count || 0,

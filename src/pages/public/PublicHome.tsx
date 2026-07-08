@@ -9,16 +9,20 @@ import {
   Star,
   Award,
   ArrowRight,
+  MessageCircle,
   Phone,
   Mail,
   Send,
   ChevronRight,
 } from "lucide-react";
-import { supabase } from "../../lib/supabase";
+import dbClient from "../../data/tableClient";
 import { useSiteContent } from "../../context/SiteContentContext";
 import { useSettings } from "../../context/SettingsContext";
 import type { PublicPage } from "../../lib/publicRoutes";
+import type { VitrineLot } from "../../types";
+import { formatMontant } from "../../utils/reference";
 import PublicSocialWall from "../../components/public/PublicSocialWall";
+import { OFFICIAL_CONTACT, buildWhatsAppUrl } from "../../lib/officialContact";
 
 interface Realisation {
   id: string;
@@ -96,26 +100,34 @@ const getCategoryLabel = (category: string): string => {
   return category;
 };
 
+function normalizeHeroTitle(rawTitle: string, companyName: string): string {
+  const fallback = "BTP, immobilier et foncier sécurisés";
+  const title = rawTitle.trim().replace(/\s+/g, " ");
+  if (!title) return fallback;
+
+  const lowerTitle = title.toLowerCase();
+  const lowerCompany = companyName.toLowerCase();
+
+  if (
+    lowerTitle.includes(lowerCompany) ||
+    /^bienvenue\b/i.test(title) ||
+    /^accueil\b/i.test(title)
+  ) {
+    return fallback;
+  }
+
+  return title;
+}
+
 export default function PublicHome({ onNavigate }: Props) {
   const { get } = useSiteContent();
   const { settings } = useSettings();
   const primaryColor = settings.primary_color || "#1e40af";
-  const appCompany = settings.app_company || "Gnamba Services";
-  const normalizePhoneForWhatsApp = (value: string) => {
-    const digits = value.replace(/\D/g, "");
-    if (!digits) return "";
-    if (digits.startsWith("225")) return digits;
-    if (digits.startsWith("0") && digits.length === 10) {
-      return `225${digits.slice(1)}`;
-    }
-    if (digits.length === 8) {
-      return `225${digits}`;
-    }
-    return digits;
-  };
+  const appCompany = OFFICIAL_CONTACT.companyName;
 
   const [realisations, setRealisations] = useState<Realisation[]>([]);
   const [loadingRealisations, setLoadingRealisations] = useState(true);
+  const [featuredLots, setFeaturedLots] = useState<VitrineLot[]>([]);
   const [form, setForm] = useState<ContactForm>({
     name: "",
     phone: "",
@@ -186,7 +198,7 @@ export default function PublicHome({ onNavigate }: Props) {
   useEffect(() => {
     void (async () => {
       try {
-        const { data, error } = await supabase
+        const { data, error } = await dbClient
           .from("site_realisations")
           .select("id, title, description, category, year, location, image_url")
           .eq("featured", true)
@@ -198,6 +210,25 @@ export default function PublicHome({ onNavigate }: Props) {
       } finally {
         setLoadingRealisations(false);
       }
+    })();
+  }, []);
+
+  useEffect(() => {
+    void (async () => {
+      const { data, error } = await dbClient
+        .from("vitrine_lots")
+        .select("*")
+        .eq("publier_sur_vitrine", true)
+        .order("ordre_affichage", { ascending: true })
+        .order("created_at", { ascending: false })
+        .limit(3);
+
+      if (error) {
+        setFeaturedLots([]);
+        return;
+      }
+
+      setFeaturedLots((data as VitrineLot[]) || []);
     })();
   }, []);
 
@@ -236,7 +267,7 @@ export default function PublicHome({ onNavigate }: Props) {
     setSending(true);
 
     try {
-      const { error } = await supabase.from("contact_messages").insert({
+      const { error } = await dbClient.from("contact_messages").insert({
         name: form.name.trim(),
         phone: form.phone.trim(),
         email: form.email.trim(),
@@ -267,35 +298,42 @@ export default function PublicHome({ onNavigate }: Props) {
   const heroTitle = get(
     "hero",
     "title",
-    "BTP, immobilier et foncier pour faire avancer vos projets",
+    "L'expertise qui transforme vos opportunités en patrimoine.",
   );
+  const heroHeadline = normalizeHeroTitle(heroTitle, appCompany);
   const heroSubtitle = get(
     "hero",
     "subtitle",
-    "Entreprise multiservices en Côte d'Ivoire, nous accompagnons particuliers, promoteurs et entreprises avec un suivi sérieux, des devis rapides et un vrai relais commercial.",
+    "De l'acquisition du terrain à la livraison clé en main, GNAMBA SERVICES accompagne votre projet de A à Z.",
   );
-  const ctaPrimary = get("hero", "cta_primary", "Demander un devis");
-  const ctaSecondary = get("hero", "cta_secondary", "Découvrir nos services");
-  const primaryTarget: PublicPage =
-    /service|découvr|decouvr/i.test(ctaPrimary) ? "services" : "contact";
-  const secondaryTarget: PublicPage =
-    /service|découvr|decouvr/i.test(ctaSecondary) ? "services" : "contact";
+  const ctaPrimary = get("hero", "cta_primary", "Demander un devis gratuit");
+  const ctaSecondary = get("hero", "cta_secondary", "Voir nos réalisations");
+  const primaryTarget: PublicPage = /réalisations|realisations/i.test(
+    ctaPrimary,
+  )
+    ? "realisations"
+    : /service|découvr|decouvr/i.test(ctaPrimary)
+      ? "services"
+      : "contact";
+  const secondaryTarget: PublicPage = /réalisations|realisations/i.test(
+    ctaSecondary,
+  )
+    ? "realisations"
+    : /service|découvr|decouvr/i.test(ctaSecondary)
+      ? "services"
+      : "contact";
   // Use settings.hero_background_url first, fallback to site_content
   const heroBg =
     settings.hero_background_url || get("hero", "background_url", "");
 
-  const statsProjects = get("about", "stats_projects", "150+");
-  const statsClients = get("about", "stats_clients", "300+");
-  const statsYears = get("about", "stats_years", "10+");
-  const statsEmployees = get("about", "stats_employees", "50+");
+  const statsProjects = get("about", "stats_projects", "50+");
+  const statsClients = get("about", "stats_clients", "100+");
+  const statsYears = get("about", "stats_years", "5+");
+  const statsEmployees = get("about", "stats_employees", "3 régions");
 
-  const contactPhone = settings.contact_phone || get("contact", "phone", "");
-  const contactEmail =
-    settings.contact_email ||
-    get("contact", "email", "contact@gnambaservices.ci");
-  const whatsappLink = contactPhone
-    ? `https://wa.me/${normalizePhoneForWhatsApp(contactPhone)}`
-    : "";
+  const contactPhone = OFFICIAL_CONTACT.phone;
+  const contactEmail = OFFICIAL_CONTACT.email;
+  const whatsappLink = buildWhatsAppUrl(OFFICIAL_CONTACT.phone);
 
   const services = [
     {
@@ -303,10 +341,10 @@ export default function PublicHome({ onNavigate }: Props) {
       title: get("services", "btp_title", "BTP & Construction"),
       color: "blue",
       items: [
-        "Villas, immeubles et locaux commerciaux",
-        "Rénovation et réhabilitation",
+        "Villas, immeubles et rénovation",
         "Suivi de chantier et contrôle qualité",
-        "Études techniques et accompagnement",
+        "Livraison clé en main",
+        "Devis rapide sous 48h",
       ],
       page: "services" as PublicPage,
     },
@@ -315,34 +353,38 @@ export default function PublicHome({ onNavigate }: Props) {
       title: get("services", "immobilier_title", "Immobilier"),
       color: "sky",
       items: [
-        "Gestion locative résidentielle et commerciale",
-        "Vente et acquisition de biens",
-        "Conseil en investissement",
-        "Syndic et valorisation du patrimoine",
+        "Achat et vente de biens",
+        "Gestion locative",
+        "Conseil patrimonial",
+        "Accompagnement des dossiers",
       ],
       page: "services" as PublicPage,
     },
     {
       icon: Map,
-      title: get("services", "foncier_title", "Foncier"),
+      title: get("services", "foncier_title", "Foncier sécurisé"),
       color: "emerald",
       items: [
-        "Gestion de terrains et lotissements",
-        "Régularisation foncière",
-        "Dossiers fonciers et attestations",
+        "Vérification documentaire",
+        "ACD, compulsoire et cadastre",
         "Bornage et sécurisation des parcelles",
+        "Achat terrain sans risque",
       ],
       page: "services" as PublicPage,
     },
     {
       icon: Package,
-      title: get("services", "fournitures_title", "Fournitures Pro"),
+      title: get(
+        "services",
+        "fournitures_title",
+        "Fournitures professionnelles",
+      ),
       color: "amber",
       items: [
-        "Mobilier de bureau et aménagement",
-        "Équipements chantier et consommables",
-        "Fournitures professionnelles",
-        "Maintenance et accompagnement",
+        "Mobilier de bureau",
+        "Équipements et consommables",
+        "Solutions pour PME et chantiers",
+        "Livraison rapide",
       ],
       page: "services" as PublicPage,
     },
@@ -408,19 +450,18 @@ export default function PublicHome({ onNavigate }: Props) {
           <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5 mb-8">
             <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
             <span className="text-white/90 text-sm font-medium">
-              Entreprise certifiée · Abidjan, Côte d'Ivoire
+              Entreprise certifiée · Sikensi, Côte d'Ivoire
             </span>
           </div>
 
           <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold text-white leading-tight mb-6 max-w-4xl mx-auto">
-            {appCompany} –{" "}
             <span
-              className="text-transparent bg-clip-text"
+              className="block text-transparent bg-clip-text"
               style={{
                 backgroundImage: `linear-gradient(135deg, ${primaryColor}40 0%, ${primaryColor}80 100%)`,
               }}
             >
-              {heroTitle}
+              {heroHeadline}
             </span>
           </h1>
 
@@ -458,6 +499,7 @@ export default function PublicHome({ onNavigate }: Props) {
                 className="flex items-center justify-center gap-2 px-8 py-4 bg-emerald-500/90 hover:bg-emerald-500 text-white rounded-2xl font-semibold text-base transition-all duration-200 shadow-lg"
                 aria-label="Contacter l'équipe par WhatsApp"
               >
+                <MessageCircle size={18} aria-hidden="true" />
                 WhatsApp
               </a>
             )}
@@ -466,9 +508,9 @@ export default function PublicHome({ onNavigate }: Props) {
           <div className="mt-16 grid grid-cols-2 sm:grid-cols-4 gap-6 max-w-2xl mx-auto">
             {[
               { n: statsProjects, l: "Projets réalisés" },
-              { n: statsClients, l: "Clients satisfaits" },
-              { n: statsYears, l: "Années d'expérience" },
-              { n: statsEmployees, l: "Experts qualifiés" },
+              { n: statsClients, l: "Clients accompagnés" },
+              { n: statsYears, l: "Années d'expertise" },
+              { n: statsEmployees, l: "Régions couvertes" },
             ].map((s) => (
               <div key={s.l} className="text-center">
                 <div className="text-2xl sm:text-3xl font-bold text-white">
@@ -546,72 +588,118 @@ export default function PublicHome({ onNavigate }: Props) {
         </div>
       </section>
 
-      {/* Promotions - Lots à Sikensi */}
-      {
-        (() => {
-          const raw = get("promotions", "lots_sikensi", "");
-          let promoLots: any[] = [];
-          try {
-            promoLots = raw ? JSON.parse(raw) : [];
-          } catch {
-            promoLots = [];
-          }
-          return promoLots.length > 0 ? (
-            <section className="py-20 bg-white">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="text-center mb-10">
-                  <h2 className="text-2xl font-bold">Lots à vendre à Sikensi</h2>
-                  <p className="text-gray-500">Nous disposons de plusieurs lots à Sikensi. Réservez votre parcelle aujourd'hui — contactez-nous pour plus d'informations.</p>
-                </div>
+      {featuredLots.length > 0 && (
+        <section className="py-20 bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-10">
+              <h2 className="text-2xl font-bold">Lots à vendre</h2>
+              <p className="text-gray-500">
+                Sélection de lots actuellement mise en avant pour vos projets
+                d'achat, d'investissement ou de revente.
+              </p>
+            </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {promoLots.map((lot, idx) => (
-                    <div key={lot.id || lot.numero_lot || idx} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100">
-                      {lot.image_url ? (
-                        <img
-                          src={lot.image_url}
-                          alt={lot.title || `Lot ${lot.numero_lot || ''}`}
-                          className="h-48 w-full object-cover"
-                        />
-                      ) : (
-                        <div className="h-48 bg-slate-100 flex items-center justify-center text-sm text-slate-400">
-                          Image indisponible
-                        </div>
-                      )}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {featuredLots.map((lot) => (
+                <div
+                  key={lot.id}
+                  className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100"
+                >
+                  {lot.image_url ? (
+                    <img
+                      src={lot.image_url}
+                      alt={lot.image_alt || lot.titre}
+                      className="h-48 w-full object-cover"
+                    />
+                  ) : (
+                    <div className="h-48 bg-slate-100 flex items-center justify-center text-sm text-slate-400 px-4 text-center">
+                      {lot.image_alt || lot.titre}
+                    </div>
+                  )}
 
-                      <div className="p-5">
-                        <h3 className="font-bold text-gray-900 mb-1.5">{lot.title || `Lot ${lot.numero_lot || ''}`}</h3>
-                        <p className="text-sm text-gray-500 mb-3">{lot.subtitle || lot.description || ''}</p>
+                  <div className="p-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="font-bold text-gray-900 mb-1.5">
+                          {lot.titre}
+                        </h3>
+                        <p className="text-sm text-gray-500 mb-3 line-clamp-3">
+                          {lot.description}
+                        </p>
+                      </div>
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                          lot.statut === "disponible"
+                            ? "bg-emerald-50 text-emerald-700"
+                            : lot.statut === "reserve"
+                              ? "bg-amber-50 text-amber-700"
+                              : "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        {lot.statut === "disponible"
+                          ? "Disponible"
+                          : lot.statut === "reserve"
+                            ? "Réservé"
+                            : "Vendu"}
+                      </span>
+                    </div>
 
-                        <div className="flex items-center justify-between">
-                          <div className="text-sm text-gray-700 font-semibold">{lot.superficie ? `${lot.superficie} m²` : ''}</div>
-                          <div className="text-sm text-gray-900 font-bold">{lot.prix ? `${lot.prix} FCFA` : ''}</div>
-                        </div>
-
-                        <div className="mt-4 flex gap-2">
-                          <button
-                            onClick={() => nav('contact')}
-                            className="px-4 py-2 rounded-xl text-white text-sm"
-                            style={{ backgroundColor: primaryColor }}
-                          >
-                            Contacter
-                          </button>
-                          <a
-                            href={`tel:${contactPhone}`}
-                            className="px-4 py-2 rounded-xl border border-gray-200 text-sm"
-                          >
-                            Appeler
-                          </a>
-                        </div>
+                    <div className="space-y-2 text-sm text-gray-700">
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="text-gray-500">Surface</span>
+                        <span className="font-semibold">
+                          {Number(lot.superficie)} m²
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="text-gray-500">Prix</span>
+                        <span className="font-semibold text-gray-900">
+                          {formatMontant(Number(lot.prix_vente))} FCFA
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="text-gray-500">Localisation</span>
+                        <span className="font-semibold text-right">
+                          {lot.village}
+                        </span>
                       </div>
                     </div>
-                  ))}
+
+                    {lot.caracteristiques.length > 0 && (
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {lot.caracteristiques.slice(0, 3).map((feature) => (
+                          <span
+                            key={feature}
+                            className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] text-slate-600"
+                          >
+                            {feature}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="mt-4 flex gap-2">
+                      <button
+                        onClick={() => nav("contact")}
+                        className="px-4 py-2 rounded-xl text-white text-sm"
+                        style={{ backgroundColor: primaryColor }}
+                      >
+                        Contacter
+                      </button>
+                      <a
+                        href={`tel:${(lot.contact_phone || contactPhone).replace(/\s+/g, "")}`}
+                        className="px-4 py-2 rounded-xl border border-gray-200 text-sm"
+                      >
+                        Appeler
+                      </a>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </section>
-          ) : null;
-        })()
-      }
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Réalisations */}
       {realisations.length > 0 && (
@@ -721,8 +809,8 @@ export default function PublicHome({ onNavigate }: Props) {
               Pourquoi Choisir {appCompany} ?
             </h2>
             <p className="text-gray-500 max-w-xl mx-auto">
-              Notre approche met la réactivité, la proximité et le suivi
-              commercial au service de vos projets.
+              Notre approche met la réactivité, la proximité et un suivi clair
+              au service de vos projets.
             </p>
           </div>
 
@@ -831,11 +919,11 @@ export default function PublicHome({ onNavigate }: Props) {
                       <Phone size={18} className="text-blue-700" />
                     </div>
                     <div>
-                    <div className="text-xs text-gray-400 font-medium uppercase tracking-wide">
+                      <div className="text-xs text-gray-400 font-medium uppercase tracking-wide">
                         Téléphone
                       </div>
                       <a
-                        href={`tel:${contactPhone}`}
+                        href={`tel:${contactPhone.replace(/\s+/g, "")}`}
                         className="text-gray-700 font-semibold hover:text-blue-700 transition-colors"
                       >
                         {contactPhone}

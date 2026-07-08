@@ -182,9 +182,9 @@ export function defaultProps(type: SectionType): SectionProps {
   switch (type) {
     case "hero":
       return {
-        title: "Bienvenue chez Gnamba Services",
+        title: "BTP, immobilier et foncier sécurisés",
         subtitle:
-          "Votre partenaire de confiance pour vos projets BTP et immobiliers",
+          "Votre partenaire de confiance pour vos projets de construction, d'investissement et de valorisation.",
         bg_image_url: "",
         cta_text: "Nous contacter",
         cta_url: "/contact",
@@ -194,7 +194,7 @@ export function defaultProps(type: SectionType): SectionProps {
       return {
         title: "Notre histoire",
         content:
-          "Gnamba Services est une entreprise spécialisée dans la construction et la gestion immobilière.",
+          "Gnamba Services accompagne les particuliers et les entreprises dans leurs projets de construction, d'immobilier et de foncier.",
         align: "left",
       } as TextProps;
     case "services":
@@ -232,7 +232,7 @@ export function defaultProps(type: SectionType): SectionProps {
           {
             name: "Marie Dupont",
             role: "Cliente",
-            text: "Excellent service, je recommande vivement Gnamba Services.",
+            text: "Un accompagnement clair et professionnel du début à la fin.",
             avatar_url: "",
           },
         ],

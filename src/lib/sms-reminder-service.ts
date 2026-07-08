@@ -10,7 +10,7 @@
  * - Ou via cron: 0 9 5 * * (le 5 du mois à 9h)
  */
 
-import { supabase } from "../lib/supabase";
+import dbClient from "../data/tableClient";
 
 interface TenantWithContact {
   id: string;
@@ -74,7 +74,7 @@ async function sendSMS(
 async function getTenantsWithLatePayments(): Promise<PaymentReminder[]> {
   const today = new Date();
   // Get all active contracts with unpaid rent
-  const { data: contracts, error: contractsError } = await supabase
+  const { data: contracts, error: contractsError } = await dbClient
     .from("lease_contracts")
     .select(
       `
@@ -101,7 +101,7 @@ async function getTenantsWithLatePayments(): Promise<PaymentReminder[]> {
     }
 
     // Check for unpaid payments
-    const { data: payments, error: paymentsError } = await supabase
+    const { data: payments, error: paymentsError } = await dbClient
       .from("rent_payments")
       .select("*")
       .eq("locataire_id", tenant.id)

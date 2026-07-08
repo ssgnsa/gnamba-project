@@ -1,156 +1,65 @@
 import { useCallback } from "react";
-import { supabase } from "../lib/supabase";
-import { supabaseService } from '../lib/supabase.service'
-import type { FoncierLot, FoncierAttestation } from "../types";
-import type { FoncierConfigMap, AttestationForm } from "../components/foncier/FoncierConstants";
 import DOMPurify from "dompurify";
+import { dataService } from "../lib/dbClient.service";
+import type { FoncierLot } from "../types";
+import { cleanText, generateFoncierReference, generateUUID } from "../utils/reference";
 import {
-  cleanText,
-  generateFoncierReference,
-  generateUUID,
-  formatDateLong,
-  parseNumberInput,
-} from "../utils/reference";
-import {
-  printAttestationCoutumiere,
-} from "../utils/print";
-import { getUsageForSlot } from "../lib/mediaUtils";
-import {
-  validateAttestationForm,
-  validateFoncierForm,
-} from "../lib/foncierValidation";
-import { buildAttestationRpcParams } from "../lib/foncierAttestation";
-import {
-  parseAttestationSnapshot,
-  getLocalDateInput,
-  isMissingColumnError,
-} from "../components/foncier/FoncierConstants";
-import { withBackoff } from "../lib/supabase.service";
-
-type VerificationUrlParams = {
-  reference?: string | null;
-  control_number?: string | null;
-  hash_sha256?: string | null;
-  baseUrl?: string | null;
-};
-
-const buildAttestationVerificationUrl = ({
-  reference,
-  control_number,
-  hash_sha256,
-  baseUrl,
-}: VerificationUrlParams) => {
-  const origin =
-    typeof window !== "undefined" && window.location
-      ? window.location.origin
-      : "http://localhost";
-  const fallbackUrl = new URL("/verification-attestation", origin);
-
-  let targetUrl = fallbackUrl;
-  if (baseUrl && baseUrl.trim()) {
-    try {
-      targetUrl = new URL(baseUrl, origin);
-    } catch {
-      targetUrl = fallbackUrl;
-    }
-  }
-
-  const ref = cleanText(reference || "");
-  const control = cleanText(control_number || "");
-  const hash = cleanText(hash_sha256 || "");
-
-  if (ref) targetUrl.searchParams.set("ref", ref);
-  if (control) targetUrl.searchParams.set("control", control);
-  if (hash) targetUrl.searchParams.set("hash", hash);
-
-  return targetUrl.toString();
-};
-
-const fetchLatestAttestationForLot = async (
-  lotId: string,
-  attestationHasDeletedAt: boolean | null,
-  setAttestationHasDeletedAt: (value: boolean | null) => void,
-  options?: { includeArchived?: boolean; select?: string },
-) => {
-  const select = options?.select || "*, foncier_attestation_temoins(*)";
-  const includeArchived = options?.includeArchived ?? false;
-
-  // Pour la compatibilité, on gère encore la logique deleted_at ici
-  // mais on utilise le service pour la requête
-  const supportsDeletedAt = attestationHasDeletedAt !== false;
-  let result = await supabaseService.getLatestAttestationForLot(lotId, includeArchived, select);
-
-  if (result.error && isMissingColumnError(result.error, "deleted_at")) {
-    setAttestationHasDeletedAt(false);
-    result = await supabaseService.getLatestAttestationForLot(lotId, includeArchived, select);
-  } else if (
-    !result.error &&
-    supportsDeletedAt &&
-    attestationHasDeletedAt === null
-  ) {
-    setAttestationHasDeletedAt(true);
-  }
-
-  return result;
-};
-
-const buildQrDataUrl = async (payload: string) => {
-  const size = payload.length;
-  const errorCorrectionLevel = size > 800 ? "M" : "H";
-  const width = size > 800 ? 280 : 240;
-  const margin = size > 800 ? 2 : 1;
-  const QRCode = await import("qrcode");
-  return QRCode.toDataURL(payload, { errorCorrectionLevel, width, margin });
-};
-
-const signAttestationPayload = async (
-  attestationId: string,
-  payload: Record<string, unknown>,
-) => {
-  try {
-    const { data, error } = await supabaseService.signAttestation(attestationId, payload);
-    if (error) return "";
-    return data || "";
-  } catch {
-    return "";
-  }
-};
-import { logFoncierAudit } from "../lib/foncierAudit";
-import {
-  createEmptyForm,
-} from "../components/foncier/FoncierConstants";
-import {
-  upsertCachedLot,
   addQueueItem,
+  getCachedLots,
   OFFLINE_STORAGE_FULL,
+  upsertCachedLot,
 } from "../lib/foncierOffline";
+import { createEmptyForm as buildEmptyFoncierForm } from "../components/foncier/FoncierConstants";
+import { validateFoncierForm } from "../lib/foncierValidation";
 
-/**
- * Hook pour la logique métier foncier (CRUD opérations)
- */
+type LotForm = ReturnType<typeof buildEmptyFoncierForm>;
+
+type SaveLotResult =
+  | {
+      success: true;
+      data?: FoncierLot | null;
+      offline?: boolean;
+      message: string;
+    }
+  | {
+      success: false;
+      error: string;
+      newRef?: string;
+    };
+
+const normalizeField = (value: string | null | undefined) => cleanText(value || "");
+
+const sameLotKey = (lot: FoncierLot, input: {
+  village: string;
+  nom_lotissement: string;
+  numero_ilot: string;
+  numero_lot: string;
+}) =>
+  normalizeField(lot.village) === input.village &&
+  normalizeField(lot.nom_lotissement) === input.nom_lotissement &&
+  normalizeField(lot.numero_ilot) === input.numero_ilot &&
+  normalizeField(lot.numero_lot) === input.numero_lot;
+
 export function useFoncierLogic(
   deviceId: string,
-  profile?: any,
-  attestationHasDeletedAt?: boolean | null,
-  setAttestationHasDeletedAt?: (value: boolean | null) => void,
+  _profile?: { id?: string | null; full_name?: string | null } | null,
 ) {
-  // ============ VALIDATE & SAVE LOT ============
   const saveLot = useCallback(
     async (
-      form: any,
+      form: LotForm,
       editingId: string | null,
       lots: FoncierLot[],
       isOnline: boolean,
-    ) => {
-      // 1. Validation
+    ): Promise<SaveLotResult> => {
       const validation = validateFoncierForm(form);
-      if (!validation.success && validation.errors) {
-        const errorEntries = Object.entries(validation.errors);
+      if (!validation.success || !validation.parsedData) {
+        const errorEntries = validation.errors
+          ? Object.entries(validation.errors)
+          : [["general", "Validation impossible. Veuillez vérifier les champs."]];
         const [fieldName, errorMsg] = errorEntries[0];
-        // Format field name for display (e.g., "numero_lot" → "Numero Lot")
         const fieldLabel = fieldName
           .replace(/_/g, " ")
-          .replace(/\b\w/g, (l) => l.toUpperCase());
+          .replace(/\b\w/g, (letter) => letter.toUpperCase());
         const fullError = errorMsg.includes("›")
           ? errorMsg
           : `${fieldLabel}: ${errorMsg}`;
@@ -158,39 +67,34 @@ export function useFoncierLogic(
       }
 
       const parsed = validation.parsedData;
-      if (!parsed) {
+      const normalizedVillage = normalizeField(form.village);
+      const normalizedLotissement = normalizeField(form.nom_lotissement);
+      const normalizedIlot = normalizeField(form.numero_ilot);
+      const normalizedNumeroLot = normalizeField(form.numero_lot);
+
+      if (normalizedVillage.length < 2 || normalizedVillage.length > 100) {
         return {
           success: false,
-          error: "Validation impossible. Veuillez vérifier les champs.",
+          error: "Le nom du village doit contenir entre 2 et 100 caractères.",
         };
       }
 
-      // 2. Validation village
-      const villageValue = form.village.trim();
-      if (villageValue.length < 2 || villageValue.length > 100) {
-        return {
-          success: false,
-          error:
-            "Le nom du village doit contenir entre 2 et 100 caractères.",
-        };
-      }
+      const sourceLots = isOnline ? lots : await getCachedLots();
+      const editableLots = sourceLots.filter(
+        (lot) => !lot.deleted_at && lot.statut !== "annule",
+      );
 
-      // 3. Préparer valeurs
-      const superficieValue = Number(parsed.superficie || 0);
-      const prixValue = Number(parsed.prix_cession || 0);
-      const naissanceDate = parsed.proprietaire_naissance_date || "";
-      const cniDate = parsed.proprietaire_cni_date || "";
-      const arreteDate = parsed.arrete_date || "";
-
-      // 4. Vérifier doublons localement
-      const duplicateLocal = lots.find(
+      const duplicateLocal = editableLots.find(
         (lot) =>
-          lot.village === form.village &&
-          lot.nom_lotissement === form.nom_lotissement &&
-          lot.numero_ilot === form.numero_ilot &&
-          lot.numero_lot === form.numero_lot &&
+          sameLotKey(lot, {
+            village: normalizedVillage,
+            nom_lotissement: normalizedLotissement,
+            numero_ilot: normalizedIlot,
+            numero_lot: normalizedNumeroLot,
+          }) &&
           lot.id !== editingId,
       );
+
       if (duplicateLocal) {
         return {
           success: false,
@@ -198,15 +102,15 @@ export function useFoncierLogic(
         };
       }
 
-      // 5. Vérifier doublons en ligne
       if (isOnline) {
-        const { data: duplicateData, error: duplicateError } = await supabaseService.checkLotDuplicate({
-          village: form.village,
-          lotissement: form.nom_lotissement,
-          ilot: form.numero_ilot,
-          lot: form.numero_lot,
-          exclude_lot_id: editingId,
-        });
+        const { data: duplicateData, error: duplicateError } =
+          await dataService.checkLotDuplicate({
+            village: normalizedVillage,
+            lotissement: normalizedLotissement,
+            ilot: normalizedIlot,
+            lot: normalizedNumeroLot,
+            exclude_lot_id: editingId,
+          });
 
         if (duplicateError) {
           return {
@@ -215,94 +119,106 @@ export function useFoncierLogic(
           };
         }
 
-        if (duplicateData && duplicateData.length > 0) {
+        const duplicateRows = (duplicateData || []) as Array<Pick<FoncierLot, "reference">>;
+        if (duplicateRows.length > 0) {
           return {
             success: false,
-            error: `Un lot existe déjà avec ces caractéristiques : ${duplicateData[0].reference}.`,
+            error: `Un lot existe déjà avec ces caractéristiques : ${duplicateRows[0].reference}.`,
           };
         }
       }
 
-      // 6. Créer/mettre à jour le payload
-      const nowIso = new Date().toISOString();
-      const dateCession = form.date_cession || getLocalDateInput();
-      const lotId = editingId || generateUUID();
-      const existing = lots.find((lot) => lot.id === editingId);
-
-      // 7. Générer ou régénérer référence
-      let ref = form.reference?.trim() || generateFoncierReference();
+      const existingLot = sourceLots.find((lot) => lot.id === editingId);
+      let reference = normalizeField(form.reference) || generateFoncierReference();
       if (
         editingId &&
-        existing &&
-        (existing.village !== form.village ||
-          existing.nom_lotissement !== form.nom_lotissement ||
-          existing.numero_ilot !== form.numero_ilot ||
-          existing.numero_lot !== form.numero_lot)
+        existingLot &&
+        !sameLotKey(existingLot, {
+          village: normalizedVillage,
+          nom_lotissement: normalizedLotissement,
+          numero_ilot: normalizedIlot,
+          numero_lot: normalizedNumeroLot,
+        })
       ) {
-        ref = generateFoncierReference();
+        reference = generateFoncierReference();
       }
 
       if (isOnline) {
-        const { data: refExists } = await supabaseService.checkLotReferenceExists(
-          ref,
-          editingId || undefined
-        );
+        const { data: refExists, error: refError } =
+          await dataService.checkLotReferenceExists(
+            reference,
+            editingId || undefined,
+          );
+
+        if (refError) {
+          return {
+            success: false,
+            error: "Erreur lors de la vérification de la référence.",
+          };
+        }
 
         if (refExists) {
-          const newRef = generateFoncierReference();
           return {
             success: false,
             error:
               "Référence déjà utilisée. Une nouvelle référence a été générée, veuillez réessayer.",
-            newRef,
+            newRef: generateFoncierReference(),
           };
         }
       }
 
-      // 8. Construire payload
+      const nowIso = new Date().toISOString();
+      const rawDateCession = normalizeField(form.date_cession);
+      const rawPrix = normalizeField(form.prix_cession);
+      const lotId = editingId || generateUUID();
+      const superficieValue = Number(parsed.superficie || 0);
+      const prixValue =
+        rawPrix.length > 0 ? Number(parsed.prix_cession ?? 0) : undefined;
+
       const payload = {
         id: lotId,
-        reference: ref,
-        numero_lot: cleanText(form.numero_lot),
-        numero_ilot: cleanText(form.numero_ilot),
-        nom_lotissement: cleanText(form.nom_lotissement),
-        quartier: cleanText(form.quartier),
-        village: cleanText(form.village),
-        commune: cleanText(form.commune),
-        departement: cleanText(form.departement),
-        region: cleanText(form.region),
+        reference,
+        numero_lot: normalizedNumeroLot,
+        numero_ilot: normalizedIlot,
+        nom_lotissement: normalizedLotissement,
+        quartier: normalizeField(form.quartier),
+        village: normalizedVillage,
+        commune: normalizeField(form.commune),
+        departement: normalizeField(form.departement),
+        region: normalizeField(form.region),
         superficie: superficieValue,
-        code_barre: "",
-        proprietaire_nom: cleanText(form.proprietaire_nom),
-        proprietaire_prenom: cleanText(form.proprietaire_prenom),
-        proprietaire_naissance_date: cleanText(naissanceDate),
-        proprietaire_naissance_lieu: cleanText(form.proprietaire_naissance_lieu),
-        proprietaire_cni_numero: cleanText(form.proprietaire_cni_numero),
-        proprietaire_cni_date: cleanText(cniDate),
-        proprietaire_cni_lieu: cleanText(form.proprietaire_cni_lieu),
-        proprietaire_profession: cleanText(form.proprietaire_profession),
-        proprietaire_telephone: cleanText(form.proprietaire_telephone),
-        chef_village: cleanText(form.chef_village),
-        arrete_prefectoral: cleanText(form.arrete_prefectoral),
-        arrete_date: cleanText(arreteDate),
-        statut: form.statut,
-        publier_sur_vitrine: form.publier_sur_vitrine || false,
-        date_cession: dateCession,
+        code_barre: normalizeField(form.code_barre),
+        proprietaire_nom: normalizeField(form.proprietaire_nom),
+        proprietaire_prenom: normalizeField(form.proprietaire_prenom),
+        proprietaire_naissance_date: parsed.proprietaire_naissance_date || undefined,
+        proprietaire_naissance_lieu: normalizeField(form.proprietaire_naissance_lieu),
+        proprietaire_cni_numero: normalizeField(form.proprietaire_cni_numero),
+        proprietaire_cni_date: parsed.proprietaire_cni_date || undefined,
+        proprietaire_cni_lieu: normalizeField(form.proprietaire_cni_lieu),
+        proprietaire_profession: normalizeField(form.proprietaire_profession),
+        proprietaire_telephone: normalizeField(form.proprietaire_telephone),
+        chef_village: normalizeField(form.chef_village),
+        arrete_prefectoral: normalizeField(form.arrete_prefectoral),
+        arrete_date: parsed.arrete_date || undefined,
+        statut: parsed.statut,
+        publier_sur_vitrine: Boolean(form.publier_sur_vitrine),
+        date_cession: rawDateCession || undefined,
         prix_cession: prixValue,
-        notes: DOMPurify.sanitize(form.notes),
+        notes: DOMPurify.sanitize(form.notes || ""),
         client_updated_at: nowIso,
         last_modified_device_id: deviceId,
         updated_at: nowIso,
-        created_at: existing?.created_at || nowIso,
-        deleted_at: existing?.deleted_at || null,
-        row_version: existing?.row_version ?? 1,
-        retention_until: existing?.retention_until ?? null,
-      };
+        created_at: existingLot?.created_at || nowIso,
+        deleted_at: existingLot?.deleted_at ?? null,
+        deleted_by: existingLot?.deleted_by ?? null,
+        deleted_reason: existingLot?.deleted_reason ?? null,
+        row_version: existingLot?.row_version ?? 1,
+        retention_until: existingLot?.retention_until ?? null,
+      } as FoncierLot;
 
-      // 9. Sauvegarder hors-ligne ou en ligne
       if (!isOnline) {
         try {
-          await upsertCachedLot(payload as FoncierLot);
+          await upsertCachedLot(payload);
           await addQueueItem({
             id: generateUUID(),
             op: "upsert_lot",
@@ -314,8 +230,8 @@ export function useFoncierLogic(
             offline: true,
             message: "Lot enregistré hors-ligne.",
           };
-        } catch (err: any) {
-          if (err?.code === OFFLINE_STORAGE_FULL) {
+        } catch (error: any) {
+          if (error?.code === OFFLINE_STORAGE_FULL) {
             return {
               success: false,
               error: "Stockage local plein. Libérez de l'espace puis réessayez.",
@@ -328,8 +244,10 @@ export function useFoncierLogic(
         }
       }
 
-      // 10. Insertion/mise à jour en ligne
-      const { data, error: dbError } = await supabaseService.saveLot(payload, !!editingId);
+      const { data, error: dbError } = await dataService.saveLot(
+        payload,
+        Boolean(editingId),
+      );
 
       if (dbError) {
         return {
@@ -352,14 +270,13 @@ export function useFoncierLogic(
 
       return {
         success: true,
-        data,
+        data: data as FoncierLot | null,
         message: editingId ? "Lot modifié." : "Lot créé.",
       };
     },
     [deviceId],
   );
 
-  // ============ ARCHIVE LOT ============
   const archiveLot = useCallback(
     async (lot: FoncierLot, isOnline: boolean) => {
       const nowIso = new Date().toISOString();
@@ -392,7 +309,7 @@ export function useFoncierLogic(
         }
       }
 
-      const { error } = await supabaseService.softDeleteLot(lot.id, "archivage");
+      const { error } = await dataService.softDeleteLot(lot.id);
 
       if (error) {
         return {
@@ -406,7 +323,6 @@ export function useFoncierLogic(
     [],
   );
 
-  // ============ RESTORE LOT ============
   const restoreLot = useCallback(
     async (lot: FoncierLot, isOnline: boolean) => {
       const nowIso = new Date().toISOString();
@@ -439,13 +355,12 @@ export function useFoncierLogic(
         }
       }
 
-      const { error } = await supabaseService.restoreLot(lot.id);
+      const { error } = await dataService.restoreLot(lot.id);
 
       if (error) {
         return {
           success: false,
-          error:
-            "Restauration impossible. Vérifiez vos droits ou réessayez.",
+          error: "Restauration impossible. Vérifiez vos droits ou réessayez.",
         };
       }
 
@@ -454,637 +369,10 @@ export function useFoncierLogic(
     [],
   );
 
-  // ============ ATTESTATION FUNCTIONS ============
-
-  const buildAttestationPrintData = useCallback((
-    attestationData: {
-      reference: string;
-      numero_enregistrement?: string | null;
-      date_etablissement?: string | null;
-      original: boolean;
-      statut?: string | null;
-      mode_acquisition?: string | null;
-      historique_possession?: string | null;
-      domicile?: string | null;
-      limites_nord?: string | null;
-      limites_sud?: string | null;
-      limites_est?: string | null;
-      limites_ouest?: string | null;
-      gps_lat?: number | null;
-      gps_lng?: number | null;
-      gps_precision?: number | null;
-      gps_points?: Record<string, unknown> | null;
-      registre_volume?: string | null;
-      registre_page?: number | null;
-      registre_ligne?: number | null;
-      control_number?: string | null;
-      qr_payload?: string | null;
-      hash_sha256?: string | null;
-      validation_agent_nom?: string | null;
-      validation_chef_nom?: string | null;
-      type?: string | null;
-      cedant_nom?: string | null;
-      cedant_prenom?: string | null;
-      cedant_cni_numero?: string | null;
-      cedant_telephone?: string | null;
-      cedant_domicile?: string | null;
-      chef_empreinte_url?: string | null;
-      signatureUrl?: string | null;
-      cachetUrl?: string | null;
-    },
-    lot: FoncierLot,
-    config: FoncierConfigMap,
-    form: AttestationForm,
-    qrDataUrl?: string,
-    gpsPointsResult?: Array<{ label: string; lat: number; lng: number }> | null,
-    verificationUrl?: string,
-    villageLogoUrl?: string,
-  ) => {
-    const gpsLat = form.gps_lat ? parseFloat(form.gps_lat) : null;
-    const gpsLng = form.gps_lng ? parseFloat(form.gps_lng) : null;
-    const gpsPrecision = form.gps_precision
-      ? parseFloat(form.gps_precision)
-      : null;
-    const isCession = attestationData.type === "cession";
-    const registrePage = form.registre_page
-      ? parseInt(form.registre_page, 10)
-      : null;
-    const registreLigne = form.registre_ligne
-      ? parseInt(form.registre_ligne, 10)
-      : null;
-
-    return {
-      reference: attestationData.reference,
-      numero_enregistrement:
-        attestationData.numero_enregistrement || attestationData.reference,
-      date_etablissement: formatDateLong(
-        attestationData.date_etablissement || getLocalDateInput(),
-      ),
-      original: attestationData.original,
-      draft: attestationData.statut !== "valide",
-      region: config.region || lot.region || "REGION",
-      departement: config.departement || lot.departement || "DEPARTEMENT",
-      commune: config.commune || lot.commune || "COMMUNE",
-      village: config.village || lot.village || "VILLAGE",
-      quartier: lot.quartier || "",
-      lotissement: lot.nom_lotissement || "",
-      numero_lot: lot.numero_lot || "",
-      superficie_m2: lot.superficie || 0,
-      limites: {
-        nord: form.limites_nord || "",
-        sud: form.limites_sud || "",
-        est: form.limites_est || "",
-        ouest: form.limites_ouest || "",
-      },
-      coordonnees_gps:
-        gpsLat != null && gpsLng != null
-          ? { lat: gpsLat, lng: gpsLng, precision: gpsPrecision ?? undefined }
-          : undefined,
-      gps_points: gpsPointsResult || undefined,
-      mode_acquisition: form.mode_acquisition || "",
-      historique_possession: form.historique_possession || "",
-      proprietaire_nom: lot.proprietaire_nom || "",
-      proprietaire_prenom: lot.proprietaire_prenom || "",
-      proprietaire_naissance_date: lot.proprietaire_naissance_date || "",
-      proprietaire_naissance_lieu: lot.proprietaire_naissance_lieu || "",
-      proprietaire_domicile: form.domicile || "",
-      proprietaire_profession: lot.proprietaire_profession || "",
-      proprietaire_cni_numero: lot.proprietaire_cni_numero || "",
-      proprietaire_cni_date: lot.proprietaire_cni_date || "",
-      proprietaire_cni_lieu: lot.proprietaire_cni_lieu || "",
-      proprietaire_telephone: lot.proprietaire_telephone || "",
-      cedant_nom: isCession ? form.cedant_nom || "" : "",
-      cedant_prenom: isCession ? form.cedant_prenom || "" : "",
-      cedant_cni_numero: isCession ? form.cedant_cni_numero || "" : "",
-      cedant_telephone: isCession ? form.cedant_telephone || "" : "",
-      cedant_domicile: isCession ? form.cedant_domicile || "" : "",
-      temoins: (form.temoins || []).map((t) => ({
-        nom: t.nom || "",
-        prenom: t.prenom || "",
-        profession: t.profession || "",
-        telephone: t.telephone || "",
-        cni: t.cni || "",
-      })),
-      chef_village: config.chef_village || lot.chef_village || "",
-      lieu_signature: config.lieu_signature || lot.village || "",
-      registre_volume: form.registre_volume || "",
-      registre_page: isNaN(registrePage as number) ? null : registrePage,
-      registre_ligne: isNaN(registreLigne as number) ? null : registreLigne,
-      control_number: attestationData.control_number || "",
-      verification_url:
-        verificationUrl ||
-        buildAttestationVerificationUrl({
-          reference: attestationData.reference,
-          control_number: attestationData.control_number || "",
-          hash_sha256: attestationData.hash_sha256 || "",
-        }),
-      qrDataUrl,
-      hash_sha256: attestationData.hash_sha256 || "",
-      validation_agent_nom:
-        attestationData.validation_agent_nom || form.validation_agent_nom || "",
-      validation_chef_nom:
-        attestationData.validation_chef_nom ||
-        form.validation_chef_nom ||
-        config.chef_village ||
-        "",
-      logoUrl: config.logo_url || "",
-      village_logo_url: villageLogoUrl || config.village_logo_url || "",
-      signatureUrl: attestationData.signatureUrl || "",
-      cachetUrl:
-        attestationData.cachetUrl || attestationData.chef_empreinte_url || "",
-      chef_nom: config.chef_village || lot.chef_village || "",
-      attestation_type: attestationData.type || "standard",
-      statut: attestationData.statut || "soumis",
-      lot_statut: lot.statut,
-      date_cession: isCession ? lot.date_cession || "" : "",
-      prix_cession: isCession ? lot.prix_cession : undefined,
-    };
-  }, []);
-
-  const validateAttestationPrerequisites = useCallback(async (
-    lot: FoncierLot,
-    form: AttestationForm,
-    isOnline: boolean,
-    configVillage: string,
-    ensureConfigLoaded: (village: string) => Promise<FoncierConfigMap>,
-  ) => {
-    const config = await ensureConfigLoaded(lot.village || configVillage);
-    const attestationValidation = validateAttestationForm(form);
-    if (!attestationValidation.success && attestationValidation.errors) {
-      const errorEntries = Object.entries(attestationValidation.errors);
-      const [fieldName, errorMsg] = errorEntries[0];
-      // Format field name for display (e.g., "registre_ligne" → "Registre › Ligne")
-      const fieldLabel = fieldName
-        .replace(/_/g, " ")
-        .replace(/\b\w/g, (l) => l.toUpperCase());
-      const fullError = errorMsg.includes("›")
-        ? errorMsg
-        : `${fieldLabel}: ${errorMsg}`;
-      return { success: false, error: fullError, config };
-    }
-
-    const parsedAttestation = attestationValidation.parsedData;
-    if (!parsedAttestation) {
-      return {
-        success: false,
-        error: "Validation de l'attestation impossible.",
-        config,
-      };
-    }
-
-    const attestationType =
-      form.attestation_type === "cession" ? "cession" : "standard";
-    const isCessionAttestation = attestationType === "cession";
-
-    if (isCessionAttestation && !isOnline) {
-      return {
-        success: false,
-        error: "Connexion requise pour réémettre une attestation de cession.",
-        config,
-      };
-    }
-
-    // Validation OBLIGATOIRE pour les cessions
-    if (isCessionAttestation) {
-      const cedantNom = cleanText(form.cedant_nom || "");
-      const cedantPrenom = cleanText(form.cedant_prenom || "");
-      const cedantCni = cleanText(form.cedant_cni_numero || "");
-      if (!cedantNom || !cedantPrenom) {
-        return {
-          success: false,
-          error: "Pour une cession, les nom et prénoms du cédant sont requis.",
-          config,
-        };
-      }
-      if (!cedantCni) {
-        return {
-          success: false,
-          error: "Pour une cession, la CNI du cédant est requise.",
-          config,
-        };
-      }
-    }
-
-    if (!isOnline) {
-      return {
-        success: false,
-        error:
-          "Connexion requise : la référence officielle, le numéro de contrôle et le hash sont générés côté serveur dans une transaction sécurisée.",
-        config,
-      };
-    }
-
-    // Validation des champs numériques du registre
-    const registrePage = parseNumberInput(form.registre_page);
-    const registreLigne = parseNumberInput(form.registre_ligne);
-
-    if (form.registre_page.trim() && registrePage === null) {
-      return {
-        success: false,
-        error: "La page du registre est invalide.",
-        config,
-      };
-    }
-    if (form.registre_ligne.trim() && registreLigne === null) {
-      return {
-        success: false,
-        error: "La ligne du registre est invalide.",
-        config,
-      };
-    }
-
-    return {
-      success: true,
-      config,
-      parsedAttestation,
-      attestationType,
-      isCessionAttestation,
-      registrePage,
-      registreLigne,
-    };
-  }, []);
-
-  const createAttestationRecord = useCallback(async (
-    lot: FoncierLot,
-    parsedAttestation: any,
-    config: FoncierConfigMap,
-    attestationType: string,
-    isCessionAttestation: boolean,
-    attestationForm: AttestationForm,
-  ) => {
-    let baseAttestation: Pick<
-      FoncierAttestation,
-      | "id"
-      | "reference"
-      | "version"
-      | "numero_enregistrement"
-      | "control_number"
-      | "statut"
-    > | null = null;
-
-    if (isCessionAttestation) {
-      const { data, error } = await fetchLatestAttestationForLot(lot.id, attestationHasDeletedAt ?? null, setAttestationHasDeletedAt ?? (() => {}), {
-        includeArchived: false,
-        select:
-          "id, reference, version, numero_enregistrement, control_number, statut",
-      });
-      if (error) {
-        return {
-          success: false,
-          error: "Impossible de charger l'attestation précédente.",
-        };
-      }
-      if (!data) {
-        return {
-          success: false,
-          error: "Aucune attestation active à réémettre pour cette cession.",
-        };
-      }
-      baseAttestation = data as Pick<
-        FoncierAttestation,
-        | "id"
-        | "reference"
-        | "version"
-        | "numero_enregistrement"
-        | "control_number"
-        | "statut"
-      >;
-    }
-
-    const signatureNonce = generateUUID();
-    const signatureIssuedAt = new Date().toISOString();
-    const agentName = cleanText(
-      attestationForm.validation_agent_nom || profile?.full_name || "",
-    );
-    const chefName = cleanText(
-      attestationForm.validation_chef_nom ||
-        config.nom_chef_signe ||
-        config.chef_village ||
-        "",
-    );
-
-    const attestationPayload = buildAttestationRpcParams({
-      attestationForm: parsedAttestation,
-      attestationLot: lot,
-      signatureNonce,
-      signatureIssuedAt,
-      deviceId,
-      baseAttestationId: baseAttestation?.id ?? null,
-      isCession: isCessionAttestation,
-    });
-
-    const { data: attestationRows, error: attestationError } =
-      await supabaseService.createAttestationAtomic(attestationPayload);
-
-    const createdAttestation = (
-      Array.isArray(attestationRows) ? attestationRows[0] : attestationRows
-    ) as Pick<
-      FoncierAttestation,
-      | "id"
-      | "lot_id"
-      | "reference"
-      | "version"
-      | "numero_enregistrement"
-      | "qr_payload"
-      | "hash_sha256"
-      | "control_number"
-      | "statut"
-      | "date_etablissement"
-      | "created_at"
-    > | null;
-
-    if (attestationError || !createdAttestation) {
-      if (import.meta.env.DEV)
-        console.error("❌ Attestation atomic creation failed", {
-          error: attestationError,
-          message: (attestationError as any)?.message,
-          details: (attestationError as any)?.details,
-          hint: (attestationError as any)?.hint,
-          code: (attestationError as any)?.code,
-        });
-      return {
-        success: false,
-        error:
-          (attestationError as any)?.message || "Création de l'attestation impossible.",
-      };
-    }
-
-    // Audit logs pour création
-    await withBackoff(() =>
-      logFoncierAudit(supabase, {
-        lotId: lot.id,
-        action: "SOUMISSION_CHEF",
-        details: {
-          attestation_id: createdAttestation.id,
-          reference: createdAttestation.reference,
-        },
-      }),
-    );
-
-    if (isCessionAttestation && baseAttestation) {
-      await withBackoff(() =>
-        logFoncierAudit(supabase, {
-          lotId: lot.id,
-          action: "ARCHIVAGE_ATTESTATION",
-          details: {
-            attestation_id: baseAttestation.id,
-            reference: baseAttestation.reference,
-          },
-        }),
-      );
-
-      await withBackoff(() =>
-        logFoncierAudit(supabase, {
-          lotId: lot.id,
-          action: "REEMISSION_CESSION",
-          details: {
-            attestation_id: createdAttestation.id,
-            reference: createdAttestation.reference,
-            archived_attestation_id: baseAttestation.id,
-          },
-        }),
-      );
-    }
-
-    return {
-      success: true,
-      createdAttestation,
-      baseAttestation,
-      agentName,
-      chefName,
-      attestationType,
-    };
-  }, [deviceId, profile, attestationHasDeletedAt, setAttestationHasDeletedAt]);
-
-  const signAndGenerateQr = useCallback(async (createdAttestation: any) => {
-    const qrVerificationUrl = buildAttestationVerificationUrl({
-      reference: createdAttestation.reference,
-      control_number: createdAttestation.control_number || "",
-      hash_sha256: createdAttestation.hash_sha256 || "",
-    });
-    const qrDataUrl = await buildQrDataUrl(qrVerificationUrl);
-
-    let finalStatus = createdAttestation.statut || "soumis";
-    const payloadToSign =
-      parseAttestationSnapshot(createdAttestation.qr_payload) || {};
-
-    try {
-      const signature = await signAttestationPayload(
-        createdAttestation.id,
-        payloadToSign,
-      );
-      if (signature) {
-        finalStatus = "valide";
-      }
-    } catch (error) {
-      if (import.meta.env.DEV) console.warn("⚠️ Signature error:", error);
-    }
-
-    return {
-      qrDataUrl,
-      qrVerificationUrl,
-      finalStatus,
-      payloadToSign,
-    };
-  }, []);
-
-  const printAndAuditAttestation = useCallback(async (
-    createdAttestation: any,
-    lot: FoncierLot,
-    config: FoncierConfigMap,
-    form: AttestationForm,
-    qrDataUrl: string,
-    qrVerificationUrl: string,
-    finalStatus: string,
-    attestationType: string,
-    agentName: string,
-    chefName: string,
-    refreshQueueCount: () => void,
-    setPageNotice: (notice: string) => void,
-  ) => {
-    const hookVillageKey = (lot.village || '').replace(/^(VILLAGE\s+DE\s+|VILLAGE\s+)/i, '').trim();
-    const hookVillageLogoMedia = hookVillageKey
-      ? await getUsageForSlot('foncier_village', hookVillageKey, 'logo').catch(() => null)
-      : null;
-    const hookVillageLogoUrl = hookVillageLogoMedia?.url || config.village_logo_url || config.logo_url || '';
-
-    const onlinePrintData = buildAttestationPrintData(
-      {
-        ...createdAttestation,
-        original: form.original,
-        statut: finalStatus,
-        type: attestationType,
-        validation_agent_nom: agentName,
-        validation_chef_nom: chefName,
-      },
-      lot,
-      config,
-      form,
-      qrDataUrl,
-      undefined, // gpsPointsResult
-      qrVerificationUrl,
-      hookVillageLogoUrl,
-    );
-
-    printAttestationCoutumiere(onlinePrintData);
-
-    // Attempt to attach metadata to DB via RPC (background script may also do this)
-    try {
-      const pdfMeta = {
-        attestation_id: createdAttestation.id,
-        pdf_path: undefined,
-        hash_sha256: createdAttestation.hash_sha256 || undefined,
-        verify_url: undefined,
-        printed_by: profile?.id || null,
-      };
-      // Call client-side RPC (requires service role; best-effort)
-      await supabaseService.attachAttestationPdfMetadata({
-        attestation_id: pdfMeta.attestation_id,
-        pdf_metadata: {
-          hash_sha256: pdfMeta.hash_sha256,
-          verify_url: pdfMeta.verify_url,
-          pdf_path: pdfMeta.pdf_path,
-          pdf_generated_at: new Date().toISOString(),
-          printed_by: pdfMeta.printed_by,
-        },
-      });
-    } catch {
-      // ignore — server script will reconcile metadata if RPC not available
-    }
-
-    const { error: printAuditError } = await withBackoff(() =>
-      logFoncierAudit(supabase, {
-        lotId: lot.id,
-        action: "IMPRESSION",
-        details: {
-          attestation_id: createdAttestation.id,
-          reference: createdAttestation.reference,
-        },
-      }),
-    );
-
-    if (printAuditError) {
-      try {
-        await addQueueItem({
-          id: generateUUID(),
-          op: "audit_log",
-          payload: {
-            lot_id: lot.id,
-            action: "IMPRESSION",
-            details: {
-              attestation_id: createdAttestation.id,
-              reference: createdAttestation.reference,
-            },
-          },
-          client_updated_at: new Date().toISOString(),
-        });
-        await refreshQueueCount();
-        setPageNotice(
-          "Impression OK. Journalisation en attente de synchronisation.",
-        );
-      } catch {
-        setPageNotice("Impression OK, mais journalisation impossible.");
-      }
-    }
-  }, [profile, buildAttestationPrintData]);
-
-  const handleGenerateAttestation = useCallback(async (
-    attestationLot: FoncierLot | null,
-    attestationForm: AttestationForm,
-    isOnline: boolean,
-    configVillage: string,
-    ensureConfigLoaded: (village: string) => Promise<FoncierConfigMap>,
-    setAttestationError: (error: string | null) => void,
-    setAttestationSaving: (saving: boolean) => void,
-    setAttestationModalOpen: (open: boolean) => void,
-    setAttestationLot: (lot: FoncierLot | null) => void,
-    refreshQueueCount: () => void,
-    setPageNotice: (notice: string) => void,
-  ) => {
-    if (!attestationLot) return;
-    setAttestationError(null);
-
-    // PHASE 1 - Étape 1: Validation des prérequis
-    const validationResult = await validateAttestationPrerequisites(
-      attestationLot,
-      attestationForm,
-      isOnline,
-      configVillage,
-      ensureConfigLoaded,
-    );
-    if (!validationResult.success) {
-      setAttestationError(validationResult.error || "Erreur de validation inconnue");
-      return;
-    }
-
-    const { config, parsedAttestation, attestationType, isCessionAttestation } =
-      validationResult;
-
-    setAttestationSaving(true);
-
-    try {
-      // PHASE 1 - Étape 2: Création de l'enregistrement
-      const creationResult = await createAttestationRecord(
-        attestationLot,
-        parsedAttestation,
-        config,
-        attestationType!,
-        isCessionAttestation!,
-        attestationForm,
-      );
-
-      if (!creationResult.success) {
-        setAttestationSaving(false);
-        setAttestationError(creationResult.error || "Erreur de création inconnue");
-        return;
-      }
-
-      const { createdAttestation, agentName, chefName } = creationResult;
-
-      // PHASE 1 - Étape 3: Signature et génération QR
-      const qrResult = await signAndGenerateQr(createdAttestation);
-
-      // PHASE 1 - Étape 4: Impression et audit
-      await printAndAuditAttestation(
-        createdAttestation,
-        attestationLot,
-        config,
-        attestationForm,
-        qrResult.qrDataUrl,
-        qrResult.qrVerificationUrl,
-        qrResult.finalStatus,
-        attestationType!,
-        agentName!,
-        chefName!,
-        refreshQueueCount,
-        setPageNotice,
-      );
-
-      // Nettoyage final
-      setAttestationSaving(false);
-      setAttestationModalOpen(false);
-      setAttestationLot(null);
-    } catch (error) {
-      setAttestationSaving(false);
-      setAttestationError(
-        "Une erreur inattendue s'est produite lors de la génération de l'attestation.",
-      );
-      if (import.meta.env.DEV)
-        console.error("Attestation generation error:", error);
-    }
-  }, [
-    validateAttestationPrerequisites,
-    createAttestationRecord,
-    signAndGenerateQr,
-    printAndAuditAttestation,
-  ]);
-
   return {
     saveLot,
     archiveLot,
     restoreLot,
-    createEmptyForm,
-    handleGenerateAttestation,
-    buildAttestationPrintData,
+    createEmptyForm: buildEmptyFoncierForm,
   };
 }

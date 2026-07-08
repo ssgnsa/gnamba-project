@@ -12,8 +12,9 @@ import {
   CheckCircle,
   XCircle,
 } from "lucide-react";
-import { supabase } from "../lib/supabase";
+import dbClient from "../data/tableClient";
 import { useSettings } from "../context/SettingsContext";
+import { leadsRepository } from "../data/leads.repository";
 import Badge from "../components/ui/Badge";
 
 interface Lead {
@@ -79,28 +80,26 @@ export default function LeadsPage() {
     setLoading(true);
     try {
       const [leadsRes, campaignsRes, interactionsRes] = await Promise.all([
-        supabase
-          .from("leads")
-          .select("*")
-          .order("created_at", { ascending: false }),
-        supabase
+        leadsRepository.getAll({ limit: 1000 }),
+        dbClient
           .from("lead_campaigns")
           .select("*")
           .order("created_at", { ascending: false }),
-        supabase.from("lead_interactions").select("status"),
+        dbClient.from("lead_interactions").select("status"),
       ]);
 
-      setLeads(leadsRes.data || []);
+      setLeads((leadsRes.data?.items || []) as Lead[]);
       setCampaigns(campaignsRes.data || []);
 
       const interactions = interactionsRes.data || [];
       setStats({
-        total: leadsRes.data?.length || 0,
+        total: leadsRes.data?.total || 0,
         active:
-          leadsRes.data?.filter((l: Lead) => l.status === "active").length || 0,
+          leadsRes.data?.items?.filter((l: any) => l.status === "active")
+            .length || 0,
         optedOut:
-          leadsRes.data?.filter((l: Lead) => l.status === "opted_out").length ||
-          0,
+          leadsRes.data?.items?.filter((l: any) => l.status === "opted_out")
+            .length || 0,
         totalSent: interactions.filter((i: any) => i.status === "sent").length,
         totalFailed: interactions.filter((i: any) => i.status === "failed")
           .length,
@@ -158,17 +157,24 @@ export default function LeadsPage() {
     try {
       const now = new Date();
       const segmentSummary = [
-        filterStatus ? `statut ${statusLabels[filterStatus] || filterStatus}` : "tous statuts",
-        filterChannel ? `canal ${channelLabels[filterChannel] || filterChannel}` : "multi-canal",
+        filterStatus
+          ? `statut ${statusLabels[filterStatus] || filterStatus}`
+          : "tous statuts",
+        filterChannel
+          ? `canal ${channelLabels[filterChannel] || filterChannel}`
+          : "multi-canal",
         search.trim() ? `recherche "${search.trim()}"` : null,
       ]
         .filter(Boolean)
         .join(" · ");
 
-      const campaignName = `Campagne ${channelLabels[filterChannel] || "Commerciale"} ${now.toLocaleDateString("fr-FR", {
-        day: "2-digit",
-        month: "short",
-      })}`;
+      const campaignName = `Campagne ${channelLabels[filterChannel] || "Commerciale"} ${now.toLocaleDateString(
+        "fr-FR",
+        {
+          day: "2-digit",
+          month: "short",
+        },
+      )}`;
 
       const channels =
         filterChannel && channelLabels[filterChannel]
@@ -180,15 +186,18 @@ export default function LeadsPage() {
         lead_count: filteredLeads.length,
         audience_preview: filteredLeads.slice(0, 25).map((lead) => ({
           id: lead.id,
-          name: [lead.first_name, lead.last_name].filter(Boolean).join(" ").trim() || "Lead",
+          name:
+            [lead.first_name, lead.last_name]
+              .filter(Boolean)
+              .join(" ")
+              .trim() || "Lead",
           phone: lead.phone,
           source: lead.source_page || lead.source_form || lead.source,
           score: lead.score,
         })),
         whatsapp:
           "Bonjour, Gnamba Services vous accompagne sur vos projets en Côte d'Ivoire. Répondez à ce message pour recevoir un devis rapide ou une fiche projet.",
-        sms:
-          "Gnamba Services: demandez votre devis rapide pour BTP, immobilier ou foncier. Répondez OUI pour être rappelé.",
+        sms: "Gnamba Services: demandez votre devis rapide pour BTP, immobilier ou foncier. Répondez OUI pour être rappelé.",
         email:
           "Gnamba Services vous propose un accompagnement rapide et local pour vos projets BTP, immobilier et foncier en Côte d'Ivoire.",
         facebook:
@@ -200,7 +209,7 @@ export default function LeadsPage() {
         call_to_action: "Demander un devis",
       };
 
-      const { data, error } = await supabase
+      const { data, error } = await dbClient
         .from("lead_campaigns")
         .insert({
           name: campaignName,
@@ -237,7 +246,7 @@ export default function LeadsPage() {
   };
 
   const updateLeadStatus = async (leadId: string, status: string) => {
-    await supabase.from("leads").update({ status }).eq("id", leadId);
+    await leadsRepository.update(leadId, { status });
     fetchData();
   };
 
@@ -298,7 +307,8 @@ export default function LeadsPage() {
             📢 Gestion des Leads & Campagnes
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Capture automatique, segmentation commerciale et relais multi-canal vers le terrain et les réseaux sociaux
+            Capture automatique, segmentation commerciale et relais multi-canal
+            vers le terrain et les réseaux sociaux
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -659,7 +669,11 @@ export default function LeadsPage() {
                 </div>
                 <div className="flex gap-2">
                   {(camp.channels || []).map((ch: string) => (
-                    <Badge key={ch} label={channelLabels[ch] || ch} color="blue" />
+                    <Badge
+                      key={ch}
+                      label={channelLabels[ch] || ch}
+                      color="blue"
+                    />
                   ))}
                 </div>
                 <div className="grid grid-cols-5 gap-3 text-center">

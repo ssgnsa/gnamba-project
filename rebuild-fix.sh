@@ -44,15 +44,19 @@ echo -e "${GREEN}✅ Conteneur arrêté${NC}"
 echo ""
 
 # ============================================
-# 2. Build avec les bonnes variables
+# 2. Build avec les bonnes variables (canonical API)
 # ============================================
-echo -e "${BLUE}[2/4] Build Docker avec les variables correctes...${NC}"
+echo -e "${BLUE}[2/4] Build Docker avec les variables correctes (transition vers VITE_LOCAL_API_URL)...${NC}"
 cd /home/soma/gnamba-project
 
+# Preferer la variable canonique VITE_LOCAL_API_URL; fallback sur VITE_SUPABASE_URL pour compatibilite
+LOCAL_API_URL="${VITE_LOCAL_API_URL:-${VITE_SUPABASE_URL:-}}"
+
 docker build \
+  --build-arg VITE_LOCAL_API_URL="$LOCAL_API_URL" \
   --build-arg VITE_SUPABASE_MODE="$VITE_SUPABASE_MODE" \
-  --build-arg VITE_SUPABASE_URL="$VITE_SUPABASE_URL" \
-  --build-arg VITE_SUPABASE_ANON_KEY="$VITE_SUPABASE_ANON_KEY" \
+  --build-arg VITE_SUPABASE_URL="$LOCAL_API_URL" \
+  --build-arg VITE_SUPABASE_ANON_KEY="${VITE_SUPABASE_ANON_KEY:-}" \
   -t egs-web:fixed \
   -f Dockerfile .
 
@@ -88,20 +92,15 @@ else
     echo -e "${YELLOW}HTTP $HTTP_CODE${NC}"
 fi
 
-# Test API Supabase avec la clé
-echo -n "Test API Supabase: "
-API_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
-  --max-time 5 \
-  -H "apikey: $VITE_SUPABASE_ANON_KEY" \
-  -H "Authorization: Bearer $VITE_SUPABASE_ANON_KEY" \
-  "${VITE_SUPABASE_URL}/rest/v1/user_profiles?select=count" 2>/dev/null || echo "000")
+# Test health de l'API canonique (sans exposer de cle produit)
+echo -n "Test API canonical: "
+API_URL_TO_TEST="${LOCAL_API_URL:-${VITE_SUPABASE_URL:-}}"
+API_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "${API_URL_TO_TEST}/health" 2>/dev/null || echo "000")
 
 if [ "$API_CODE" = "200" ]; then
-    echo -e "${GREEN}OK (HTTP 200) - Clé API fonctionnelle !${NC}"
-elif [ "$API_CODE" = "401" ]; then
-    echo -e "${RED}ERREUR (HTTP 401) - Clé API invalide${NC}"
+  echo -e "${GREEN}OK (HTTP 200) - API reachable${NC}"
 else
-    echo -e "${YELLOW}HTTP $API_CODE${NC}"
+  echo -e "${YELLOW}HTTP $API_CODE (API check)${NC}"
 fi
 
 echo ""

@@ -89,60 +89,20 @@ Ce guide explique comment déployer EGS en production avec :
 
 ## 🚀 Déploiement Rapide
 
-### Option 1: Script de Démarrage (Recommandé)
+Le chemin officiel de publication est:
 
 ```bash
-cd /home/soma/gnamba-project
-
-# 1. Construire l'image (une seule fois)
-docker build -t egs-web:runtime -f Dockerfile.runtime .
-
-# 2. Lancer le startup complet
-./startup.sh
+bash scripts/deploy-production.sh
 ```
 
-### Option 2: Docker Compose avec HTTPS
+Ce script:
 
-```bash
-cd /home/soma/gnamba-project
-
-# 1. Créer le fichier .env
-cat > .env << 'EOF'
-VITE_SUPABASE_URL=https://thykrnoqgylrbfupophs.supabase.co
-VITE_SUPABASE_ANON_KEY=sb_publishable_K2AvUraEL_URgy91DbLcyQ_wDPtmWuu
-VITE_SUPABASE_MODE=cloud
-EOF
-
-# 2. Lancer avec HTTPS
-docker-compose -f docker-compose.https.yml up -d
-
-# 3. Vérifier
-https://gnambaservices.ci
-https://files.gnambaservices.ci
-```
-
-### Option 3: Manuel (Sans HTTPS)
-
-```bash
-# 1. Filebrowser (indépendant)
-docker run -d \
-  --name filebrowser \
-  --network gnamba-network \
-  -p 8081:80 \
-  -v /home/soma/partage:/srv \
-  -v /home/soma/filebrowser.db:/database.db \
-  filebrowser/filebrowser
-
-# 2. EGS (sans dépendance filebrowser)
-docker run -d \
-  --name egs-web \
-  --network gnamba-network \
-  -p 8080:80 \
-  -e VITE_SUPABASE_URL=https://thykrnoqgylrbfupophs.supabase.co \
-  -e VITE_SUPABASE_ANON_KEY=sb_publishable_K2AvUraEL_URgy91DbLcyQ_wDPtmWuu \
-  -e VITE_SUPABASE_MODE=cloud \
-  egs-web:runtime
-```
+- installe les dépendances avec `npm ci`;
+- construit `dist/` avec `npm run build`;
+- génère `dist/VERSION.json`;
+- valide la release avec `npm run release:check`;
+- publie vers `/var/www/egs/current`;
+- recharge Nginx si le service est disponible.
 
 ---
 

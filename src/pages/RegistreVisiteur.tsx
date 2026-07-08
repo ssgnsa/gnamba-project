@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useSettings } from "../context/SettingsContext";
 import BrandLogo from "../components/BrandLogo";
-import { supabase } from "../lib/supabase";
+import dbClient from "../data/tableClient";
 import {
   Visiteur,
   Visite,
@@ -10,6 +10,12 @@ import {
   VisiteFormData,
   UserProfile,
 } from "../types";
+import {
+  type ManualSyncStatus,
+  normalizeManualStatus,
+  readManualCache,
+  writeManualCache,
+} from "../lib/manualSyncStore";
 import {
   UserPlus,
   Users,
@@ -25,10 +31,41 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { FormulaireVisiteur } from "./registre/FormulaireVisiteur";
+import SyncRemoteButton from "../components/ui/SyncRemoteButton";
+import { apiClient } from "../api/client";
+import { isSelfHostedMode } from "../lib/selfHosted";
 
 // ============================================
 // PAGE REGISTRE VISITEUR
 // ============================================
+
+const VISITEURS_CACHE_KEY = "egs.visiteurs.local_cache.v1";
+const VISITES_CACHE_KEY = "egs.visites.local_cache.v1";
+
+type LocalVisiteur = Visiteur & {
+  sync_status: ManualSyncStatus;
+  sync_error: string | null;
+  deleted_at: string | null;
+};
+type LocalVisite = Visite & {
+  sync_status: ManualSyncStatus;
+  sync_error: string | null;
+  deleted_at: string | null;
+};
+
+function sortVisiteurs(items: LocalVisiteur[]): LocalVisiteur[] {
+  return [...items].sort(
+    (a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  );
+}
+
+function sortVisites(items: LocalVisite[]): LocalVisite[] {
+  return [...items].sort(
+    (a, b) =>
+      new Date(b.date_arrivee).getTime() - new Date(a.date_arrivee).getTime(),
+  );
+}
 
 export default function RegistreVisiteur() {
   const { user } = useAuth();
@@ -61,12 +98,13 @@ export default function RegistreVisiteur() {
   type RegistreTab = (typeof registreTabs)[number]["id"];
 
   const [activeTab, setActiveTab] = useState<RegistreTab>("enregistrement");
-  const [visiteurs, setVisiteurs] = useState<Visiteur[]>([]);
-  const [visites, setVisites] = useState<Visite[]>([]);
-  const [visitesEnCours, setVisitesEnCours] = useState<Visite[]>([]);
+  const [visiteurs, setVisiteurs] = useState<LocalVisiteur[]>([]);
+  const [visites, setVisites] = useState<LocalVisite[]>([]);
+  const [visitesEnCours, setVisitesEnCours] = useState<LocalVisite[]>([]);
   const [employes, setEmployes] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatut, setFilterStatut] = useState("");
 
@@ -97,14 +135,29 @@ export default function RegistreVisiteur() {
   const uploadPhotoToStorage = async (file: File): Promise<string | null> => {
     setPhotoUploading(true);
     try {
+      if (isSelfHostedMode()) {
+        const result = await apiClient.media.upload(file, {
+          category: "autre",
+        });
+        if (result.error || !result.data)
+          throw new Error(result.error || "Échec de l'upload");
+        return result.data.url;
+      }
+
       const ext = file.name.split(".").pop() || "jpg";
       const filename = `visiteurs/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError } = await dbClient.storage
         .from("media")
-        .upload(filename, file, { cacheControl: "3600", upsert: false, contentType: file.type });
+        .upload(filename, file, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: file.type,
+        });
       if (uploadError) throw uploadError;
-      const { data: { publicUrl } } = supabase.storage.from("media").getPublicUrl(filename);
-      await supabase.from("media_files").insert({
+      const {
+        data: { publicUrl },
+      } = dbClient.storage.from("media").getPublicUrl(filename);
+      await dbClient.from("media_files").insert({
         filename,
         original_name: file.name,
         url: publicUrl,
@@ -119,7 +172,13 @@ export default function RegistreVisiteur() {
       return publicUrl;
     } catch (err) {
       if (import.meta.env.DEV) console.error("Photo upload error:", err);
-      return null;
+      return await new Promise<string | null>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () =>
+          resolve(typeof reader.result === "string" ? reader.result : null);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(file);
+      });
     } finally {
       setPhotoUploading(false);
     }
@@ -173,31 +232,83 @@ export default function RegistreVisiteur() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      // Visiteurs existants
-      const { data: visData } = await supabase
-        .from("visiteurs")
-        .select("*")
-        .is("deleted_at", null)
-        .order("created_at", { ascending: false })
-        .limit(100);
-      if (visData) setVisiteurs(visData);
+      const cachedVisiteurs = sortVisiteurs(
+        readManualCache<LocalVisiteur>(VISITEURS_CACHE_KEY).map((item) => ({
+          ...item,
+          sync_status: normalizeManualStatus(item.sync_status),
+          sync_error: item.sync_error ?? null,
+          deleted_at: item.deleted_at ?? null,
+        })),
+      );
+      const cachedVisites = sortVisites(
+        readManualCache<LocalVisite>(VISITES_CACHE_KEY).map((item) => ({
+          ...item,
+          sync_status: normalizeManualStatus(item.sync_status),
+          sync_error: item.sync_error ?? null,
+          deleted_at: item.deleted_at ?? null,
+        })),
+      );
 
-      // Visites du jour
-      const { data: visitesData } = await supabase
-        .from("visites_du_jour")
-        .select("*")
-        .order("date_arrivee", { ascending: false });
-      if (visitesData) setVisites(visitesData);
+      if (cachedVisiteurs.length > 0 || cachedVisites.length > 0) {
+        setVisiteurs(cachedVisiteurs);
+        setVisites(cachedVisites);
+        setVisitesEnCours(
+          cachedVisites.filter((visite) => visite.statut === "EN_COURS"),
+        );
+      } else {
+        // Visiteurs existants
+        const { data: visData } = await dbClient
+          .from("visiteurs")
+          .select("*")
+          .is("deleted_at", null)
+          .order("created_at", { ascending: false })
+          .limit(100);
+        const seededVisiteurs = sortVisiteurs(
+          ((visData || []) as Visiteur[]).map((item) => ({
+            ...item,
+            sync_status: "synced" as const,
+            sync_error: null,
+            deleted_at: null,
+          })),
+        );
+        if (visData) setVisiteurs(seededVisiteurs);
 
-      // Visites en cours
-      const { data: enCoursData } = await supabase
-        .from("visites_en_cours")
-        .select("*")
-        .order("date_arrivee", { ascending: false });
-      if (enCoursData) setVisitesEnCours(enCoursData);
+        // Visites du jour
+        const { data: visitesData } = await dbClient
+          .from("visites_du_jour")
+          .select("*")
+          .order("date_arrivee", { ascending: false });
+        const seededVisites = sortVisites(
+          ((visitesData || []) as Visite[]).map((item) => ({
+            ...item,
+            sync_status: "synced" as const,
+            sync_error: null,
+            deleted_at: null,
+          })),
+        );
+        if (visitesData) setVisites(seededVisites);
+
+        // Visites en cours
+        const { data: enCoursData } = await dbClient
+          .from("visites_en_cours")
+          .select("*")
+          .order("date_arrivee", { ascending: false });
+        const seededEnCours = sortVisites(
+          ((enCoursData || []) as Visite[]).map((item) => ({
+            ...item,
+            sync_status: "synced" as const,
+            sync_error: null,
+            deleted_at: null,
+          })),
+        );
+        if (enCoursData) setVisitesEnCours(seededEnCours);
+
+        writeManualCache(VISITEURS_CACHE_KEY, seededVisiteurs);
+        writeManualCache(VISITES_CACHE_KEY, seededVisites);
+      }
 
       // Employés
-      const { data: empData } = await supabase
+      const { data: empData } = await dbClient
         .from("user_profiles")
         .select("*")
         .not("role", "eq", "admin")
@@ -213,6 +324,190 @@ export default function RegistreVisiteur() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const pendingSyncCount = [
+    ...readManualCache<{ sync_status?: string }>(VISITEURS_CACHE_KEY),
+    ...readManualCache<{ sync_status?: string }>(VISITES_CACHE_KEY),
+  ].filter(
+    (item) => normalizeManualStatus(item.sync_status) !== "synced",
+  ).length;
+
+  const handleSyncToRemote = async () => {
+    if (!user) {
+      alert("Vous devez être connecté pour synchroniser.");
+      return;
+    }
+
+    setSyncing(true);
+    try {
+      const cachedVisitors = readManualCache<LocalVisiteur>(
+        VISITEURS_CACHE_KEY,
+      ).map((item) => ({
+        ...item,
+        sync_status: normalizeManualStatus(item.sync_status),
+        sync_error: item.sync_error ?? null,
+        deleted_at: item.deleted_at ?? null,
+      }));
+      const cachedVisits = readManualCache<LocalVisite>(VISITES_CACHE_KEY).map(
+        (item) => ({
+          ...item,
+          sync_status: normalizeManualStatus(item.sync_status),
+          sync_error: item.sync_error ?? null,
+          deleted_at: item.deleted_at ?? null,
+        }),
+      );
+
+      const nextVisitors = [...cachedVisitors];
+      const nextVisits = [...cachedVisits];
+
+      for (const visitor of cachedVisitors) {
+        if (visitor.sync_status === "synced") continue;
+        if (visitor.sync_status === "deleted") {
+          const { error } = await dbClient
+            .from("visiteurs")
+            .delete()
+            .eq("id", visitor.id);
+          if (error) {
+            const index = nextVisitors.findIndex(
+              (item) => item.id === visitor.id,
+            );
+            if (index >= 0)
+              nextVisitors[index] = {
+                ...nextVisitors[index],
+                sync_error: error.message,
+              };
+            continue;
+          }
+          const index = nextVisitors.findIndex(
+            (item) => item.id === visitor.id,
+          );
+          if (index >= 0) nextVisitors.splice(index, 1);
+          continue;
+        }
+
+        const payload = {
+          id: visitor.id,
+          nom_complet: visitor.nom_complet,
+          type_piece: visitor.type_piece,
+          numero_piece: visitor.numero_piece,
+          telephone: visitor.telephone,
+          email: visitor.email,
+          societe: visitor.societe,
+          photo_url: visitor.photo_url || visitor.photo_base64,
+          photo_base64: visitor.photo_base64,
+          nb_visites: visitor.nb_visites,
+          derniere_visite: visitor.derniere_visite,
+          created_at: visitor.created_at,
+          updated_at: visitor.updated_at,
+          created_by: visitor.created_by,
+          deleted_at: visitor.deleted_at ?? null,
+        };
+
+        const { error } = await dbClient.from("visiteurs").upsert(payload, {
+          onConflict: "id",
+        });
+        if (error) {
+          const index = nextVisitors.findIndex(
+            (item) => item.id === visitor.id,
+          );
+          if (index >= 0)
+            nextVisitors[index] = {
+              ...nextVisitors[index],
+              sync_error: error.message,
+            };
+          continue;
+        }
+        const index = nextVisitors.findIndex((item) => item.id === visitor.id);
+        if (index >= 0) {
+          nextVisitors[index] = {
+            ...nextVisitors[index],
+            sync_status: "synced",
+            sync_error: null,
+            deleted_at: null,
+          };
+        }
+      }
+
+      for (const visite of cachedVisits) {
+        if (visite.sync_status === "synced") continue;
+        if (visite.sync_status === "deleted") {
+          const { error } = await dbClient
+            .from("visites")
+            .delete()
+            .eq("id", visite.id);
+          if (error) {
+            const index = nextVisits.findIndex((item) => item.id === visite.id);
+            if (index >= 0)
+              nextVisits[index] = {
+                ...nextVisits[index],
+                sync_error: error.message,
+              };
+            continue;
+          }
+          const index = nextVisits.findIndex((item) => item.id === visite.id);
+          if (index >= 0) nextVisits.splice(index, 1);
+          continue;
+        }
+
+        const payload = {
+          id: visite.id,
+          visiteur_id: visite.visiteur_id,
+          date_arrivee: visite.date_arrivee,
+          date_depart: visite.date_depart,
+          motif: visite.motif,
+          motif_autre: visite.motif_autre,
+          personne_rencontree_id: visite.personne_rencontree_id,
+          personne_rencontree_nom: visite.personne_rencontree_nom,
+          service: visite.service,
+          badge_imprime: visite.badge_imprime,
+          badge_imprime_at: visite.badge_imprime_at,
+          statut: visite.statut,
+          observations: visite.observations,
+          signature_numerique: visite.signature_numerique,
+          qr_code: visite.qr_code,
+          type_visite: visite.type_visite,
+          created_at: visite.created_at,
+          updated_at: visite.updated_at,
+          created_by: visite.created_by,
+        };
+
+        const { error } = await dbClient.from("visites").upsert(payload, {
+          onConflict: "id",
+        });
+        if (error) {
+          const index = nextVisits.findIndex((item) => item.id === visite.id);
+          if (index >= 0)
+            nextVisits[index] = {
+              ...nextVisits[index],
+              sync_error: error.message,
+            };
+          continue;
+        }
+        const index = nextVisits.findIndex((item) => item.id === visite.id);
+        if (index >= 0) {
+          nextVisits[index] = {
+            ...nextVisits[index],
+            sync_status: "synced",
+            sync_error: null,
+            deleted_at: null,
+          };
+        }
+      }
+
+      writeManualCache(VISITEURS_CACHE_KEY, sortVisiteurs(nextVisitors));
+      writeManualCache(VISITES_CACHE_KEY, sortVisites(nextVisits));
+      await fetchData();
+      alert("Synchronisation terminée.");
+    } catch (error) {
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Erreur lors de la synchronisation.",
+      );
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   // Gestion webcam
   const startWebcam = async () => {
@@ -253,12 +548,23 @@ export default function RegistreVisiteur() {
       if (ctx) {
         ctx.drawImage(video, 0, 0);
         stopWebcam();
-        canvas.toBlob(async (blob) => {
-          if (!blob) return;
-          const file = new File([blob], `webcam-${Date.now()}.jpg`, { type: "image/jpeg" });
-          const url = await uploadPhotoToStorage(file);
-          if (url) setVisiteurForm((prev) => ({ ...prev, photo_url: url, photo_base64: null }));
-        }, "image/jpeg", 0.8);
+        canvas.toBlob(
+          async (blob) => {
+            if (!blob) return;
+            const file = new File([blob], `webcam-${Date.now()}.jpg`, {
+              type: "image/jpeg",
+            });
+            const url = await uploadPhotoToStorage(file);
+            if (url)
+              setVisiteurForm((prev) => ({
+                ...prev,
+                photo_url: url,
+                photo_base64: null,
+              }));
+          },
+          "image/jpeg",
+          0.8,
+        );
       }
     }
   };
@@ -267,21 +573,12 @@ export default function RegistreVisiteur() {
   const checkDoublon = async (
     numeroPiece: string,
   ): Promise<Visiteur | null> => {
-    const { data, error } = await supabase
-      .from("visiteurs")
-      .select("*")
-      .eq("numero_piece", numeroPiece)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(1);
-
-    if (error) {
-      if (import.meta.env.DEV)
-        console.error("Erreur vérification doublon:", error);
-      return null;
-    }
-
-    return data && data.length > 0 ? data[0] : null;
+    const localMatch = visiteurs.find(
+      (visiteur) =>
+        visiteur.numero_piece === numeroPiece &&
+        normalizeManualStatus(visiteur.sync_status) !== "deleted",
+    );
+    return localMatch || null;
   };
 
   // Sauvegarder visiteur + visite
@@ -328,56 +625,102 @@ export default function RegistreVisiteur() {
   const creerVisiteurEtVisite = async (visiteurId?: string) => {
     setSaving(true);
     try {
-      let visiteurData;
+      const now = new Date().toISOString();
+      let visiteurData: LocalVisiteur;
 
       if (visiteurId) {
         // Réutiliser un visiteur existant
-        visiteurData = visiteurs.find((v) => v.id === visiteurId);
-        if (!visiteurData) throw new Error("Visiteur existant introuvable");
+        const foundVisiteur = visiteurs.find((v) => v.id === visiteurId);
+        if (!foundVisiteur) throw new Error("Visiteur existant introuvable");
+        visiteurData = foundVisiteur;
       } else {
-        // 1. Créer le visiteur
-        const { data, error: visError } = await supabase
-          .from("visiteurs")
-          .insert({
-            nom_complet: visiteurForm.nom_complet,
-            type_piece: visiteurForm.type_piece,
-            numero_piece: visiteurForm.numero_piece,
-            telephone: visiteurForm.telephone,
-            email: visiteurForm.email || null,
-            societe: visiteurForm.societe || null,
-            photo_url: visiteurForm.photo_url || null,
-            created_by: user?.id,
-          })
-          .select()
-          .single();
-
-        if (visError) throw visError;
-        visiteurData = data;
+        // 1. Créer le visiteur localement
+        visiteurData = {
+          id: crypto.randomUUID(),
+          nom_complet: visiteurForm.nom_complet,
+          type_piece: visiteurForm.type_piece,
+          numero_piece: visiteurForm.numero_piece,
+          telephone: visiteurForm.telephone,
+          email: visiteurForm.email || null,
+          societe: visiteurForm.societe || null,
+          photo_url: visiteurForm.photo_url || null,
+          photo_base64: visiteurForm.photo_url?.startsWith("data:")
+            ? visiteurForm.photo_url
+            : null,
+          nb_visites: 0,
+          derniere_visite: null,
+          created_by: user?.id ?? null,
+          created_at: now,
+          updated_at: now,
+          deleted_at: null,
+          sync_status: "pending",
+          sync_error: null,
+        };
+        const cachedVisitors =
+          readManualCache<LocalVisiteur>(VISITEURS_CACHE_KEY);
+        writeManualCache(
+          VISITEURS_CACHE_KEY,
+          sortVisiteurs(cachedVisitors.concat(visiteurData)),
+        );
+        setVisiteurs((prev) => sortVisiteurs(prev.concat(visiteurData)));
       }
 
-      // 2. Créer la visite
-      const { data: visiteData, error: visiteError } = await supabase
-        .from("visites")
-        .insert({
-          visiteur_id: visiteurData.id,
-          motif: visiteForm.motif,
-          motif_autre: visiteForm.motif_autre || null,
-          personne_rencontree_id: visiteForm.personne_rencontree_id || null,
-          personne_rencontree_nom: visiteForm.personne_rencontree_nom || null,
-          service: visiteForm.service,
-          type_visite: visiteForm.type_visite,
-          observations: visiteForm.observations || null,
-          created_by: user?.id,
-        })
-        .select(
-          `
-          *,
-          visiteurs (nom_complet, telephone, photo_url)
-        `,
-        )
-        .single();
+      // 2. Créer la visite localement
+      const visiteData: LocalVisite = {
+        id: crypto.randomUUID(),
+        visiteur_id: visiteurData.id,
+        date_arrivee: now,
+        date_depart: null,
+        motif: visiteForm.motif,
+        motif_autre: visiteForm.motif_autre || null,
+        personne_rencontree_id: visiteForm.personne_rencontree_id || null,
+        personne_rencontree_nom: visiteForm.personne_rencontree_nom || null,
+        service: visiteForm.service,
+        badge_imprime: false,
+        badge_imprime_at: null,
+        statut: "EN_COURS",
+        observations: visiteForm.observations || null,
+        signature_numerique: null,
+        qr_code: null,
+        type_visite: visiteForm.type_visite,
+        created_at: now,
+        updated_at: now,
+        created_by: user?.id ?? null,
+        visiteurs: {
+          nom_complet: visiteurData.nom_complet,
+          telephone: visiteurData.telephone,
+          photo_url: visiteurData.photo_url,
+          photo_base64: visiteurData.photo_base64,
+        },
+        sync_status: "pending",
+        sync_error: null,
+        deleted_at: null,
+      };
 
-      if (visiteError) throw visiteError;
+      const cachedVisits = readManualCache<LocalVisite>(VISITES_CACHE_KEY);
+      writeManualCache(
+        VISITES_CACHE_KEY,
+        sortVisites(cachedVisits.concat(visiteData)),
+      );
+      setVisites((prev) => sortVisites(prev.concat(visiteData)));
+      setVisitesEnCours((prev) => sortVisites(prev.concat(visiteData)));
+
+      const updatedVisitors = visiteurs.map((item) =>
+        item.id === visiteurData.id
+          ? {
+              ...item,
+              nb_visites: (item.nb_visites || 0) + 1,
+              derniere_visite: now,
+              updated_at: now,
+              sync_status:
+                normalizeManualStatus(item.sync_status) === "synced"
+                  ? "pending"
+                  : normalizeManualStatus(item.sync_status),
+            }
+          : item,
+      );
+      setVisiteurs(sortVisiteurs(updatedVisitors));
+      writeManualCache(VISITEURS_CACHE_KEY, sortVisiteurs(updatedVisitors));
 
       setDerniereVisite(visiteData);
       setShowBadgePreview(true);
@@ -581,20 +924,26 @@ export default function RegistreVisiteur() {
   // Enregistrer départ
   const enregistrerDepart = async (visiteId: string) => {
     if (!confirm("Confirmer le départ du visiteur ?")) return;
-
-    const { error } = await supabase
-      .from("visites")
-      .update({
-        statut: "TERMINEE",
-        date_depart: new Date().toISOString(),
-      })
-      .eq("id", visiteId);
-
-    if (error) {
-      alert("Erreur: " + error.message);
-    } else {
-      fetchData();
-    }
+    const now = new Date().toISOString();
+    const nextVisits = visites.map((visite) =>
+      visite.id === visiteId
+        ? {
+            ...visite,
+            statut: "TERMINEE" as const,
+            date_depart: now,
+            updated_at: now,
+            sync_status:
+              normalizeManualStatus(visite.sync_status) === "synced"
+                ? "pending"
+                : normalizeManualStatus(visite.sync_status),
+          }
+        : visite,
+    );
+    writeManualCache(VISITES_CACHE_KEY, sortVisites(nextVisits));
+    setVisites(sortVisites(nextVisits));
+    setVisitesEnCours(
+      nextVisits.filter((visite) => visite.statut === "EN_COURS"),
+    );
   };
 
   // Filtrer les visites
@@ -690,10 +1039,25 @@ export default function RegistreVisiteur() {
                   {visitesEnCours.length} visite(s) en cours
                 </div>
               )}
+              <SyncRemoteButton
+                pendingCount={pendingSyncCount}
+                syncing={syncing}
+                onClick={() => void handleSyncToRemote()}
+                size="compact"
+              />
             </div>
           </div>
         </div>
       </div>
+
+      {pendingSyncCount > 0 && (
+        <div className="max-w-7xl mx-auto mb-6">
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            {pendingSyncCount} élément{pendingSyncCount > 1 ? "s" : ""} en
+            attente de synchronisation.
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="max-w-7xl mx-auto mb-6">
@@ -729,11 +1093,20 @@ export default function RegistreVisiteur() {
                   onFormChange={handleVisiteurFormChange}
                   photoUploading={photoUploading}
                   onPhotoDelete={() =>
-                    setVisiteurForm((prev) => ({ ...prev, photo_url: null, photo_base64: null }))
+                    setVisiteurForm((prev) => ({
+                      ...prev,
+                      photo_url: null,
+                      photo_base64: null,
+                    }))
                   }
                   onPhotoUpload={async (file: File) => {
                     const url = await uploadPhotoToStorage(file);
-                    if (url) setVisiteurForm((prev) => ({ ...prev, photo_url: url, photo_base64: null }));
+                    if (url)
+                      setVisiteurForm((prev) => ({
+                        ...prev,
+                        photo_url: url,
+                        photo_base64: null,
+                      }));
                   }}
                   onStartWebcam={startWebcam}
                   onNext={() => setEtape(2)}

@@ -13,7 +13,7 @@ export const lotSchema = z.object({
   numero_lot: z.string().min(1, 'Numéro de lot requis').max(50),
   superficie: z.number().min(1, 'Superficie minimum : 1 m²').max(100_000, 'Superficie maximum : 100 000 m²'),
   prix_cession: z.number().min(0).optional().nullable(),
-  statut: z.enum(['disponible', 'reserve', 'vendu', 'litige', 'indisponible', 'archive']).default('disponible'),
+  statut: z.enum(['actif', 'reserve', 'vendu', 'litige', 'annule']).default('actif'),
   proprietaire_nom: z.string().max(200).optional().nullable(),
   proprietaire_prenom: z.string().max(200).optional().nullable(),
   proprietaire_telephone: z.string().max(30).optional().nullable(),

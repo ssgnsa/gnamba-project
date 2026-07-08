@@ -5,6 +5,7 @@ import {
   Building2,
   Map,
   Package,
+  Tag,
   DollarSign,
   UserCog,
   Truck,
@@ -21,6 +22,7 @@ import {
   Shield,
   Images,
   Megaphone,
+  Bot,
 } from "lucide-react";
 import { useSettings } from "../context/SettingsContext";
 import BrandLogo from "./BrandLogo";
@@ -37,6 +39,7 @@ export type Page =
   | "projets"
   | "immobilier"
   | "foncier"
+  | "catalogue-lots"
   | "fournitures"
   | "finances"
   | "employes"
@@ -49,7 +52,8 @@ export type Page =
   | "site-editor"
   | "media"
   | "registre"
-  | "leads";
+  | "leads"
+  | "codex-assistant";
 
 interface SidebarProps {
   activePage: Page;
@@ -74,6 +78,7 @@ const navItems: {
   { id: "projets", label: "Projets BTP", icon: HardHat },
   { id: "immobilier", label: "Immobilier", icon: Building2 },
   { id: "foncier", label: "Foncier", icon: Map },
+  { id: "catalogue-lots", label: "Lots à vendre", icon: Tag },
   { id: "fournitures", label: "Fournitures", icon: Package },
   { id: "finances", label: "Finances", icon: DollarSign },
   { id: "employes", label: "Employés", icon: UserCog },
@@ -85,6 +90,7 @@ const navItems: {
   { id: "statistiques", label: "Statistiques", icon: BarChart2 },
   { id: "parametres", label: "Paramètres", icon: Settings },
   { id: "site-editor", label: "Site Vitrine", icon: Globe, adminOnly: true },
+  { id: "codex-assistant", label: "Assistant Codex", icon: Bot, adminOnly: true },
   { id: "registre", label: "Registre Visiteur", icon: Users },
   { id: "leads", label: "Leads & Campagnes", icon: Megaphone },
 ];
@@ -104,6 +110,7 @@ export default function Sidebar({
   const { signOut, profile } = useAuth();
   const role = profile?.role;
   const accessLevel = resolveAccessLevel(profile?.role, profile?.access_level);
+  const isAdmin = accessLevel === "admin";
   const logoInitials = (settings.app_title || "EG").slice(0, 2).toUpperCase();
   const effectiveCollapsed = isDesktop ? collapsed : false;
 
@@ -206,6 +213,11 @@ export default function Sidebar({
                   {ACCESS_LEVEL_LABELS[accessLevel] || profile.role}
                 </span>
               </div>
+              {isAdmin && (
+                <div className="mt-1 inline-flex items-center rounded-full bg-emerald-400/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-100">
+                  Administrateur
+                </div>
+              )}
             </div>
           </div>
         </div>

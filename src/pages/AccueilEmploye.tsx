@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useSettings } from "../context/SettingsContext";
-import { supabase } from "../lib/supabase";
+import dbClient from "../data/tableClient";
+import { fetchLatestDailyStats } from "../lib/dashboardStats";
 import {
   MessageDirection,
   EmployePresence,
@@ -33,6 +34,10 @@ import {
   ChevronLeft,
 } from "lucide-react";
 import BrandLogo from "../components/BrandLogo";
+import {
+  ACCESS_LEVEL_LABELS,
+  resolveAccessLevel,
+} from "../context/AuthContext";
 
 const getPriorityRank = (value?: string | null) => {
   switch (value) {
@@ -64,6 +69,7 @@ const sortMessages = (items: MessageDirection[]) => {
 export default function AccueilEmploye() {
   const { user, profile, signOut } = useAuth();
   const { settings } = useSettings();
+  const accessLevel = resolveAccessLevel(profile?.role, profile?.access_level);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [messageDirection, setMessageDirection] =
     useState<MessageDirection | null>(null);
@@ -136,7 +142,7 @@ export default function AccueilEmploye() {
   useEffect(() => {
     if (!showMessageForm) return;
     const fetchTargets = async () => {
-      const { data } = await supabase
+      const { data } = await dbClient
         .from("user_profiles")
         .select("id, full_name, department")
         .order("full_name");
@@ -146,11 +152,11 @@ export default function AccueilEmploye() {
         );
         const services = Array.from(
           new Set(
-            data
+            (data as { department?: string | null }[])
               .map((item) => (item.department || "").trim())
-              .filter((item) => item.length > 0),
+              .filter((item: string) => item.length > 0),
           ),
-        ).sort((a, b) => a.localeCompare(b, "fr"));
+        ).sort((a: string, b: string) => a.localeCompare(b, "fr"));
         setTargetServices(services);
       }
     };
@@ -201,7 +207,7 @@ export default function AccueilEmploye() {
       const nowIso = new Date().toISOString();
       setDataError(null);
 
-      const { data: messages, error: messagesError } = await supabase
+      const { data: messages, error: messagesError } = await dbClient
         .from("messages_direction")
         .select("*")
         .eq("statut", "PUBLIE")
@@ -213,7 +219,7 @@ export default function AccueilEmploye() {
         trackIssue("messages de direction", messagesError);
         setMessageDirection(null);
       } else if (messages && messages.length > 0) {
-        const validMessages = messages.filter((msg) => {
+        const validMessages = (messages as MessageDirection[]).filter((msg) => {
           if (msg.date_expiration) {
             return new Date(msg.date_expiration).getTime() >= Date.now();
           }
@@ -226,7 +232,7 @@ export default function AccueilEmploye() {
         setMessageDirection(null);
       }
 
-      const { data: presence, error: presenceError } = await supabase
+      const { data: presence, error: presenceError } = await dbClient
         .from("employes_presence")
         .select("*")
         .eq("statut", "EN_LIGNE")
@@ -240,7 +246,7 @@ export default function AccueilEmploye() {
         setEmployesEnLigne(presence);
       }
 
-      const { data: visites, error: visitesError } = await supabase
+      const { data: visites, error: visitesError } = await dbClient
         .from("visites_en_cours")
         .select("*")
         .limit(5);
@@ -252,7 +258,7 @@ export default function AccueilEmploye() {
         setVisitesEnCours(visites);
       }
 
-      const { data: activites, error: activitesError } = await supabase
+      const { data: activites, error: activitesError } = await dbClient
         .from("activites_journal")
         .select("*")
         .order("created_at", { ascending: false })
@@ -265,10 +271,8 @@ export default function AccueilEmploye() {
         setActivitesRecentes(activites);
       }
 
-      const { data: statsData, error: statsError } = await supabase
-        .from("stats_journalieres")
-        .select("*")
-        .single();
+      const { data: statsData, error: statsError } =
+        await fetchLatestDailyStats(dbClient);
 
       if (statsError) {
         trackIssue("statistiques journalieres", statsError);
@@ -380,7 +384,7 @@ export default function AccueilEmploye() {
 
   // Admin: Fetch messages
   const fetchMessages = useCallback(async () => {
-    const { data } = await supabase
+    const { data } = await dbClient
       .from("messages_direction")
       .select("*")
       .order("created_at", { ascending: false });
@@ -442,13 +446,13 @@ export default function AccueilEmploye() {
 
     try {
       if (editingMessage) {
-        const { error } = await supabase
+        const { error } = await dbClient
           .from("messages_direction")
           .update(messageData)
           .eq("id", editingMessage.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase
+        const { error } = await dbClient
           .from("messages_direction")
           .insert(messageData);
         if (error) throw error;
@@ -470,14 +474,20 @@ export default function AccueilEmploye() {
   // Admin: Delete message
   const handleDeleteMessage = async (id: string) => {
     if (!confirm("Supprimer ce message ?")) return;
-    const { error } = await supabase.from("messages_direction").delete().eq("id", id);
-    if (error) { setMessageFormError(error.message); return; }
+    const { error } = await dbClient
+      .from("messages_direction")
+      .delete()
+      .eq("id", id);
+    if (error) {
+      setMessageFormError(error.message);
+      return;
+    }
     fetchMessages();
   };
 
   // Admin: Toggle message status
   const handleToggleMessage = async (message: MessageDirection) => {
-    await supabase
+    await dbClient
       .from("messages_direction")
       .update({ statut: message.statut === "PUBLIE" ? "BROUILLON" : "PUBLIE" })
       .eq("id", message.id);
@@ -485,7 +495,7 @@ export default function AccueilEmploye() {
   };
 
   // Check if user is admin or gestionnaire
-  const isAdmin = profile?.role === "admin" || profile?.role === "gestionnaire";
+  const isAdmin = accessLevel === "admin" || accessLevel === "gestionnaire";
   const targetsDisabled = ciblesTous;
   const filteredEmployees = targetEmployees.filter((emp) => {
     const term = employeeSearch.trim().toLowerCase();
@@ -549,6 +559,11 @@ export default function AccueilEmploye() {
                   {settings.app_company || "Gnamba Services"}
                 </h1>
                 <p className="text-xs text-gray-500">Espace Employé</p>
+                {isAdmin && (
+                  <div className="mt-1 inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                    {ACCESS_LEVEL_LABELS.admin}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -583,6 +598,11 @@ export default function AccueilEmploye() {
                     {profile?.poste || profile?.department || "Employé"}
                   </p>
                 </div>
+                {isAdmin && (
+                  <span className="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                    Administrateur
+                  </span>
+                )}
                 <button
                   onClick={signOut}
                   className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"

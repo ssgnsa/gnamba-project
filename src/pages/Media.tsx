@@ -17,7 +17,9 @@ import {
   RotateCcw,
   AlertTriangle,
 } from "lucide-react";
-import { supabase } from "../lib/supabase";
+import { apiClient } from "../api/client";
+import { isSelfHostedMode } from "../lib/selfHosted";
+import dbClient from "../data/tableClient";
 import { logMediaAction } from "../lib/mediaUtils";
 import { useAuth } from "../context/AuthContext";
 import type { MediaFile } from "../types";
@@ -79,7 +81,17 @@ export default function Media() {
   const fetchTrashed = useCallback(async () => {
     if (authLoading || !user) return;
     setLoadingTrash(true);
-    const { data } = await supabase
+    if (isSelfHostedMode()) {
+      const result = await apiClient.media.getAll(true);
+      const trashed = (result.data || []).filter((file) =>
+        Boolean(file.deleted_at),
+      );
+      setTrashedFiles(trashed);
+      setLoadingTrash(false);
+      return;
+    }
+
+    const { data } = await dbClient
       .from("media_files")
       .select("*")
       .not("deleted_at", "is", null)
@@ -92,49 +104,110 @@ export default function Media() {
     if (mainTab === "trash" && !authLoading && user) fetchTrashed();
   }, [mainTab, fetchTrashed, authLoading, user]);
 
-  const fetchFiles = useCallback(async (currentOffset = 0) => {
-    if (authLoading || !user) return;
-    setLoading(true);
-    const [orderCol, orderDir] = (() => {
-      switch (sort) {
-        case "date_asc":  return ["upload_date", true];
-        case "name_asc":  return ["original_name", true];
-        case "size_desc": return ["size", false];
-        default:          return ["upload_date", false];
+  const fetchFiles = useCallback(
+    async (currentOffset = 0) => {
+      if (authLoading || !user) return;
+      setLoading(true);
+      const [orderCol, orderDir] = (() => {
+        switch (sort) {
+          case "date_asc":
+            return ["upload_date", true];
+          case "name_asc":
+            return ["original_name", true];
+          case "size_desc":
+            return ["size", false];
+          default:
+            return ["upload_date", false];
+        }
+      })();
+
+      if (isSelfHostedMode()) {
+        const result = await apiClient.media.getAll();
+        const mediaFiles = (result.data || [])
+          .filter((file) => !file.deleted_at)
+          .filter((file) => category === "all" || file.category === category)
+          .sort((a, b) => {
+            switch (sort) {
+              case "date_asc":
+                return (
+                  new Date(a.upload_date).getTime() -
+                  new Date(b.upload_date).getTime()
+                );
+              case "name_asc":
+                return a.original_name.localeCompare(b.original_name);
+              case "size_desc":
+                return b.size - a.size;
+              default:
+                return (
+                  new Date(b.upload_date).getTime() -
+                  new Date(a.upload_date).getTime()
+                );
+            }
+          });
+        const page = mediaFiles.slice(currentOffset, currentOffset + PAGE_SIZE);
+        if (currentOffset === 0) {
+          setFiles(page);
+        } else {
+          setFiles((prev) => [...prev, ...page]);
+        }
+        setHasMore(currentOffset + page.length < mediaFiles.length);
+        if (currentOffset === 0) {
+          const tags = Array.from(
+            new Set(mediaFiles.flatMap((f) => f.tags || [])),
+          ).sort();
+          setAllTags(tags);
+        } else {
+          setAllTags((prev) =>
+            Array.from(
+              new Set([...prev, ...mediaFiles.flatMap((f) => f.tags || [])]),
+            ).sort(),
+          );
+        }
+        setLoading(false);
+        return;
       }
-    })();
 
-    let query = supabase
-      .from("media_files")
-      .select("*")
-      .is("deleted_at", null)
-      .order(orderCol as string, { ascending: orderDir as boolean })
-      .range(currentOffset, currentOffset + PAGE_SIZE - 1);
+      let query = dbClient
+        .from("media_files")
+        .select("*")
+        .is("deleted_at", null)
+        .order(orderCol as string, { ascending: orderDir as boolean })
+        .range(currentOffset, currentOffset + PAGE_SIZE - 1);
 
-    if (category !== "all") query = query.eq("category", category);
+      if (category !== "all") query = query.eq("category", category);
 
-    const { data, error: fetchError } = await query;
-    if (fetchError) { console.error("[Media] fetchFiles error:", fetchError.message); setLoading(false); return; }
-    const mediaFiles = (data as MediaFile[]) || [];
+      const { data, error: fetchError } = await query;
+      if (fetchError) {
+        console.error("[Media] fetchFiles error:", fetchError.message);
+        setLoading(false);
+        return;
+      }
+      const mediaFiles = (data as MediaFile[]) || [];
 
-    if (currentOffset === 0) {
-      setFiles(mediaFiles);
-    } else {
-      setFiles((prev) => [...prev, ...mediaFiles]);
-    }
+      if (currentOffset === 0) {
+        setFiles(mediaFiles);
+      } else {
+        setFiles((prev) => [...prev, ...mediaFiles]);
+      }
 
-    setHasMore(mediaFiles.length === PAGE_SIZE);
+      setHasMore(mediaFiles.length === PAGE_SIZE);
 
-    if (currentOffset === 0) {
-      const tags = Array.from(new Set(mediaFiles.flatMap((f) => f.tags || []))).sort();
-      setAllTags(tags);
-    } else {
-      setAllTags((prev) =>
-        Array.from(new Set([...prev, ...mediaFiles.flatMap((f) => f.tags || [])])).sort()
-      );
-    }
-    setLoading(false);
-  }, [authLoading, user, category, sort]);
+      if (currentOffset === 0) {
+        const tags = Array.from(
+          new Set(mediaFiles.flatMap((f) => f.tags || [])),
+        ).sort();
+        setAllTags(tags);
+      } else {
+        setAllTags((prev) =>
+          Array.from(
+            new Set([...prev, ...mediaFiles.flatMap((f) => f.tags || [])]),
+          ).sort(),
+        );
+      }
+      setLoading(false);
+    },
+    [authLoading, user, category, sort],
+  );
 
   const loadMore = useCallback(() => {
     if (authLoading || !user) return;
@@ -160,12 +233,34 @@ export default function Media() {
 
   const handleDelete = async (file: MediaFile) => {
     setActionError(null);
-    const { error } = await supabase
+    if (isSelfHostedMode()) {
+      const result = await apiClient.media.delete(file.id);
+      if (result.error) {
+        setActionError(result.error);
+        return;
+      }
+      void logMediaAction("soft_delete", file.id, user?.id ?? null, {
+        filename: file.filename,
+        category: file.category,
+      });
+      setFiles((prev) => prev.filter((f) => f.id !== file.id));
+      setDeleteConfirm(null);
+      if (detail?.id === file.id) setDetail(null);
+      return;
+    }
+
+    const { error } = await dbClient
       .from("media_files")
       .update({ deleted_at: new Date().toISOString() })
       .eq("id", file.id);
-    if (error) { setActionError(error.message); return; }
-    void logMediaAction("soft_delete", file.id, user?.id ?? null, { filename: file.filename, category: file.category });
+    if (error) {
+      setActionError(error.message);
+      return;
+    }
+    void logMediaAction("soft_delete", file.id, user?.id ?? null, {
+      filename: file.filename,
+      category: file.category,
+    });
     setFiles((prev) => prev.filter((f) => f.id !== file.id));
     setDeleteConfirm(null);
     if (detail?.id === file.id) setDetail(null);
@@ -173,19 +268,55 @@ export default function Media() {
 
   const handleRestore = async (file: MediaFile) => {
     setActionError(null);
-    const { error } = await supabase
+    if (isSelfHostedMode()) {
+      const result = await apiClient.media.restore(file.id);
+      if (result.error) {
+        setActionError(result.error);
+        return;
+      }
+      void logMediaAction("restore", file.id, user?.id ?? null, {
+        filename: file.filename,
+      });
+      setTrashedFiles((prev) => prev.filter((f) => f.id !== file.id));
+      return;
+    }
+
+    const { error } = await dbClient
       .from("media_files")
       .update({ deleted_at: null })
       .eq("id", file.id);
-    if (error) { setActionError(error.message); return; }
-    void logMediaAction("restore", file.id, user?.id ?? null, { filename: file.filename });
+    if (error) {
+      setActionError(error.message);
+      return;
+    }
+    void logMediaAction("restore", file.id, user?.id ?? null, {
+      filename: file.filename,
+    });
     setTrashedFiles((prev) => prev.filter((f) => f.id !== file.id));
   };
 
   const handlePurge = async (file: MediaFile) => {
     setActionError(null);
+    if (isSelfHostedMode()) {
+      const result = await apiClient.media.purge(file.id);
+      if (result.error) {
+        setActionError(result.error);
+        return;
+      }
+      void logMediaAction("purge", null, user?.id ?? null, {
+        filename: file.filename,
+        category: file.category,
+      });
+      setTrashedFiles((prev) => prev.filter((f) => f.id !== file.id));
+      setPurgeConfirm(null);
+      return;
+    }
+
     // Delete DB record first to avoid dangling references; then remove storage files.
-    const { error: dbErr } = await supabase.from("media_files").delete().eq("id", file.id);
+    const { error: dbErr } = await dbClient
+      .from("media_files")
+      .delete()
+      .eq("id", file.id);
     if (dbErr) {
       setActionError(`Erreur base de données : ${dbErr.message}`);
       return;
@@ -195,13 +326,20 @@ export default function Media() {
     if (file.thumbnail_url) {
       filesToRemove.push(file.filename.replace(/\.([^.]+)$/, "_thumb.webp"));
     }
-    const { error: storageErr } = await supabase.storage.from("media").remove(filesToRemove);
+    const { error: storageErr } = await dbClient.storage
+      .from("media")
+      .remove(filesToRemove);
     if (storageErr) {
       // Storage failed but DB already removed; surface warning to user.
-      setActionError(`Attention : suppression stockage échouée — ${storageErr.message}`);
+      setActionError(
+        `Attention : suppression stockage échouée — ${storageErr.message}`,
+      );
     }
 
-    void logMediaAction("purge", null, user?.id ?? null, { filename: file.filename, category: file.category });
+    void logMediaAction("purge", null, user?.id ?? null, {
+      filename: file.filename,
+      category: file.category,
+    });
     setTrashedFiles((prev) => prev.filter((f) => f.id !== file.id));
     setPurgeConfirm(null);
   };
@@ -233,7 +371,9 @@ export default function Media() {
       <div className="min-h-[50vh] flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-700 mx-auto mb-4" />
-          <p className="text-sm text-gray-500">Vérification de l'authentification...</p>
+          <p className="text-sm text-gray-500">
+            Vérification de l'authentification...
+          </p>
         </div>
       </div>
     );
@@ -243,7 +383,9 @@ export default function Media() {
     return (
       <div className="min-h-[50vh] flex items-center justify-center bg-amber-50 rounded-xl border border-amber-200 p-6">
         <div className="text-center">
-          <h3 className="text-lg font-semibold text-amber-900 mb-2">Accès refusé</h3>
+          <h3 className="text-lg font-semibold text-amber-900 mb-2">
+            Accès refusé
+          </h3>
           <p className="text-sm text-amber-700">
             Vous devez être connecté pour voir la bibliothèque de médias.
           </p>
@@ -333,7 +475,11 @@ export default function Media() {
               { id: "library", label: "Bibliothèque", icon: Images },
               { id: "brand", label: "Actifs de marque", icon: Star },
               { id: "assignments", label: "Assignations", icon: Tag },
-              { id: "trash", label: `Corbeille${trashedFiles.length > 0 ? ` (${trashedFiles.length})` : ""}`, icon: Trash },
+              {
+                id: "trash",
+                label: `Corbeille${trashedFiles.length > 0 ? ` (${trashedFiles.length})` : ""}`,
+                icon: Trash,
+              },
             ] as {
               id: MainTab;
               label: string;
@@ -626,12 +772,20 @@ export default function Media() {
               <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
                 <AlertTriangle size={14} className="flex-shrink-0" />
                 <span>{actionError}</span>
-                <button onClick={() => setActionError(null)} className="ml-auto text-red-400 hover:text-red-600"><X size={13} /></button>
+                <button
+                  onClick={() => setActionError(null)}
+                  className="ml-auto text-red-400 hover:text-red-600"
+                >
+                  <X size={13} />
+                </button>
               </div>
             )}
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <AlertTriangle size={15} className="text-amber-500" />
-              <span>Les fichiers en corbeille ne sont plus accessibles dans la bibliothèque. Suppression définitive pour libérer le stockage.</span>
+              <span>
+                Les fichiers en corbeille ne sont plus accessibles dans la
+                bibliothèque. Suppression définitive pour libérer le stockage.
+              </span>
             </div>
           </div>
           <div className="p-4">
@@ -647,20 +801,31 @@ export default function Media() {
             ) : (
               <div className="space-y-2">
                 {trashedFiles.map((file) => (
-                  <div key={file.id} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 border border-gray-100">
+                  <div
+                    key={file.id}
+                    className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 border border-gray-100"
+                  >
                     <img
                       src={file.thumbnail_url || file.url}
                       alt={file.original_name}
                       crossOrigin="anonymous"
                       loading="lazy"
                       className="w-12 h-12 rounded-lg object-cover flex-shrink-0 opacity-60"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = "none";
+                      }}
                     />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-700 truncate">{file.original_name}</p>
+                      <p className="text-sm font-medium text-gray-700 truncate">
+                        {file.original_name}
+                      </p>
                       <p className="text-xs text-gray-400">
-                        Supprimé le {new Date(file.deleted_at!).toLocaleDateString("fr-FR")}
-                        {" · "}{file.size < 1024*1024 ? `${(file.size/1024).toFixed(0)} KB` : `${(file.size/1024/1024).toFixed(1)} MB`}
+                        Supprimé le{" "}
+                        {new Date(file.deleted_at!).toLocaleDateString("fr-FR")}
+                        {" · "}
+                        {file.size < 1024 * 1024
+                          ? `${(file.size / 1024).toFixed(0)} KB`
+                          : `${(file.size / 1024 / 1024).toFixed(1)} MB`}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -709,14 +874,21 @@ export default function Media() {
               Déplacer en corbeille
             </h3>
             <p className="text-sm text-gray-500 text-center mb-5">
-              <strong>"{deleteConfirm.original_name}"</strong> sera déplacé dans la corbeille. Vous pourrez le restaurer ou le supprimer définitivement depuis l'onglet Corbeille.
+              <strong>"{deleteConfirm.original_name}"</strong> sera déplacé dans
+              la corbeille. Vous pourrez le restaurer ou le supprimer
+              définitivement depuis l'onglet Corbeille.
             </p>
             {actionError && (
-              <p className="text-xs text-red-600 text-center -mt-2 mb-2">{actionError}</p>
+              <p className="text-xs text-red-600 text-center -mt-2 mb-2">
+                {actionError}
+              </p>
             )}
             <div className="flex items-center gap-3">
               <button
-                onClick={() => { setDeleteConfirm(null); setActionError(null); }}
+                onClick={() => {
+                  setDeleteConfirm(null);
+                  setActionError(null);
+                }}
                 className="flex-1 px-4 py-2 border border-gray-200 text-gray-600 text-sm rounded-xl hover:bg-gray-50 transition-colors"
               >
                 Annuler
@@ -742,14 +914,20 @@ export default function Media() {
               Suppression définitive
             </h3>
             <p className="text-sm text-gray-500 text-center mb-5">
-              <strong>"{purgeConfirm.original_name}"</strong> sera supprimé définitivement du stockage. Cette action est irréversible.
+              <strong>"{purgeConfirm.original_name}"</strong> sera supprimé
+              définitivement du stockage. Cette action est irréversible.
             </p>
             {actionError && (
-              <p className="text-xs text-red-600 text-center -mt-2 mb-2">{actionError}</p>
+              <p className="text-xs text-red-600 text-center -mt-2 mb-2">
+                {actionError}
+              </p>
             )}
             <div className="flex items-center gap-3">
               <button
-                onClick={() => { setPurgeConfirm(null); setActionError(null); }}
+                onClick={() => {
+                  setPurgeConfirm(null);
+                  setActionError(null);
+                }}
                 className="flex-1 px-4 py-2 border border-gray-200 text-gray-600 text-sm rounded-xl hover:bg-gray-50 transition-colors"
               >
                 Annuler

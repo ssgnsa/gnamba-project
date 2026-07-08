@@ -9,7 +9,7 @@ import {
   ExternalLink,
   Image as ImageIcon,
 } from "lucide-react";
-import { supabase } from "../../lib/supabase";
+import dbClient from "../../data/tableClient";
 import { logFoncierAudit } from "../../lib/foncierAudit";
 import Badge from "../ui/Badge";
 import MediaPicker from "../media/MediaPicker";
@@ -98,7 +98,7 @@ export default function WorkflowValidation({
 
   const fetchUserRole = useCallback(async () => {
     if (!userId) return;
-    const { data } = await supabase
+    const { data } = await dbClient
       .from("user_profiles")
       .select("foncier_role")
       .eq("id", userId)
@@ -111,7 +111,7 @@ export default function WorkflowValidation({
   const fetchAttestation = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const baseQuery = supabase
+    const baseQuery = dbClient
       .from("foncier_attestations")
       .select(
         "id, lot_id, reference, statut, created_at, version, validation_agent_nom, validation_chef_nom, validation_chef_date, foncier_lots:lot_id(reference, numero_lot, village, proprietaire_nom, proprietaire_prenom)",
@@ -192,7 +192,7 @@ export default function WorkflowValidation({
 
     setSubmitting(true);
     const now = new Date().toISOString();
-    const { error: updateError } = await supabase
+    const { error: updateError } = await dbClient
       .from("foncier_attestations")
       .update({ statut: "soumis", updated_at: now, client_updated_at: now })
       .eq("id", attestation.id);
@@ -200,7 +200,7 @@ export default function WorkflowValidation({
     if (updateError) {
       alert("Erreur : " + updateError.message);
     } else {
-      await logFoncierAudit(supabase, {
+      await logFoncierAudit(dbClient, {
         lotId: attestation.lot_id,
         action: "SOUMISSION_CHEF",
         details: {
@@ -227,7 +227,7 @@ export default function WorkflowValidation({
     const now = new Date().toISOString();
     const chefName = attestation.validation_chef_nom || userName || null;
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await dbClient
       .from("foncier_attestations")
       .update({
         statut: "valide",
@@ -242,7 +242,7 @@ export default function WorkflowValidation({
     if (updateError) {
       alert("Erreur : " + updateError.message);
     } else {
-      await logFoncierAudit(supabase, {
+      await logFoncierAudit(dbClient, {
         lotId: attestation.lot_id,
         action: "VALIDATION_CHEF",
         details: {
@@ -270,7 +270,7 @@ export default function WorkflowValidation({
       alert(`Erreur : ${error}`);
     } else {
       setScanMedia(file);
-      await logFoncierAudit(supabase, {
+      await logFoncierAudit(dbClient, {
         lotId: attestation.lot_id,
         action: "SCAN_ORIGINAL",
         details: {

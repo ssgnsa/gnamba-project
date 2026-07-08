@@ -12,7 +12,7 @@ Structure normalisée des scripts EGS.
 ## Commandes NPM
 
 ```bash
-npm run backup           # Backup cloud
+  npm run backup           # Backup distant
 npm run backup:local     # Backup local
 npm run backup:restore   # Restaurer
 npm run backup:list      # Lister backups
