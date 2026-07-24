@@ -1,0 +1,1877 @@
+{
+  "migration_files": [
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260324000000_create_foncier_base_tables_and_rpc.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260325000000_create_user_profiles_base.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260326000000_create_foncier_attestations_tables.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260330000000_fix_unique_constraint.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260401080000_fix_foncier_attestations.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260401090000_foncier_attestation_reference_archive.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260402080000_create_immobilier_tables.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260402090000_fix_tenants_schema.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260403090000_create_core_business_tables.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260404080000_fix_rls_policies_foncier_attestations.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260404110000_align_immobilier_schema.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260405120000_rename_tenants_to_locataires.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260405130000_add_comprehensive_rls_policies.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260405140000_create_lead_capture_system.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260405160000_fix_lease_contracts_fk_and_cleanup_rls.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260408030000_current_user_role_fn.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260408040000_rename_tenants_table.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260408050000_rename_lease_contracts_tenant_col.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260408060000_rename_rent_payments_tenant_col.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260408070000_rls_lease_contracts.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260408080000_rls_rent_payments.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260408090000_rls_properties.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260408100000_rls_locataires.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260408120000_rls_critical_tables.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260409000001_add_rls_business_tables.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260409000002_fix_security_definer_functions.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260409140000_fix_user_profiles_email.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260409141423_demo_account_sample_data.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260428000003_migrate_tenants_to_locataires.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260503084300_add_attestation_pdf_metadata.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260508000000_fix_foncier_audit_recommendations.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260508100000_fix_foncier_standalone.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260508110000_fix_foncier_rpc_security.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260509100000_fix_village_config_rls.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260509140000_create_village_logos_bucket.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260509150000_fix_village_logo_registry_rls.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260509160000_fix_village_logo_registry_table.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260509170000_debug_rls_policies.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260509180000_fix_storage_rls_policies.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260510090000_fix_foncier_village_config_rls.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260510100000_fix_foncier_functions_rls.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260511090000_debug_stats_function.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260511110000_fix_media_storage_rls_v3.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260512_unify_immobilier_schema.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260515000001_create_leads_module.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260515000002_leads_module_rls_policies.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260515000003_add_rpc_functions.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260515000004_fix_cors_storage.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260515100000_fix_security_definer_search_path.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260521100000_drop_village_logo_registry.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260521110000_media_center_improvements.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260521120000_media_audit_logs.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260521130000_media_dimensions.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260524000001_create_media_tables_reference.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260524000002_fix_media_usage_column_names.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260524000003_verify_media_schema_cloud.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260524000004_create_media_bucket_and_storage_policies.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260524000005_media_files_compat_columns.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260525000001_create_village_logos_bucket.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260525170000_add_foncier_lots_publier_vitrine.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260604160000_enable_realtime_rent_payments.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260604161000_add_whatsapp_notifications.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260604170000_add_onesignal_to_properties.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260607090724_create_vitrine_lots_table.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260608090000_add_foncier_lots_compat_columns.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260608171419_foncier_phase1_critical_rls.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260609102844_foncier_village_normalization.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260609105850_foncier_public_verification_hardening.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260622100713_fix_user_profiles_rls_recursion.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260701000000_fix_public_access_and_dashboard_tables.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260702000000_fix_user_invites_and_create_profile_rpc.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260702010000_fix_leads_ip_address_column.sql",
+    "/home/soma/gnamba-project/archive/supabase/migrations/20260702020000_create_parties_model.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260306175204_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260306182111_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260306184030_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260306185236_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260306191105_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260306192718_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260306193353_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260307125104_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260307130559_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260307134539_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260307140607_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260309170000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260310130000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260311123000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260311140000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260311150000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260311160000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260311170000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260311171000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260311180000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260311190000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260311203000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260311210000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260312100000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260312110000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260312120000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260312154800_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260312155000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260312163800_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260313120000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260313123000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260313130000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260313140000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260313141000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260318103000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260318110000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260318120000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260318130000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-20260404T175138Z/supabase/migrations/20260318164000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260306175204_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260306182111_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260306184030_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260306185236_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260306191105_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260306192718_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260306193353_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260307125104_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260307130559_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260307134539_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260307140607_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260309170000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260310130000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260311123000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260311140000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260311150000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260311160000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260311170000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260311171000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260311180000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260311190000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260311203000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260311210000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260312100000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260312110000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260312120000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260312154800_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260312155000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260312163800_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260313120000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260313123000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260313130000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260313140000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260313141000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260318103000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260318110000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260318120000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260318130000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/egs/pull-workdir-iso-20260404T175942Z/supabase/migrations/20260318164000_placeholder.sql",
+    "/home/soma/gnamba-project/backups/pre_fix_20260407/migrations/20260326000000_create_foncier_attestations_tables.sql",
+    "/home/soma/gnamba-project/backups/pre_fix_20260407/migrations/20260330000000_fix_unique_constraint.sql",
+    "/home/soma/gnamba-project/backups/pre_fix_20260407/migrations/20260401080000_fix_foncier_attestations.sql",
+    "/home/soma/gnamba-project/backups/pre_fix_20260407/migrations/20260401090000_foncier_attestation_reference_archive.sql",
+    "/home/soma/gnamba-project/backups/pre_fix_20260407/migrations/20260402080000_create_immobilier_tables.sql",
+    "/home/soma/gnamba-project/backups/pre_fix_20260407/migrations/20260402090000_fix_tenants_schema.sql",
+    "/home/soma/gnamba-project/backups/pre_fix_20260407/migrations/20260404080000_fix_rls_policies_foncier_attestations.sql",
+    "/home/soma/gnamba-project/backups/pre_fix_20260407/migrations/20260404110000_align_immobilier_schema.sql",
+    "/home/soma/gnamba-project/backups/pre_fix_20260407/migrations/20260405120000_rename_tenants_to_locataires.sql",
+    "/home/soma/gnamba-project/backups/pre_fix_20260407/migrations/20260405130000_add_comprehensive_rls_policies.sql",
+    "/home/soma/gnamba-project/backups/pre_fix_20260407/migrations/20260405140000_create_lead_capture_system.sql",
+    "/home/soma/gnamba-project/backups/pre_fix_20260407/migrations/20260405150000_create_foncier_base_tables_and_rpc.sql",
+    "/home/soma/gnamba-project/backups/pre_fix_20260407/migrations/20260405160000_fix_lease_contracts_fk_and_cleanup_rls.sql",
+    "/home/soma/gnamba-project/backups/pre_fix_20260407/migrations/20260407000000_fix_foncier_lots.sql",
+    "/home/soma/gnamba-project/backups/pre_fix_20260407/migrations/20260408010000_add_foncier_lots_deleted_at.sql",
+    "/home/soma/gnamba-project/backups/pre_fix_20260407/migrations/20260408020000_idx_foncier_lots_deleted_at.sql",
+    "/home/soma/gnamba-project/backups/pre_fix_20260407/migrations/20260408030000_current_user_role_fn.sql",
+    "/home/soma/gnamba-project/backups/pre_fix_20260407/migrations/20260408040000_rename_tenants_table.sql",
+    "/home/soma/gnamba-project/backups/pre_fix_20260407/migrations/20260408050000_rename_lease_contracts_tenant_col.sql",
+    "/home/soma/gnamba-project/backups/pre_fix_20260407/migrations/20260408060000_rename_rent_payments_tenant_col.sql",
+    "/home/soma/gnamba-project/backups/pre_fix_20260407/migrations/20260408070000_rls_lease_contracts.sql",
+    "/home/soma/gnamba-project/backups/pre_fix_20260407/migrations/20260408080000_rls_rent_payments.sql",
+    "/home/soma/gnamba-project/backups/pre_fix_20260407/migrations/20260408090000_rls_properties.sql",
+    "/home/soma/gnamba-project/backups/pre_fix_20260407/migrations/20260408100000_rls_locataires.sql",
+    "/home/soma/gnamba-project/backups/pre_fix_20260407/migrations/20260408120000_rls_critical_tables.sql"
+  ],
+  "parsed_from_migrations": {
+    "tables": [
+      "activites_journal",
+      "app_settings",
+      "bot_workflows",
+      "campagnes",
+      "clients",
+      "contact_messages",
+      "documents",
+      "employees",
+      "employes_presence",
+      "finances",
+      "foncier_attestation_temoins",
+      "foncier_attestations",
+      "foncier_audit",
+      "foncier_lots",
+      "foncier_villages",
+      "if",
+      "lead_campagnes",
+      "lead_campaigns",
+      "lead_interactions",
+      "lead_optouts",
+      "leads",
+      "lease_contracts",
+      "locataires",
+      "media_audit_logs",
+      "media_files",
+      "media_usage",
+      "media_versions",
+      "messages_direction",
+      "page_layouts",
+      "parties",
+      "party_lead_details",
+      "party_merge_candidates",
+      "party_merge_log",
+      "party_roles",
+      "products",
+      "projects",
+      "properties",
+      "rent_payments",
+      "site_content",
+      "site_realisations",
+      "social_posts",
+      "stats_journalieres",
+      "suppliers",
+      "tasks",
+      "tenants",
+      "user_invites",
+      "user_profiles",
+      "user_village_access",
+      "ventes_foncieres",
+      "village_logo_registry",
+      "village_logo_registry_fallback",
+      "visites_en_cours",
+      "visites_terrain",
+      "vitrine_lots",
+      "whatsapp_notifications"
+    ],
+    "functions": [
+      "attach_foncier_attestation_pdf_metadata",
+      "auto_assign_lead",
+      "can_manage_content",
+      "check_attestation_expiration",
+      "check_foncier_duplicate",
+      "create_task_after_visite",
+      "create_user_with_profile",
+      "current_user_role",
+      "ensure_foncier_hierarchy",
+      "foncier_stats_by_village",
+      "get_agent_performance",
+      "get_agent_workload",
+      "get_funnel_stats",
+      "get_leads_needing_attention",
+      "handle_new_user",
+      "has_finance_access",
+      "increment_lead_reponses",
+      "increment_lead_visites",
+      "is_admin",
+      "is_demo_user",
+      "is_gestionnaire",
+      "jwt_app_role",
+      "log_foncier_audit",
+      "normalize_phone",
+      "restore_foncier_lot",
+      "revoke_foncier_attestation",
+      "search_foncier_lots",
+      "soft_delete_foncier_lot",
+      "sync_foncier_lot_village",
+      "trigger_normalize_lead_phone",
+      "update_derniere_interaction",
+      "update_foncier_lots_updated_at",
+      "update_lead_derniere_interaction",
+      "update_lead_score",
+      "update_pipeline_stats",
+      "update_tenants_updated_at",
+      "update_timestamp_trigger",
+      "update_updated_at_column",
+      "update_vitrine_lots_updated_at",
+      "with"
+    ],
+    "views": [],
+    "policies_on_tables": [
+      "activites_journal",
+      "app_settings",
+      "bot_workflows",
+      "clients",
+      "contact_messages",
+      "documents",
+      "employees",
+      "employes_presence",
+      "finances",
+      "foncier_attestation_temoins",
+      "foncier_attestations",
+      "foncier_audit",
+      "foncier_lots",
+      "foncier_village_config",
+      "foncier_villages",
+      "lead_campaigns",
+      "lead_interactions",
+      "lead_optouts",
+      "leads",
+      "lease_contracts",
+      "locataires",
+      "media_audit_logs",
+      "media_files",
+      "media_usage",
+      "media_versions",
+      "messages_direction",
+      "page_layouts",
+      "products",
+      "projects",
+      "properties",
+      "rent_payments",
+      "site_content",
+      "site_realisations",
+      "social_posts",
+      "stats_journalieres",
+      "storage",
+      "suppliers",
+      "tasks",
+      "tenants",
+      "user_invites",
+      "user_profiles",
+      "user_village_access",
+      "visites_en_cours",
+      "vitrine_lots"
+    ]
+  },
+  "db_snapshot": {
+    "tables": [
+      "alembic_version",
+      "employees",
+      "finances",
+      "foncier_items",
+      "foncier_lots",
+      "immobilier_items",
+      "lead_captures",
+      "leads",
+      "media_audit_logs",
+      "media_files",
+      "media_usage",
+      "media_versions",
+      "products",
+      "projects",
+      "site_content",
+      "suppliers",
+      "users",
+      "ventes_foncieres",
+      "visites_terrain"
+    ],
+    "columns": {
+      "finances": [
+        {
+          "column": "montant",
+          "type": "real",
+          "nullable": "NO"
+        },
+        {
+          "column": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": "YES"
+        },
+        {
+          "column": "updated_at",
+          "type": "timestamp without time zone",
+          "nullable": "YES"
+        },
+        {
+          "column": "reference",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "column": "type",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "type_transaction",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "categorie",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "date_transaction",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "mode_paiement",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "description",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "client_id",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "project_id",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "statut",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "id",
+          "type": "text",
+          "nullable": "NO"
+        }
+      ],
+      "media_usage": [
+        {
+          "column": "id",
+          "type": "uuid",
+          "nullable": "NO"
+        },
+        {
+          "column": "media_id",
+          "type": "uuid",
+          "nullable": "NO"
+        },
+        {
+          "column": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "column": "entity_type",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "column": "entity_id",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "usage_type",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "column": "label",
+          "type": "text",
+          "nullable": "NO"
+        }
+      ],
+      "projects": [
+        {
+          "column": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": "YES"
+        },
+        {
+          "column": "updated_at",
+          "type": "timestamp without time zone",
+          "nullable": "YES"
+        },
+        {
+          "column": "budget",
+          "type": "real",
+          "nullable": "YES"
+        },
+        {
+          "column": "id",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "column": "nom",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "column": "client_id",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "localisation",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "type_projet",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "date_debut",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "date_fin",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "statut",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "description",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "notes",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "cover_image_url",
+          "type": "text",
+          "nullable": "YES"
+        }
+      ],
+      "media_files": [
+        {
+          "column": "id",
+          "type": "uuid",
+          "nullable": "NO"
+        },
+        {
+          "column": "uploaded_by",
+          "type": "uuid",
+          "nullable": "YES"
+        },
+        {
+          "column": "upload_date",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "column": "size",
+          "type": "bigint",
+          "nullable": "NO"
+        },
+        {
+          "column": "is_brand_asset",
+          "type": "boolean",
+          "nullable": "NO"
+        },
+        {
+          "column": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "column": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "column": "deleted_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "column": "deleted_by",
+          "type": "uuid",
+          "nullable": "YES"
+        },
+        {
+          "column": "width",
+          "type": "integer",
+          "nullable": "YES"
+        },
+        {
+          "column": "height",
+          "type": "integer",
+          "nullable": "YES"
+        },
+        {
+          "column": "filename",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "column": "storage_key",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "original_name",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "column": "url",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "column": "thumbnail_url",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "category",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "column": "type",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "column": "alt_text",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "column": "description",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "column": "tags",
+          "type": "ARRAY",
+          "nullable": "NO"
+        },
+        {
+          "column": "brand_asset_type",
+          "type": "text",
+          "nullable": "YES"
+        }
+      ],
+      "media_versions": [
+        {
+          "column": "id",
+          "type": "uuid",
+          "nullable": "NO"
+        },
+        {
+          "column": "media_id",
+          "type": "uuid",
+          "nullable": "NO"
+        },
+        {
+          "column": "version_number",
+          "type": "integer",
+          "nullable": "NO"
+        },
+        {
+          "column": "replaced_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "column": "replaced_by",
+          "type": "uuid",
+          "nullable": "YES"
+        },
+        {
+          "column": "old_url",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "column": "old_filename",
+          "type": "text",
+          "nullable": "NO"
+        }
+      ],
+      "employees": [
+        {
+          "column": "salaire",
+          "type": "real",
+          "nullable": "YES"
+        },
+        {
+          "column": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": "YES"
+        },
+        {
+          "column": "updated_at",
+          "type": "timestamp without time zone",
+          "nullable": "YES"
+        },
+        {
+          "column": "id",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "column": "nom",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "column": "prenom",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "column": "poste",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "department",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "telephone",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "email",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "date_embauche",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "statut",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "notes",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "photo_url",
+          "type": "text",
+          "nullable": "YES"
+        }
+      ],
+      "immobilier_items": [
+        {
+          "column": "prix",
+          "type": "real",
+          "nullable": "YES"
+        },
+        {
+          "column": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": "YES"
+        },
+        {
+          "column": "updated_at",
+          "type": "timestamp without time zone",
+          "nullable": "YES"
+        },
+        {
+          "column": "id",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "column": "titre",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "column": "ville",
+          "type": "text",
+          "nullable": "YES"
+        }
+      ],
+      "users": [
+        {
+          "column": "access_level",
+          "type": "USER-DEFINED",
+          "nullable": "NO"
+        },
+        {
+          "column": "role",
+          "type": "USER-DEFINED",
+          "nullable": "NO"
+        },
+        {
+          "column": "is_active",
+          "type": "integer",
+          "nullable": "NO"
+        },
+        {
+          "column": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "column": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": "NO"
+        },
+        {
+          "column": "id",
+          "type": "character varying",
+          "nullable": "NO"
+        },
+        {
+          "column": "email",
+          "type": "character varying",
+          "nullable": "NO"
+        },
+        {
+          "column": "full_name",
+          "type": "character varying",
+          "nullable": "NO"
+        },
+        {
+          "column": "password_hash",
+          "type": "character varying",
+          "nullable": "NO"
+        },
+        {
+          "column": "poste",
+          "type": "character varying",
+          "nullable": "YES"
+        },
+        {
+          "column": "department",
+          "type": "character varying",
+          "nullable": "YES"
+        },
+        {
+          "column": "phone",
+          "type": "character varying",
+          "nullable": "YES"
+        }
+      ],
+      "foncier_items": [
+        {
+          "column": "superficie",
+          "type": "real",
+          "nullable": "YES"
+        },
+        {
+          "column": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": "YES"
+        },
+        {
+          "column": "updated_at",
+          "type": "timestamp without time zone",
+          "nullable": "YES"
+        },
+        {
+          "column": "id",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "column": "reference",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "column": "statut",
+          "type": "text",
+          "nullable": "YES"
+        }
+      ],
+      "media_audit_logs": [
+        {
+          "column": "id",
+          "type": "uuid",
+          "nullable": "NO"
+        },
+        {
+          "column": "media_id",
+          "type": "uuid",
+          "nullable": "YES"
+        },
+        {
+          "column": "actor_id",
+          "type": "uuid",
+          "nullable": "YES"
+        },
+        {
+          "column": "metadata",
+          "type": "jsonb",
+          "nullable": "YES"
+        },
+        {
+          "column": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": "YES"
+        },
+        {
+          "column": "action",
+          "type": "text",
+          "nullable": "NO"
+        }
+      ],
+      "lead_captures": [
+        {
+          "column": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": "YES"
+        },
+        {
+          "column": "updated_at",
+          "type": "timestamp without time zone",
+          "nullable": "YES"
+        },
+        {
+          "column": "id",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "column": "phone",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "column": "first_name",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "last_name",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "email",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "source",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "source_page",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "source_form",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "consent_text",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "channels_optin",
+          "type": "text",
+          "nullable": "YES"
+        }
+      ],
+      "ventes_foncieres": [
+        {
+          "column": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": "YES"
+        },
+        {
+          "column": "updated_at",
+          "type": "timestamp without time zone",
+          "nullable": "YES"
+        },
+        {
+          "column": "id",
+          "type": "text",
+          "nullable": "NO"
+        }
+      ],
+      "suppliers": [
+        {
+          "column": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": "YES"
+        },
+        {
+          "column": "updated_at",
+          "type": "timestamp without time zone",
+          "nullable": "YES"
+        },
+        {
+          "column": "id",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "column": "nom",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "column": "telephone",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "email",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "adresse",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "produits_fournis",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "statut",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "notes",
+          "type": "text",
+          "nullable": "YES"
+        }
+      ],
+      "foncier_lots": [
+        {
+          "column": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": "YES"
+        },
+        {
+          "column": "updated_at",
+          "type": "timestamp without time zone",
+          "nullable": "YES"
+        },
+        {
+          "column": "superficie",
+          "type": "bigint",
+          "nullable": "YES"
+        },
+        {
+          "column": "id",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "column": "numero_lot",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "numero_ilot",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "nom_lotissement",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "quartier",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "village",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "statut",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "reference",
+          "type": "text",
+          "nullable": "YES"
+        }
+      ],
+      "products": [
+        {
+          "column": "prix_unitaire",
+          "type": "real",
+          "nullable": "YES"
+        },
+        {
+          "column": "stock_actuel",
+          "type": "real",
+          "nullable": "YES"
+        },
+        {
+          "column": "stock_minimum",
+          "type": "real",
+          "nullable": "YES"
+        },
+        {
+          "column": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": "YES"
+        },
+        {
+          "column": "updated_at",
+          "type": "timestamp without time zone",
+          "nullable": "YES"
+        },
+        {
+          "column": "id",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "column": "designation",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "nom",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "categorie",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "unite",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "description",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "image_url",
+          "type": "text",
+          "nullable": "YES"
+        }
+      ],
+      "leads": [
+        {
+          "column": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": "YES"
+        },
+        {
+          "column": "updated_at",
+          "type": "timestamp without time zone",
+          "nullable": "YES"
+        },
+        {
+          "column": "id",
+          "type": "text",
+          "nullable": "NO"
+        }
+      ],
+      "visites_terrain": [
+        {
+          "column": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": "YES"
+        },
+        {
+          "column": "updated_at",
+          "type": "timestamp without time zone",
+          "nullable": "YES"
+        },
+        {
+          "column": "id",
+          "type": "text",
+          "nullable": "NO"
+        }
+      ],
+      "site_content": [
+        {
+          "column": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": "YES"
+        },
+        {
+          "column": "updated_at",
+          "type": "timestamp without time zone",
+          "nullable": "YES"
+        },
+        {
+          "column": "id",
+          "type": "text",
+          "nullable": "NO"
+        },
+        {
+          "column": "section",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "key",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "value",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "content_type",
+          "type": "text",
+          "nullable": "YES"
+        },
+        {
+          "column": "label",
+          "type": "text",
+          "nullable": "YES"
+        }
+      ],
+      "alembic_version": [
+        {
+          "column": "version_num",
+          "type": "character varying",
+          "nullable": "NO"
+        }
+      ]
+    },
+    "indexes": {
+      "alembic_version": [
+        {
+          "index": "alembic_version_pkc",
+          "def": "CREATE UNIQUE INDEX alembic_version_pkc ON public.alembic_version USING btree (version_num)"
+        }
+      ],
+      "users": [
+        {
+          "index": "users_pkey",
+          "def": "CREATE UNIQUE INDEX users_pkey ON public.users USING btree (id)"
+        },
+        {
+          "index": "users_email_key",
+          "def": "CREATE UNIQUE INDEX users_email_key ON public.users USING btree (email)"
+        },
+        {
+          "index": "ix_users_email",
+          "def": "CREATE UNIQUE INDEX ix_users_email ON public.users USING btree (email)"
+        },
+        {
+          "index": "ix_users_id",
+          "def": "CREATE INDEX ix_users_id ON public.users USING btree (id)"
+        }
+      ],
+      "media_files": [
+        {
+          "index": "media_files_pkey",
+          "def": "CREATE UNIQUE INDEX media_files_pkey ON public.media_files USING btree (id)"
+        }
+      ],
+      "media_usage": [
+        {
+          "index": "media_usage_pkey",
+          "def": "CREATE UNIQUE INDEX media_usage_pkey ON public.media_usage USING btree (id)"
+        }
+      ],
+      "media_versions": [
+        {
+          "index": "media_versions_pkey",
+          "def": "CREATE UNIQUE INDEX media_versions_pkey ON public.media_versions USING btree (id)"
+        }
+      ],
+      "media_audit_logs": [
+        {
+          "index": "media_audit_logs_pkey",
+          "def": "CREATE UNIQUE INDEX media_audit_logs_pkey ON public.media_audit_logs USING btree (id)"
+        }
+      ],
+      "projects": [
+        {
+          "index": "projects_pkey",
+          "def": "CREATE UNIQUE INDEX projects_pkey ON public.projects USING btree (id)"
+        }
+      ],
+      "employees": [
+        {
+          "index": "employees_pkey",
+          "def": "CREATE UNIQUE INDEX employees_pkey ON public.employees USING btree (id)"
+        }
+      ],
+      "suppliers": [
+        {
+          "index": "suppliers_pkey",
+          "def": "CREATE UNIQUE INDEX suppliers_pkey ON public.suppliers USING btree (id)"
+        }
+      ],
+      "products": [
+        {
+          "index": "products_pkey",
+          "def": "CREATE UNIQUE INDEX products_pkey ON public.products USING btree (id)"
+        }
+      ],
+      "finances": [
+        {
+          "index": "finances_pkey",
+          "def": "CREATE UNIQUE INDEX finances_pkey ON public.finances USING btree (id)"
+        }
+      ],
+      "immobilier_items": [
+        {
+          "index": "immobilier_items_pkey",
+          "def": "CREATE UNIQUE INDEX immobilier_items_pkey ON public.immobilier_items USING btree (id)"
+        }
+      ],
+      "foncier_items": [
+        {
+          "index": "foncier_items_pkey",
+          "def": "CREATE UNIQUE INDEX foncier_items_pkey ON public.foncier_items USING btree (id)"
+        }
+      ],
+      "lead_captures": [
+        {
+          "index": "lead_captures_pkey",
+          "def": "CREATE UNIQUE INDEX lead_captures_pkey ON public.lead_captures USING btree (id)"
+        }
+      ],
+      "foncier_lots": [
+        {
+          "index": "foncier_lots_pkey",
+          "def": "CREATE UNIQUE INDEX foncier_lots_pkey ON public.foncier_lots USING btree (id)"
+        }
+      ],
+      "leads": [
+        {
+          "index": "leads_pkey",
+          "def": "CREATE UNIQUE INDEX leads_pkey ON public.leads USING btree (id)"
+        }
+      ],
+      "visites_terrain": [
+        {
+          "index": "visites_terrain_pkey",
+          "def": "CREATE UNIQUE INDEX visites_terrain_pkey ON public.visites_terrain USING btree (id)"
+        }
+      ],
+      "ventes_foncieres": [
+        {
+          "index": "ventes_foncieres_pkey",
+          "def": "CREATE UNIQUE INDEX ventes_foncieres_pkey ON public.ventes_foncieres USING btree (id)"
+        }
+      ],
+      "site_content": [
+        {
+          "index": "site_content_pkey",
+          "def": "CREATE UNIQUE INDEX site_content_pkey ON public.site_content USING btree (id)"
+        },
+        {
+          "index": "site_content_key_key",
+          "def": "CREATE UNIQUE INDEX site_content_key_key ON public.site_content USING btree (key)"
+        }
+      ]
+    },
+    "constraints": {
+      "alembic_version": [
+        {
+          "type": "PRIMARY KEY",
+          "name": "alembic_version_pkc"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_16389_1_not_null"
+        }
+      ],
+      "users": [
+        {
+          "type": "PRIMARY KEY",
+          "name": "users_pkey"
+        },
+        {
+          "type": "UNIQUE",
+          "name": "users_email_key"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_16413_1_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_16413_2_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_16413_3_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_16413_4_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_16413_5_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_16413_6_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_16413_10_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_16413_11_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_16413_12_not_null"
+        }
+      ],
+      "media_files": [
+        {
+          "type": "PRIMARY KEY",
+          "name": "media_files_pkey"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_16426_1_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_16426_2_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_16426_4_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_16426_5_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_16426_7_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_16426_10_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_16426_11_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_16426_12_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_16426_13_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_16426_14_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_16426_15_not_null"
+        }
+      ],
+      "media_usage": [
+        {
+          "type": "PRIMARY KEY",
+          "name": "media_usage_pkey"
+        },
+        {
+          "type": "FOREIGN KEY",
+          "name": "media_usage_media_id_fkey"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_16445_1_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_16445_2_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_16445_3_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_16445_5_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_16445_6_not_null"
+        }
+      ],
+      "media_versions": [
+        {
+          "type": "PRIMARY KEY",
+          "name": "media_versions_pkey"
+        },
+        {
+          "type": "FOREIGN KEY",
+          "name": "media_versions_media_id_fkey"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_16459_1_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_16459_2_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_16459_3_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_16459_4_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_16459_5_not_null"
+        }
+      ],
+      "media_audit_logs": [
+        {
+          "type": "PRIMARY KEY",
+          "name": "media_audit_logs_pkey"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_16475_1_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_16475_3_not_null"
+        }
+      ],
+      "projects": [
+        {
+          "type": "PRIMARY KEY",
+          "name": "projects_pkey"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_24576_1_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_24576_2_not_null"
+        }
+      ],
+      "employees": [
+        {
+          "type": "PRIMARY KEY",
+          "name": "employees_pkey"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_24585_1_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_24585_2_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_24585_3_not_null"
+        }
+      ],
+      "suppliers": [
+        {
+          "type": "PRIMARY KEY",
+          "name": "suppliers_pkey"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_24594_1_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_24594_2_not_null"
+        }
+      ],
+      "products": [
+        {
+          "type": "PRIMARY KEY",
+          "name": "products_pkey"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_24603_1_not_null"
+        }
+      ],
+      "finances": [
+        {
+          "type": "PRIMARY KEY",
+          "name": "finances_pkey"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_24612_1_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_24612_2_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_24612_3_not_null"
+        }
+      ],
+      "immobilier_items": [
+        {
+          "type": "PRIMARY KEY",
+          "name": "immobilier_items_pkey"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_24621_1_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_24621_2_not_null"
+        }
+      ],
+      "foncier_items": [
+        {
+          "type": "PRIMARY KEY",
+          "name": "foncier_items_pkey"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_24630_1_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_24630_2_not_null"
+        }
+      ],
+      "lead_captures": [
+        {
+          "type": "PRIMARY KEY",
+          "name": "lead_captures_pkey"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_32768_1_not_null"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_32768_2_not_null"
+        }
+      ],
+      "foncier_lots": [
+        {
+          "type": "PRIMARY KEY",
+          "name": "foncier_lots_pkey"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_32777_1_not_null"
+        }
+      ],
+      "leads": [
+        {
+          "type": "PRIMARY KEY",
+          "name": "leads_pkey"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_32786_1_not_null"
+        }
+      ],
+      "visites_terrain": [
+        {
+          "type": "PRIMARY KEY",
+          "name": "visites_terrain_pkey"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_32795_1_not_null"
+        }
+      ],
+      "ventes_foncieres": [
+        {
+          "type": "PRIMARY KEY",
+          "name": "ventes_foncieres_pkey"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_32804_1_not_null"
+        }
+      ],
+      "site_content": [
+        {
+          "type": "PRIMARY KEY",
+          "name": "site_content_pkey"
+        },
+        {
+          "type": "UNIQUE",
+          "name": "site_content_key_key"
+        },
+        {
+          "type": "CHECK",
+          "name": "2200_32813_1_not_null"
+        }
+      ]
+    },
+    "functions": [],
+    "views": [],
+    "triggers": [],
+    "policies": [],
+    "extensions": [],
+    "migration_tables_detected": []
+  },
+  "diff": {
+    "tables_missing": [
+      "activites_journal",
+      "app_settings",
+      "bot_workflows",
+      "campagnes",
+      "clients",
+      "contact_messages",
+      "documents",
+      "employes_presence",
+      "foncier_attestation_temoins",
+      "foncier_attestations",
+      "foncier_audit",
+      "foncier_villages",
+      "if",
+      "lead_campagnes",
+      "lead_campaigns",
+      "lead_interactions",
+      "lead_optouts",
+      "lease_contracts",
+      "locataires",
+      "messages_direction",
+      "page_layouts",
+      "parties",
+      "party_lead_details",
+      "party_merge_candidates",
+      "party_merge_log",
+      "party_roles",
+      "properties",
+      "rent_payments",
+      "site_realisations",
+      "social_posts",
+      "stats_journalieres",
+      "tasks",
+      "tenants",
+      "user_invites",
+      "user_profiles",
+      "user_village_access",
+      "village_logo_registry",
+      "village_logo_registry_fallback",
+      "visites_en_cours",
+      "vitrine_lots",
+      "whatsapp_notifications"
+    ],
+    "tables_extra": [
+      "alembic_version",
+      "foncier_items",
+      "immobilier_items",
+      "lead_captures",
+      "users"
+    ],
+    "functions_missing": [
+      "attach_foncier_attestation_pdf_metadata",
+      "auto_assign_lead",
+      "can_manage_content",
+      "check_attestation_expiration",
+      "check_foncier_duplicate",
+      "create_task_after_visite",
+      "create_user_with_profile",
+      "current_user_role",
+      "ensure_foncier_hierarchy",
+      "foncier_stats_by_village",
+      "get_agent_performance",
+      "get_agent_workload",
+      "get_funnel_stats",
+      "get_leads_needing_attention",
+      "handle_new_user",
+      "has_finance_access",
+      "increment_lead_reponses",
+      "increment_lead_visites",
+      "is_admin",
+      "is_demo_user",
+      "is_gestionnaire",
+      "jwt_app_role",
+      "log_foncier_audit",
+      "normalize_phone",
+      "restore_foncier_lot",
+      "revoke_foncier_attestation",
+      "search_foncier_lots",
+      "soft_delete_foncier_lot",
+      "sync_foncier_lot_village",
+      "trigger_normalize_lead_phone",
+      "update_derniere_interaction",
+      "update_foncier_lots_updated_at",
+      "update_lead_derniere_interaction",
+      "update_lead_score",
+      "update_pipeline_stats",
+      "update_tenants_updated_at",
+      "update_timestamp_trigger",
+      "update_updated_at_column",
+      "update_vitrine_lots_updated_at",
+      "with"
+    ],
+    "views_missing": [],
+    "policies_missing_tables": [
+      "activites_journal",
+      "app_settings",
+      "bot_workflows",
+      "clients",
+      "contact_messages",
+      "documents",
+      "employees",
+      "employes_presence",
+      "finances",
+      "foncier_attestation_temoins",
+      "foncier_attestations",
+      "foncier_audit",
+      "foncier_lots",
+      "foncier_village_config",
+      "foncier_villages",
+      "lead_campaigns",
+      "lead_interactions",
+      "lead_optouts",
+      "leads",
+      "lease_contracts",
+      "locataires",
+      "media_audit_logs",
+      "media_files",
+      "media_usage",
+      "media_versions",
+      "messages_direction",
+      "page_layouts",
+      "products",
+      "projects",
+      "properties",
+      "rent_payments",
+      "site_content",
+      "site_realisations",
+      "social_posts",
+      "stats_journalieres",
+      "storage",
+      "suppliers",
+      "tasks",
+      "tenants",
+      "user_invites",
+      "user_profiles",
+      "user_village_access",
+      "visites_en_cours",
+      "vitrine_lots"
+    ]
+  }
+}
