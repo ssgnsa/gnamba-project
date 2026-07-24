@@ -51,3 +51,69 @@ Thumbs.db
 backups/
 dist_old/
 .sync-config
+
+# =====================
+# FILEBROWSER
+# =====================
+filebrowser/database/
+filebrowser/*.db
+
+# Python environment
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Node
+node_modules/
+
+# Logs
+*.log
+*.log~
+
+# Temporary files
+*.tmp
+*.bak
+*.backup
+*.restored
+
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Node
+node_modules/
+
+# IDE
+.vscode/
+.cursor/
+.continue/
+.claude/
+
+# Runtime generated files
+backend/storage/uploads/
+*.log
+*.tmp
+*.bak
+*.backup*
+.last-cycle-result.json
+loop_state.json
+loop-run-log.md
+
+# Local AI tools
+.claude/
+.cursor/
+.continue/
+.grok/
+.amplitude/
+
+# Temporary tests
+test_write.txt
+*.backup2

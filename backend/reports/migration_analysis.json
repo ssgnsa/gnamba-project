@@ -1,0 +1,3260 @@
+{
+  "total_migrations": 116,
+  "applied_order_strategy": "functions → tables → policies/rls → indexes → other",
+  "migrations": [
+    {
+      "name": "20260405130000_add_comprehensive_rls_policies",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [
+        "current_user_role",
+        "has_finance_access"
+      ],
+      "tables_with_rls": [],
+      "policies_on_tables": [
+        "finances",
+        "lease_contracts",
+        "locataires",
+        "properties",
+        "rent_payments"
+      ],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {
+        "purpose": "Replace overly permissive USING (true) with role-based policies"
+      },
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260408120000_rls_critical_tables",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [
+        "can_manage_content",
+        "current_user_role",
+        "is_admin"
+      ],
+      "tables_with_rls": [
+        "app_settings",
+        "finances",
+        "media_files",
+        "page_layouts",
+        "site_content",
+        "user_profiles"
+      ],
+      "policies_on_tables": [
+        "app_settings",
+        "finances",
+        "media_files",
+        "page_layouts",
+        "site_content",
+        "user_profiles"
+      ],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {
+        "purpose": "--   - user_profiles was created without RLS — any authenticated user could read/modify all profiles and roles",
+        "risk": "Applying this on a live DB will immediately restrict access."
+      },
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260503084300_add_attestation_pdf_metadata",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [
+        "attach_foncier_attestation_pdf_metadata"
+      ],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260515000002_leads_module_rls_policies",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [
+        "create_task_after_visite",
+        "increment_lead_reponses",
+        "increment_lead_visites",
+        "is_admin",
+        "is_gestionnaire",
+        "update_lead_derniere_interaction"
+      ],
+      "tables_with_rls": [
+        "campagnes",
+        "lead_campagnes",
+        "leads",
+        "ventes_foncieres",
+        "visites_terrain"
+      ],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260515100000_fix_security_definer_search_path",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [
+        "auto_assign_lead",
+        "can_manage_content",
+        "current_user_role",
+        "has_finance_access",
+        "is_admin",
+        "update_derniere_interaction",
+        "update_lead_score",
+        "update_pipeline_stats"
+      ],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {
+        "purpose": "Bloquer les attaques search_path injection sur toutes les"
+      },
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260330000000_fix_unique_constraint",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [
+        "check_foncier_duplicate"
+      ],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [
+        "idx_foncier_attestations_reference_unique",
+        "idx_foncier_lots_active_search",
+        "idx_foncier_lots_unique_location"
+      ],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260508100000_fix_foncier_standalone",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [
+        "foncier_stats_by_village",
+        "restore_foncier_lot",
+        "search_foncier_lots",
+        "soft_delete_foncier_lot"
+      ],
+      "tables_with_rls": [],
+      "policies_on_tables": [
+        "foncier_lots"
+      ],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {
+        "purpose": "Apply audit recommendations for foncier module (standalone version)"
+      },
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260622100713_fix_user_profiles_rls_recursion",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [
+        "current_user_role",
+        "jwt_app_role"
+      ],
+      "tables_with_rls": [
+        "user_profiles"
+      ],
+      "policies_on_tables": [
+        "user_profiles"
+      ],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {
+        "purpose": "--   - Remove recursive policies on public.user_profiles"
+      },
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260409000002_fix_security_definer_functions",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [
+        "log_foncier_audit",
+        "restore_foncier_lot",
+        "revoke_foncier_attestation",
+        "soft_delete_foncier_lot"
+      ],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {
+        "purpose": "--   - soft_delete_foncier_lot(), restore_foncier_lot(), log_foncier_audit()"
+      },
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260515000003_add_rpc_functions",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [
+        "get_agent_performance",
+        "get_agent_workload",
+        "get_funnel_stats",
+        "get_leads_needing_attention"
+      ],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260408030000_current_user_role_fn",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [
+        "current_user_role"
+      ],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260511090000_debug_stats_function",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [
+        "foncier_stats_by_village",
+        "with"
+      ],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260409000001_add_rls_business_tables",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [
+        "can_manage_content",
+        "current_user_role"
+      ],
+      "tables_with_rls": [
+        "clients",
+        "contact_messages",
+        "documents",
+        "employees",
+        "products",
+        "projects",
+        "suppliers",
+        "tasks"
+      ],
+      "policies_on_tables": [
+        "clients",
+        "contact_messages",
+        "documents",
+        "employees",
+        "products",
+        "projects",
+        "suppliers",
+        "tasks"
+      ],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {
+        "purpose": "--   - These tables were identified with ZERO Row Level Security",
+        "risk": "Applying this on a live DB will immediately restrict access."
+      },
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260609102844_foncier_village_normalization",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [
+        "sync_foncier_lot_village"
+      ],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [
+        "idx_foncier_lots_village_id"
+      ],
+      "constraints_added": {
+        "foncier_lots": [
+          "COLUMN",
+          "FOREIGN"
+        ]
+      },
+      "metadata": {
+        "purpose": "--   - add a normalized village foreign key to foncier_lots"
+      },
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260508000000_fix_foncier_audit_recommendations",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [
+        "foncier_stats_by_village",
+        "restore_foncier_lot",
+        "search_foncier_lots",
+        "soft_delete_foncier_lot"
+      ],
+      "tables_with_rls": [],
+      "policies_on_tables": [
+        "foncier_lots"
+      ],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {
+        "purpose": "Apply audit recommendations for foncier module"
+      },
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260524000001_create_media_tables_reference",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "media_audit_logs",
+        "media_files",
+        "media_usage",
+        "media_versions"
+      ],
+      "functions_created": [],
+      "tables_with_rls": [
+        "media_audit_logs",
+        "media_files",
+        "media_usage",
+        "media_versions"
+      ],
+      "policies_on_tables": [
+        "media_audit_logs",
+        "media_files",
+        "media_usage",
+        "media_versions"
+      ],
+      "indexes_created": [
+        "idx_media_audit_logs_actor_id",
+        "idx_media_audit_logs_created_at",
+        "idx_media_audit_logs_media_id",
+        "idx_media_files_brand_asset",
+        "idx_media_files_category_active",
+        "idx_media_files_deleted_at",
+        "idx_media_usage_entity",
+        "idx_media_usage_media_id",
+        "idx_media_versions_media_id"
+      ],
+      "constraints_added": {
+        "media_files": [
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN"
+        ]
+      },
+      "metadata": {},
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260402080000_create_immobilier_tables",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "lease_contracts",
+        "properties",
+        "rent_payments",
+        "tenants"
+      ],
+      "functions_created": [],
+      "tables_with_rls": [
+        "lease_contracts",
+        "properties",
+        "rent_payments",
+        "tenants"
+      ],
+      "policies_on_tables": [
+        "lease_contracts",
+        "properties",
+        "rent_payments",
+        "tenants"
+      ],
+      "indexes_created": [
+        "idx_lease_contracts_property_id",
+        "idx_lease_contracts_tenant_id",
+        "idx_properties_statut",
+        "idx_rent_payments_contract_id",
+        "idx_rent_payments_tenant_id",
+        "idx_tenants_property_id"
+      ],
+      "constraints_added": {},
+      "metadata": {
+        "purpose": "Create all tables for Real Estate module"
+      },
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260509140000_create_village_logos_bucket",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "village_logo_registry"
+      ],
+      "functions_created": [],
+      "tables_with_rls": [
+        "village_logo_registry"
+      ],
+      "policies_on_tables": [],
+      "indexes_created": [
+        "idx_village_logo_registry_village_name"
+      ],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260428000003_migrate_tenants_to_locataires",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "locataires"
+      ],
+      "functions_created": [],
+      "tables_with_rls": [
+        "locataires"
+      ],
+      "policies_on_tables": [
+        "locataires"
+      ],
+      "indexes_created": [],
+      "constraints_added": {
+        "rent_payments": [
+          "FOREIGN"
+        ],
+        "lease_contracts": [
+          "FOREIGN"
+        ]
+      },
+      "metadata": {
+        "purpose": "Migrate data first, then create FKs"
+      },
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260604161000_add_whatsapp_notifications",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "whatsapp_notifications"
+      ],
+      "functions_created": [
+        "update_updated_at_column"
+      ],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [
+        "idx_whatsapp_notifications_created_at",
+        "idx_whatsapp_notifications_status"
+      ],
+      "constraints_added": {
+        "locataires": [
+          "COLUMN"
+        ],
+        "tenants": [
+          "COLUMN"
+        ]
+      },
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260702000000_fix_user_invites_and_create_profile_rpc",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "user_invites"
+      ],
+      "functions_created": [
+        "create_user_with_profile"
+      ],
+      "tables_with_rls": [
+        "user_invites"
+      ],
+      "policies_on_tables": [
+        "user_invites"
+      ],
+      "indexes_created": [
+        "idx_user_invites_email",
+        "idx_user_invites_invited_at"
+      ],
+      "constraints_added": {},
+      "metadata": {
+        "purpose": "--   - support the admin invite flow used by the Utilisateurs UI"
+      },
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260509180000_fix_storage_rls_policies",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "village_logo_registry_fallback"
+      ],
+      "functions_created": [],
+      "tables_with_rls": [
+        "village_logo_registry_fallback"
+      ],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260325000000_create_user_profiles_base",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "user_profiles"
+      ],
+      "functions_created": [
+        "handle_new_user",
+        "update_updated_at_column"
+      ],
+      "tables_with_rls": [
+        "user_profiles"
+      ],
+      "policies_on_tables": [],
+      "indexes_created": [
+        "idx_user_profiles_email",
+        "idx_user_profiles_is_active",
+        "idx_user_profiles_role"
+      ],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260508110000_fix_foncier_rpc_security",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "user_village_access"
+      ],
+      "functions_created": [
+        "foncier_stats_by_village",
+        "search_foncier_lots"
+      ],
+      "tables_with_rls": [
+        "user_village_access"
+      ],
+      "policies_on_tables": [
+        "user_village_access"
+      ],
+      "indexes_created": [],
+      "constraints_added": {
+        "user_village_access": [
+          "COLUMN"
+        ]
+      },
+      "metadata": {
+        "purpose": "Add SECURITY DEFINER to RPC functions to bypass RLS policies"
+      },
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260324000000_create_foncier_base_tables_and_rpc",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "foncier_audit",
+        "foncier_lots",
+        "foncier_villages",
+        "user_village_access"
+      ],
+      "functions_created": [
+        "current_user_role",
+        "ensure_foncier_hierarchy",
+        "foncier_stats_by_village",
+        "log_foncier_audit",
+        "restore_foncier_lot",
+        "search_foncier_lots",
+        "soft_delete_foncier_lot",
+        "update_foncier_lots_updated_at"
+      ],
+      "tables_with_rls": [
+        "foncier_audit",
+        "foncier_lots",
+        "foncier_villages",
+        "user_village_access"
+      ],
+      "policies_on_tables": [
+        "foncier_audit",
+        "foncier_lots",
+        "foncier_villages",
+        "user_village_access"
+      ],
+      "indexes_created": [
+        "idx_foncier_audit_action",
+        "idx_foncier_audit_lot",
+        "idx_foncier_lots_deleted_at",
+        "idx_foncier_lots_location",
+        "idx_foncier_lots_reference",
+        "idx_foncier_lots_statut",
+        "idx_foncier_lots_village",
+        "idx_user_village_user"
+      ],
+      "constraints_added": {},
+      "metadata": {
+        "purpose": "Fixes CRITICAL audit findings — foncier_lots table never created"
+      },
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260509160000_fix_village_logo_registry_table",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "village_logo_registry"
+      ],
+      "functions_created": [],
+      "tables_with_rls": [
+        "village_logo_registry"
+      ],
+      "policies_on_tables": [],
+      "indexes_created": [
+        "idx_village_logo_registry_created_by",
+        "idx_village_logo_registry_village_name"
+      ],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260521120000_media_audit_logs",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "media_audit_logs"
+      ],
+      "functions_created": [],
+      "tables_with_rls": [
+        "media_audit_logs"
+      ],
+      "policies_on_tables": [
+        "media_audit_logs"
+      ],
+      "indexes_created": [
+        "idx_media_audit_logs_actor_id",
+        "idx_media_audit_logs_created_at",
+        "idx_media_audit_logs_media_id"
+      ],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260701000000_fix_public_access_and_dashboard_tables",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "activites_journal",
+        "employes_presence",
+        "messages_direction",
+        "stats_journalieres",
+        "visites_en_cours"
+      ],
+      "functions_created": [
+        "can_manage_content",
+        "current_user_role",
+        "is_admin"
+      ],
+      "tables_with_rls": [
+        "activites_journal",
+        "app_settings",
+        "employes_presence",
+        "messages_direction",
+        "page_layouts",
+        "site_content",
+        "site_realisations",
+        "stats_journalieres",
+        "visites_en_cours"
+      ],
+      "policies_on_tables": [
+        "activites_journal",
+        "app_settings",
+        "employes_presence",
+        "messages_direction",
+        "page_layouts",
+        "site_content",
+        "site_realisations",
+        "stats_journalieres",
+        "visites_en_cours"
+      ],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260402090000_fix_tenants_schema",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "tenants"
+      ],
+      "functions_created": [
+        "update_tenants_updated_at"
+      ],
+      "tables_with_rls": [
+        "tenants"
+      ],
+      "policies_on_tables": [],
+      "indexes_created": [
+        "idx_tenants_email",
+        "idx_tenants_nom",
+        "idx_tenants_statut",
+        "idx_tenants_telephone"
+      ],
+      "constraints_added": {
+        "tenants": [
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN"
+        ]
+      },
+      "metadata": {},
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260607090724_create_vitrine_lots_table",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "vitrine_lots"
+      ],
+      "functions_created": [
+        "update_vitrine_lots_updated_at"
+      ],
+      "tables_with_rls": [
+        "vitrine_lots"
+      ],
+      "policies_on_tables": [
+        "vitrine_lots"
+      ],
+      "indexes_created": [
+        "idx_vitrine_lots_ordre_affichage",
+        "idx_vitrine_lots_publier_sur_vitrine",
+        "idx_vitrine_lots_statut",
+        "idx_vitrine_lots_village"
+      ],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260405140000_create_lead_capture_system",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "bot_workflows",
+        "lead_campaigns",
+        "lead_interactions",
+        "lead_optouts",
+        "leads",
+        "social_posts"
+      ],
+      "functions_created": [
+        "current_user_role",
+        "normalize_phone",
+        "trigger_normalize_lead_phone",
+        "update_timestamp_trigger"
+      ],
+      "tables_with_rls": [
+        "bot_workflows",
+        "lead_campaigns",
+        "lead_interactions",
+        "lead_optouts",
+        "leads",
+        "social_posts"
+      ],
+      "policies_on_tables": [
+        "bot_workflows",
+        "lead_campaigns",
+        "lead_interactions",
+        "lead_optouts",
+        "leads",
+        "social_posts"
+      ],
+      "indexes_created": [
+        "idx_campaigns_created",
+        "idx_campaigns_status",
+        "idx_interactions_channel",
+        "idx_interactions_created",
+        "idx_interactions_lead",
+        "idx_leads_created_at",
+        "idx_leads_phone",
+        "idx_leads_source",
+        "idx_leads_status",
+        "idx_leads_tags",
+        "idx_optouts_channel",
+        "idx_optouts_lead",
+        "idx_social_platform",
+        "idx_social_scheduled",
+        "idx_social_status",
+        "idx_workflows_status"
+      ],
+      "constraints_added": {},
+      "metadata": {
+        "purpose": "Universal phone number capture from all ERP forms"
+      },
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260326000000_create_foncier_attestations_tables",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "foncier_attestation_temoins",
+        "foncier_attestations",
+        "if"
+      ],
+      "functions_created": [
+        "check_attestation_expiration",
+        "revoke_foncier_attestation"
+      ],
+      "tables_with_rls": [
+        "foncier_attestation_temoins",
+        "foncier_attestations"
+      ],
+      "policies_on_tables": [],
+      "indexes_created": [
+        "idx_foncier_attestations_expiration",
+        "idx_foncier_attestations_lot",
+        "idx_foncier_attestations_reference",
+        "idx_foncier_attestations_revoked",
+        "idx_foncier_attestations_statut",
+        "idx_foncier_temoins_attestation"
+      ],
+      "constraints_added": {
+        "foncier_attestations": [
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "FOREIGN"
+        ]
+      },
+      "metadata": {},
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260409141423_demo_account_sample_data",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "app_settings",
+        "user_profiles"
+      ],
+      "functions_created": [
+        "is_demo_user"
+      ],
+      "tables_with_rls": [
+        "app_settings",
+        "user_profiles"
+      ],
+      "policies_on_tables": [
+        "app_settings",
+        "clients",
+        "employees",
+        "finances",
+        "lease_contracts",
+        "locataires",
+        "projects",
+        "properties",
+        "rent_payments",
+        "suppliers",
+        "tasks",
+        "user_profiles"
+      ],
+      "indexes_created": [],
+      "constraints_added": {
+        "user_profiles": [
+          "COLUMN"
+        ],
+        "employees": [
+          "COLUMN"
+        ]
+      },
+      "metadata": {},
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260515000001_create_leads_module",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "campagnes",
+        "lead_campagnes",
+        "leads",
+        "ventes_foncieres",
+        "visites_terrain"
+      ],
+      "functions_created": [
+        "update_updated_at_column"
+      ],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [
+        "idx_campagnes_canal",
+        "idx_campagnes_date_envoi",
+        "idx_campagnes_statut",
+        "idx_campagnes_type",
+        "idx_clients_lead_source",
+        "idx_lead_campagnes_campagne",
+        "idx_lead_campagnes_lead",
+        "idx_lead_campagnes_statut",
+        "idx_leads_agent",
+        "idx_leads_created_at",
+        "idx_leads_derniere_interaction",
+        "idx_leads_score",
+        "idx_leads_source",
+        "idx_leads_statut",
+        "idx_leads_telephone",
+        "idx_taches_lead",
+        "idx_taches_visite",
+        "idx_terrains_statut_vente",
+        "idx_ventes_agent",
+        "idx_ventes_client",
+        "idx_ventes_date_reservation",
+        "idx_ventes_statut",
+        "idx_ventes_terrain",
+        "idx_visites_terrain_agent",
+        "idx_visites_terrain_client",
+        "idx_visites_terrain_date",
+        "idx_visites_terrain_lead",
+        "idx_visites_terrain_resultat",
+        "idx_visites_terrain_terrain"
+      ],
+      "constraints_added": {
+        "leads": [
+          "COLUMN",
+          "COLUMN"
+        ],
+        "clients": [
+          "COLUMN"
+        ],
+        "terrains": [
+          "COLUMN"
+        ],
+        "taches": [
+          "COLUMN",
+          "COLUMN"
+        ]
+      },
+      "metadata": {},
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260702020000_create_parties_model",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "parties",
+        "party_lead_details",
+        "party_merge_candidates",
+        "party_merge_log",
+        "party_roles"
+      ],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [
+        "idx_parties_email",
+        "idx_parties_telephone",
+        "idx_party_lead_details_status",
+        "idx_party_merge_candidates_source",
+        "idx_party_roles_party_id"
+      ],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260403090000_create_core_business_tables",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "app_settings",
+        "clients",
+        "contact_messages",
+        "documents",
+        "employees",
+        "finances",
+        "media_audit_logs",
+        "media_files",
+        "media_usage",
+        "media_versions",
+        "page_layouts",
+        "products",
+        "projects",
+        "site_content",
+        "site_realisations",
+        "suppliers",
+        "tasks"
+      ],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [
+        "idx_documents_client_id",
+        "idx_documents_project_id",
+        "idx_finances_client_id",
+        "idx_finances_date_transaction",
+        "idx_finances_project_id",
+        "idx_finances_reference",
+        "idx_media_audit_logs_actor_id",
+        "idx_media_audit_logs_created_at",
+        "idx_media_audit_logs_media_id",
+        "idx_media_files_brand_asset",
+        "idx_media_files_category_active",
+        "idx_media_files_deleted_at",
+        "idx_media_usage_entity",
+        "idx_media_usage_media_id",
+        "idx_media_versions_media_id",
+        "idx_projects_client_id",
+        "idx_tasks_assignee_id",
+        "idx_tasks_project_id"
+      ],
+      "constraints_added": {},
+      "metadata": {
+        "purpose": "--   - Recreate the core business tables that are referenced by later"
+      },
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260405150000_create_foncier_base_tables_and_rpc",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "foncier_audit",
+        "foncier_lots",
+        "foncier_villages",
+        "user_village_access"
+      ],
+      "functions_created": [
+        "check_foncier_duplicate",
+        "ensure_foncier_hierarchy",
+        "foncier_stats_by_village",
+        "log_foncier_audit",
+        "restore_foncier_lot",
+        "search_foncier_lots",
+        "soft_delete_foncier_lot",
+        "update_foncier_lots_updated_at"
+      ],
+      "tables_with_rls": [
+        "foncier_audit",
+        "foncier_lots",
+        "foncier_villages",
+        "user_village_access"
+      ],
+      "policies_on_tables": [
+        "foncier_audit",
+        "foncier_lots",
+        "foncier_villages",
+        "user_village_access"
+      ],
+      "indexes_created": [
+        "idx_foncier_audit_action",
+        "idx_foncier_audit_lot",
+        "idx_foncier_lots_location",
+        "idx_foncier_lots_reference",
+        "idx_foncier_lots_statut",
+        "idx_foncier_lots_village",
+        "idx_user_village_user"
+      ],
+      "constraints_added": {
+        "foncier_attestations": [
+          "FOREIGN"
+        ]
+      },
+      "metadata": {
+        "purpose": "Fixes CRITICAL audit findings — foncier_lots table never created"
+      },
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260524000001_create_media_tables_reference",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "media_audit_logs",
+        "media_files",
+        "media_usage",
+        "media_versions"
+      ],
+      "functions_created": [],
+      "tables_with_rls": [
+        "media_audit_logs",
+        "media_files",
+        "media_usage",
+        "media_versions"
+      ],
+      "policies_on_tables": [
+        "media_audit_logs",
+        "media_files",
+        "media_usage",
+        "media_versions"
+      ],
+      "indexes_created": [
+        "idx_media_audit_logs_actor_id",
+        "idx_media_audit_logs_created_at",
+        "idx_media_audit_logs_media_id",
+        "idx_media_files_brand_asset",
+        "idx_media_files_category_active",
+        "idx_media_files_deleted_at",
+        "idx_media_usage_entity",
+        "idx_media_usage_media_id",
+        "idx_media_versions_media_id"
+      ],
+      "constraints_added": {
+        "media_files": [
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN"
+        ]
+      },
+      "metadata": {},
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260402080000_create_immobilier_tables",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "lease_contracts",
+        "properties",
+        "rent_payments",
+        "tenants"
+      ],
+      "functions_created": [],
+      "tables_with_rls": [
+        "lease_contracts",
+        "properties",
+        "rent_payments",
+        "tenants"
+      ],
+      "policies_on_tables": [
+        "lease_contracts",
+        "properties",
+        "rent_payments",
+        "tenants"
+      ],
+      "indexes_created": [
+        "idx_lease_contracts_property_id",
+        "idx_lease_contracts_tenant_id",
+        "idx_properties_statut",
+        "idx_rent_payments_contract_id",
+        "idx_rent_payments_tenant_id",
+        "idx_tenants_property_id"
+      ],
+      "constraints_added": {},
+      "metadata": {
+        "purpose": "Create all tables for Real Estate module"
+      },
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260509140000_create_village_logos_bucket",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "village_logo_registry"
+      ],
+      "functions_created": [],
+      "tables_with_rls": [
+        "village_logo_registry"
+      ],
+      "policies_on_tables": [],
+      "indexes_created": [
+        "idx_village_logo_registry_village_name"
+      ],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260428000003_migrate_tenants_to_locataires",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "locataires"
+      ],
+      "functions_created": [],
+      "tables_with_rls": [
+        "locataires"
+      ],
+      "policies_on_tables": [
+        "locataires"
+      ],
+      "indexes_created": [],
+      "constraints_added": {
+        "rent_payments": [
+          "FOREIGN"
+        ],
+        "lease_contracts": [
+          "FOREIGN"
+        ]
+      },
+      "metadata": {
+        "purpose": "Migrate data first, then create FKs"
+      },
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260405130000_add_comprehensive_rls_policies",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [
+        "current_user_role",
+        "has_finance_access"
+      ],
+      "tables_with_rls": [],
+      "policies_on_tables": [
+        "finances",
+        "lease_contracts",
+        "locataires",
+        "properties",
+        "rent_payments"
+      ],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {
+        "purpose": "Replace overly permissive USING (true) with role-based policies"
+      },
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260408120000_rls_critical_tables",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [
+        "can_manage_content",
+        "current_user_role",
+        "is_admin"
+      ],
+      "tables_with_rls": [
+        "app_settings",
+        "finances",
+        "media_files",
+        "page_layouts",
+        "site_content",
+        "user_profiles"
+      ],
+      "policies_on_tables": [
+        "app_settings",
+        "finances",
+        "media_files",
+        "page_layouts",
+        "site_content",
+        "user_profiles"
+      ],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {
+        "purpose": "--   - user_profiles was created without RLS — any authenticated user could read/modify all profiles and roles",
+        "risk": "Applying this on a live DB will immediately restrict access."
+      },
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260511110000_fix_media_storage_rls_v3",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [
+        "media_files",
+        "media_usage",
+        "media_versions"
+      ],
+      "policies_on_tables": [
+        "media_files",
+        "media_usage",
+        "media_versions"
+      ],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260702000000_fix_user_invites_and_create_profile_rpc",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "user_invites"
+      ],
+      "functions_created": [
+        "create_user_with_profile"
+      ],
+      "tables_with_rls": [
+        "user_invites"
+      ],
+      "policies_on_tables": [
+        "user_invites"
+      ],
+      "indexes_created": [
+        "idx_user_invites_email",
+        "idx_user_invites_invited_at"
+      ],
+      "constraints_added": {},
+      "metadata": {
+        "purpose": "--   - support the admin invite flow used by the Utilisateurs UI"
+      },
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260509180000_fix_storage_rls_policies",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "village_logo_registry_fallback"
+      ],
+      "functions_created": [],
+      "tables_with_rls": [
+        "village_logo_registry_fallback"
+      ],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260608171419_foncier_phase1_critical_rls",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [
+        "foncier_attestation_temoins",
+        "foncier_attestations",
+        "foncier_lots"
+      ],
+      "policies_on_tables": [
+        "foncier_attestation_temoins",
+        "foncier_attestations",
+        "foncier_lots"
+      ],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {
+        "purpose": "--   - close the two critical Foncier security gaps identified in the audit"
+      },
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260325000000_create_user_profiles_base",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "user_profiles"
+      ],
+      "functions_created": [
+        "handle_new_user",
+        "update_updated_at_column"
+      ],
+      "tables_with_rls": [
+        "user_profiles"
+      ],
+      "policies_on_tables": [],
+      "indexes_created": [
+        "idx_user_profiles_email",
+        "idx_user_profiles_is_active",
+        "idx_user_profiles_role"
+      ],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260509100000_fix_village_config_rls",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [
+        "app_settings",
+        "foncier_villages",
+        "media_files"
+      ],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {
+        "purpose": "Allow authenticated users to insert village config during development"
+      },
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260508110000_fix_foncier_rpc_security",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "user_village_access"
+      ],
+      "functions_created": [
+        "foncier_stats_by_village",
+        "search_foncier_lots"
+      ],
+      "tables_with_rls": [
+        "user_village_access"
+      ],
+      "policies_on_tables": [
+        "user_village_access"
+      ],
+      "indexes_created": [],
+      "constraints_added": {
+        "user_village_access": [
+          "COLUMN"
+        ]
+      },
+      "metadata": {
+        "purpose": "Add SECURITY DEFINER to RPC functions to bypass RLS policies"
+      },
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260408080000_rls_rent_payments",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [
+        "rent_payments"
+      ],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260515000002_leads_module_rls_policies",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [
+        "create_task_after_visite",
+        "increment_lead_reponses",
+        "increment_lead_visites",
+        "is_admin",
+        "is_gestionnaire",
+        "update_lead_derniere_interaction"
+      ],
+      "tables_with_rls": [
+        "campagnes",
+        "lead_campagnes",
+        "leads",
+        "ventes_foncieres",
+        "visites_terrain"
+      ],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260324000000_create_foncier_base_tables_and_rpc",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "foncier_audit",
+        "foncier_lots",
+        "foncier_villages",
+        "user_village_access"
+      ],
+      "functions_created": [
+        "current_user_role",
+        "ensure_foncier_hierarchy",
+        "foncier_stats_by_village",
+        "log_foncier_audit",
+        "restore_foncier_lot",
+        "search_foncier_lots",
+        "soft_delete_foncier_lot",
+        "update_foncier_lots_updated_at"
+      ],
+      "tables_with_rls": [
+        "foncier_audit",
+        "foncier_lots",
+        "foncier_villages",
+        "user_village_access"
+      ],
+      "policies_on_tables": [
+        "foncier_audit",
+        "foncier_lots",
+        "foncier_villages",
+        "user_village_access"
+      ],
+      "indexes_created": [
+        "idx_foncier_audit_action",
+        "idx_foncier_audit_lot",
+        "idx_foncier_lots_deleted_at",
+        "idx_foncier_lots_location",
+        "idx_foncier_lots_reference",
+        "idx_foncier_lots_statut",
+        "idx_foncier_lots_village",
+        "idx_user_village_user"
+      ],
+      "constraints_added": {},
+      "metadata": {
+        "purpose": "Fixes CRITICAL audit findings — foncier_lots table never created"
+      },
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260509160000_fix_village_logo_registry_table",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "village_logo_registry"
+      ],
+      "functions_created": [],
+      "tables_with_rls": [
+        "village_logo_registry"
+      ],
+      "policies_on_tables": [],
+      "indexes_created": [
+        "idx_village_logo_registry_created_by",
+        "idx_village_logo_registry_village_name"
+      ],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260521120000_media_audit_logs",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "media_audit_logs"
+      ],
+      "functions_created": [],
+      "tables_with_rls": [
+        "media_audit_logs"
+      ],
+      "policies_on_tables": [
+        "media_audit_logs"
+      ],
+      "indexes_created": [
+        "idx_media_audit_logs_actor_id",
+        "idx_media_audit_logs_created_at",
+        "idx_media_audit_logs_media_id"
+      ],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260408100000_rls_locataires",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [
+        "locataires"
+      ],
+      "policies_on_tables": [
+        "locataires"
+      ],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260510090000_fix_foncier_village_config_rls",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [
+        "foncier_village_config"
+      ],
+      "policies_on_tables": [
+        "foncier_village_config"
+      ],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260701000000_fix_public_access_and_dashboard_tables",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "activites_journal",
+        "employes_presence",
+        "messages_direction",
+        "stats_journalieres",
+        "visites_en_cours"
+      ],
+      "functions_created": [
+        "can_manage_content",
+        "current_user_role",
+        "is_admin"
+      ],
+      "tables_with_rls": [
+        "activites_journal",
+        "app_settings",
+        "employes_presence",
+        "messages_direction",
+        "page_layouts",
+        "site_content",
+        "site_realisations",
+        "stats_journalieres",
+        "visites_en_cours"
+      ],
+      "policies_on_tables": [
+        "activites_journal",
+        "app_settings",
+        "employes_presence",
+        "messages_direction",
+        "page_layouts",
+        "site_content",
+        "site_realisations",
+        "stats_journalieres",
+        "visites_en_cours"
+      ],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260525000001_create_village_logos_bucket",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [
+        "storage"
+      ],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260402090000_fix_tenants_schema",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "tenants"
+      ],
+      "functions_created": [
+        "update_tenants_updated_at"
+      ],
+      "tables_with_rls": [
+        "tenants"
+      ],
+      "policies_on_tables": [],
+      "indexes_created": [
+        "idx_tenants_email",
+        "idx_tenants_nom",
+        "idx_tenants_statut",
+        "idx_tenants_telephone"
+      ],
+      "constraints_added": {
+        "tenants": [
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN"
+        ]
+      },
+      "metadata": {},
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260408070000_rls_lease_contracts",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [
+        "lease_contracts"
+      ],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260508100000_fix_foncier_standalone",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [
+        "foncier_stats_by_village",
+        "restore_foncier_lot",
+        "search_foncier_lots",
+        "soft_delete_foncier_lot"
+      ],
+      "tables_with_rls": [],
+      "policies_on_tables": [
+        "foncier_lots"
+      ],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {
+        "purpose": "Apply audit recommendations for foncier module (standalone version)"
+      },
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260622100713_fix_user_profiles_rls_recursion",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [
+        "current_user_role",
+        "jwt_app_role"
+      ],
+      "tables_with_rls": [
+        "user_profiles"
+      ],
+      "policies_on_tables": [
+        "user_profiles"
+      ],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {
+        "purpose": "--   - Remove recursive policies on public.user_profiles"
+      },
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260405120000_rename_tenants_to_locataires",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [
+        "locataires"
+      ],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {
+        "purpose": "Eliminate naming collision with other tenant-style tables"
+      },
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260607090724_create_vitrine_lots_table",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "vitrine_lots"
+      ],
+      "functions_created": [
+        "update_vitrine_lots_updated_at"
+      ],
+      "tables_with_rls": [
+        "vitrine_lots"
+      ],
+      "policies_on_tables": [
+        "vitrine_lots"
+      ],
+      "indexes_created": [
+        "idx_vitrine_lots_ordre_affichage",
+        "idx_vitrine_lots_publier_sur_vitrine",
+        "idx_vitrine_lots_statut",
+        "idx_vitrine_lots_village"
+      ],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260405140000_create_lead_capture_system",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "bot_workflows",
+        "lead_campaigns",
+        "lead_interactions",
+        "lead_optouts",
+        "leads",
+        "social_posts"
+      ],
+      "functions_created": [
+        "current_user_role",
+        "normalize_phone",
+        "trigger_normalize_lead_phone",
+        "update_timestamp_trigger"
+      ],
+      "tables_with_rls": [
+        "bot_workflows",
+        "lead_campaigns",
+        "lead_interactions",
+        "lead_optouts",
+        "leads",
+        "social_posts"
+      ],
+      "policies_on_tables": [
+        "bot_workflows",
+        "lead_campaigns",
+        "lead_interactions",
+        "lead_optouts",
+        "leads",
+        "social_posts"
+      ],
+      "indexes_created": [
+        "idx_campaigns_created",
+        "idx_campaigns_status",
+        "idx_interactions_channel",
+        "idx_interactions_created",
+        "idx_interactions_lead",
+        "idx_leads_created_at",
+        "idx_leads_phone",
+        "idx_leads_source",
+        "idx_leads_status",
+        "idx_leads_tags",
+        "idx_optouts_channel",
+        "idx_optouts_lead",
+        "idx_social_platform",
+        "idx_social_scheduled",
+        "idx_social_status",
+        "idx_workflows_status"
+      ],
+      "constraints_added": {},
+      "metadata": {
+        "purpose": "Universal phone number capture from all ERP forms"
+      },
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260326000000_create_foncier_attestations_tables",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "foncier_attestation_temoins",
+        "foncier_attestations",
+        "if"
+      ],
+      "functions_created": [
+        "check_attestation_expiration",
+        "revoke_foncier_attestation"
+      ],
+      "tables_with_rls": [
+        "foncier_attestation_temoins",
+        "foncier_attestations"
+      ],
+      "policies_on_tables": [],
+      "indexes_created": [
+        "idx_foncier_attestations_expiration",
+        "idx_foncier_attestations_lot",
+        "idx_foncier_attestations_reference",
+        "idx_foncier_attestations_revoked",
+        "idx_foncier_attestations_statut",
+        "idx_foncier_temoins_attestation"
+      ],
+      "constraints_added": {
+        "foncier_attestations": [
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "FOREIGN"
+        ]
+      },
+      "metadata": {},
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260409141423_demo_account_sample_data",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "app_settings",
+        "user_profiles"
+      ],
+      "functions_created": [
+        "is_demo_user"
+      ],
+      "tables_with_rls": [
+        "app_settings",
+        "user_profiles"
+      ],
+      "policies_on_tables": [
+        "app_settings",
+        "clients",
+        "employees",
+        "finances",
+        "lease_contracts",
+        "locataires",
+        "projects",
+        "properties",
+        "rent_payments",
+        "suppliers",
+        "tasks",
+        "user_profiles"
+      ],
+      "indexes_created": [],
+      "constraints_added": {
+        "user_profiles": [
+          "COLUMN"
+        ],
+        "employees": [
+          "COLUMN"
+        ]
+      },
+      "metadata": {},
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260510100000_fix_foncier_functions_rls",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [
+        "foncier_attestation_temoins",
+        "foncier_attestations"
+      ],
+      "policies_on_tables": [
+        "foncier_attestation_temoins",
+        "foncier_attestations"
+      ],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260408090000_rls_properties",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [
+        "properties"
+      ],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260524000004_create_media_bucket_and_storage_policies",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [
+        "storage"
+      ],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260409000001_add_rls_business_tables",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [
+        "can_manage_content",
+        "current_user_role"
+      ],
+      "tables_with_rls": [
+        "clients",
+        "contact_messages",
+        "documents",
+        "employees",
+        "products",
+        "projects",
+        "suppliers",
+        "tasks"
+      ],
+      "policies_on_tables": [
+        "clients",
+        "contact_messages",
+        "documents",
+        "employees",
+        "products",
+        "projects",
+        "suppliers",
+        "tasks"
+      ],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {
+        "purpose": "--   - These tables were identified with ZERO Row Level Security",
+        "risk": "Applying this on a live DB will immediately restrict access."
+      },
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260508000000_fix_foncier_audit_recommendations",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [
+        "foncier_stats_by_village",
+        "restore_foncier_lot",
+        "search_foncier_lots",
+        "soft_delete_foncier_lot"
+      ],
+      "tables_with_rls": [],
+      "policies_on_tables": [
+        "foncier_lots"
+      ],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {
+        "purpose": "Apply audit recommendations for foncier module"
+      },
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260405150000_create_foncier_base_tables_and_rpc",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [
+        "foncier_audit",
+        "foncier_lots",
+        "foncier_villages",
+        "user_village_access"
+      ],
+      "functions_created": [
+        "check_foncier_duplicate",
+        "ensure_foncier_hierarchy",
+        "foncier_stats_by_village",
+        "log_foncier_audit",
+        "restore_foncier_lot",
+        "search_foncier_lots",
+        "soft_delete_foncier_lot",
+        "update_foncier_lots_updated_at"
+      ],
+      "tables_with_rls": [
+        "foncier_audit",
+        "foncier_lots",
+        "foncier_villages",
+        "user_village_access"
+      ],
+      "policies_on_tables": [
+        "foncier_audit",
+        "foncier_lots",
+        "foncier_villages",
+        "user_village_access"
+      ],
+      "indexes_created": [
+        "idx_foncier_audit_action",
+        "idx_foncier_audit_lot",
+        "idx_foncier_lots_location",
+        "idx_foncier_lots_reference",
+        "idx_foncier_lots_statut",
+        "idx_foncier_lots_village",
+        "idx_user_village_user"
+      ],
+      "constraints_added": {
+        "foncier_attestations": [
+          "FOREIGN"
+        ]
+      },
+      "metadata": {
+        "purpose": "Fixes CRITICAL audit findings — foncier_lots table never created"
+      },
+      "risk_level": "MEDIUM"
+    },
+    {
+      "name": "20260401080000_fix_foncier_attestations",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [
+        "idx_foncier_attestations_deleted_at"
+      ],
+      "constraints_added": {
+        "foncier_attestations": [
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN"
+        ]
+      },
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260604170000_add_onesignal_to_properties",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [
+        "idx_properties_onesignal_player_id"
+      ],
+      "constraints_added": {
+        "properties": [
+          "COLUMN"
+        ]
+      },
+      "metadata": {
+        "purpose": "Add onesignal_player_id column to properties table for push notifications"
+      },
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260521110000_media_center_improvements",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [
+        "idx_media_files_category_active",
+        "idx_media_files_deleted_at"
+      ],
+      "constraints_added": {
+        "media_files": [
+          "COLUMN"
+        ]
+      },
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260401090000_foncier_attestation_reference_archive",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [
+        "idx_foncier_attestations_lot_active",
+        "idx_foncier_attestations_reference_active"
+      ],
+      "constraints_added": {
+        "foncier_attestations": [
+          "COLUMN"
+        ]
+      },
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260330000000_fix_unique_constraint",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [
+        "check_foncier_duplicate"
+      ],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [
+        "idx_foncier_attestations_reference_unique",
+        "idx_foncier_lots_active_search",
+        "idx_foncier_lots_unique_location"
+      ],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260609105850_foncier_public_verification_hardening",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [
+        "idx_foncier_attestations_hash_sha256"
+      ],
+      "constraints_added": {},
+      "metadata": {
+        "purpose": "--   - add a minimal verification view for the public attestation endpoint"
+      },
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260524000002_fix_media_usage_column_names",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [
+        "idx_media_usage_entity"
+      ],
+      "constraints_added": {
+        "media_usage": [
+          "UNIQUE"
+        ]
+      },
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260512_unify_immobilier_schema",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [
+        "idx_lease_contracts_locataire_id",
+        "idx_lease_contracts_property_id",
+        "idx_lease_contracts_statut",
+        "idx_properties_proprietaire",
+        "idx_rent_payments_locataire_id",
+        "idx_rent_payments_property_id",
+        "idx_rent_payments_statut",
+        "idx_tenants_statut"
+      ],
+      "constraints_added": {
+        "tenants": [
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN"
+        ]
+      },
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260525170000_add_foncier_lots_publier_vitrine",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [
+        "idx_foncier_lots_publier_sur_vitrine"
+      ],
+      "constraints_added": {
+        "foncier_lots": [
+          "COLUMN"
+        ]
+      },
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260609102844_foncier_village_normalization",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [
+        "sync_foncier_lot_village"
+      ],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [
+        "idx_foncier_lots_village_id"
+      ],
+      "constraints_added": {
+        "foncier_lots": [
+          "COLUMN",
+          "FOREIGN"
+        ]
+      },
+      "metadata": {
+        "purpose": "--   - add a normalized village foreign key to foncier_lots"
+      },
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260404110000_align_immobilier_schema",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [
+        "idx_rent_payments_date_echeance",
+        "idx_rent_payments_mois_concerne_date",
+        "idx_tenants_property_id"
+      ],
+      "constraints_added": {
+        "properties": [
+          "COLUMN"
+        ],
+        "tenants": [
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN"
+        ],
+        "lease_contracts": [
+          "COLUMN"
+        ],
+        "rent_payments": [
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN"
+        ]
+      },
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260407000000_fix_foncier_lots",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [
+        "idx_foncier_lots_deleted_at"
+      ],
+      "constraints_added": {
+        "foncier_lots": [
+          "COLUMN"
+        ]
+      },
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260408020000_idx_foncier_lots_deleted_at",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [
+        "idx_foncier_lots_deleted_at"
+      ],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260521100000_drop_village_logo_registry",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260521130000_media_dimensions",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {
+        "media_files": [
+          "COLUMN"
+        ]
+      },
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260408040000_rename_tenants_table",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260404080000_fix_rls_policies_foncier_attestations",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260515000004_fix_cors_storage",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260604160000_enable_realtime_rent_payments",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260509150000_fix_village_logo_registry_rls",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260408060000_rename_rent_payments_tenant_col",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {
+        "rent_payments": [
+          "FOREIGN"
+        ]
+      },
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260409140000_fix_user_profiles_email",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {
+        "user_profiles": [
+          "COLUMN"
+        ]
+      },
+      "metadata": {
+        "purpose": "Add email column to user_profiles table"
+      },
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260524000003_verify_media_schema_cloud",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260524000005_media_files_compat_columns",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {
+        "media_files": [
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN"
+        ]
+      },
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260702010000_fix_leads_ip_address_column",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {
+        "leads": [
+          "COLUMN"
+        ]
+      },
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260408050000_rename_lease_contracts_tenant_col",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {
+        "lease_contracts": [
+          "FOREIGN"
+        ]
+      },
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260405160000_fix_lease_contracts_fk_and_cleanup_rls",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {
+        "lease_contracts": [
+          "FOREIGN"
+        ],
+        "rent_payments": [
+          "FOREIGN"
+        ]
+      },
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260608090000_add_foncier_lots_compat_columns",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {
+        "foncier_lots": [
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN",
+          "COLUMN"
+        ]
+      },
+      "metadata": {
+        "purpose": "--   - align the database schema with the current Foncier frontend payload"
+      },
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260509170000_debug_rls_policies",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260408010000_add_foncier_lots_deleted_at",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {
+        "foncier_lots": [
+          "COLUMN"
+        ]
+      },
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260311170000_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260311140000_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260306184030_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260306175204_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260311210000_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260311123000_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260313123000_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260306192718_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260312155000_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260313120000_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260311171000_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260312120000_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260318120000_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260318130000_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260310130000_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260312154800_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260311180000_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260309170000_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260313140000_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260307125104_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260306193353_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260313130000_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260311160000_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260306182111_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260312110000_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260306191105_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260313141000_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260318110000_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260318164000_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260307130559_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260311190000_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260307134539_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260311203000_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260307140607_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260311150000_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260312163800_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260306185236_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260318103000_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    },
+    {
+      "name": "20260312100000_placeholder",
+      "timestamp": "",
+      "description": "",
+      "tables_created": [],
+      "functions_created": [],
+      "tables_with_rls": [],
+      "policies_on_tables": [],
+      "indexes_created": [],
+      "constraints_added": {},
+      "metadata": {},
+      "risk_level": "LOW"
+    }
+  ]
+}
