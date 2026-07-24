@@ -117,3 +117,7 @@ loop-run-log.md
 # Temporary tests
 test_write.txt
 *.backup2
+.mcp.json
+filebrowser/database/*.db
+.mcp.json
+filebrowser/database/*.db
