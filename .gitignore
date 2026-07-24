@@ -56,7 +56,6 @@ dist_old/
 # FILEBROWSER
 # =====================
 filebrowser/database/
-filebrowser/*.db
 
 # Python environment
 .venv/
@@ -118,6 +117,4 @@ loop-run-log.md
 test_write.txt
 *.backup2
 .mcp.json
-filebrowser/database/*.db
-.mcp.json
-filebrowser/database/*.db
+
