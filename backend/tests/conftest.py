@@ -1,10 +1,10 @@
 """Pytest configuration for backend tests."""
 import pytest
 from fastapi.testclient import TestClient
-from backend.app.main import app
-from backend.app.repositories.user_repository import InMemoryUserRepository
-from backend.app.services.auth_service import AuthService
-from backend.app.api import deps
+from app.main import app
+from app.repositories.user_repository import InMemoryUserRepository
+from app.services.auth_service import AuthService
+from app.api import deps
 
 
 @pytest.fixture
