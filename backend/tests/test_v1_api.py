@@ -1,15 +1,16 @@
 from __future__ import annotations
 
+import unittest
 from fastapi.testclient import TestClient
 
-from backend.app.main import app
-from backend.app.repositories.user_repository import InMemoryUserRepository
-from backend.app.services.auth_service import AuthService
-from backend.app.api import deps
+from app.main import app
+from app.repositories.user_repository import InMemoryUserRepository
+from app.services.auth_service import AuthService
+from app.api import deps
 
 
-class UnifiedV1ApiTests:
-    def setup_method(self) -> None:
+class UnifiedV1ApiTests(unittest.TestCase):
+    def setUp(self) -> None:
         self.memory_repo = InMemoryUserRepository()
 
         def override_get_user_repository():
@@ -22,13 +23,13 @@ class UnifiedV1ApiTests:
         app.dependency_overrides[deps.get_auth_service] = override_get_auth_service
         self.client = TestClient(app)
 
-    def teardown_method(self) -> None:
+    def tearDown(self) -> None:
         app.dependency_overrides.clear()
 
     def test_v1_auth_login_and_me(self) -> None:
         response = self.client.post(
             "/api/v1/auth/login",
-            json={"email": "admin@egs.local", "password": "deadsoulja28@"},
+            json={"email": "admin@egs.local", "password": "Admin@EGS2025!"},
         )
         assert response.status_code == 200
         payload = response.json()
@@ -45,7 +46,7 @@ class UnifiedV1ApiTests:
     def test_v1_users_listing_requires_admin(self) -> None:
         login = self.client.post(
             "/api/v1/auth/login",
-            json={"email": "admin@egs.local", "password": "deadsoulja28@"},
+            json={"email": "admin@egs.local", "password": "Admin@EGS2025!"},
         )
         token = login.json()["access_token"]
 

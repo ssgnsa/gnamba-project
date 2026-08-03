@@ -1,8 +1,8 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from backend.app.core.database import Base
-from backend.app.repositories.sqlalchemy_user_repository import UserRepository
+from app.core.database import Base
+from app.repositories.sqlalchemy_user_repository import UserRepository
 
 
 def test_sqlalchemy_repository_seeds_default_admin() -> None:
