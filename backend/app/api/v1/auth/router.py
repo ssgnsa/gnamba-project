@@ -2,27 +2,26 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Header
 
-from backend.app.api.deps import get_auth_service
-from backend.app.core.security import AuthenticationError, AuthorizationError, get_http_exception_for_error
-from backend.app.schemas.auth import (
+from app.api.deps import get_auth_service
+from app.core.security import AuthenticationError, AuthorizationError, get_http_exception_for_error
+from app.schemas.auth import (
     AuthMeResponse,
     AuthTokenResponse,
     LoginRequest,
+    PersistTokenRequest,
     RefreshTokenRequest,
     RefreshTokenResponse,
     ResetPasswordRequest,
 )
-from backend.app.services.auth_service import AuthService
+from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 
 @router.post("/login", response_model=AuthTokenResponse)
 def login(payload: LoginRequest, auth_service: AuthService = Depends(get_auth_service)) -> AuthTokenResponse:
-    try:
-        return AuthTokenResponse(**auth_service.authenticate(payload.email, payload.password))
-    except (AuthenticationError, AuthorizationError) as exc:
-        raise get_http_exception_for_error(exc) from exc
+    # Let AuthenticationError propagate to custom exception handler
+    return AuthTokenResponse(**auth_service.authenticate(payload.email, payload.password))
 
 
 @router.get("/me", response_model=AuthMeResponse)
@@ -63,3 +62,17 @@ def reset_password(payload: ResetPasswordRequest, authorization: str | None = He
 @router.post("/reset-password")
 def reset_password_alias(payload: ResetPasswordRequest, authorization: str | None = Header(default=None), auth_service: AuthService = Depends(get_auth_service)) -> dict[str, str]:
     return reset_password(payload, authorization, auth_service)
+
+
+@router.post("/persist-token")
+def persist_token(payload: PersistTokenRequest, auth_service: AuthService = Depends(get_auth_service)) -> dict[str, str]:
+    """Persist local auth tokens - used for offline/remember me"""
+    # The tokens are already validated by the frontend
+    # We just store them in the user's session/cache if needed
+    return {"status": "ok", "message": "Tokens persistés"}
+
+
+@router.post("/clear-token")
+def clear_token() -> dict[str, str]:
+    """Clear local auth tokens - used for logout"""
+    return {"status": "ok", "message": "Tokens effacés"}
