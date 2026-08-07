@@ -4,16 +4,20 @@ import os
 import sys
 from pathlib import Path
 
-# Add the project root to the path so imports work
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
+# Add the backend directory to the path so imports work
+# This allows imports like "app.models" to resolve correctly
+sys.path.insert(0, '/home/soma/gnamba-project/backend')
 
 from sqlalchemy import pool, engine_from_config
 from sqlalchemy.engine import Connection
 
 from alembic import context
 
-from backend.app.core.database import Base
+from app.core.database import Base
+
+# Import models to register them with Base.metadata
+# This is needed for Alembic autogenerate to work
+from app.models import *
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
