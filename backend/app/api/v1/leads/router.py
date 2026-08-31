@@ -129,11 +129,11 @@ def _lead_capture_to_entity_create(payload: LeadCaptureRequest) -> EntityCreate:
     
     return EntityCreate(
         type="lead",
-        subtype="prospect",
+        subtype="particulier",
         status="pending",
         display_name=f"{payload.first_name or ''} {payload.last_name or ''}".strip() or f"Lead {payload.phone}",
-        first_name=payload.first_name,
-        last_name=payload.last_name,
+        first_name=payload.first_name or "",
+        last_name=payload.last_name or "",
         phone=payload.phone.strip() if payload.phone else None,
         email=payload.email.lower() if payload.email else None,
         metadata={
@@ -172,11 +172,11 @@ def _lead_payload_to_entity_create(payload: LeadCreateRequest) -> EntityCreate:
     
     return EntityCreate(
         type="lead",
-        subtype="prospect",
+        subtype="particulier",
         status="pending" if payload.statut == "nouveau" else "active",
         display_name=f"{payload.first_name or ''} {payload.last_name or ''}".strip() or "Lead sans nom",
-        first_name=payload.first_name,
-        last_name=payload.last_name,
+        first_name=payload.first_name or "",
+        last_name=payload.last_name or "",
         phone=payload.phone,
         email=payload.email,
         metadata={

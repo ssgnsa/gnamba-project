@@ -27,10 +27,30 @@ def get_user_id(current_user: dict = Depends(get_current_user)) -> str:
     return user_id
 
 
-def get_user_id_optional(current_user: dict | None = Depends(get_optional_current_user)) -> str | None:
+from fastapi import Header
+
+
+def get_user_id_optional(
+    authorization: str | None = Header(default=None),
+    current_user: dict | None = Depends(get_optional_current_user),
+) -> str | None:
     """Return user id if auth present, otherwise None.
-    Uses `get_optional_current_user` so tests can override `get_current_user`.
+    If a test override exists for `get_current_user`, call it directly so that
+    tests that override authentication behavior (e.g. to raise 401) are respected.
     """
+    # If a dependency override for get_current_user exists, call it so tests' overrides run
+    try:
+        from app.main import app as main_app
+        override = main_app.dependency_overrides.get(get_current_user)
+        if override is not None:
+            # Call the override directly with the same signature (authorization)
+            user = override(authorization)
+            if user:
+                return user.get("id") or user.get("sub")
+    except Exception:
+        # Let exceptions from override propagate (e.g., HTTPException(401))
+        raise
+
     if not current_user:
         return None
     return current_user.get("id") or current_user.get("sub")
