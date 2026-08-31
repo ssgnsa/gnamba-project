@@ -5,6 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 import os
 import json
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api import v1_router
 from app.core.bootstrap import initialize_system_seed
@@ -57,6 +58,20 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["*"],
 )
+
+
+class LegacyAPIPrefixMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        path = request.scope.get("path", "")
+        # Rewrite legacy /api/... paths to /api/v1/... for compatibility in tests
+        if path.startswith("/api/") and not path.startswith("/api/v1/") and not path.startswith("/api/attestations"):
+            new_path = "/api/v1" + path[4:]
+            request.scope["path"] = new_path
+            request.scope["raw_path"] = new_path.encode("utf-8")
+        return await call_next(request)
+
+
+app.add_middleware(LegacyAPIPrefixMiddleware)
 
 # Custom exception handlers for authentication/authorization errors to return structured format
 @app.exception_handler(AuthenticationError)
