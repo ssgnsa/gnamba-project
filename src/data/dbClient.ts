@@ -1,4 +1,4 @@
-import tableClient from "./tableClient";
+import tableClient from "./tableClient.ts";
 
 export const dbClient = tableClient as any;
 

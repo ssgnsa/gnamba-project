@@ -137,26 +137,58 @@ const parseOrClause = (clause: string): OrClause | null => {
   return {
     column,
     operator: operator as OrClause["operator"],
-    value,
+    value: value,
   };
 };
 
 const tableEndpoints: Record<string, string> = {
-  projects: "/api/v1/projects",
-  employees: "/api/v1/employees",
-  suppliers: "/api/v1/suppliers",
-  products: "/api/v1/products",
-  finances: "/api/v1/finance",
-  immobilier_items: "/api/v1/immobilier",
-  foncier_items: "/api/v1/foncier",
-  media_files: "/api/v1/media",
-  app_settings: "/api/v1/settings",
-  site_content: "/api/v1/site-content",
+  projects: "/projects",
+  employees: "/employees",
+  suppliers: "/suppliers",
+  products: "/products",
+  finances: "/finance",
+  immobilier_items: "/immobilier",
+  foncier_items: "/foncier",
+  media_files: "/media",
+  app_settings: "/settings",
+  site_content: "/site-content",
+  clients: "/clients",
+  leads: "/leads",
+  lead_campaigns: "/leads/campaigns",
+  lead_captures: "/leads/captures",
+  lead_interactions: "/leads/interactions",
+  party_roles: "/parties/roles",
+  party_lead_details: "/parties/lead-details",
+  parties: "/tables/parties",
+  page_layouts: "/api/v1/page-layouts", // FIXED: Changed from "/site-content/page-layouts" to direct API endpoint
+  bot_workflows: "/bot/workflows",
+  user_profiles: "/users/profiles",
+  media_audit_logs: "/media/audit-logs",
+  media_usage: "/media/usage",
+  media_versions: "/media/versions",
+  messages_direction: "/messages",
+  visites_en_cours: "/visites/en-cours",
+  documents: "/documents",
+  social_posts: "/social/posts",
+  foncier_lots: "/foncier/lots",
+  foncier_attestations: "/foncier/attestations",
+  activites_journal: "/activites",
+  stats_journalieres: "/stats",
+  visites_terrain: "/visites/terrain",
+  ventes_foncieres: "/foncier/ventes",
+  campagnes_marketing: "/campagnes",
+  visites: "/visites",
+  opportunites: "/opportunites",
+  site_realisations: "/site/realisations",
+  vitrine_lots: "/site/vitrine-lots",
+  visites_du_jour: "/visites/jour",
+  visiteurs: "/visiteurs",
+  employees_presence: "/employees/presence",
 };
 
 const resolveTableEndpoint = (tableName: string): string =>
   tableEndpoints[tableName] ??
-  `/api/v1/tables/${encodeURIComponent(tableName)}`;
+  `/tables/${encodeURIComponent(tableName)}`;
 
 const OPTIONAL_EMPTY_TABLES = new Set([
   "employees",
@@ -450,8 +482,8 @@ class ApiTableQuery {
       (relationPatterns.some((pattern) =>
         this.selectedColumns.includes(pattern),
       ) ||
-        this.filters.some((filter) =>
-          relationPatterns.some((pattern) => filter.column.includes(pattern)),
+        relationPatterns.some((pattern) =>
+          this.filters.some((filter) => filter.column.includes(pattern)),
         ) ||
         this.orClauses.some((clause) =>
           relationPatterns.some((pattern) => clause.includes(pattern)),
@@ -530,7 +562,6 @@ const storageFrom = (_bucket: string) => ({
     // Best-effort delete using backend storage API.
     try {
       for (const p of paths) {
-        // Attempt a DELETE against a conventional storage endpoint.
         await apiClient.request(
           `/api/v1/storage/media/${encodeURIComponent(p)}`,
           {
@@ -552,7 +583,7 @@ const dataClient = {
 
   async rpc(name: string, params?: Record<string, unknown>) {
     const res = await apiClient.request<unknown>(
-      `/api/v1/rpc/${encodeURIComponent(name)}`,
+      `/rpc/${encodeURIComponent(name)}`,
       {
         method: "POST",
         body: JSON.stringify(params || {}),

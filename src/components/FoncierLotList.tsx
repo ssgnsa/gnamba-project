@@ -7,9 +7,9 @@ interface FoncierLotListProps {
   onEdit: (lot: FoncierLot) => void;
   onArchive: (lot: FoncierLot) => void;
   onRestore: (lot: FoncierLot) => void;
-  _onOpenAttestation: (lot: FoncierLot) => void;
+  onOpenAttestation: (lot: FoncierLot) => void;
+  onCreate: () => void;
   canManage: boolean;
-    onCreate: () => void;
 }
 
 const Icon: FC<{ label: string; className?: string }> = ({ label, className }) => (
@@ -23,7 +23,8 @@ export const FoncierLotList: FC<FoncierLotListProps> = ({
   onEdit,
   onArchive,
   onRestore,
-  _onOpenAttestation,
+  onOpenAttestation,
+  onCreate,
   canManage,
 }) => {
   const {
@@ -234,6 +235,13 @@ export const FoncierLotList: FC<FoncierLotListProps> = ({
                         className="px-3 py-1 bg-blue-500/20 hover:bg-blue-500/30 text-xs font-medium text-blue-300 rounded-lg transition-colors"
                       >
                         Modifier
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onOpenAttestation(lot)}
+                        className="px-3 py-1 bg-purple-500/20 hover:bg-purple-500/30 text-xs font-medium text-purple-300 rounded-lg transition-colors"
+                      >
+                        Attestation
                       </button>
                       <button
                         type="button"

@@ -1,5 +1,6 @@
 import { memo, useMemo } from "react";
 import { VisiteurFormData } from "../../types";
+import { validateIvoryCoastPhone } from "../../lib/phone/ivoryCoastPhone";
 import {
   Camera,
   Upload,
@@ -33,10 +34,8 @@ const validateEmail = (email: string): string | null => {
 
 const validatePhone = (phone: string): string | null => {
   if (!phone) return "Téléphone requis";
-  const phoneRegex = /^(\+225|0)[0-9]{9,10}$/;
-  if (!phoneRegex.test(phone.replace(/\s/g, "")))
-    return "Numéro invalide (ex: 0707080808)";
-  return null;
+  const error = validateIvoryCoastPhone(phone);
+  return error ?? null;
 };
 
 const validateRequired = (value: string, fieldName: string): string | null => {

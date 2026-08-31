@@ -62,7 +62,7 @@ export interface OllamaModel {
   };
 }
 
-import { isLikelyLoopback } from "./loopback";
+import { isLikelyLoopback } from "./loopback.ts";
 
 const isLocalHost = (host: string): boolean => {
   if (!import.meta.env.DEV) return false;

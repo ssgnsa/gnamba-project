@@ -7,8 +7,8 @@ import type {
   Issue,
   Recommendation,
   ServerContext,
-  ServiceStatus,
 } from "./types";
+import { spawnSync } from "node:child_process";
 
 const severityOrder: Record<CheckResult["severity"], number> = {
   CRITICAL: 4,
@@ -23,8 +23,6 @@ const severityPriority: Record<CheckResult["severity"], Recommendation["priority
   MEDIUM: "MEDIUM",
   LOW: "LOW",
 };
-
-const hasRunning = (service: ServiceStatus): boolean => service.status === "running" && service.healthy;
 
 const getPseudoStack = (context: ServerContext): ServerContext["services"]["pseudoStack"] =>
   context.services?.pseudoStack ?? context.dbClient?.pseudoStack ?? createDefaultServerContext().services.pseudoStack;
@@ -45,23 +43,81 @@ const getRamSnapshot = (context: ServerContext): { total: number; used: number; 
   return { total: 0, used: 0, available: 0 };
 };
 
+// Helper functions for real health checks
+const runCommand = (command: string, args: string[], timeout = 5000): { success: boolean; output: string } => {
+  try {
+    const result = spawnSync(command, args, {
+      encoding: "utf8",
+      timeout,
+      stdio: "pipe",
+    });
+    return { success: result.status === 0, output: (result.stdout || "") + (result.stderr || "") };
+  } catch {
+    return { success: false, output: "Command failed" };
+  }
+};
+
+const checkHttpHealth = (url: string, timeout = 3000): Promise<{ success: boolean; output: string }> => {
+  return new Promise((resolve) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    fetch(url, { signal: controller.signal, method: "GET" })
+      .then((response) => {
+        clearTimeout(timeoutId);
+        resolve({ success: response.ok, output: `HTTP ${response.status}` });
+      })
+      .catch(() => {
+        clearTimeout(timeoutId);
+        resolve({ success: false, output: "Connection failed" });
+      });
+  });
+};
+
+const checkDockerDaemon = (): { success: boolean; output: string } => {
+  return runCommand("docker", ["version", "--format", "{{.Server.Version}}"]);
+};
+
+const checkPostgresHealth = (port: number): { success: boolean; output: string } => {
+  return runCommand("pg_isready", ["-h", "localhost", "-p", String(port)]);
+};
+
+const checkServiceHealth = async (port: number, path = "/health"): Promise<{ success: boolean; output: string }> => {
+  const url = `http://localhost:${port}${path}`;
+  return checkHttpHealth(url);
+};
+
 export class DiagnosticEngine {
   constructor(private contextManager: ContextManager = new ContextManager()) {}
 
-  healthCheck(context: ServerContext = this.contextManager.getSnapshot()): HealthCheck {
+  async healthCheck(context: ServerContext = this.contextManager.getSnapshot()): Promise<HealthCheck> {
     const normalized = this.normalizeContext(context);
+    
+    // Run sync checks first
+    const dockerCheck = this.checkDocker(normalized);
+    const portsCheck = this.checkPorts(normalized);
+    const resourcesCheck = this.checkResources(normalized);
+    const migrationCheck = this.checkMigration(normalized);
+    
+    // Run async checks in parallel
+    const [postgresCheck, authCheck, apiCheck, studioCheck] = await Promise.all([
+      this.checkPostgres(normalized),
+      this.checkAuth(normalized),
+      this.checkAPI(normalized),
+      this.checkStudio(normalized),
+    ]);
+
     const checks = {
-      docker: this.checkDocker(normalized),
-      postgres: this.checkPostgres(normalized),
-      ports: this.checkPorts(normalized),
-      auth: this.checkAuth(normalized),
-      api: this.checkAPI(normalized),
-      resources: this.checkResources(normalized),
-      studio: this.checkStudio(normalized),
-      migration: this.checkMigration(normalized),
+      docker: dockerCheck,
+      postgres: postgresCheck,
+      ports: portsCheck,
+      auth: authCheck,
+      api: apiCheck,
+      resources: resourcesCheck,
+      studio: studioCheck,
+      migration: migrationCheck,
     };
 
-    const conflicts = this.detectConflicts(normalized);
+    const conflicts = this.detectConflicts(normalized, checks);
     const issues = this.collectIssues(checks);
     const healthIssues = this.collectHealthIssues(normalized, checks, conflicts);
     const recommendations = this.generateRecommendations(issues, conflicts, healthIssues);
@@ -89,36 +145,43 @@ export class DiagnosticEngine {
   }
 
   private checkDocker(context: ServerContext): CheckResult {
-    if (context.docker.containers.length > 0) {
+    // Try to connect to Docker daemon
+    const dockerCheck = checkDockerDaemon();
+    if (dockerCheck.success) {
+      const containerCount = context.docker.containers.length;
       return {
         healthy: true,
         severity: "LOW",
-        message: `${context.docker.containers.length} conteneurs actifs`,
+        message: `Docker actif (${containerCount} conteneurs)`,
       };
     }
 
     return {
       healthy: false,
       severity: "CRITICAL",
-      message: "Docker ne tourne pas ou aucun conteneur",
+      message: "Docker daemon inaccessible",
       recommendation: "sudo systemctl start docker",
     };
   }
 
   private checkPostgres(context: ServerContext): CheckResult {
+    // Try pg_isready on the pseudo-stack postgres port
     const pg = getPseudoStack(context).postgres;
-    if (hasRunning(pg)) {
+    const port = pg.port || 54322;
+    const pgCheck = checkPostgresHealth(port);
+    
+    if (pgCheck.success) {
       return {
         healthy: true,
         severity: "LOW",
-        message: "PostgreSQL actif sur port 54322",
+        message: `PostgreSQL actif sur port ${port}`,
       };
     }
 
     return {
       healthy: false,
       severity: "CRITICAL",
-      message: "PostgreSQL non actif",
+      message: `PostgreSQL non accessible sur port ${port}`,
       recommendation: "npm run db:local:start",
     };
   }
@@ -150,64 +213,84 @@ export class DiagnosticEngine {
     };
   }
 
-  private checkAuth(context: ServerContext): CheckResult {
+  private async checkAuth(context: ServerContext): Promise<CheckResult> {
     const pseudoStack = getPseudoStack(context);
     const coreStack = getCoreStack(context);
-    const hasKeycloak = pseudoStack.keycloak.status === "running";
-    const hasGoTrue = coreStack.auth.status === "running";
+    
+    // Check Keycloak health
+    const keycloakPort = pseudoStack.keycloak.port || 8080;
+    const keycloakHealth = await checkServiceHealth(keycloakPort, "/realms/master");
+    
+    // Check GoTrue health (Supabase Auth)
+    const gotruePort = coreStack.auth.port || 9999;
+    const gotrueHealth = await checkServiceHealth(gotruePort, "/health");
+    
+    const hasKeycloak = keycloakHealth.success;
+    const hasGoTrue = gotrueHealth.success;
 
     if (hasKeycloak && hasGoTrue) {
       return {
         healthy: false,
         severity: "HIGH",
-        message: "Double système d'auth (Keycloak + GoTrue)",
+        message: "Double système d'auth (Keycloak + GoTrue) détecté",
         recommendation: "Migrer vers GoTrue uniquement",
       };
     }
 
     if (hasKeycloak || hasGoTrue) {
+      const active = hasKeycloak ? "Keycloak" : "GoTrue";
       return {
         healthy: true,
         severity: "LOW",
-        message: "Un système d'auth présent",
+        message: `${active} accessible`,
       };
     }
 
     return {
       healthy: false,
       severity: "MEDIUM",
-      message: "Aucun système d'auth détecté",
+      message: "Aucun système d'auth accessible",
       recommendation: "Installer GoTrue ou Keycloak",
     };
   }
 
-  private checkAPI(context: ServerContext): CheckResult {
+  private async checkAPI(context: ServerContext): Promise<CheckResult> {
     const pseudoStack = getPseudoStack(context);
     const coreStack = getCoreStack(context);
-    const hasPostgrest = pseudoStack.postgrest.status === "running";
-    const hasKong = coreStack.kong.status === "running";
+    
+    // Check PostgREST health
+    const postgrestPort = pseudoStack.postgrest.port || 3001;
+    const postgrestHealth = await checkServiceHealth(postgrestPort, "/");
+    
+    // Check Kong health
+    const kongPort = coreStack.kong.port || 8000;
+    const kongHealth = await checkServiceHealth(kongPort, "/health");
+    
+    const hasPostgrest = postgrestHealth.success;
+    const hasKong = kongHealth.success;
 
     if (hasPostgrest && hasKong) {
       return {
         healthy: false,
         severity: "HIGH",
-        message: "Double API (PostgREST + Kong)",
+        message: "Double API (PostgREST + Kong) détectée",
         recommendation: "Migrer vers Kong uniquement",
       };
     }
 
     if (hasKong || hasPostgrest) {
+      const active = hasKong ? "Kong" : "PostgREST";
       return {
         healthy: true,
         severity: "LOW",
-        message: "API présente",
+        message: `${active} accessible`,
       };
     }
 
     return {
       healthy: false,
       severity: "MEDIUM",
-      message: "Aucune API détectée",
+      message: "Aucune API accessible",
       recommendation: "Installer Kong ou PostgREST",
     };
   }
@@ -241,25 +324,32 @@ export class DiagnosticEngine {
     };
   }
 
-  private checkStudio(context: ServerContext): CheckResult {
+  private async checkStudio(context: ServerContext): Promise<CheckResult> {
     const pseudoStack = getPseudoStack(context);
     const coreStack = getCoreStack(context);
-    const studio = pseudoStack.studio;
-    const coreStudio = coreStack.studio;
+    
+    // Check pseudo-stack Studio health
+    const studioPort = pseudoStack.studio.port || 3000;
+    const studioHealth = await checkServiceHealth(studioPort, "/api/health");
+    
+    // Check core-stack Studio health
+    const coreStudioPort = coreStack.studio.port || 3000;
+    const coreStudioHealth = await checkServiceHealth(coreStudioPort, "/api/health");
 
-    if (studio.status === "unhealthy" || coreStudio.status === "unhealthy") {
+    if (!studioHealth.success && !coreStudioHealth.success) {
       return {
         healthy: false,
         severity: "MEDIUM",
-        message: "API locale Studio unhealthy",
-        recommendation: "Redémarrer API locale Studio ou vérifier les logs",
+        message: "Studio inaccessible (pseudo + core)",
+        recommendation: "Redémarrer Studio ou vérifier les logs",
       };
     }
 
+    const active = studioHealth.success ? "pseudo" : "core";
     return {
       healthy: true,
       severity: "LOW",
-      message: "API locale Studio sain",
+      message: `Studio (${active}) accessible`,
     };
   }
 
@@ -282,12 +372,13 @@ export class DiagnosticEngine {
     };
   }
 
-  private detectConflicts(context: ServerContext): Conflict[] {
+  private detectConflicts(context: ServerContext, checks: Record<string, CheckResult>): Conflict[] {
     const conflicts: Conflict[] = [];
-    const pseudoStack = getPseudoStack(context);
-    const coreStack = getCoreStack(context);
 
-    if (pseudoStack.postgrest.status === "running" && coreStack.kong.status === "running") {
+    // Check if both PostgREST and Kong are accessible via our health checks
+    // The api check tells us if there's a conflict
+    const apiCheck = checks.api;
+    if (apiCheck && !apiCheck.healthy && apiCheck.message.includes("Double API")) {
       conflicts.push({
         id: "api-conflict",
         type: "API_CONFLICT",
@@ -299,7 +390,9 @@ export class DiagnosticEngine {
       });
     }
 
-    if (pseudoStack.keycloak.status === "running" && coreStack.auth.status === "running") {
+    // Check auth conflict from auth check results
+    const authCheck = checks.auth;
+    if (authCheck && !authCheck.healthy && authCheck.message.includes("Double système d'auth")) {
       conflicts.push({
         id: "auth-conflict",
         type: "AUTH_CONFLICT",
@@ -310,12 +403,14 @@ export class DiagnosticEngine {
       });
     }
 
-    if (pseudoStack.studio.status === "unhealthy") {
+    // Check studio from studio check results
+    const studioCheck = checks.studio;
+    if (studioCheck && !studioCheck.healthy) {
       conflicts.push({
         id: "studio-unhealthy",
         type: "STACK_FRAGMENTATION",
         severity: "MEDIUM",
-        details: "API locale Studio est signalé unhealthy.",
+        details: "Studio est signalé unhealthy.",
         remediation:
           "Redémarrer ou isoler Studio après avoir vérifié les données persistantes.",
       });

@@ -8,9 +8,6 @@ from sqlalchemy.orm import Session
 
 from app.models.user import (
     User,
-    AuthSession,
-    AuthAuditLog,
-    AuthLoginFailure,
 )
 # Import other models as needed, but we'll use raw SQL for flexibility since
 # the tables are defined via the generic table repository and may not have SQLAlchemy models.
@@ -91,8 +88,8 @@ class DashboardService:
             elif item['type_transaction'] == 'depense':
                 previous_depenses = item['total']
 
-        # 2. Total clients (from clients table)
-        total_clients = query_one("SELECT COUNT(*) FROM clients") or 0
+        # 2. Total clients (from parties table, type = 'particulier' or 'entreprise')
+        total_clients = query_one("SELECT COUNT(*) FROM entities WHERE type = 'client' AND status = 'active'") or 0
 
         # 3. Active projects (from projects table, where statut != 'termine' or similar)
         projets_actifs = query_one("""
@@ -118,12 +115,12 @@ class DashboardService:
         # 7. Monthly aggregates (last 6 months)
         monthly = query_all("""
             SELECT 
-                strftime('%m/%Y', date_transaction) as month,
+                to_char(date_transaction::date, 'MM/YYYY') as month,
                 SUM(CASE WHEN type_transaction = 'recette' THEN montant ELSE 0 END) as recettes,
                 SUM(CASE WHEN type_transaction = 'depense' THEN montant ELSE 0 END) as depenses
             FROM finances
             WHERE date_transaction >= :six_months_ago
-            GROUP BY strftime('%m/%Y', date_transaction)
+            GROUP BY to_char(date_transaction::date, 'MM/YYYY')
             ORDER BY month
         """, {
             "six_months_ago": six_months_ago.strftime("%Y-%m-%d")

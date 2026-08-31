@@ -59,7 +59,7 @@ export interface DashboardData {
 
 export const dashboardService = {
   async fetchDashboardData(): Promise<DashboardData> {
-    const response = await apiClient.request<DashboardData>("/api/v1/dashboard");
+    const response = await apiClient.request<DashboardData>("/dashboard");
     if (response.error) {
       throw new Error(response.error);
     }

@@ -38,7 +38,7 @@ describe("Foncier villages repository", () => {
     });
 
     const { foncierRepository } = await import("@/data/foncier.repository");
-    const result = await foncierRepository.getVillagesList();
+    const result = await foncierRepository.getVillagesList() as { data: typeof mockVillages | null; error: string | null };
 
     expect(result.error).toBeNull();
     expect(result.data).toEqual(mockVillages);
@@ -57,10 +57,10 @@ describe("Foncier villages repository", () => {
     const { foncierRepository } = await import("@/data/foncier.repository");
     const result = await foncierRepository.updateVillage(invalidId, {
       nom: "Test",
-    });
+    }) as { data: null; error: { message: string } | null };
 
     expect(result.error).toBeDefined();
-    expect((result.error as { message: string }).message).toContain("invalide");
+    expect(result.error!.message).toContain("invalide");
   });
 
   it("should reject invalid village ID on delete", async () => {
@@ -72,9 +72,9 @@ describe("Foncier villages repository", () => {
     });
 
     const { foncierRepository } = await import("@/data/foncier.repository");
-    const result = await foncierRepository.deleteVillage(invalidId);
+    const result = await foncierRepository.deleteVillage(invalidId) as { data: null; error: { message: string } | null };
 
     expect(result.error).toBeDefined();
-    expect((result.error as { message: string }).message).toContain("invalide");
+    expect(result.error!.message).toContain("invalide");
   });
 });

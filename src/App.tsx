@@ -25,7 +25,8 @@ import PublicLayout from "./components/public/PublicLayout";
 import type { Page } from "./components/Sidebar";
 import type { PublicPage } from "./lib/publicRoutes";
 import { PUBLIC_PAGE_PATHS, getPublicPageFromPath } from "./lib/publicRoutes";
-import dbClient from "./data/tableClient";
+import { apiClient } from "./api/client";
+import { useContentVersion } from "./hooks/useContentVersion";
 import type { PageSection } from "./components/page-builder/types";
 import PublicPageLayoutRenderer from "./components/public/PublicPageLayoutRenderer";
 import PublicSocialWall from "./components/public/PublicSocialWall";
@@ -499,6 +500,8 @@ function AppContent() {
   const sw = useServiceWorker();
   const oneSignalInitializedRef = useRef(false);
   const oneSignalBlockedRef = useRef(false);
+  const contentVersion = useContentVersion();
+  const { showToast } = useNotifications();
   const [view, setView] = useState<AppView>("public");
   const [publicPage, setPublicPage] = useState<PublicPage>("home");
   const [dashPage, setDashPage] = useState<Page>("dashboard");
@@ -570,6 +573,27 @@ function AppContent() {
     updateFavicon();
   }, [settings.brand_favicon_url]);
 
+  // Démarrer le service de synchronisation en background
+  useEffect(() => {
+    try {
+      // lazy require to avoid SSR issues
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { startManualSyncService } = require("./lib/manualSyncService");
+      const stop = startManualSyncService({
+        onError: (err: Error) => {
+          try {
+            showToast("error", "Sync automatique", err.message || String(err));
+          } catch (e) {
+            // ignore
+          }
+        },
+      });
+      return () => stop();
+    } catch (e) {
+      // ignore in non-browser environments
+    }
+  }, []);
+
   // ============================================
   // GESTION DYNAMIQUE DU TITRE DE L'ONGLET
   // ============================================
@@ -587,7 +611,7 @@ function AppContent() {
         projets: "Projets BTP",
         immobilier: "Gestion Immobilière",
         foncier: "Dossiers Fonciers",
-        "catalogue-lots": "Catalogue Commercial",
+          "catalogue-lots": "Catalogue Commercial",
         fournitures: "Fournitures",
         finances: "Finances",
         employes: "Employés",
@@ -877,7 +901,7 @@ function AppContent() {
     };
 
     initOneSignal();
-  }, [user]);
+  }, [user, isOneSignalAllowedByCsp]);
 
   const role = profile?.role;
   const accessLevel = profile?.access_level;
@@ -1080,19 +1104,20 @@ function AppContent() {
     setPublishedLayoutLoading(true);
 
     void (async () => {
-      const { data, error } = await dbClient
-        .from("page_layouts")
-        .select("layout_json")
-        .eq("page_slug", layoutSlug)
-        .eq("is_published", true)
-        .maybeSingle();
+      const { data, error } = await apiClient.pageLayouts.get(layoutSlug);
 
       if (cancelled) return;
 
-      const sections = Array.isArray(data?.layout_json)
+      if (error || !data || !data.is_published) {
+        setPublishedLayoutSections(null);
+        setPublishedLayoutLoading(false);
+        return;
+      }
+
+      const sections = Array.isArray(data.layout_json)
         ? (data.layout_json as PageSection[])
         : [];
-      if (error || sections.length === 0) {
+      if (sections.length === 0) {
         setPublishedLayoutSections(null);
         setPublishedLayoutLoading(false);
         return;
@@ -1105,7 +1130,7 @@ function AppContent() {
     return () => {
       cancelled = true;
     };
-  }, [publicPage]);
+  }, [publicPage, contentVersion]);
 
   useEffect(() => {
     const handler = (event: Event) => {
@@ -1493,7 +1518,7 @@ function AppContent() {
   );
 }
 
-export default function App() {
+export function App() {
   return (
     <ErrorBoundary moduleName="Application EGS">
       <AuthProvider>
@@ -1506,3 +1531,5 @@ export default function App() {
     </ErrorBoundary>
   );
 }
+
+export default App;

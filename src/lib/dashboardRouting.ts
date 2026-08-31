@@ -6,7 +6,6 @@ export const DASHBOARD_PAGE_PATHS: Record<Page, string> = {
   projets: "/projets",
   immobilier: "/immobilier",
   foncier: "/foncier",
-  "foncier-villages": "/foncier-villages",
   "catalogue-lots": "/lots-a-vendre",
   fournitures: "/fournitures",
   finances: "/finances",

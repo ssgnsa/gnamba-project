@@ -13,11 +13,11 @@ import {
   Tag,
   Trash2,
 } from "lucide-react";
-import dbClient from "../data/tableClient";
+import dbClient from '../lib/dbClient.service';
 import { useAuth } from "../context/AuthContext";
 import { useNotifications } from "../context/NotificationContext";
 import { OFFICIAL_CONTACT } from "../lib/officialContact";
-import { formatMontant, generateReference } from "../utils/reference";
+import { formatMontant, generateReference, generateUUID } from "../utils/reference";
 import type { VitrineLot } from "../types";
 import MediaPicker from "../components/media/MediaPicker";
 
@@ -217,6 +217,7 @@ export default function CatalogueLots() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<CatalogFormState>(emptyForm);
   const [showImagePicker, setShowImagePicker] = useState(false);
+  const [formVisible, setFormVisible] = useState(false);
 
   const roleLabel = profile?.role || profile?.access_level || "—";
 
@@ -235,7 +236,7 @@ export default function CatalogueLots() {
       .from("vitrine_lots")
       .select("*")
       .order("ordre_affichage", { ascending: true })
-      .order("created_at", { ascending: false });
+      .order("created_at");
 
     if (fetchError) {
       setError(fetchError.message);
@@ -281,6 +282,7 @@ export default function CatalogueLots() {
 
   const resetForm = () => {
     setEditingId(null);
+    setFormVisible(false);
     setForm({
       ...emptyForm,
       reference: generateReference("GS-LOT"),
@@ -291,6 +293,7 @@ export default function CatalogueLots() {
   const handleEdit = (lot: LocalVitrineLot) => {
     setEditingId(lot.id);
     setForm(lotToForm(lot));
+    setFormVisible(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -391,7 +394,7 @@ export default function CatalogueLots() {
     const existingLot = lots.find((lot) => lot.id === editingId);
     const localRecord: LocalVitrineLot = {
       ...(existingLot ?? {}),
-      id: existingLot?.id ?? crypto.randomUUID(),
+      id: existingLot?.id ?? generateUUID(),
       reference: form.reference.trim(),
       titre: form.titre.trim(),
       description: form.description.trim(),
@@ -593,7 +596,14 @@ export default function CatalogueLots() {
           </button>
           <button
             type="button"
-            onClick={resetForm}
+            onClick={() => {
+              setForm({
+                ...emptyForm,
+                reference: generateReference("GS-LOT"),
+              });
+              setEditingId(null);
+              setFormVisible(true);
+            }}
             className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"
           >
             <Plus size={16} />
@@ -641,10 +651,11 @@ export default function CatalogueLots() {
       )}
 
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
-        <form
-          onSubmit={handleSubmit}
-          className="xl:col-span-2 rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm space-y-5"
-        >
+        {formVisible && (
+          <form
+            onSubmit={handleSubmit}
+            className="xl:col-span-2 rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm space-y-5"
+          >
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-bold text-slate-900">
@@ -1069,8 +1080,9 @@ export default function CatalogueLots() {
             </button>
           </div>
         </form>
+        )}
 
-        <div className="xl:col-span-3 rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm">
+        <div className={formVisible ? "xl:col-span-3 rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm" : "xl:col-span-5 rounded-3xl border border-slate-200 bg-white p-5 sm:p-6 shadow-sm"}>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
             <div>
               <h2 className="text-lg font-bold text-slate-900">Lots saisis</h2>

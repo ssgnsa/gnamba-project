@@ -109,7 +109,7 @@ class VitrineLot(Base):
     __table_args__ = (
         Index("idx_vitrine_lot_reference", "reference"),
         Index("idx_vitrine_lot_statut", "statut"),
-        Index("idx_lot_vitrine", "publier_sur_vitrine"),
+        Index("idx_vitrine_lot_publie", "publier_sur_vitrine"),
     )
 
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import dbClient from "../data/tableClient";
+import dbClient from '../lib/dbClient.service';
 
 interface NotificationButtonProps {
   propertyId?: string;

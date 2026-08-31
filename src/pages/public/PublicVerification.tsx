@@ -5,6 +5,17 @@ import {
   ShieldAlert,
   ShieldCheck,
   ShieldX,
+  Hash,
+  User,
+  Phone,
+  Briefcase,
+  CreditCard,
+  Home,
+  Building2,
+  FileText,
+  CheckCircle,
+  AlertTriangle,
+  Search,
 } from "lucide-react";
 import { useSettings } from "../../context/SettingsContext";
 import BrandLogo from "../../components/BrandLogo";
@@ -14,6 +25,21 @@ import {
   type VerificationLookup,
   type VerificationResult,
 } from "../../lib/attestationVerification";
+
+// Premium UI Components
+import {
+  Button,
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  Badge,
+  Container,
+  Grid,
+  Flex,
+  IconWrapper,
+  Divider,
+} from "../../components/ui";
 
 interface PublicVerificationProps {
   onNavigate?: (page: PublicPage) => void;
@@ -58,15 +84,21 @@ const formatSurface = (value?: number) => {
 const isNotFoundMessage = (message: string) =>
   /introuvable|non reconnu|not found/i.test(message);
 
-const StatBlock = ({ label, value }: { label: string; value: string }) => (
-  <div className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-3">
-    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+// Premium Stat Block Component
+const StatBlock = ({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) => (
+  <Card variant="bordered" padding="md" className="text-center">
+    {icon && (
+      <IconWrapper size="sm" variant="primary" shape="circle" className="mx-auto mb-3">
+        {icon}
+      </IconWrapper>
+    )}
+    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-400 mb-1">
       {label}
     </div>
-    <div className="mt-1 text-sm font-semibold text-slate-900 break-words">
+    <div className="text-sm font-semibold text-neutral-900 break-words">
       {value || "—"}
     </div>
-  </div>
+  </Card>
 );
 
 export default function PublicVerification({
@@ -97,7 +129,7 @@ export default function PublicVerification({
   useEffect(() => {
     const lookup = getLookupFromUrl();
     if (!hasLookupValue(lookup)) {
-      setError("Référence, numéro de contrôle ou hash manquant dans l’URL.");
+      setError("Référence, numéro de contrôle ou hash manquant dans l'URL.");
       setLoading(false);
       return;
     }
@@ -140,21 +172,41 @@ export default function PublicVerification({
     data?.titulaire || (data?.temoins && data.temoins.length > 0),
   );
 
-  return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#eef6f0_48%,#f8fafc_100%)] px-4 py-10 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-4xl">
-        <button
-          onClick={handleBack}
-          className="mb-6 inline-flex items-center gap-2 text-sm text-slate-500 transition-colors hover:text-slate-900"
-        >
-          <ChevronLeft size={16} />
-          Retour accueil
-        </button>
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <Flex direction="col" align="center" gap="4" className="px-4">
+          <IconWrapper size="xl" variant="primary" shape="circle">
+            <Search size={32} className="text-primary-600 animate-pulse" />
+          </IconWrapper>
+          <CardTitle className="text-xl font-bold text-neutral-900">Vérification en cours...</CardTitle>
+          <p className="text-neutral-500">Veuillez patienter pendant la recherche du document.</p>
+        </Flex>
+      </div>
+    );
+  }
 
-        <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_24px_90px_rgba(15,23,42,0.08)]">
-          <div className="border-b border-slate-200 bg-[linear-gradient(135deg,rgba(15,23,42,0.96),rgba(21,128,61,0.92))] px-6 py-7 text-white sm:px-8">
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-4">
+  return (
+    <div className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#f1f5f9_50%,#f8fafc_100%)] px-4 py-10 sm:px-6 lg:px-8">
+      <Container size="2xl">
+        {/* Back Button */}
+        <Flex className="mb-6" onClick={handleBack}>
+          <Button
+            variant="ghost"
+            size="sm"
+            iconLeft={<ChevronLeft size={16} />}
+            className="text-neutral-500 hover:text-neutral-900 transition-colors p-2"
+          >
+            Retour accueil
+          </Button>
+        </Flex>
+
+        {/* Main Verification Card */}
+        <Card variant="elevated" padding="none" className="overflow-hidden">
+          {/* Header */}
+          <div className="border-b border-neutral-200 bg-[linear-gradient(135deg,rgba(15,23,42,0.96),rgba(21,128,61,0.92))] px-6 py-7 sm:px-8">
+            <Flex direction="col" smDirection="row" smAlign="center" smJustify="between" gap="5">
+              <Flex align="center" gap="4">
                 <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/12 ring-1 ring-white/20 overflow-hidden">
                   <BrandLogo
                     tone="light"
@@ -171,121 +223,124 @@ export default function PublicVerification({
                   <div className="text-xs font-semibold uppercase tracking-[0.28em] text-emerald-100/90">
                     Vérification publique
                   </div>
-                  <h1 className="mt-1 text-2xl font-semibold tracking-tight">
+                  <h1 className="mt-1 text-2xl font-bold tracking-tight text-white">
                     Attestation de propriété villageoise
                   </h1>
                   <p className="mt-1 text-sm text-emerald-50/90">
-                    Contrôle d’authenticité en ligne
+                    Contrôle d'authenticité en ligne
                   </p>
                 </div>
-              </div>
+              </Flex>
 
+              {/* Status Badge */}
               <div
                 className="inline-flex items-center gap-3 self-start rounded-full border px-4 py-2 text-sm font-semibold"
                 style={{
                   borderColor: authenticity
                     ? "rgba(255,255,255,0.24)"
+                    : notFound
+                    ? "rgba(255,255,255,0.18)"
+                    : error
+                    ? "rgba(255,255,255,0.18)"
                     : "rgba(255,255,255,0.18)",
                   backgroundColor: authenticity
-                    ? "rgba(255,255,255,0.16)"
-                    : "rgba(127,29,29,0.32)",
+                    ? "rgba(16, 185, 129, 0.2)"
+                    : notFound
+                    ? "rgba(239, 68, 68, 0.2)"
+                    : error
+                    ? "rgba(245, 158, 11, 0.2)"
+                    : "rgba(245, 158, 11, 0.2)",
                 }}
               >
-                {loading ? (
-                  <ShieldAlert className="h-5 w-5" />
-                ) : authenticity ? (
-                  <ShieldCheck className="h-5 w-5 text-emerald-100" />
+                {authenticity ? (
+                  <>
+                    <ShieldCheck className="h-5 w-5 text-emerald-100" />
+                    <span className="text-emerald-100">DOCUMENT AUTHENTIQUE</span>
+                  </>
                 ) : notFound ? (
-                  <ShieldX className="h-5 w-5 text-red-100" />
+                  <>
+                    <ShieldX className="h-5 w-5 text-red-100" />
+                    <span className="text-red-100">DOCUMENT NON RECONNU</span>
+                  </>
+                ) : error ? (
+                  <>
+                    <ShieldAlert className="h-5 w-5 text-amber-100" />
+                    <span className="text-amber-100">VÉRIFICATION INDISPONIBLE</span>
+                  </>
                 ) : (
-                  <ShieldAlert className="h-5 w-5 text-amber-100" />
+                  <>
+                    <ShieldAlert className="h-5 w-5 text-amber-100" />
+                    <span className="text-amber-100">VÉRIFICATION INCOMPLÈTE</span>
+                  </>
                 )}
-                <span>
-                  {loading
-                    ? "Vérification en cours"
-                    : authenticity
-                      ? "DOCUMENT AUTHENTIQUE"
-                      : notFound
-                        ? "DOCUMENT NON RECONNU"
-                        : "VÉRIFICATION INCOMPLÈTE"}
-                </span>
               </div>
-            </div>
+            </Flex>
           </div>
 
-          <div className="px-6 py-6 sm:px-8">
-            {loading && (
-              <div className="rounded-3xl border border-slate-200 bg-slate-50 px-6 py-10 text-center text-sm text-slate-500">
-                Vérification du document en cours...
-              </div>
+          <div className="p-6 sm:p-8">
+            {/* Not Found State */}
+            {notFound && (
+              <Card variant="default" padding="xl" style={{ background: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)' }} className="border-red-200">
+                <Flex align="start" gap="4">
+                  <IconWrapper size="lg" variant="danger" shape="circle" className="flex-shrink-0">
+                    <ShieldX size={28} className="text-red-600" />
+                  </IconWrapper>
+                  <Flex direction="col" gap="1" flex-1>
+                    <CardTitle className="text-lg font-bold text-red-900">Document non reconnu</CardTitle>
+                    <CardDescription className="text-red-800">
+                      Cette référence, ce numéro de contrôle ou ce hash ne correspond à aucune attestation officielle enregistrée.
+                    </CardDescription>
+                  </Flex>
+                </Flex>
+              </Card>
             )}
 
-            {!loading && notFound && (
-              <div className="rounded-3xl border border-red-200 bg-red-50 px-6 py-8">
-                <div className="flex items-start gap-4">
-                  <div className="rounded-2xl bg-red-100 p-3 text-red-600">
-                    <ShieldX className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-semibold text-red-900">
-                      Document non reconnu
-                    </h2>
-                    <p className="mt-2 text-sm leading-6 text-red-800">
-                      Cette référence, ce numéro de contrôle ou ce hash ne
-                      correspond à aucune attestation officielle enregistrée.
-                    </p>
-                  </div>
-                </div>
-              </div>
+            {/* Error State */}
+            {error && !notFound && (
+              <Card variant="default" padding="xl" style={{ background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)' }} className="border-amber-200">
+                <Flex align="start" gap="4">
+                  <IconWrapper size="lg" variant="warning" shape="circle" className="flex-shrink-0">
+                    <ShieldAlert size={28} className="text-amber-600" />
+                  </IconWrapper>
+                  <Flex direction="col" gap="1" flex-1>
+                    <CardTitle className="text-lg font-bold text-amber-950">Vérification indisponible</CardTitle>
+                    <CardDescription className="text-amber-900">{error}</CardDescription>
+                  </Flex>
+                </Flex>
+              </Card>
             )}
 
-            {!loading && !notFound && error && (
-              <div className="rounded-3xl border border-amber-200 bg-amber-50 px-6 py-8">
-                <div className="flex items-start gap-4">
-                  <div className="rounded-2xl bg-amber-100 p-3 text-amber-700">
-                    <ShieldAlert className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-semibold text-amber-950">
-                      Vérification indisponible
-                    </h2>
-                    <p className="mt-2 text-sm leading-6 text-amber-900">
-                      {error}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {!loading && !error && data && (
+            {/* Success State - Full Verification Details */}
+            {!loading && !notFound && !error && data && (
               <div className="space-y-6">
-                <div
-                  className={`rounded-[26px] border px-5 py-5 sm:px-6 ${
+                {/* Authenticity Result Card */}
+                <Card
+                  variant="default"
+                  padding="lg"
+                  className={
                     authenticity
                       ? "border-emerald-200 bg-[linear-gradient(135deg,#ecfdf5,#f7fee7)]"
                       : "border-amber-200 bg-[linear-gradient(135deg,#fff7ed,#fffbeb)]"
-                  }`}
+                  }
                 >
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <div
-                        className={`text-xs font-semibold uppercase tracking-[0.28em] ${
-                          authenticity ? "text-emerald-700" : "text-amber-700"
-                        }`}
+                  <Flex direction="col" smDirection="row" smAlign="center" smJustify="between" gap="4">
+                    <Flex direction="col" gap="2">
+                      <Badge
+                        variant={authenticity ? "success" : "warning"}
+                        size="sm"
+                        className="text-xs"
                       >
                         Résultat du contrôle
-                      </div>
-                      <div
-                        className={`mt-2 text-2xl font-semibold ${
+                      </Badge>
+                      <CardTitle
+                        className={`text-2xl font-bold ${
                           authenticity ? "text-emerald-950" : "text-amber-950"
                         }`}
                       >
-                        {authenticity
-                          ? "Document authentique"
-                          : "Authenticité à confirmer"}
-                      </div>
-                      <p
-                        className={`mt-2 max-w-2xl text-sm leading-6 ${
+                        {authenticity ? "Document authentique" : "Authenticité à confirmer"}
+                      </CardTitle>
+                      <CardDescription
+                        className={`text-sm leading-6 ${
                           authenticity
                             ? "text-emerald-900/85"
                             : "text-amber-900/85"
@@ -293,243 +348,324 @@ export default function PublicVerification({
                       >
                         {authenticity
                           ? "Les éléments de sécurité du document correspondent aux données enregistrées."
-                          : "Le document existe mais la preuve cryptographique ou la signature n’a pas pu être validée complètement."}
-                      </p>
-                    </div>
+                          : "Le document existe mais la preuve cryptographique ou la signature n'a pas pu être validée complètement."}
+                      </CardDescription>
+                    </Flex>
 
-                    <div className="grid gap-2 text-sm">
-                      <div
-                        className={`inline-flex items-center gap-2 rounded-full px-3 py-2 ${
-                          data.signature_valid
-                            ? "bg-emerald-100 text-emerald-800"
-                            : "bg-white/70 text-slate-700"
-                        }`}
+                    <Flex wrap gap="2" className="text-sm">
+                      <Badge
+                        variant={data.signature_valid ? "success" : "outline"}
+                        size="sm"
+                        className="gap-1.5"
                       >
-                        <ShieldCheck className="h-4 w-4" />
-                        Signature{" "}
-                        {data.signature_valid ? "vérifiée" : "non vérifiée"}
-                      </div>
-                      <div
-                        className={`inline-flex items-center gap-2 rounded-full px-3 py-2 ${
-                          data.hash_valid
-                            ? "bg-emerald-100 text-emerald-800"
-                            : "bg-white/70 text-slate-700"
-                        }`}
+                        <ShieldCheck size={12} />
+                        Signature {data.signature_valid ? "vérifiée" : "non vérifiée"}
+                      </Badge>
+                      <Badge
+                        variant={data.hash_valid ? "success" : "outline"}
+                        size="sm"
+                        className="gap-1.5"
                       >
-                        <ShieldCheck className="h-4 w-4" />
+                        <Hash size={12} />
                         Hash {data.hash_valid ? "vérifié" : "non vérifié"}
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                      </Badge>
+                    </Flex>
+                  </Flex>
+                </Card>
 
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  <StatBlock label="Référence" value={data.reference || "—"} />
+                {/* Key Stats Grid */}
+                <Grid cols={{ base: 2, md: 4 }} gap="md">
                   <StatBlock
-                    label="Contrôle"
-                    value={data.control_number || "—"}
+                    label="Référence"
+                    value={data.reference || "—"}
+                    icon={<FileText size={16} className="text-primary-600" />}
                   />
                   <StatBlock
-                    label="Date"
+                    label="N° Contrôle"
+                    value={data.control_number || "—"}
+                    icon={<ShieldCheck size={16} className="text-primary-600" />}
+                  />
+                  <StatBlock
+                    label="Date établissement"
                     value={formatDate(data.date_etablissement)}
+                    icon={<CheckCircle size={16} className="text-primary-600" />}
                   />
                   <StatBlock
                     label="Statut"
                     value={String(data.statut || "—").toUpperCase()}
+                    icon={<CheckCircle size={16} className="text-primary-600" />}
                   />
-                </div>
+                </Grid>
 
-                <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-                  <section className="rounded-[26px] border border-slate-200 bg-white p-5 sm:p-6">
-                    <div className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                      Données personnelles
-                    </div>
-                    {hasPrivateDetails ? (
-                      <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                        <StatBlock label="Nom complet" value={holderName} />
-                        <StatBlock
-                          label="Téléphone"
-                          value={data.titulaire?.telephone || "—"}
-                        />
-                        <StatBlock
-                          label="Profession"
-                          value={data.titulaire?.profession || "—"}
-                        />
-                        <StatBlock
-                          label="CNI"
-                          value={data.titulaire?.cni_numero || "—"}
-                        />
-                        <div className="sm:col-span-2">
+                {/* Main Content Grid */}
+                <Grid cols={{ base: 1, lg: 12 }} gap="lg">
+                  {/* Left Column - Personal Details & Validation */}
+                  <div className="lg:col-span-7 space-y-6">
+                    {/* Personal Details */}
+                    <Card variant="bordered" padding="lg">
+                      <CardHeader className="mb-5">
+                        <Flex align="center" gap="2" className="mb-3" style={{ width: 'fit-content' }}>
+                          <IconWrapper size="sm" variant="primary" shape="circle">
+                            <User size={14} className="text-primary-600" />
+                          </IconWrapper>
+                          <Badge variant="primary" size="sm">Données personnelles</Badge>
+                        </Flex>
+                        <CardTitle className="text-lg font-bold text-neutral-900">Titulaire de l'attestation</CardTitle>
+                      </CardHeader>
+
+                      {hasPrivateDetails ? (
+                        <Grid cols={{ base: 1, sm: 2 }} gap="md">
                           <StatBlock
-                            label="Domicile"
-                            value={data.titulaire?.domicile || "—"}
+                            label="Nom complet"
+                            value={holderName}
+                            icon={<User size={16} className="text-primary-600" />}
                           />
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-600">
-                        Les données personnelles détaillées ne sont pas publiées
-                        dans cette vue de vérification.
-                      </div>
-                    )}
-                  </section>
+                          <StatBlock
+                            label="Téléphone"
+                            value={data.titulaire?.telephone || "—"}
+                            icon={<Phone size={16} className="text-primary-600" />}
+                          />
+                          <StatBlock
+                            label="Profession"
+                            value={data.titulaire?.profession || "—"}
+                            icon={<Briefcase size={16} className="text-primary-600" />}
+                          />
+                          <StatBlock
+                            label="N° CNI"
+                            value={data.titulaire?.cni_numero || "—"}
+                            icon={<CreditCard size={16} className="text-primary-600" />}
+                          />
+                          <StatBlock label="Domicile" value={data.titulaire?.domicile || "—"} icon={<Home size={16} className="text-primary-600" />} />
+                        </Grid>
+                      ) : (
+                        <Card variant="default" padding="md" className="border-dashed border-neutral-200 bg-neutral-50">
+                          <Flex align="center" gap="3">
+                            <IconWrapper size="md" variant="ghost" shape="circle">
+                              <AlertTriangle size={20} className="text-neutral-400" />
+                            </IconWrapper>
+                            <CardDescription className="text-sm text-neutral-600">
+                              Les données personnelles détaillées ne sont pas publiées dans cette vue de vérification.
+                            </CardDescription>
+                          </Flex>
+                        </Card>
+                      )}
+                    </Card>
 
-                  <section className="rounded-[26px] border border-slate-200 bg-white p-5 sm:p-6">
-                    <div className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                      Validation coutumière
-                    </div>
-                    <div className="mt-4 space-y-3">
-                      <StatBlock
-                        label="Chef du village"
-                        value={data.validation?.chef_nom || "—"}
-                      />
-                      <StatBlock
-                        label="Agent"
-                        value={data.validation?.agent_nom || "—"}
-                      />
-                      <StatBlock
-                        label="N° enregistrement"
-                        value={data.numero_enregistrement || "—"}
-                      />
-                    </div>
-                  </section>
-                </div>
+                    {/* Customary Validation */}
+                    <Card variant="bordered" padding="lg">
+                      <CardHeader className="mb-5">
+                        <Flex align="center" gap="2" className="mb-3" style={{ width: 'fit-content' }}>
+                          <IconWrapper size="sm" variant="primary" shape="circle">
+                            <CheckCircle size={14} className="text-primary-600" />
+                          </IconWrapper>
+                          <Badge variant="primary" size="sm">Validation coutumière</Badge>
+                        </Flex>
+                        <CardTitle className="text-lg font-bold text-neutral-900">Autorités administratives</CardTitle>
+                      </CardHeader>
 
-                <section className="rounded-[26px] border border-slate-200 bg-white p-5 sm:p-6">
-                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                    <MapPin className="h-4 w-4" />
-                    Informations sur la parcelle
+                      <Grid cols={{ base: 1, sm: 3 }} gap="md">
+                        <StatBlock
+                          label="Chef du village"
+                          value={data.validation?.chef_nom || "—"}
+                          icon={<User size={16} className="text-primary-600" />}
+                        />
+                        <StatBlock
+                          label="Agent"
+                          value={data.validation?.agent_nom || "—"}
+                          icon={<User size={16} className="text-primary-600" />}
+                        />
+                        <StatBlock
+                          label="N° Enregistrement"
+                          value={data.numero_enregistrement || "—"}
+                          icon={<FileText size={16} className="text-primary-600" />}
+                        />
+                      </Grid>
+                    </Card>
                   </div>
-                  <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    <StatBlock label="Village" value={villageName} />
-                    <StatBlock label="Lotissement" value={lotissementName} />
-                    <StatBlock label="Lot" value={lotNumber} />
-                    <StatBlock
-                      label="Superficie"
-                      value={formatSurface(surface)}
-                    />
-                    <StatBlock
-                      label="Quartier"
-                      value={
-                        data.village_info?.quartier || data.lot?.quartier || "—"
-                      }
-                    />
-                    <StatBlock
-                      label="GPS principal"
-                      value={formatCoords(gps?.lat, gps?.lng, gps?.precision)}
-                    />
-                  </div>
 
-                  <div className="mt-5 grid gap-3 lg:grid-cols-2">
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                  {/* Right Column - Parcel Info */}
+                  <div className="lg:col-span-5 space-y-6">
+                    {/* Parcel Info */}
+                    <Card variant="bordered" padding="lg">
+                      <CardHeader className="mb-5">
+                        <Flex align="center" gap="2" className="mb-3" style={{ width: 'fit-content' }}>
+                          <IconWrapper size="sm" variant="primary" shape="circle">
+                            <MapPin size={14} className="text-primary-600" />
+                          </IconWrapper>
+                          <Badge variant="primary" size="sm">Informations parcelle</Badge>
+                        </Flex>
+                        <CardTitle className="text-lg font-bold text-neutral-900">Localisation et superficie</CardTitle>
+                      </CardHeader>
+
+                      <Grid cols={{ base: 1, sm: 2 }} gap="md">
+                        <StatBlock
+                          label="Village"
+                          value={villageName}
+                          icon={<Building2 size={16} className="text-primary-600" />}
+                        />
+                        <StatBlock
+                          label="Lotissement"
+                          value={lotissementName}
+                          icon={<Building2 size={16} className="text-primary-600" />}
+                        />
+                        <StatBlock
+                          label="Lot"
+                          value={lotNumber}
+                          icon={<Hash size={16} className="text-primary-600" />}
+                        />
+                        <StatBlock
+                          label="Superficie"
+                          value={formatSurface(surface)}
+                          icon={<MapPin size={16} className="text-primary-600" />}
+                        />
+                        <StatBlock
+                          label="Quartier"
+                          value={data.village_info?.quartier || data.lot?.quartier || "—"}
+                          icon={<MapPin size={16} className="text-primary-600" />}
+                        />
+                        <StatBlock
+                          label="GPS Principal"
+                          value={formatCoords(gps?.lat, gps?.lng, gps?.precision)}
+                          icon={<MapPin size={16} className="text-primary-600" />}
+                        />
+                      </Grid>
+
+                      {/* Boundaries */}
+                      <Divider className="my-5" />
+                      <div className="text-sm font-semibold uppercase tracking-[0.18em] text-neutral-400 mb-3">
                         Limites déclarées
                       </div>
-                      <div className="mt-3 grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
-                        <div>
-                          Nord:{" "}
-                          <strong>{data.parcelle?.limites?.nord || "—"}</strong>
-                        </div>
-                        <div>
-                          Sud:{" "}
-                          <strong>{data.parcelle?.limites?.sud || "—"}</strong>
-                        </div>
-                        <div>
-                          Est:{" "}
-                          <strong>{data.parcelle?.limites?.est || "—"}</strong>
-                        </div>
-                        <div>
-                          Ouest:{" "}
-                          <strong>
+                      <Grid cols={{ base: 2, sm: 4 }} gap="md">
+                        <Card variant="bordered" padding="md" className="text-center">
+                          <div className="text-[11px] font-semibold text-neutral-400 mb-1">Nord</div>
+                          <div className="text-sm font-semibold text-neutral-900 break-words">
+                            {data.parcelle?.limites?.nord || "—"}
+                          </div>
+                        </Card>
+                        <Card variant="bordered" padding="md" className="text-center">
+                          <div className="text-[11px] font-semibold text-neutral-400 mb-1">Sud</div>
+                          <div className="text-sm font-semibold text-neutral-900 break-words">
+                            {data.parcelle?.limites?.sud || "—"}
+                          </div>
+                        </Card>
+                        <Card variant="bordered" padding="md" className="text-center">
+                          <div className="text-[11px] font-semibold text-neutral-400 mb-1">Est</div>
+                          <div className="text-sm font-semibold text-neutral-900 break-words">
+                            {data.parcelle?.limites?.est || "—"}
+                          </div>
+                        </Card>
+                        <Card variant="bordered" padding="md" className="text-center">
+                          <div className="text-[11px] font-semibold text-neutral-400 mb-1">Ouest</div>
+                          <div className="text-sm font-semibold text-neutral-900 break-words">
                             {data.parcelle?.limites?.ouest || "—"}
-                          </strong>
-                        </div>
-                      </div>
-                    </div>
+                          </div>
+                        </Card>
+                      </Grid>
 
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                        Points GPS complémentaires
-                      </div>
-                      <div className="mt-3 space-y-2 text-sm text-slate-700">
-                        {data.parcelle?.gps_points &&
-                        data.parcelle.gps_points.length > 0 ? (
-                          data.parcelle.gps_points.map((point, index) => (
-                            <div
-                              key={`${point.label || "gps"}-${index}`}
-                              className="rounded-xl bg-white px-3 py-2"
-                            >
-                              <strong>
-                                {point.label || `Point ${index + 1}`}
-                              </strong>{" "}
-                              : {formatCoords(point.lat, point.lng)}
-                            </div>
+                      {/* GPS Points */}
+                      {data.parcelle?.gps_points && data.parcelle.gps_points.length > 0 && (
+                        <>
+                          <Divider className="my-5" />
+                          <div className="text-sm font-semibold uppercase tracking-[0.18em] text-neutral-400 mb-3">
+                            Points GPS complémentaires
+                          </div>
+                          <div className="space-y-2">
+                            {data.parcelle.gps_points.map((point, index) => (
+                              <Card key={`${point.label || "gps"}-${index}`} variant="default" padding="sm" className="bg-neutral-50">
+                                <Flex align="center" justify="between">
+                                  <span className="font-semibold text-sm text-neutral-900">
+                                    {point.label || `Point ${index + 1}`}
+                                  </span>
+                                  <span className="font-mono text-[11px] text-neutral-700">
+                                    {formatCoords(point.lat, point.lng)}
+                                  </span>
+                                </Flex>
+                              </Card>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </Card>
+                  </div>
+                </Grid>
+
+                {/* Witnesses & Hash Section */}
+                <Card variant="bordered" padding="lg">
+                  <CardHeader className="mb-5">
+                    <Flex align="center" gap="2" className="mb-3" style={{ width: 'fit-content' }}>
+                      <IconWrapper size="sm" variant="primary" shape="circle">
+                        <Hash size={14} className="text-primary-600" />
+                      </IconWrapper>
+                      <Badge variant="primary" size="sm">Sécurité et témoins</Badge>
+                    </Flex>
+                    <CardTitle className="text-lg font-bold text-neutral-900">Sécurité et témoins</CardTitle>
+                  </CardHeader>
+                  <div>
+                    <Grid cols={{ base: 1, lg: 2 }} gap="lg">
+                      {/* Witnesses */}
+                      <div className="space-y-3">
+                        <div className="text-sm font-semibold uppercase tracking-[0.18em] text-neutral-400">
+                          Témoins
+                        </div>
+                        {data.temoins && data.temoins.length > 0 ? (
+                          data.temoins.map((temoin, index) => (
+                            <Card key={`${temoin.nom || "temoin"}-${index}`} variant="default" padding="md" className="bg-neutral-50">
+                              <Flex align="start" gap="3">
+                                <IconWrapper size="md" variant="secondary" shape="circle" className="flex-shrink-0">
+                                  <CheckCircle size={18} className="text-success-600" />
+                                </IconWrapper>
+                                <Flex direction="col" gap="1" flex-1>
+                                  <div className="font-semibold text-sm text-neutral-900">
+                                    {[temoin.prenom, temoin.nom].filter(Boolean).join(" ") || `Témoin ${index + 1}`}
+                                  </div>
+                                  <div className="text-sm text-neutral-600">
+                                    {[temoin.profession, temoin.telephone, temoin.cni].filter(Boolean).join(" • ") || "Informations complémentaires non renseignées"}
+                                  </div>
+                                </Flex>
+                              </Flex>
+                            </Card>
                           ))
                         ) : (
-                          <div className="rounded-xl bg-white px-3 py-2 text-slate-500">
-                            Aucun point GPS complémentaire renseigné.
-                          </div>
+                          <Card variant="default" padding="md" className="border-dashed border-neutral-200 bg-neutral-50">
+                            <Flex align="center" gap="3">
+                              <IconWrapper size="md" variant="ghost" shape="circle">
+                                <AlertTriangle size={20} className="text-neutral-400" />
+                              </IconWrapper>
+                              <CardDescription className="text-sm text-neutral-600">
+                                Les témoins détaillés restent visibles dans le dossier interne.
+                              </CardDescription>
+                            </Flex>
+                          </Card>
                         )}
                       </div>
-                    </div>
-                  </div>
-                </section>
 
-                <section className="rounded-[26px] border border-slate-200 bg-white p-5 sm:p-6">
-                  <div className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                    Témoins et empreinte de sécurité
-                  </div>
-                  <div className="mt-4 grid gap-5 lg:grid-cols-[1fr_1fr]">
-                    <div className="space-y-3">
-                      {data.temoins && data.temoins.length > 0 ? (
-                        data.temoins.map((temoin, index) => (
-                          <div
-                            key={`${temoin.nom || "temoin"}-${index}`}
-                            className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
-                          >
-                            <div className="font-semibold text-slate-900">
-                              {[temoin.prenom, temoin.nom]
-                                .filter(Boolean)
-                                .join(" ") || `Témoin ${index + 1}`}
-                            </div>
-                            <div className="mt-1 text-sm text-slate-600">
-                              {[temoin.profession, temoin.telephone, temoin.cni]
-                                .filter(Boolean)
-                                .join(" • ") ||
-                                "Informations complémentaires non renseignées"}
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-500">
-                          Les témoins détaillés restent visibles dans le dossier
-                          interne.
+                      {/* SHA-256 Hash */}
+                      <div>
+                        <div className="text-sm font-semibold uppercase tracking-[0.18em] text-neutral-400 mb-3">
+                          Empreinte SHA-256
                         </div>
-                      )}
-                    </div>
-
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                        Empreinte SHA-256
+                        <Card variant="default" padding="md" style={{ background: '#0f172a' }} className="font-mono text-[11px] leading-6 text-emerald-200 break-all">
+                          {data.hash_sha256 || "—"}
+                        </Card>
                       </div>
-                      <div className="mt-3 rounded-2xl bg-white px-4 py-4 font-mono text-[11px] leading-6 text-slate-700 break-all">
-                        {data.hash_sha256 || "—"}
-                      </div>
-                    </div>
+                    </Grid>
                   </div>
-                </section>
-              </div>
-            )}
-          </div>
+                </Card>
+                </div>
+              )}
 
-          <div className="border-t border-slate-200 bg-slate-50 px-6 py-4 text-xs text-slate-500 sm:px-8">
+              </div>
+
+              {/* Footer Disclaimer */}
+            <div className="border-t border-neutral-200 bg-neutral-50 px-6 py-4 text-xs text-neutral-500 sm:px-8 text-center">
             Contrôle en ligne opéré via la plateforme{" "}
-            {settings.app_company || settings.app_title || "EGS"}. Pour tout
-            doute, rapprochez la référence affichée du registre administratif
-            physique.
+            <span className="font-semibold text-neutral-900">
+              {settings.app_company || settings.app_title || "EGS"}
+            </span>{" "}
+            . Pour tout doute, rapprochez la référence affichée du registre administratif physique.
           </div>
-        </div>
-      </div>
+        </Card>
+      </Container>
 
       <style>{`
         :root {

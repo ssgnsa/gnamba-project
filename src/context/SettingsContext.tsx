@@ -10,6 +10,7 @@ import {
 import { apiClient } from "../api/client";
 import { BrandSettings } from "../types";
 import { OFFICIAL_CONTACT } from "../lib/officialContact";
+import { bumpContentVersion } from "../hooks/useContentVersion";
 
 // ============================================
 // CONSTANTES ET CACHE
@@ -48,6 +49,9 @@ const defaultSettings: BrandSettings = {
   brand_watermark_url: "",
   // Site vitrine backgrounds
   hero_background_url: "",
+  // Immobilier settings
+  commission_rate: "",
+  rent_due_day: "",
 };
 
 // ============================================
@@ -169,14 +173,14 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       }
 
       const map: Record<string, string> = {};
-      (settingsResult.data ?? []).forEach((row) => {
+      (settingsResult.data ?? []).forEach((row: { key: string; value: string | null }) => {
         map[row.key] = row.value || "";
       });
 
       // Charger les assets de marque depuis la media library (requête unique optimisée)
       const mediaResult = await apiClient.media.getBrandAssets();
       const mediaMap: Record<string, string> = {};
-      (mediaResult.data ?? []).forEach((item) => {
+      (mediaResult.data ?? []).forEach((item: { brand_asset_type: string; url: string }) => {
         if (!mediaMap[item.brand_asset_type]) {
           mediaMap[item.brand_asset_type] = item.url;
         }
@@ -215,6 +219,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         brand_watermark_url:
           map["brand_watermark_url"] || mediaMap["watermark"] || "",
         hero_background_url: map["hero_background_url"] || "",
+        commission_rate: map["commission_rate"] || "",
+        rent_due_day: map["rent_due_day"] || "",
       };
 
       setSettings(newSettings);
@@ -253,6 +259,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }
 
     await refreshSettings();
+    bumpContentVersion(); // Invalidate caches
   };
 
   /**
@@ -286,6 +293,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }
 
     await refreshSettings();
+    bumpContentVersion(); // Invalidate caches
   };
 
   // Chargement initial

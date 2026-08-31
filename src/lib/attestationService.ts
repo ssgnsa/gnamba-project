@@ -1,9 +1,5 @@
 export class AttestationService {
-  private deviceId: string;
-
-  constructor(deviceId: string) {
-    this.deviceId = deviceId;
-  }
+  constructor(_deviceId: string) {}
 
   async validatePrerequisites(): Promise<{ success: true } | { success: false; error: string }> {
     return { success: true };

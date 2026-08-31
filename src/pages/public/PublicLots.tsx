@@ -2,12 +2,14 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   ArrowLeft,
   Filter,
-  Mail,
   MapPin,
   MessageCircle,
   Phone,
   Ruler,
   Tag,
+  X,
+  ChevronDown,
+  ArrowRight,
 } from "lucide-react";
 import dbClient from "../../data/tableClient";
 import type { VitrineLot } from "../../types";
@@ -15,6 +17,26 @@ import { formatMontant } from "../../utils/reference";
 import { captureLead } from "../../lib/lead-capture";
 import { clientsRepository } from "../../data/clients.repository";
 import { OFFICIAL_CONTACT, buildWhatsAppUrl } from "../../lib/officialContact";
+
+// Premium UI Components
+import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  Badge,
+  Container,
+  Grid,
+  Flex,
+  IconWrapper,
+  Skeleton,
+  Input,
+  Textarea,
+  Select,
+  Tooltip,
+} from "../../components/ui";
 
 interface LeadFormData {
   nom: string;
@@ -77,11 +99,7 @@ const fallbackLotCards: PublicLotCard[] = [
     prixVente: 5000000,
     statut: "exemple",
     documents: "Dossier commercial à compléter",
-    caracteristiques: [
-      "Quartier en développement",
-      "Bonne visibilité",
-      "Lot libre",
-    ],
+    caracteristiques: ["Quartier en développement", "Bonne visibilité", "Lot libre"],
     imageUrl: "",
     imageAlt: "Lot à vendre à Sikensi",
     contactPhone: OFFICIAL_CONTACT.phone,
@@ -97,11 +115,7 @@ const fallbackLotCards: PublicLotCard[] = [
     prixVente: 5000000,
     statut: "exemple",
     documents: "Dossier commercial à compléter",
-    caracteristiques: [
-      "Surface généreuse",
-      "Accès route",
-      "Potentiel commercial",
-    ],
+    caracteristiques: ["Surface généreuse", "Accès route", "Potentiel commercial"],
     imageUrl: "",
     imageAlt: "Lot à vendre à Sikensi",
     contactPhone: OFFICIAL_CONTACT.phone,
@@ -133,11 +147,7 @@ const fallbackLotCards: PublicLotCard[] = [
     prixVente: 3000000,
     statut: "exemple",
     documents: "Dossier commercial à compléter",
-    caracteristiques: [
-      "Quartier recherché",
-      "Investissement accessible",
-      "Lot libre",
-    ],
+    caracteristiques: ["Quartier recherché", "Investissement accessible", "Lot libre"],
     imageUrl: "",
     imageAlt: "Lot à vendre au Quartier Lycée",
     contactPhone: OFFICIAL_CONTACT.phone,
@@ -153,11 +163,7 @@ const fallbackLotCards: PublicLotCard[] = [
     prixVente: 2500000,
     statut: "exemple",
     documents: "Dossier commercial à compléter",
-    caracteristiques: [
-      "Prix attractif",
-      "Bonne accessibilité",
-      "Potentiel de revente",
-    ],
+    caracteristiques: ["Prix attractif", "Bonne accessibilité", "Potentiel de revente"],
     imageUrl: "",
     imageAlt: "Lot à vendre à Braffouéby",
     contactPhone: OFFICIAL_CONTACT.phone,
@@ -176,6 +182,30 @@ const formatSurface = (surface?: number | string) => {
   if (!Number.isFinite(amount) || amount <= 0) return "Surface non précisée";
   return `${amount} m²`;
 };
+
+const getStatutBadge = (statut: string, isExample = false) => {
+  if (isExample || statut === "exemple") {
+    return { variant: "warning" as const, label: "Exemple" };
+  }
+  switch (statut) {
+    case "disponible":
+      return { variant: "success" as const, label: "Disponible" };
+    case "reserve":
+      return { variant: "secondary" as const, label: "Réservé" };
+    case "vendu":
+      return { variant: "default" as const, label: "Vendu" };
+    default:
+      return { variant: "default" as const, label: statut };
+  }
+};
+
+const villageOptions = [
+  { value: "", label: "Tous les villages" },
+  { value: "Sikensi", label: "Sikensi" },
+  { value: "Katadji", label: "Katadji" },
+  { value: "Quartier Lycée", label: "Quartier Lycée" },
+  { value: "Braffouéby", label: "Braffouéby" },
+];
 
 export default function PublicLots() {
   const [lots, setLots] = useState<VitrineLot[]>([]);
@@ -220,24 +250,15 @@ export default function PublicLots() {
     void loadPublishedLots();
   }, []);
 
-  const villages = useMemo(() => {
-    const allVillages = lots.map((lot) => lot.village).filter(Boolean);
-    return [...new Set(allVillages)];
-  }, [lots]);
-
   const filteredLots = useMemo(() => {
     return lots.filter((lot) => {
       if (filterVillage && lot.village !== filterVillage) return false;
 
-      if (filterMinPrice && lot.prix_vente < Number(filterMinPrice))
-        return false;
-      if (filterMaxPrice && lot.prix_vente > Number(filterMaxPrice))
-        return false;
+      if (filterMinPrice && lot.prix_vente < Number(filterMinPrice)) return false;
+      if (filterMaxPrice && lot.prix_vente > Number(filterMaxPrice)) return false;
 
-      if (filterMinSurface && lot.superficie < Number(filterMinSurface))
-        return false;
-      if (filterMaxSurface && lot.superficie > Number(filterMaxSurface))
-        return false;
+      if (filterMinSurface && lot.superficie < Number(filterMinSurface)) return false;
+      if (filterMaxSurface && lot.superficie > Number(filterMaxSurface)) return false;
 
       return true;
     });
@@ -381,391 +402,404 @@ export default function PublicLots() {
     }
   };
 
+  const handleCloseModal = () => {
+    setShowLeadForm(false);
+    setSelectedLot(null);
+    setLeadForm(emptyLeadForm);
+  };
+
+  const whatsappUrl = buildWhatsAppUrl(OFFICIAL_CONTACT.phone);
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-blue-600" />
-      </div>
+      <section className="min-h-screen bg-neutral-50 flex items-center justify-center">
+        <Container size="sm">
+          <Grid cols={3} gap="md">
+            {[1, 2, 3].map((i) => (
+              <Card key={i} variant="default" padding="none" className="overflow-hidden animate-pulse">
+                <Skeleton variant="rectangular" className="h-48 w-full" />
+                <CardContent padding="lg">
+                  <Skeleton variant="text" width="3/4" className="mb-3" />
+                  <Skeleton variant="text" width="full" className="mb-2" />
+                  <Skeleton variant="text" width="1/2" />
+                </CardContent>
+              </Card>
+            ))}
+          </Grid>
+        </Container>
+      </section>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center gap-4">
-            <button
+    <div className="min-h-screen bg-neutral-50">
+      {/* Header */}
+      <header className="bg-white border-b border-neutral-100 sticky top-0 z-40">
+        <Container size="xl">
+          <Flex align="center" gap="3" className="py-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              iconLeft={<ArrowLeft size={18} />}
               onClick={() => window.history.back()}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              className="text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100"
             >
-              <ArrowLeft className="w-5 h-5 text-gray-600" />
-            </button>
+              Retour
+            </Button>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                Lots à vendre
-              </h1>
-              <p className="text-sm text-gray-600 mt-1">
-                {displayLots.length} fiche
-                {displayLots.length > 1 ? "s" : ""} affichée
-                {displayLots.length > 1 ? "s" : ""} pour achat, investissement
-                ou revente.
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-neutral-900">Lots à Vendre</h1>
+              <p className="text-sm text-neutral-500 mt-0.5">
+                {displayLots.length} fiche{displayLots.length > 1 ? "s" : ""} affichée{displayLots.length > 1 ? "s" : ""} pour achat, investissement ou revente.
               </p>
             </div>
-          </div>
-        </div>
+          </Flex>
+        </Container>
+      </header>
+
+      {/* Info Bar */}
+      <div className="bg-primary-50 border-b border-primary-100">
+        <Container size="xl" className="py-3">
+          <Flex align="center" justify="between" wrap gap="3" className="text-sm">
+            <span className="text-primary-900">
+              Le catalogue des lots est séparé de la gestion foncière pour vous proposer des annonces claires et faciles à consulter.
+            </span>
+            <a
+              href={whatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 font-semibold text-emerald-700 hover:text-emerald-800 transition-colors"
+            >
+              <MessageCircle size={16} />
+              WhatsApp {OFFICIAL_CONTACT.phone}
+            </a>
+          </Flex>
+        </Container>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-2">
-        <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-4 text-sm text-blue-900 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <span>
-            Le catalogue des lots est séparé de la gestion foncière pour vous
-            proposer des annonces claires et faciles à consulter.
-          </span>
-          <a
-            href={buildWhatsAppUrl(OFFICIAL_CONTACT.phone)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 font-semibold text-emerald-700 hover:text-emerald-800"
-          >
-            <MessageCircle size={15} />
-            WhatsApp {OFFICIAL_CONTACT.phone}
-          </a>
-        </div>
-      </div>
+      {/* Filters & Grid */}
+      <main className="py-8 sm:py-12">
+        <Container size="xl">
+          {/* Filters Toggle */}
+          <Flex align="center" justify="between" wrap gap="4" className="mb-6">
+            <Button
+              variant="outline"
+              size="sm"
+              iconLeft={<Filter size={16} />}
+              onClick={() => setShowFilters(!showFilters)}
+              className={showFilters ? "bg-primary-50 border-primary-300 text-primary-700" : ""}
+            >
+              Filtres {showFilters && <ChevronDown size={16} className="rotate-180" />}
+            </Button>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-        >
-          <Filter className="w-4 h-4" />
-          Filtres
-        </button>
-
-        {showFilters && (
-          <div className="mt-4 p-4 bg-white rounded-lg border border-gray-200 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Village
-              </label>
-              <select
-                value={filterVillage}
-                onChange={(e) => setFilterVillage(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                iconLeft={<X size={14} />}
+                onClick={() => {
+                  setFilterVillage("");
+                  setFilterMinPrice("");
+                  setFilterMaxPrice("");
+                  setFilterMinSurface("");
+                  setFilterMaxSurface("");
+                }}
               >
-                <option value="">Tous les villages</option>
-                {villages.map((village) => (
-                  <option key={village} value={village}>
-                    {village}
-                  </option>
-                ))}
-              </select>
-            </div>
+                Effacer les filtres
+              </Button>
+            )}
+          </Flex>
 
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Prix min (FCFA)
-              </label>
-              <input
-                type="number"
-                value={filterMinPrice}
-                onChange={(e) => setFilterMinPrice(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="0"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Prix max (FCFA)
-              </label>
-              <input
-                type="number"
-                value={filterMaxPrice}
-                onChange={(e) => setFilterMaxPrice(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Max"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Surface min (m²)
-              </label>
-              <input
-                type="number"
-                value={filterMinSurface}
-                onChange={(e) => setFilterMinSurface(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="0"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Surface max (m²)
-              </label>
-              <input
-                type="number"
-                value={filterMaxSurface}
-                onChange={(e) => setFilterMaxSurface(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Max"
-              />
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
-        {error && (
-          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
-          </div>
-        )}
-
-        {displayLots.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
-            <MapPin className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900">
-              Aucun lot disponible
-            </h3>
-            <p className="text-gray-600 mt-2">
-              Aucun lot ne correspond à vos critères actuellement.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {displayLots.map((lot) => (
-              <div
-                key={lot.id}
-                className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow"
-              >
-                <div className="h-48 bg-gradient-to-br from-blue-100 to-green-100 flex items-center justify-center">
-                  {lot.imageUrl ? (
-                    <img
-                      src={lot.imageUrl}
-                      alt={lot.imageAlt}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="text-center px-4">
-                      <MapPin className="w-12 h-12 text-blue-300 mx-auto mb-3" />
-                      <p className="text-xs font-medium text-slate-600">
-                        {lot.imageAlt}
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="p-5">
-                  <div className="flex items-start justify-between gap-4 mb-3">
-                    <div>
-                      <h3 className="font-semibold text-gray-900">
-                        {lot.titre}
-                      </h3>
-                      <p className="text-sm text-gray-600">{lot.reference}</p>
-                    </div>
-                    <span
-                      className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        lot.isExample || lot.statut === "exemple"
-                          ? "bg-amber-50 text-amber-700"
-                          : lot.statut === "disponible"
-                            ? "bg-emerald-50 text-emerald-700"
-                            : lot.statut === "reserve"
-                              ? "bg-blue-50 text-blue-700"
-                              : "bg-slate-100 text-slate-600"
-                      }`}
-                    >
-                      {lot.isExample || lot.statut === "exemple"
-                        ? "Exemple"
-                        : lot.statut === "disponible"
-                          ? "Disponible"
-                          : lot.statut === "reserve"
-                            ? "Réservé"
-                            : "Vendu"}
-                    </span>
-                  </div>
-
-                  <div className="space-y-2 mb-4">
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Ruler className="w-4 h-4" />
-                      {formatSurface(lot.superficie)}
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Tag className="w-4 h-4" />
-                      {formatPrice(lot.prixVente)}
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <MapPin className="w-4 h-4" />
-                      {lot.quartier}
-                    </div>
-                    <div className="text-xs text-gray-500">{lot.village}</div>
-                    <div className="text-xs text-gray-500">{lot.documents}</div>
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      {lot.caracteristiques.slice(0, 4).map((feature) => (
-                        <span
-                          key={feature}
-                          className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] text-slate-600"
-                        >
-                          {feature}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => handleOpenLeadForm(lot)}
-                    className="w-full py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
-                  >
-                    {lot.isExample
-                      ? "Demander un exemple similaire"
-                      : "Demander des informations"}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {showLeadForm && selectedLot && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900">
-                Intéressé(e) par ce lot ?
-              </h2>
-              <p className="text-sm text-gray-600 mt-1">
-                {selectedLot.reference} à {selectedLot.village}
-              </p>
-            </div>
-
-            {submitSuccess ? (
-              <div className="p-6 text-center">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Mail className="w-8 h-8 text-green-600" />
-                </div>
-                <h3 className="text-lg font-medium text-gray-900">
-                  Demande envoyée !
-                </h3>
-                <p className="text-gray-600 mt-2">
-                  Notre équipe vous contactera très prochainement par téléphone
-                  ou WhatsApp pour qualifier votre besoin.
-                </p>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmitLead} className="p-6 space-y-4">
-                {error && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                    {error}
-                  </div>
-                )}
-                {leadBridgeError && (
-                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
-                    {leadBridgeError}
-                  </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Prénom *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={leadForm.prenom}
-                      onChange={(e) =>
-                        setLeadForm({ ...leadForm, prenom: e.target.value })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Nom *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={leadForm.nom}
-                      onChange={(e) =>
-                        setLeadForm({ ...leadForm, nom: e.target.value })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                </div>
-
+          {/* Filters Panel */}
+          {showFilters && (
+            <Card variant="bordered" padding="lg" className="mb-6 animate-in slide-in-from-top-2 duration-200">
+              <Grid cols={{ base: 1, sm: 2, lg: 5 }} gap="md">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Email *
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    value={leadForm.email}
-                    onChange={(e) =>
-                      setLeadForm({ ...leadForm, email: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  <label className="block text-xs font-medium text-neutral-600 mb-1.5">Village</label>
+                  <Select
+                    value={filterVillage}
+                    onChange={(e) => setFilterVillage(e.target.value)}
+                    options={villageOptions}
+                    placeholder="Tous les villages"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Téléphone *
-                  </label>
+                  <label className="block text-xs font-medium text-neutral-600 mb-1.5">Prix min (FCFA)</label>
+                  <Input
+                    type="number"
+                    value={filterMinPrice}
+                    onChange={(e) => setFilterMinPrice(e.target.value)}
+                    placeholder="0"
+                    iconLeft={<Tag size={16} />}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-neutral-600 mb-1.5">Prix max (FCFA)</label>
+                  <Input
+                    type="number"
+                    value={filterMaxPrice}
+                    onChange={(e) => setFilterMaxPrice(e.target.value)}
+                    placeholder="Max"
+                    iconLeft={<Tag size={16} />}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-neutral-600 mb-1.5">Surface min (m²)</label>
+                  <Input
+                    type="number"
+                    value={filterMinSurface}
+                    onChange={(e) => setFilterMinSurface(e.target.value)}
+                    placeholder="0"
+                    iconLeft={<Ruler size={16} />}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-neutral-600 mb-1.5">Surface max (m²)</label>
+                  <Input
+                    type="number"
+                    value={filterMaxSurface}
+                    onChange={(e) => setFilterMaxSurface(e.target.value)}
+                    placeholder="Max"
+                    iconLeft={<Ruler size={16} />}
+                  />
+                </div>
+              </Grid>
+            </Card>
+          )}
+
+          {/* Error */}
+          {error && (
+            <div role="alert" className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-center gap-2">
+              <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" /></svg>
+              {error}
+            </div>
+          )}
+
+          {/* Lots Grid */}
+          {displayLots.length === 0 ? (
+            <Card variant="bordered" padding="xl" className="text-center py-16">
+              <IconWrapper size="xl" variant="ghost" shape="circle" className="mx-auto mb-4">
+                <MapPin size={28} className="text-neutral-400" />
+              </IconWrapper>
+              <CardTitle className="text-lg font-semibold text-neutral-900">Aucun lot disponible</CardTitle>
+              <CardDescription className="mt-1">Aucun lot ne correspond à vos critères actuellement.</CardDescription>
+            </Card>
+          ) : (
+            <Grid cols={{ base: 1, sm: 2, lg: 3 }} gap="lg">
+              {displayLots.map((lot) => (
+                <Card key={lot.id} variant="elevated" padding="none" className="overflow-hidden h-full flex flex-col group">
+                  <div className="relative h-56 bg-gradient-to-br from-primary-100 to-emerald-100 flex items-center justify-center overflow-hidden">
+                    {lot.imageUrl ? (
+                      <img
+                        src={lot.imageUrl}
+                        alt={lot.imageAlt}
+                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    ) : (
+                      <div className="text-center px-6">
+                        <MapPin className="w-14 h-14 text-primary-300 mx-auto mb-3" />
+                        <p className="text-sm font-medium text-neutral-500">{lot.imageAlt}</p>
+                      </div>
+                    )}
+                    <div className="absolute top-3 left-3 z-10">
+                      <Badge variant="primary" size="sm">Lot</Badge>
+                    </div>
+                    <div className="absolute top-3 right-3 z-10">
+                      <Badge size="sm" variant={getStatutBadge(lot.statut, lot.isExample).variant}>
+                        {getStatutBadge(lot.statut, lot.isExample).label}
+                      </Badge>
+                    </div>
+                    {lot.isExample && (
+                      <div className="absolute bottom-3 left-3 z-10">
+                        <Badge variant="warning" size="sm" className="bg-amber-500/90 text-white">Exemple</Badge>
+                      </div>
+                    )}
+                  </div>
+
+                  <CardContent padding="lg" className="flex-1 flex flex-col">
+                    <Flex justify="between" align="start" gap="3" className="mb-4">
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-lg font-bold text-neutral-900 line-clamp-1">{lot.titre}</CardTitle>
+                        <CardDescription className="mt-0.5 text-xs">{lot.reference}</CardDescription>
+                      </div>
+                    </Flex>
+
+                    <div className="space-y-2.5 mb-4 flex-1">
+                      <Flex align="center" gap="2" className="text-sm text-neutral-600">
+                        <IconWrapper size="sm" variant="ghost" shape="circle">
+                          <Ruler size={14} className="text-neutral-400" />
+                        </IconWrapper>
+                        <span className="font-medium text-neutral-900">{formatSurface(lot.superficie)}</span>
+                      </Flex>
+                      <Flex align="center" gap="2" className="text-sm text-neutral-600">
+                        <IconWrapper size="sm" variant="ghost" shape="circle">
+                          <Tag size={14} className="text-neutral-400" />
+                        </IconWrapper>
+                        <span className="font-semibold text-neutral-900">{formatPrice(lot.prixVente)}</span>
+                      </Flex>
+                      <Flex align="center" gap="2" className="text-sm text-neutral-600">
+                        <IconWrapper size="sm" variant="ghost" shape="circle">
+                          <MapPin size={14} className="text-neutral-400" />
+                        </IconWrapper>
+                        <span className="font-medium text-neutral-900 truncate">{lot.quartier}</span>
+                      </Flex>
+                      <Flex align="center" gap="2" className="text-xs text-neutral-500">
+                        <IconWrapper size="sm" variant="ghost" shape="circle">
+                          <MapPin size={12} className="text-neutral-400" />
+                        </IconWrapper>
+                        <span className="font-medium text-neutral-700">{lot.village}</span>
+                      </Flex>
+                      <p className="text-xs text-neutral-500 italic">{lot.documents}</p>
+
+                      {lot.caracteristiques.length > 0 && (
+                        <Flex wrap gap="1.5" className="pt-1">
+                          {lot.caracteristiques.slice(0, 4).map((feature) => (
+                            <Badge key={feature} variant="outline" size="sm">{feature}</Badge>
+                          ))}
+                        </Flex>
+                      )}
+                    </div>
+
+                    <Button
+                      variant="primary"
+                      size="md"
+                      onClick={() => handleOpenLeadForm(lot)}
+                      className="w-full min-h-[48px] group"
+                    >
+                      {lot.isExample ? "Demander un exemple similaire" : "Demander des informations"}
+                      <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </Grid>
+          )}
+        </Container>
+      </main>
+
+      {/* Lead Form Modal */}
+      {showLeadForm && selectedLot && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 animate-in fade-in duration-200" onClick={handleCloseModal} role="dialog" aria-modal="true" aria-labelledby="lead-form-title">
+          <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom-4 duration-200" onClick={(e) => e.stopPropagation()}>
+            <CardHeader padding="lg" className="border-b border-neutral-100 p-6" style={{ borderRadius: '1rem 1rem 0 0' }}>
+              <Flex justify="between" align="center">
+                <div>
+                  <h2 id="lead-form-title" className="text-xl font-semibold text-neutral-900">Intéressé(e) par ce lot ?</h2>
+                  <p className="text-sm text-neutral-500 mt-1">{selectedLot.reference} à {selectedLot.village}</p>
+                </div>
+                <Tooltip content="Fermer">
+                  <button
+                    onClick={handleCloseModal}
+                    className="p-1.5 rounded-xl text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
+                    aria-label="Fermer le formulaire"
+                  >
+                    <X size={20} />
+                  </button>
+                </Tooltip>
+              </Flex>
+            </CardHeader>
+
+            {submitSuccess ? (
+              <CardContent padding="lg" className="text-center py-12">
+                <IconWrapper size="xl" variant="success" shape="circle" className="mx-auto mb-4">
+                  <svg className="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                </IconWrapper>
+                <CardTitle className="text-lg">Demande envoyée !</CardTitle>
+                <CardDescription className="mt-1 max-w-sm mx-auto">Notre équipe vous contactera très prochainement par téléphone ou WhatsApp pour qualifier votre besoin.</CardDescription>
+              </CardContent>
+            ) : (
+              <form onSubmit={handleSubmitLead} className="p-6 space-y-4">
+                {error && (
+                  <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-start gap-2">
+                    <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" /></svg>
+                    {error}
+                  </div>
+                )}
+                {leadBridgeError && (
+                  <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-start gap-2">
+                    <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                    {leadBridgeError}
+                  </div>
+                )}
+
+                <Grid cols={2} gap="md">
+                  <Input
+                    label="Prénom *"
+                    value={leadForm.prenom}
+                    onChange={(e) => setLeadForm({ ...leadForm, prenom: e.target.value })}
+                    placeholder="Votre prénom"
+                    required
+                  />
+                  <Input
+                    label="Nom *"
+                    value={leadForm.nom}
+                    onChange={(e) => setLeadForm({ ...leadForm, nom: e.target.value })}
+                    placeholder="Votre nom"
+                    required
+                  />
+                </Grid>
+
+                <Input
+                  label="Email *"
+                  type="email"
+                  value={leadForm.email}
+                  onChange={(e) => setLeadForm({ ...leadForm, email: e.target.value })}
+                  placeholder="votre@email.com"
+                  required
+                />
+
+                <div className="relative">
+                  <label className="block text-xs font-medium text-neutral-600 mb-1.5">Téléphone *</label>
                   <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400 pointer-events-none" />
                     <input
                       type="tel"
                       required
                       value={leadForm.telephone}
-                      onChange={(e) =>
-                        setLeadForm({ ...leadForm, telephone: e.target.value })
-                      }
-                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      onChange={(e) => setLeadForm({ ...leadForm, telephone: e.target.value })}
+                      className="w-full pl-10 pr-3 py-3 border border-neutral-200 rounded-xl text-base focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition placeholder:text-neutral-400"
                       placeholder="+225 XX XX XX XX"
                     />
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Message
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={leadForm.message}
-                    onChange={(e) =>
-                      setLeadForm({ ...leadForm, message: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                  />
-                </div>
+                <Textarea
+                  label="Message"
+                  value={leadForm.message}
+                  onChange={(e) => setLeadForm({ ...leadForm, message: e.target.value })}
+                  placeholder="Décrivez votre besoin..."
+                  rows={3}
+                />
 
-                <div className="flex gap-3 pt-2">
-                  <button
+                <Flex gap="3" className="pt-2">
+                  <Button
                     type="button"
-                    onClick={() => setShowLeadForm(false)}
-                    className="flex-1 py-2.5 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                    variant="outline"
+                    size="md"
+                    onClick={handleCloseModal}
+                    className="flex-1 min-h-[48px]"
                   >
                     Annuler
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="submit"
+                    variant="primary"
+                    size="md"
                     disabled={submitting}
-                    className="flex-1 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                    loading={submitting}
+                    className="flex-1 min-h-[48px]"
                   >
-                    {submitting ? "Envoi..." : "Envoyer ma demande"}
-                  </button>
-                </div>
+                    Envoyer ma demande
+                  </Button>
+                </Flex>
 
-                <p className="text-xs text-gray-500 text-center">
-                  En envoyant cette demande, vous acceptez d'être contacté(e)
-                  par notre équipe pour ce lot.
+                <p className="text-xs text-neutral-500 text-center">
+                  En envoyant cette demande, vous acceptez d'être contacté(e) par notre équipe pour ce lot.
                 </p>
               </form>
             )}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Search,
   Upload,
@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { apiClient } from "../api/client";
 import { isSelfHostedMode } from "../lib/selfHosted";
-import dbClient from "../data/tableClient";
+import dbClient from '../lib/dbClient.service';
 import { logMediaAction } from "../lib/mediaUtils";
 import { useAuth } from "../context/AuthContext";
 import type { MediaFile } from "../types";
@@ -74,6 +74,7 @@ export default function Media() {
   const [loadingTrash, setLoadingTrash] = useState(false);
   const [purgeConfirm, setPurgeConfirm] = useState<MediaFile | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [fetchErrorMessage, setFetchErrorMessage] = useState<string | null>(null);
   const PAGE_SIZE = 100;
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(false);
@@ -82,8 +83,8 @@ export default function Media() {
     if (authLoading || !user) return;
     setLoadingTrash(true);
     if (isSelfHostedMode()) {
-      const result = await apiClient.media.getAll(true);
-      const trashed = (result.data || []).filter((file) =>
+      const result = await apiClient.media.getAll();
+      const trashed = ((result.data || []) as MediaFile[]).filter((file) =>
         Boolean(file.deleted_at),
       );
       setTrashedFiles(trashed);
@@ -123,7 +124,7 @@ export default function Media() {
 
       if (isSelfHostedMode()) {
         const result = await apiClient.media.getAll();
-        const mediaFiles = (result.data || [])
+        const mediaFiles = ((result.data || []) as MediaFile[])
           .filter((file) => !file.deleted_at)
           .filter((file) => category === "all" || file.category === category)
           .sort((a, b) => {
@@ -179,6 +180,7 @@ export default function Media() {
       const { data, error: fetchError } = await query;
       if (fetchError) {
         console.error("[Media] fetchFiles error:", fetchError.message);
+        setFetchErrorMessage(fetchError.message);
         setLoading(false);
         return;
       }
@@ -366,6 +368,14 @@ export default function Media() {
 
   const totalSize = files.reduce((sum, f) => sum + f.size, 0);
 
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const f of files) {
+      counts[f.category] = (counts[f.category] || 0) + 1;
+    }
+    return counts;
+  }, [files]);
+
   if (authLoading) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center bg-gray-50">
@@ -513,6 +523,19 @@ export default function Media() {
         </div>
       </div>
 
+      {fetchErrorMessage && (
+        <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+          <AlertTriangle size={15} className="flex-shrink-0" />
+          <span className="flex-1">{fetchErrorMessage}</span>
+          <button
+            onClick={() => setFetchErrorMessage(null)}
+            className="text-red-400 hover:text-red-600 transition-colors"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
       {mainTab === "library" && (
         <>
           {showUpload && (
@@ -567,7 +590,7 @@ export default function Media() {
                       <span
                         className={`ml-1 ${category === c.value ? "text-blue-200" : "text-gray-400"}`}
                       >
-                        ({files.filter((f) => f.category === c.value).length})
+                        ({categoryCounts[c.value] || 0})
                       </span>
                     )}
                   </button>

@@ -24,6 +24,8 @@ import {
   Shield,
   FileText,
   Star,
+  Eye,
+  EyeOff,
   History,
   AlertTriangle,
   Youtube,
@@ -32,7 +34,6 @@ import {
   ExternalLink,
   Trash2,
 } from "lucide-react";
-import dbClient from "../data/tableClient";
 import { apiClient } from "../api/client";
 import { useSettings } from "../context/SettingsContext";
 import { useAuth } from "../context/AuthContext";
@@ -104,6 +105,9 @@ const DEFAULT_SETTINGS: BrandSettings = {
   brand_favicon_url: "",
   brand_watermark_url: "",
   hero_background_url: "",
+  // Immobilier settings
+  commission_rate: "",
+  rent_due_day: "",
 };
 
 type SettingsTab =
@@ -249,6 +253,19 @@ export default function Parametres() {
     [],
   );
   const [showValidationWarnings, setShowValidationWarnings] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({
+    current_password: "",
+    new_password: "",
+    confirm_password: "",
+  });
+  const [passwordVisibility, setPasswordVisibility] = useState({
+    current: false,
+    new: false,
+    confirm: false,
+  });
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
   const isAdmin = profile?.role === "admin";
 
   const changedKeys = useMemo(() => {
@@ -327,7 +344,7 @@ export default function Parametres() {
   useEffect(() => {
     let cancelled = false;
     const loadReleaseInfo = async () => {
-      const result = await apiClient.version.get();
+      const result = await apiClient.version();
       if (!cancelled && !result.error && result.data) {
         setReleaseInfo(result.data);
       }
@@ -341,20 +358,9 @@ export default function Parametres() {
 
   const loadAuditLogs = useCallback(async () => {
     setLoadingAudit(true);
-    const { data, error } = await dbClient
-      .from("settings_audit")
-      .select(
-        `
-        id,
-        setting_key,
-        old_value,
-        new_value,
-        changed_at,
-        user_profiles (full_name, email)
-      `,
-      )
-      .order("changed_at", { ascending: false })
-      .limit(50);
+    const result = await apiClient.request('/settings/audit?limit=50');
+    const data = result.data;
+    const error = result.error;
 
     if (error) {
       if (import.meta.env.DEV) console.error("Erreur chargement audit:", error);
@@ -425,6 +431,48 @@ export default function Parametres() {
     if (!confirm("Réinitialiser tous les paramètres aux valeurs par défaut ?"))
       return;
     setForm(DEFAULT_SETTINGS);
+  };
+
+  const handleChangePassword = async () => {
+    if (!passwordForm.current_password || !passwordForm.new_password) {
+      setPasswordError("Veuillez remplir le mot de passe actuel et le nouveau mot de passe.");
+      return;
+    }
+    if (passwordForm.new_password.length < 6) {
+      setPasswordError("Le nouveau mot de passe doit contenir au moins 6 caractères.");
+      return;
+    }
+    if (passwordForm.new_password !== passwordForm.confirm_password) {
+      setPasswordError("Les deux mots de passe ne correspondent pas.");
+      return;
+    }
+
+    setPasswordSaving(true);
+    setPasswordError(null);
+    setPasswordSuccess(null);
+
+    const result = await apiClient.auth.updatePassword(
+      passwordForm.current_password,
+      passwordForm.new_password,
+    );
+
+    setPasswordSaving(false);
+
+    if (result.error) {
+      setPasswordError(
+        result.status === 401
+          ? "Le mot de passe actuel est incorrect."
+          : result.error,
+      );
+      return;
+    }
+
+    setPasswordForm({
+      current_password: "",
+      new_password: "",
+      confirm_password: "",
+    });
+    setPasswordSuccess("Votre mot de passe a été mis à jour avec succès.");
   };
 
   const handleReload = async () => {
@@ -720,6 +768,168 @@ export default function Parametres() {
                 <p className="text-xs text-gray-400 mt-1">
                   Description courte affichée sous le titre
                 </p>
+              </div>
+
+              <div className="border border-gray-200 rounded-2xl p-4 bg-gray-50 space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-base font-semibold text-gray-800">
+                      Sécurité du compte
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Modifiez votre mot de passe pour sécuriser le compte administrateur.
+                    </p>
+                  </div>
+                </div>
+
+                {passwordError && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {passwordError}
+                  </div>
+                )}
+
+                {passwordSuccess && (
+                  <div className="rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+                    {passwordSuccess}
+                  </div>
+                )}
+
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                      Mot de passe actuel
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={passwordVisibility.current ? "text" : "password"}
+                        value={passwordForm.current_password}
+                        onChange={(e) =>
+                          setPasswordForm({
+                            ...passwordForm,
+                            current_password: e.target.value,
+                          })
+                        }
+                        className="w-full px-4 py-3 pr-11 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-colors"
+                        placeholder="••••••••"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPasswordVisibility((prev) => ({
+                            ...prev,
+                            current: !prev.current,
+                          }))
+                        }
+                        className="absolute inset-y-0 right-3 flex items-center text-gray-500 hover:text-gray-700"
+                        aria-label={
+                          passwordVisibility.current
+                            ? "Masquer le mot de passe actuel"
+                            : "Afficher le mot de passe actuel"
+                        }
+                      >
+                        {passwordVisibility.current ? (
+                          <EyeOff size={18} />
+                        ) : (
+                          <Eye size={18} />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                      Nouveau mot de passe
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={passwordVisibility.new ? "text" : "password"}
+                        value={passwordForm.new_password}
+                        onChange={(e) =>
+                          setPasswordForm({
+                            ...passwordForm,
+                            new_password: e.target.value,
+                          })
+                        }
+                        className="w-full px-4 py-3 pr-11 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-colors"
+                        placeholder="Minimum 6 caractères"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPasswordVisibility((prev) => ({
+                            ...prev,
+                            new: !prev.new,
+                          }))
+                        }
+                        className="absolute inset-y-0 right-3 flex items-center text-gray-500 hover:text-gray-700"
+                        aria-label={
+                          passwordVisibility.new
+                            ? "Masquer le nouveau mot de passe"
+                            : "Afficher le nouveau mot de passe"
+                        }
+                      >
+                        {passwordVisibility.new ? (
+                          <EyeOff size={18} />
+                        ) : (
+                          <Eye size={18} />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1.5">
+                      Confirmer
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={passwordVisibility.confirm ? "text" : "password"}
+                        value={passwordForm.confirm_password}
+                        onChange={(e) =>
+                          setPasswordForm({
+                            ...passwordForm,
+                            confirm_password: e.target.value,
+                          })
+                        }
+                        className="w-full px-4 py-3 pr-11 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-colors"
+                        placeholder="Répétez le mot de passe"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPasswordVisibility((prev) => ({
+                            ...prev,
+                            confirm: !prev.confirm,
+                          }))
+                        }
+                        className="absolute inset-y-0 right-3 flex items-center text-gray-500 hover:text-gray-700"
+                        aria-label={
+                          passwordVisibility.confirm
+                            ? "Masquer la confirmation du mot de passe"
+                            : "Afficher la confirmation du mot de passe"
+                        }
+                      >
+                        {passwordVisibility.confirm ? (
+                          <EyeOff size={18} />
+                        ) : (
+                          <Eye size={18} />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleChangePassword}
+                    disabled={passwordSaving}
+                    className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl text-white text-sm font-medium disabled:opacity-60"
+                    style={{ backgroundColor: form.primary_color }}
+                  >
+                    {passwordSaving ? "Enregistrement..." : "Changer le mot de passe"}
+                  </button>
+                </div>
               </div>
 
               <div>

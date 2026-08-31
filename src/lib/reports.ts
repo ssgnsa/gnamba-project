@@ -27,7 +27,6 @@ export interface OwnerSummary {
   ownerName: string;
   properties: Property[];
   totalProperties: number;
-  totalValue: number;
   totalMonthlyRent: number;
   contracts: LeaseContract[];
   payments: RentPayment[];
@@ -156,7 +155,6 @@ export function generateOwnerSummary(
     ownerProperties.some((prop) => prop.id === p.property_id),
   );
 
-  const totalValue = ownerProperties.reduce((sum, p) => sum + p.valeur, 0);
   const totalMonthlyRent = ownerProperties.reduce(
     (sum, p) => sum + p.loyer_mensuel,
     0,
@@ -174,7 +172,6 @@ export function generateOwnerSummary(
     ownerName,
     properties: ownerProperties,
     totalProperties: ownerProperties.length,
-    totalValue,
     totalMonthlyRent,
     contracts: ownerContracts,
     payments: ownerPayments,

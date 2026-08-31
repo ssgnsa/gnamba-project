@@ -1,3 +1,5 @@
+import { generateUUID } from "../utils/reference";
+
 // ============================================
 // Sentry — Minimal Error Monitoring for EGS
 // ============================================
@@ -96,7 +98,7 @@ const sendToSentry = async (event: SentryEvent) => {
   try {
     // Sentry envelope protocol (no SDK required)
     const envelope = {
-      event_id: crypto.randomUUID(),
+      event_id: generateUUID(),
       sent_at: new Date().toISOString(),
       sdk: { name: "egs-minimal", version: "1.0.0" },
     };

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Plus,
   Building2,
@@ -8,11 +8,13 @@ import {
   History,
   X,
 } from "lucide-react";
-import type { Property, LeaseContract } from "../../types";
+import type { Property, LeaseContract, Client } from "../../types";
 import Modal from "../../components/ui/Modal";
 import Badge from "../../components/ui/Badge";
+import SelectWithCreate from "../../components/ui/SelectWithCreate";
 import { useSettings } from "../../context/SettingsContext";
 import { useAuth } from "../../context/AuthContext";
+import { useNotifications } from "../../context/NotificationContext";
 import {
   getDemoBlockMessage,
   shouldBlockDestructiveAction,
@@ -23,6 +25,8 @@ import {
   readManualCache,
   writeManualCache,
 } from "../../lib/manualSyncStore";
+import { generateUUID } from "../../utils/reference";
+import { clientsRepository } from "../../lib/dbClient.service";
 import {
   getTenantName,
   getPropertyStatusConfig,
@@ -32,16 +36,17 @@ import {
 } from "../../lib/immobilier";
 
 const emptyForm = {
-  type_bien: "appartement" as Property["type_bien"],
+  type_bien: "studio" as Property["type_bien"],
   adresse: "",
-  proprietaire: "",
-  valeur: "",
+  proprietaire_id: "",
   loyer_mensuel: "",
+  charges: "",
   statut: "disponible" as Property["statut"],
   description: "",
 };
 
 const PROPERTIES_CACHE_KEY = "egs.immobilier.properties.local_cache.v1";
+const CLIENTS_CACHE_KEY = "egs.clients.local_cache.v1";
 
 type LocalProperty = Property & {
   sync_status: ManualSyncStatus;
@@ -72,6 +77,7 @@ export default function PropertiesTab({
   onRefresh,
 }: Props) {
   const { settings } = useSettings();
+  const { showToast } = useNotifications();
   const { user, profile } = useAuth();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -83,6 +89,14 @@ export default function PropertiesTab({
     user,
     profile,
   );
+
+  // Get clients from cache for owner selection
+  const clients = useMemo(() => {
+    const cached = readManualCache<Client>(CLIENTS_CACHE_KEY);
+    return cached.sort((a, b) => 
+      `${a.nom} ${a.prenom}`.localeCompare(`${b.nom} ${b.prenom}`)
+    );
+  }, []);
 
   const inputClass =
     "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400";
@@ -98,9 +112,9 @@ export default function PropertiesTab({
     setForm({
       type_bien: p.type_bien,
       adresse: p.adresse,
-      proprietaire: p.proprietaire || "",
-      valeur: String(p.valeur),
+      proprietaire_id: p.proprietaire_id || "",
       loyer_mensuel: String(p.loyer_mensuel),
+      charges: String(p.charges || 0),
       statut: p.statut,
       description: p.description || "",
     });
@@ -131,12 +145,12 @@ export default function PropertiesTab({
       const existing = cached.find((property) => property.id === editingId);
       const localProperty: LocalProperty = {
         ...(existing ?? {}),
-        id: existing?.id ?? crypto.randomUUID(),
+        id: existing?.id ?? generateUUID(),
         type_bien: form.type_bien,
         adresse: form.adresse.trim(),
-        proprietaire: form.proprietaire.trim() || null,
-        valeur: parseFloat(form.valeur) || 0,
+        proprietaire_id: form.proprietaire_id.trim() || null,
         loyer_mensuel: parseFloat(form.loyer_mensuel) || 0,
+        charges: parseFloat(form.charges) || 0,
         statut: form.statut,
         description: form.description.trim() || null,
         cover_image_url: existing?.cover_image_url ?? null,
@@ -164,7 +178,7 @@ export default function PropertiesTab({
 
   const handleDelete = async (id: string) => {
     if (destructiveActionsDisabled) {
-      window.alert(getDemoBlockMessage());
+      showToast("error","Mode démo",getDemoBlockMessage());
       return;
     }
     if (
@@ -192,7 +206,7 @@ export default function PropertiesTab({
       writeManualCache(PROPERTIES_CACHE_KEY, sortProperties(next));
       onRefresh();
     } catch (err: any) {
-      alert(`Erreur lors de la suppression locale: ${err.message}`);
+      showToast("error","Erreur suppression",`Erreur lors de la suppression locale: ${err.message}`);
     }
   };
 
@@ -204,11 +218,29 @@ export default function PropertiesTab({
   const getPropertyHistory = (propertyId: string) =>
     contractHistory.filter((c) => c.property_id === propertyId);
 
+  const getOwnerName = (property: Property) => {
+    if (property.proprietaire_client) {
+      return `${property.proprietaire_client.prenom} ${property.proprietaire_client.nom}`;
+    }
+    return property.proprietaire || "";
+  };
+
   const filtered = properties.filter((p) =>
-    `${p.adresse} ${p.proprietaire} ${p.type_bien}`
+    `${p.adresse} ${getOwnerName(p)} ${p.type_bien}`
       .toLowerCase()
       .includes(search.toLowerCase()),
   );
+
+  const propertyTypeOptions = [
+    { value: "studio", label: "Studio" },
+    { value: "chambre", label: "Chambre" },
+    { value: "chambre-salon", label: "Chambre-Salon" },
+    { value: "appartement", label: "Appartement" },
+    { value: "terrain", label: "Terrain" },
+    { value: "magasin", label: "Magasin" },
+    { value: "bureau", label: "Bureau" },
+    { value: "villa", label: "Villa" },
+  ];
 
   return (
     <>
@@ -236,9 +268,10 @@ export default function PropertiesTab({
             const st = getPropertyStatusConfig(p.statut);
             const contract = getActiveContract(p.id);
             const tenant = contract
-              ? getTenantName(contract.locataires as any)
+              ? getTenantName(contract.locataires)
               : "";
             const historyCount = getPropertyHistory(p.id).length;
+            const ownerName = getOwnerName(p);
 
             return (
               <div
@@ -257,9 +290,10 @@ export default function PropertiesTab({
                 <div className="text-sm text-gray-500 mb-2 truncate">
                   {p.adresse}
                 </div>
-                {p.proprietaire && (
-                  <div className="text-xs text-gray-400 mb-2">
-                    Propriétaire: {p.proprietaire}
+                {ownerName && (
+                  <div className="text-xs text-gray-400 mb-2 flex items-center gap-1">
+                    <User size={11} className="text-gray-400" />
+                    Propriétaire: {ownerName}
                   </div>
                 )}
 
@@ -273,7 +307,7 @@ export default function PropertiesTab({
                         {tenant}
                       </p>
                       <p className="text-xs text-blue-600">
-                        {formatMontantImmo(contract.loyer_mensuel)} FCFA/mois
+                        {formatMontantImmo(contract.loyer_mensuel + (contract.charges || 0))} FCFA/mois
                       </p>
                     </div>
                   </div>
@@ -290,11 +324,11 @@ export default function PropertiesTab({
                     {p.loyer_mensuel > 0 && (
                       <div className="text-sm font-medium text-green-600">
                         {formatMontantImmo(p.loyer_mensuel)} FCFA/mois
-                      </div>
-                    )}
-                    {p.valeur > 0 && (
-                      <div className="text-xs text-gray-400">
-                        {formatMontantImmo(p.valeur)} FCFA
+                        {p.charges > 0 && (
+                          <span className="text-xs text-gray-500 ml-1.5">
+                            (+{formatMontantImmo(p.charges)} charges)
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>
@@ -346,7 +380,7 @@ export default function PropertiesTab({
             </div>
             <div className="space-y-3">
               {getPropertyHistory(historyProperty.id).map((c) => {
-                const tenantName = getTenantName(c.locataires as any);
+                const tenantName = getTenantName(c.locataires);
                 const statusConfig = getContractStatusConfig(c.statut);
                 return (
                   <div
@@ -371,7 +405,7 @@ export default function PropertiesTab({
                         {c.date_debut} → {c.date_fin || "En cours"}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {formatMontantImmo(c.loyer_mensuel)} FCFA/mois
+                        {formatMontantImmo(c.loyer_mensuel + (c.charges || 0))} FCFA/mois
                       </p>
                     </div>
                   </div>
@@ -408,12 +442,9 @@ export default function PropertiesTab({
                 }
                 className={inputClass}
               >
-                <option value="appartement">Appartement</option>
-                <option value="villa">Villa</option>
-                <option value="bureau">Bureau</option>
-                <option value="commerce">Commerce</option>
-                <option value="terrain">Terrain</option>
-                <option value="autre">Autre</option>
+                {propertyTypeOptions.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
               </select>
             </div>
             <div>
@@ -450,32 +481,66 @@ export default function PropertiesTab({
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Propriétaire
-            </label>
-            <input
-              type="text"
-              value={form.proprietaire}
-              onChange={(e) =>
-                setForm({ ...form, proprietaire: e.target.value })
-              }
-              className={inputClass}
-              placeholder="Nom du propriétaire"
+            <SelectWithCreate
+              value={form.proprietaire_id}
+              onChange={(val) => setForm({ ...form, proprietaire_id: val })}
+              options={clients.map((c) => ({ value: c.id, label: `${c.prenom} ${c.nom} ${c.telephone ? `(${c.telephone})` : ""}` }))}
+              placeholder="Sélectionner un client..."
+              label="Propriétaire (Client) *"
+              required
+              createModalTitle="Nouveau Client (Propriétaire)"
+              createFields={[
+                { key: "prenom", label: "Prénom", type: "text", placeholder: "Prénom", required: true },
+                { key: "nom", label: "Nom", type: "text", placeholder: "Nom", required: true },
+                { key: "telephone", label: "Téléphone", type: "tel", placeholder: "+225 07 00 00 00", required: true },
+                { key: "email", label: "Email", type: "email", placeholder: "email@exemple.com", required: false },
+                { key: "adresse", label: "Adresse", type: "text", placeholder: "Adresse...", required: false },
+                { key: "type_client", label: "Type de Client", type: "select", required: true, options: [
+                  { value: "particulier", label: "Particulier" },
+                  { value: "entreprise", label: "Entreprise" },
+                  { value: "promoteur_immobilier", label: "Promoteur Immobilier" },
+                  { value: "institution", label: "Institution" },
+                ]},
+                { key: "notes", label: "Notes", type: "textarea", placeholder: "Notes...", required: false },
+              ]}
+              validateCreateForm={(data) => {
+                const errors: Record<string, string> = {};
+                if (!data.prenom?.trim()) errors.prenom = "Le prénom est obligatoire";
+                if (!data.nom?.trim()) errors.nom = "Le nom est obligatoire";
+                if (!data.telephone?.trim()) errors.telephone = "Le téléphone est obligatoire";
+                if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+                  errors.email = "Format d'email invalide";
+                }
+                return Object.keys(errors).length > 0 ? errors : null;
+              }}
+              onCreate={async (data) => {
+                const now = new Date().toISOString();
+                const payload = {
+                  nom: data.nom,
+                  prenom: data.prenom,
+                  telephone: data.telephone,
+                  email: data.email || null,
+                  adresse: data.adresse || null,
+                  type_client: data.type_client || "particulier",
+                  notes: data.notes || null,
+                  updated_at: now,
+                };
+                const { data: newClient, error } = await clientsRepository.create(payload);
+                if (error) throw new Error(error);
+                // Refresh clients list from cache
+                const cached = readManualCache<Client>(CLIENTS_CACHE_KEY);
+                const updated = [...cached, newClient].sort((a, b) =>
+                  `${a.nom} ${a.prenom}`.localeCompare(`${b.nom} ${b.prenom}`)
+                );
+                writeManualCache(CLIENTS_CACHE_KEY, updated);
+                return { value: newClient.id, label: `${data.prenom} ${data.nom} ${data.telephone ? `(${data.telephone})` : ""}` };
+              }}
             />
+            <p className="text-xs text-gray-500 mt-1">
+              Le propriétaire doit être un client enregistré. Le contrat de mandat sera stocké dans le filebrowser.
+            </p>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Valeur (FCFA)
-              </label>
-              <input
-                type="number"
-                value={form.valeur}
-                onChange={(e) => setForm({ ...form, valeur: e.target.value })}
-                className={inputClass}
-                placeholder="0"
-              />
-            </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">
                 Loyer/mois (FCFA)
@@ -485,6 +550,20 @@ export default function PropertiesTab({
                 value={form.loyer_mensuel}
                 onChange={(e) =>
                   setForm({ ...form, loyer_mensuel: e.target.value })
+                }
+                className={inputClass}
+                placeholder="0"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Charges/mois (FCFA)
+              </label>
+              <input
+                type="number"
+                value={form.charges}
+                onChange={(e) =>
+                  setForm({ ...form, charges: e.target.value })
                 }
                 className={inputClass}
                 placeholder="0"
@@ -514,7 +593,7 @@ export default function PropertiesTab({
             </button>
             <button
               onClick={handleSave}
-              disabled={saving || !form.adresse.trim()}
+              disabled={saving || !form.adresse.trim() || !form.proprietaire_id.trim()}
               className="flex-1 px-4 py-2.5 rounded-xl text-white text-sm font-medium hover:opacity-90 disabled:opacity-50"
               style={{
                 backgroundColor: settings.primary_color,

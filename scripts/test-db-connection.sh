@@ -14,11 +14,11 @@ get_value() {
   grep -E "^${key}=" "${ENV_FILE}" | tail -n1 | cut -d'=' -f2- | sed 's/^ *//;s/ *$//'
 }
 
-SUPABASE_DB_PASSWORD="$(get_value 'SUPABASE_DB_PASSWORD')"
+DB_PASSWORD="$(get_value 'DB_PASSWORD')"
 VITE_SUPABASE_URL="$(get_value 'VITE_SUPABASE_URL')"
 
-if [ -z "${SUPABASE_DB_PASSWORD:-}" ]; then
-  echo "[ERROR] SUPABASE_DB_PASSWORD is not defined in ${ENV_FILE}" >&2
+if [ -z "${DB_PASSWORD:-}" ]; then
+  echo "[ERROR] DB_PASSWORD is not defined in ${ENV_FILE}" >&2
   exit 1
 fi
 
@@ -33,7 +33,7 @@ if [ -z "${HOST}" ]; then
   exit 1
 fi
 
-export PGPASSWORD="${SUPABASE_DB_PASSWORD}"
+export PGPASSWORD="${DB_PASSWORD}"
 
 if ! command -v psql >/dev/null 2>&1; then
   echo "[ERROR] psql is not installed. Install postgresql-client or libpq-dev." >&2

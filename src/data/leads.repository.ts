@@ -68,8 +68,7 @@ export const leadsRepository = {
     return withRetry(async () => {
       let query = dbClient
         .from("parties")
-        .select("*, party_roles(*), party_lead_details(*)", { count: "exact" })
-        .order("created_at", { ascending: false });
+        .select("*, party_roles(*), party_lead_details(*)", { count: "exact" }).order("created_at");
 
       if (filters.statut)
         query = query.eq("party_lead_details.status", filters.statut);
@@ -233,8 +232,7 @@ export const leadsRepository = {
     return withRetry(() => {
       let query = dbClient
         .from("ventes_foncieres")
-        .select("*")
-        .order("created_at", { ascending: false });
+        .select("*").order("created_at");
       if (filters.statut) query = query.eq("statut", filters.statut);
       return query;
     });
@@ -244,8 +242,7 @@ export const leadsRepository = {
     return withRetry(() =>
       dbClient
         .from("campagnes_marketing")
-        .select("*")
-        .order("created_at", { ascending: false }),
+        .select("*").order("created_at"),
     );
   },
 };

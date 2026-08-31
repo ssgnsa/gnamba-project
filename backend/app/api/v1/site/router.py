@@ -503,13 +503,15 @@ def update_vitrine_lot(
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> VitrineLotRow:
     try:
-        # Sécurisation : vérification robuste de l'utilisateur et du rôle
         if not current_user or current_user.get("role") != "admin":
             raise HTTPException(status_code=403, detail="Accès refusé : droits admin requis")
 
         from datetime import datetime
+        from decimal import Decimal
+        import uuid
 
         with SessionLocal() as session:
+            # 1. Préparer les champs à mettre à jour
             fields = payload.model_dump(exclude_unset=True, exclude={"id", "created_at", "updated_at"})
             if not fields:
                 raise HTTPException(status_code=400, detail="Aucun champ à mettre à jour")
@@ -517,6 +519,7 @@ def update_vitrine_lot(
             fields["updated_at"] = datetime.now()
             fields["updated_by"] = current_user.get("id")
 
+            # 2. Exécuter la mise à jour
             set_clause = ", ".join(f"{key} = :{key}" for key in fields.keys())
             session.execute(
                 text(f"UPDATE vitrine_lots SET {set_clause} WHERE id = :item_id"),
@@ -524,12 +527,14 @@ def update_vitrine_lot(
             )
             session.commit()
 
-            # Note: Assurez-vous que bumpContentVersion() est bien importé et défini
+            # 3. Post-commit sécurisé (ne doit pas faire échouer l'écriture)
             try:
-                bumpContentVersion()
-            except NameError:
-                pass  # Fallback si la fonction n'est pas disponible
+                # Si cette fonction existe, on l'appelle. Sinon, on ignore silencieusement.
+                bumpContentVersion() 
+            except (NameError, Exception):
+                pass 
 
+            # 4. Relire la ligne et la sérialiser SAFELY pour Pydantic
             row = session.execute(
                 text("""
                     SELECT id, lot_id, property_id, titre, description, prix, surface, localisation,
@@ -542,19 +547,30 @@ def update_vitrine_lot(
                 """),
                 {"item_id": item_id}
             ).mappings().first()
-
+            
             if not row:
-                raise HTTPException(status_code=404, detail="Lot vitrine non trouvé")
+                raise HTTPException(status_code=404, detail="Lot vitrine non trouvé après mise à jour")
+            
+            # 5. Conversion explicite des types pour éviter les ValidationError Pydantic
+            safe_row = {}
+            for key, value in row.items():
+                if isinstance(value, uuid.UUID):
+                    safe_row[key] = str(value)
+                elif isinstance(value, Decimal):
+                    safe_row[key] = float(value)
+                elif isinstance(value, datetime):
+                    safe_row[key] = value.isoformat()
+                else:
+                    safe_row[key] = value
 
-            return VitrineLotRow(**row)
-
+            return VitrineLotRow(**safe_row)
+            
     except HTTPException:
-        raise  # Laisser passer les HTTPException (400, 403, 404)
+        raise  # Laisser passer les erreurs HTTP prévues (400, 403, 404)
     except Exception as exc:
-        # Log l'erreur réelle avant de la masquer
         import logging
-        logging.error(f"Erreur update_vitrine_lot: {str(exc)}")
-        raise HTTPException(status_code=500, detail="Erreur interne lors de la mise à jour") from exc
+        logging.error(f"Erreur critique update_vitrine_lot: {str(exc)}")
+        raise HTTPException(status_code=500, detail=f"Erreur interne: {str(exc)}") from exc
 
 
 @router.delete("/vitrine-lots/{item_id}")

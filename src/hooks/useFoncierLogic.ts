@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import DOMPurify from "dompurify";
 import { dataService } from "../lib/dbClient.service";
 import type { FoncierLot } from "../types";
+import { useFoncierAttestationWorkflow } from "./useFoncierAttestationWorkflow";
 import { cleanText, generateFoncierReference, generateUUID } from "../utils/reference";
 import {
   addQueueItem,
@@ -44,6 +45,8 @@ export function useFoncierLogic(
   deviceId: string,
   _profile?: { id?: string | null; full_name?: string | null } | null,
 ) {
+  const workflowState = useFoncierAttestationWorkflow();
+
   const saveLot = useCallback(
     async (
       form: LotForm,
@@ -370,6 +373,7 @@ export function useFoncierLogic(
   );
 
   return {
+    ...workflowState,
     saveLot,
     archiveLot,
     restoreLot,

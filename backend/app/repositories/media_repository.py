@@ -5,8 +5,8 @@ from typing import Any
 
 from fastapi import UploadFile
 
-from backend.app.domain.media import MediaAsset
-from backend.app.services.storage_provider import StorageProvider
+from app.domain.media import MediaAsset
+from app.services.storage_provider import StorageProvider
 
 
 class MediaRepositoryPort(ABC):
@@ -65,4 +65,12 @@ class MediaRepositoryPort(ABC):
 
     @abstractmethod
     def delete_media_usage(self, usage_id: str) -> bool:
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_media_versions(self, media_id: str) -> list[dict[str, Any]]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_media_audit_logs(self, media_id: str | None = None) -> list[dict[str, Any]]:
         raise NotImplementedError

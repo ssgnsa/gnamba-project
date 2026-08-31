@@ -1,11 +1,13 @@
 import hashlib
+import os
 import time
 from typing import Any
 
 import jwt
 from fastapi import HTTPException
+from passlib.hash import bcrypt
 
-from backend.app.core.config import settings
+from app.core.config import settings
 
 
 class AuthenticationError(Exception):
@@ -17,11 +19,14 @@ class AuthorizationError(Exception):
 
 
 def hash_password(password: str) -> str:
-    return hashlib.sha256(password.encode("utf-8")).hexdigest()
+    return bcrypt.hash(password)
 
 
 def verify_password(password: str, password_hash: str) -> bool:
-    return hash_password(password) == password_hash
+    try:
+        return bcrypt.verify(password, password_hash)
+    except Exception:
+        return False
 
 
 def issue_token(user: dict[str, Any], token_type: str) -> str:
@@ -53,8 +58,9 @@ def require_token(token: str | None) -> dict[str, Any]:
 def get_user_payload(user: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": user["id"],
-        "email": user["email"],
-        "full_name": user.get("full_name", ""),
+        "entity_id": user.get("entity_id") or user["id"],
+        "email": user.get("email") or "",
+        "full_name": user.get("full_name") or "",
         "role": user.get("role", "employe"),
         "access_level": user.get("access_level", "employe"),
         "poste": user.get("poste"),

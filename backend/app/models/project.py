@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import Column, DateTime, String
 from sqlalchemy.sql import func
 
-from backend.app.core.database import Base
+from app.core.database import Base
 
 
 class ProjectModel(Base):

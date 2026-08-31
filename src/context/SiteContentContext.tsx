@@ -7,6 +7,7 @@ import {
   ReactNode,
 } from "react";
 import { apiClient } from "../api/client";
+import { useContentVersion } from "../hooks/useContentVersion";
 
 interface SiteContentRow {
   section: string;
@@ -27,6 +28,7 @@ const SiteContentContext = createContext<SiteContentContextValue>({
 export function SiteContentProvider({ children }: { children: ReactNode }) {
   const [rows, setRows] = useState<SiteContentRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const contentVersion = useContentVersion(); // Subscribe to content updates
 
   useEffect(() => {
     let cancelled = false;
@@ -48,7 +50,7 @@ export function SiteContentProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [contentVersion]); // Re-fetch when content version changes
 
   const get = (section: string, key: string, fallback = ""): string => {
     const row = rows.find((r) => r.section === section && r.key === key);

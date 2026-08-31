@@ -17,7 +17,7 @@ export const publicLotsRepository = {
         .select("*")
         .eq("publier_sur_vitrine", true)
         .order("ordre_affichage", { ascending: true })
-        .order("created_at", { ascending: false })
+        .order("created_at")
         .limit(3),
     )) as QueryResult<PublicLotRow[]>;
   },

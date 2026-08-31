@@ -7,6 +7,7 @@ from app.core.security import AuthenticationError, AuthorizationError, get_http_
 from app.schemas.auth import (
     AuthMeResponse,
     AuthTokenResponse,
+    ChangePasswordRequest,
     LoginRequest,
     PersistTokenRequest,
     RefreshTokenRequest,
@@ -62,6 +63,16 @@ def reset_password(payload: ResetPasswordRequest, authorization: str | None = He
 @router.post("/reset-password")
 def reset_password_alias(payload: ResetPasswordRequest, authorization: str | None = Header(default=None), auth_service: AuthService = Depends(get_auth_service)) -> dict[str, str]:
     return reset_password(payload, authorization, auth_service)
+
+
+@router.post("/change-password")
+def change_password(payload: ChangePasswordRequest, authorization: str | None = Header(default=None), auth_service: AuthService = Depends(get_auth_service)) -> dict[str, str]:
+    try:
+        user = auth_service.get_current_user(authorization)
+        auth_service.change_password(user["id"], payload.current_password, payload.new_password)
+        return {"status": "ok", "message": "Mot de passe mis à jour"}
+    except (AuthenticationError, AuthorizationError) as exc:
+        raise get_http_exception_for_error(exc) from exc
 
 
 @router.post("/persist-token")

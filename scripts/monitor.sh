@@ -292,7 +292,7 @@ test_supabase_api() {
 
     case "$env" in
         local-dev)
-            local api_url="${VITE_SUPABASE_LOCAL_URL:-http://localhost:54321}"
+            local api_url="${VITE_SUPABASE_LOCAL_URL:-http://localhost:8000}"
             if curl -s --max-time 5 "$api_url/rest/v1/" >/dev/null 2>&1; then
                 echo "✅ API locale accessible"
             else
@@ -300,7 +300,7 @@ test_supabase_api() {
             fi
             ;;
         local-server)
-            local api_url="${VITE_SUPABASE_LOCAL_URL:-http://localhost:54321}"
+            local api_url="${VITE_SUPABASE_LOCAL_URL:-http://localhost:8000}"
             local api_key
             api_key=$(grep "VITE_SUPABASE_LOCAL_ANON_KEY" "$ROOT_DIR/.env.server" | cut -d'=' -f2 || echo "")
 

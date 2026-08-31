@@ -21,6 +21,7 @@ import {
   Zap,
   Globe,
   Target,
+  Grid3X3,
 } from "lucide-react";
 import dbClient from "../../data/tableClient";
 import { useSiteContent } from "../../context/SiteContentContext";
@@ -30,6 +31,7 @@ import type { VitrineLot } from "../../types";
 import { formatMontant } from "../../utils/reference";
 import PublicSocialWall from "../../components/public/PublicSocialWall";
 import TrustBadges from "../../components/public/TrustBadges";
+import ProjectSelector from "../../components/public/ProjectSelector";
 import { OFFICIAL_CONTACT, buildWhatsAppUrl } from "../../lib/officialContact";
 
 // Premium UI Components
@@ -348,63 +350,63 @@ export default function PublicHome({ onNavigate }: Props) {
 
   const services = [
     {
+      id: "foncier",
+      icon: Map,
+      title: get("services", "foncier_title", "Sécurisez votre projet foncier"),
+      subtitle: "Accompagnement clair pour vos démarches, vérifications et projets de terrain",
+      color: "foncier",
+      items: [
+        "Diagnostic complet avant achat : ACD, compulsoire, cadastre",
+        "Vérification juridique et bornage des parcelles",
+        "Sécurisation des droits de propriété",
+        "Suivi administratif jusqu'à la finalisation",
+      ],
+      cta: "Parler de mon terrain",
+      page: "foncier" as PublicPage,
+    },
+    {
       id: "btp",
       icon: HardHat,
-      title: get("services", "btp_title", "BTP & Construction"),
-      subtitle: "Construction, rénovation et suivi de chantier rigoureux",
+      title: get("services", "btp_title", "Construisez avec un suivi fiable"),
+      subtitle: "De l'étude à la livraison, nous organisons votre projet de construction avec méthode",
       color: "btp",
       items: [
-        "Villas, immeubles et rénovation",
-        "Suivi de chantier et contrôle qualité",
-        "Livraison clé en main",
-        "Devis rapide sous 48h",
+        "Étude technique et conception adaptée à votre budget",
+        "Suivi rigoureux du chantier et contrôle qualité",
+        "Livraison clé en main et assistance post-travaux",
+        "Devis transparent sous 48h, sans surprise",
       ],
+      cta: "Demander un devis BTP",
       page: "services" as PublicPage,
     },
     {
       id: "immobilier",
       icon: Building2,
-      title: get("services", "immobilier_title", "Immobilier"),
-      subtitle: "Gestion et valorisation de votre patrimoine",
+      title: get("services", "immobilier_title", "Valorisez votre bien immobilier"),
+      subtitle: "Vente, mise en location ou accompagnement : présentez votre bien de manière professionnelle",
       color: "immobilier",
       items: [
-        "Achat et vente de biens",
-        "Gestion locative",
-        "Conseil patrimonial",
-        "Accompagnement des dossiers",
+        "Estimation juste et stratégie de commercialisation",
+        "Gestion de la location : dossiers, contrats, suivi locataire",
+        "Accompagnement complet des négociations",
+        "Conseil patrimonial et optimisation fiscale",
       ],
-      page: "services" as PublicPage,
+      cta: "Faire estimer mon bien",
+      page: "immobilier" as PublicPage,
     },
     {
-      id: "foncier",
-      icon: Map,
-      title: get("services", "foncier_title", "Foncier sécurisé"),
-      subtitle: "Sécurisez votre patrimoine foncier",
-      color: "foncier",
-      items: [
-        "Vérification documentaire",
-        "ACD, compulsoire et cadastre",
-        "Bornage et sécurisation des parcelles",
-        "Achat terrain sans risque",
-      ],
-      page: "services" as PublicPage,
-    },
-    {
-      id: "fournitures",
-      icon: Package,
-      title: get(
-        "services",
-        "fournitures_title",
-        "Fournitures professionnelles",
-      ),
-      subtitle: "Équipez votre activité sans perdre de temps",
+      id: "lotissement",
+      icon: Grid3X3,
+      title: get("services", "lotissement_title", "Donnez forme à votre opération"),
+      subtitle: "Préparez et coordonnez votre projet de lotissement avec un interlocuteur local",
       color: "fournitures",
       items: [
-        "Mobilier de bureau",
-        "Équipements et consommables",
-        "Solutions pour PME et chantiers",
-        "Livraison rapide",
+        "Conception et viabilisation des lots avec respect des normes",
+        "Dossiers administratifs et autorisations",
+        "Commercialisation et gestion des ventes",
+        "Suivi du projet jusqu'à la réception",
       ],
+      cta: "Étudier mon projet",
       page: "services" as PublicPage,
     },
   ];
@@ -437,6 +439,50 @@ export default function PublicHome({ onNavigate }: Props) {
     { icon: Zap, label: "Réponse sous 24h", desc: "Devis et suivi ultra-rapides" },
     { icon: Globe, label: "Couverture nationale", desc: "Présence sur 3 régions ivoiriennes" },
     { icon: Target, label: "Résultats garantis", desc: "Engagement satisfaction client" },
+  ];
+
+  // Project Selector options
+  const projectOptions = [
+    {
+      id: "foncier",
+      icon: Map,
+      title: "Sécuriser un terrain",
+      problem: "Vous cherchez à acquérir ou à sécuriser une parcelle en Côte d'Ivoire",
+      action: "Vérification documentaire • ACD & Cadastre • Bornage",
+      color: "foncier" as const,
+      ctaText: "Parler de mon terrain",
+      onClick: () => nav("foncier"),
+    },
+    {
+      id: "btp",
+      icon: HardHat,
+      title: "Construire votre projet",
+      problem: "Vous avez un projet de construction, extension ou rénovation",
+      action: "Étude • Suivi de chantier • Livraison clé en main",
+      color: "btp" as const,
+      ctaText: "Demander un devis BTP",
+      onClick: () => nav("services"),
+    },
+    {
+      id: "immobilier",
+      icon: Building2,
+      title: "Valoriser un bien",
+      problem: "Vous souhaitez vendre, louer ou faire estimer un bien",
+      action: "Estimation • Commercialisation • Gestion locative",
+      color: "immobilier" as const,
+      ctaText: "Faire estimer mon bien",
+      onClick: () => nav("immobilier"),
+    },
+    {
+      id: "lotissement",
+      icon: Grid3X3,
+      title: "Lotir & Aménager",
+      problem: "Vous préparez une opération de lotissement ou d'aménagement",
+      action: "Conception • Dossiers administratifs • Suivi de travaux",
+      color: "lotissement" as const,
+      ctaText: "Étudier mon projet",
+      onClick: () => nav("services"),
+    },
   ];
 
   return (
@@ -578,6 +624,9 @@ export default function PublicHome({ onNavigate }: Props) {
         </Container>
       </section>
 
+      {/* Project Selector - Quel est votre projet ? */}
+      <ProjectSelector options={projectOptions} />
+
       {/* Services Section */}
       <section className="py-20 sm:py-24 lg:py-28 bg-white">
         <Container size="xl">
@@ -632,7 +681,7 @@ export default function PublicHome({ onNavigate }: Props) {
 
                   <Flex gap="2" className="pt-4 border-t border-neutral-100">
                     <ArrowRight size={14} className="text-primary-600 group-hover:translate-x-1 transition-transform" />
-                    <span className="text-sm font-semibold text-primary-600 group-hover:text-primary-700">En savoir plus</span>
+                    <span className="text-sm font-semibold text-primary-600 group-hover:text-primary-700">{s.cta || "En savoir plus"}</span>
                   </Flex>
                 </Card>
               );

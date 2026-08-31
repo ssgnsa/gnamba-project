@@ -8,7 +8,7 @@ import {
 } from "../index";
 
 describe("Codex assistant scaffold", () => {
-  it("calculates a health report for the current pseudo stack", () => {
+  it("calculates a health report for the current pseudo stack", async () => {
     const context = createDefaultServerContext();
     if (context.dbClient) {
       context.dbClient.pseudoStack.postgres.status = "running";
@@ -17,11 +17,11 @@ describe("Codex assistant scaffold", () => {
       context.dbClient.pseudoStack.studio.status = "unhealthy";
     }
 
-    const report = new DiagnosticEngine().healthCheck(context);
+    const report = await new DiagnosticEngine().healthCheck(context);
 
     expect(report.score).toBeGreaterThanOrEqual(0);
     expect(report.issues.length).toBeGreaterThan(0);
-    expect(report.conflicts.some((conflict) => conflict.type === "STACK_FRAGMENTATION")).toBe(true);
+    expect(report.conflicts.some((conflict: { type: string }) => conflict.type === "STACK_FRAGMENTATION")).toBe(true);
   });
 
   it("builds a migration plan from phase 0", () => {

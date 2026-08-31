@@ -1,25 +1,25 @@
 import { describe, it, expect } from "vitest";
-import { mergeManualCacheWithRemote } from "./manualSyncStore";
+import { mergeManualCacheWithRemote, type ManualSyncStatus } from "./manualSyncStore";
 
 describe("mergeManualCacheWithRemote", () => {
   it("keeps local pending changes while adding fresh remote items", () => {
-    const cached = [
+    const cached: Array<{ id: string; sync_status: ManualSyncStatus; telephone: string }> = [
       {
         id: "local-1",
-        sync_status: "pending" as const,
+        sync_status: "pending",
         telephone: "+225 07000001",
       },
     ];
 
-    const remote = [
+    const remote: Array<{ id: string; sync_status: ManualSyncStatus; telephone: string }> = [
       {
         id: "local-1",
-        sync_status: "synced" as const,
+        sync_status: "synced",
         telephone: "+225 07000002",
       },
       {
         id: "remote-2",
-        sync_status: "synced" as const,
+        sync_status: "synced",
         telephone: "+225 07000003",
       },
     ];

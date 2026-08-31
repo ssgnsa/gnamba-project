@@ -37,7 +37,7 @@ export const FoncierVillageManager: React.FC<FoncierVillageManagerProps> = ({
       }
 
       const { data, error: fetchError } = await withBackoff(() =>
-        foncierRepository.getVillageNames(),
+        foncierRepository.getVillages(),
       );
 
       if (fetchError) throw fetchError;

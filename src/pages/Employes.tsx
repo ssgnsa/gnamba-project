@@ -12,7 +12,7 @@ import {
   CalendarOff,
   Banknote,
 } from "lucide-react";
-import dbClient from "../data/tableClient";
+import dbClient from '../lib/dbClient.service';
 import { Employee } from "../types";
 import Modal from "../components/ui/Modal";
 import Badge from "../components/ui/Badge";

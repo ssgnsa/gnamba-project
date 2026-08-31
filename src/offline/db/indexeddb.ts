@@ -3,6 +3,8 @@
  * Persistant, transactionnel, structuré, adapté au terrain.
  */
 
+import { generateUUID } from '../../utils/reference';
+
 const DB_NAME = 'EGS_Offline';
 const DB_VERSION = 1;
 const hasIndexedDbSupport = (): boolean =>
@@ -178,14 +180,12 @@ class EGSIndexedDB {
   // --- Transactions ---
   async addTransaction(tx: Omit<OfflineTransaction, 'id' | 'created_at' | 'last_attempt'>): Promise<string> {
     if (!this.db) {
-      return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-        ? crypto.randomUUID()
-        : `tx-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      return generateUUID();
     }
 
     const transaction: OfflineTransaction = {
       ...tx,
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       created_at: new Date().toISOString(),
       last_attempt: null,
     };
@@ -276,13 +276,11 @@ class EGSIndexedDB {
   // --- Conflicts ---
   async addConflict(conflict: Omit<ConflictLog, 'id' | 'created_at'>): Promise<string> {
     if (!this.db) {
-      return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-        ? crypto.randomUUID()
-        : `conflict-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      return generateUUID();
     }
     const log: ConflictLog = {
       ...conflict,
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       created_at: new Date().toISOString(),
     };
     const store = this.getStore('conflicts', 'readwrite');

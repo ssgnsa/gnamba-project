@@ -1,4 +1,5 @@
 import DOMPurify from "dompurify";
+import { getLocalApiBaseUrl } from "@/lib/selfHosted";
 
 export interface AttestationCoutumiereData {
   reference: string;
@@ -71,14 +72,34 @@ export interface AttestationCoutumiereData {
   chef_empreinte_url?: string;
   revoke_reason?: string;
   revoked_at?: string;
+  // Additional properties passed from components for printing
+  lot?: {
+    id: string;
+    reference: string;
+    numero_lot: string;
+    village: string;
+    quartier?: string;
+    lotissement?: string;
+    superficie_m2?: string | number;
+    gps_lat?: string | number;
+    gps_lng?: string | number;
+    gps_precision?: string | number;
+    limites_nord?: string;
+    limites_sud?: string;
+    limites_est?: string;
+    limites_ouest?: string;
+  };
+
+  cachetUrl?: string[];
+
 }
 
 export interface QuittanceData {
+  mois_concerne?: string;
   reference: string;
   locataire_nom: string;
   locataire_prenom: string;
   bien_adresse: string;
-  mois_concerne: string;
   montant: number;
   date_paiement: string;
   mode_paiement: string;
@@ -184,7 +205,7 @@ const safeUrl = (value?: string | null) => {
     const base =
       typeof window !== "undefined" && window.location
         ? window.location.origin
-        : require("../lib/selfHosted").getLocalApiBaseUrl();
+        : getLocalApiBaseUrl();
     const parsed = new URL(value, base);
     if (parsed.protocol === "data:") {
       if (value.trim().toLowerCase().startsWith("data:image/")) {
@@ -1581,6 +1602,367 @@ export function printAuditReport(data: AuditReportData) {
       </tbody>
     </table>
   </div>
+</body>
+</html>`;
+
+  openPrintWindow(html);
+}
+
+// ============================================================================
+// CONTRAT DE BAIL (Lease Contract)
+// ============================================================================
+
+export interface LeaseContractPrintData {
+  reference: string;
+  // Bailleur
+  bailleur_nom: string;
+  bailleur_prenom: string;
+  bailleur_adresse: string;
+  bailleur_telephone: string;
+  bailleur_email: string;
+  bailleur_cni: string;
+  // Locataire
+  locataire_nom: string;
+  locataire_prenom: string;
+  locataire_adresse: string;
+  locataire_telephone: string;
+  locataire_email: string;
+  locataire_cni: string;
+  locataire_profession: string;
+  locataire_employeur: string;
+  // Le bien
+  bien_adresse: string;
+  bien_type: string;
+  bien_superficie: string;
+  // Conditions
+  date_debut: string;
+  date_fin: string;
+  loyer_mensuel: number;
+  charges: number;
+  depot_garantie: number;
+  jour_paiement: number; // Jour du mois (1-31)
+  // Métadonnées
+  date_etablissement: string;
+  lieu_etablissement: string;
+  appName: string;
+  appCompany: string;
+  logoUrl?: string;
+}
+
+export function printContratBail(data: LeaseContractPrintData) {
+  const reference = safeText(data.reference);
+  const appName = safeText(data.appName);
+  const appCompany = safeText(data.appCompany);
+  const logoUrl = safeUrl(data.logoUrl);
+  
+  // Bailleur
+  const bailleurNom = safeText(data.bailleur_nom);
+  const bailleurPrenom = safeText(data.bailleur_prenom);
+  const bailleurAdresse = safeText(data.bailleur_adresse);
+  const bailleurTel = safeText(data.bailleur_telephone);
+  const bailleurEmail = safeText(data.bailleur_email);
+  const bailleurCni = safeText(data.bailleur_cni);
+  
+  // Locataire
+  const locataireNom = safeText(data.locataire_nom);
+  const locatairePrenom = safeText(data.locataire_prenom);
+  const locataireAdresse = safeText(data.locataire_adresse);
+  const locataireTel = safeText(data.locataire_telephone);
+  const locataireEmail = safeText(data.locataire_email);
+  const locataireCni = safeText(data.locataire_cni);
+  const locataireProfession = safeText(data.locataire_profession);
+  const locataireEmployeur = safeText(data.locataire_employeur);
+  
+  // Bien
+  const bienAdresse = safeText(data.bien_adresse);
+  const bienType = safeText(data.bien_type);
+  const bienSuperficie = safeText(data.bien_superficie);
+  
+  // Conditions
+  const dateDebut = safeText(data.date_debut);
+  const dateFin = safeText(data.date_fin);
+  const loyerMensuel = Number.isFinite(data.loyer_mensuel) ? data.loyer_mensuel : 0;
+  const charges = Number.isFinite(data.charges) ? data.charges : 0;
+  const depotGarantie = Number.isFinite(data.depot_garantie) ? data.depot_garantie : 0;
+  const jourPaiement = Number.isFinite(data.jour_paiement) ? data.jour_paiement : 1;
+  
+  const totalMensuel = loyerMensuel + charges;
+  
+  const loyerLabel = loyerMensuel.toLocaleString("fr-FR") + " FCFA";
+  const chargesLabel = charges.toLocaleString("fr-FR") + " FCFA";
+  const totalLabel = totalMensuel.toLocaleString("fr-FR") + " FCFA";
+  const depotLabel = depotGarantie.toLocaleString("fr-FR") + " FCFA";
+  
+  const dateEtab = safeText(data.date_etablissement);
+  const lieuEtab = safeText(data.lieu_etablissement);
+
+  const html = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Contrat de Bail – ${reference}</title>
+  ${printBase}
+  <style>
+    body { font-family: "Times New Roman", Times, serif; font-size: 11pt; color: #000; background: #fff; }
+    .page { width: 180mm; min-height: 270mm; margin: 0 auto; padding: 15mm; position: relative; }
+    .page::before {
+      content: "";
+      position: absolute;
+      inset: 8mm;
+      border: 1.5px solid #1a3a5c;
+      pointer-events: none;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 8mm;
+      padding-bottom: 4mm;
+      border-bottom: 2px solid #1a3a5c;
+    }
+    .company-name { font-size: 14pt; font-weight: bold; color: #1a3a5c; }
+    .company-sub { font-size: 8.5pt; color: #555; margin-top: 2px; }
+    .doc-title {
+      text-align: center;
+      font-size: 16pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      background: #1a3a5c;
+      color: #fff;
+      padding: 6px 12px;
+      margin: 6mm 0;
+      letter-spacing: 1.5px;
+    }
+    .section {
+      margin: 5mm 0;
+      page-break-inside: avoid;
+    }
+    .section-title {
+      font-size: 11pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      color: #1a3a5c;
+      border-bottom: 1.5px solid #1a3a5c;
+      padding-bottom: 2px;
+      margin-bottom: 3mm;
+    }
+    .article {
+      margin: 2mm 0;
+      text-align: justify;
+      line-height: 1.7;
+      text-indent: 5mm;
+    }
+    .article-label {
+      font-weight: bold;
+      color: #1a3a5c;
+      margin-right: 4px;
+    }
+    .info-row {
+      display: flex;
+      gap: 4px;
+      margin: 2mm 0;
+      font-size: 10.5pt;
+      line-height: 1.6;
+    }
+    .info-label { font-weight: bold; white-space: nowrap; min-width: 90px; }
+    .info-value { flex: 1; border-bottom: 1px dotted #666; padding: 0 2px; }
+    .table-financial { width: 100%; border-collapse: collapse; margin: 3mm 0; font-size: 10pt; }
+    .table-financial th {
+      background: #f0f4f8;
+      border: 1px solid #cbd5e1;
+      padding: 4px 6px;
+      text-align: left;
+      font-size: 9pt;
+      text-transform: uppercase;
+      color: #1e3a5f;
+    }
+    .table-financial td { border: 1px solid #e2e8f0; padding: 4px 6px; }
+    .table-financial .total-row { background: #f0fdf4; font-weight: bold; }
+    .signature-zone {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 8mm;
+      gap: 10mm;
+    }
+    .sig-block { text-align: center; flex: 1; }
+    .sig-label { font-size: 9pt; font-weight: bold; color: #1a3a5c; margin-bottom: 10mm; text-transform: uppercase; }
+    .sig-line { border-top: 1.5px solid #333; margin-top: 12mm; padding-top: 3px; font-size: 9pt; }
+    .sig-name { font-weight: bold; margin-bottom: 1mm; }
+    .sig-detail { font-size: 9pt; color: #555; }
+    .page-footer {
+      margin-top: 6mm;
+      text-align: center;
+      font-size: 8.5pt;
+      color: #666;
+      border-top: 1px solid #cbd5e1;
+      padding-top: 3mm;
+    }
+    @media print {
+      body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      .page { margin: 0; padding: 15mm; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- En-tête société -->
+  <div class="header">
+    <div style="display:flex;align-items:center;gap:8px;">
+      ${logoUrl ? `<img src="${logoUrl}" style="width:36px;height:36px;object-fit:cover;border-radius:4px;flex-shrink:0;" onerror="this.style.display='none'" />` : `<img src="/default-logo.svg" style="width:36px;height:36px;object-fit:contain;border-radius:4px;flex-shrink:0;" onerror="this.style.display='none'" />`}
+      <div>
+        <div class="company-name">${appName}</div>
+        <div class="company-sub">${appCompany}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Titre du document -->
+  <div class="doc-title">Contrat de Bail à Usage d'Habitation</div>
+
+  <!-- Référence et date -->
+  <div style="text-align:right; font-size: 9.5pt; color: #555; margin-bottom: 4mm;">
+    <div>Référence: <strong>${reference}</strong></div>
+    <div>Fait à ${lieuEtab}, le ${dateEtab}</div>
+  </div>
+
+  <!-- PRÉAMBULE -->
+  <div class="section">
+    <div class="section-title">Préambule</div>
+    <div class="article">
+      Le présent contrat de bail est établi entre :
+    </div>
+  </div>
+
+  <!-- LE BAILLEUR -->
+  <div class="section">
+    <div class="section-title">Le Bailleur</div>
+    <div class="info-row"><span class="info-label">Nom :</span><span class="info-value"><strong>${bailleurNom.toUpperCase()}</strong> ${bailleurPrenom}</span></div>
+    <div class="info-row"><span class="info-label">Domicile :</span><span class="info-value">${bailleurAdresse}</span></div>
+    <div class="info-row"><span class="info-label">Téléphone :</span><span class="info-value">${bailleurTel}</span></div>
+    <div class="info-row"><span class="info-label">Email :</span><span class="info-value">${bailleurEmail}</span></div>
+    <div class="info-row"><span class="info-label">CNI N° :</span><span class="info-value">${bailleurCni}</span></div>
+    <div class="article">Ci-après dénommé <strong>"LE BAILLEUR"</strong>.</div>
+  </div>
+
+  <!-- LE LOCATAIRE -->
+  <div class="section">
+    <div class="section-title">Le Locataire</div>
+    <div class="info-row"><span class="info-label">Nom :</span><span class="info-value"><strong>${locataireNom.toUpperCase()}</strong> ${locatairePrenom}</span></div>
+    <div class="info-row"><span class="info-label">Domicile :</span><span class="info-value">${locataireAdresse}</span></div>
+    <div class="info-row"><span class="info-label">Téléphone :</span><span class="info-value">${locataireTel}</span></div>
+    <div class="info-row"><span class="info-label">Email :</span><span class="info-value">${locataireEmail}</span></div>
+    <div class="info-row"><span class="info-label">CNI N° :</span><span class="info-value">${locataireCni}</span></div>
+    <div class="info-row"><span class="info-label">Profession :</span><span class="info-value">${locataireProfession}</span></div>
+    <div class="info-row"><span class="info-label">Employeur :</span><span class="info-value">${locataireEmployeur}</span></div>
+    <div class="article">Ci-après dénommé <strong>"LE LOCATAIRE"</strong>.</div>
+  </div>
+
+  <!-- OBJET DU BAIL -->
+  <div class="section">
+    <div class="section-title">Objet du Bail - Désignation du Logement</div>
+    <div class="article"><span class="article-label">Article 1.</span> Le Bailleur donne à bail au Locataire, qui accepte, le logement ci-après désigné :</div>
+    <div class="info-row"><span class="info-label">Adresse :</span><span class="info-value">${bienAdresse}</span></div>
+    <div class="info-row"><span class="info-label">Type :</span><span class="info-value">${bienType}</span></div>
+    <div class="info-row"><span class="info-label">Superficie :</span><span class="info-value">${bienSuperficie} m²</span></div>
+    <div class="article">Ce logement est destiné à l'usage exclusif d'habitation principale du Locataire.</div>
+  </div>
+
+  <!-- DURÉE DU BAIL -->
+  <div class="section">
+    <div class="section-title">Durée du Bail</div>
+    <div class="article"><span class="article-label">Article 2.</span> Le présent bail est consenti pour une durée déterminée, prenant effet le <strong>${dateDebut}</strong> et expirant le <strong>${dateFin || "indéterminée"}</strong>.</div>
+    <div class="article">À l'expiration du bail, celui-ci pourra être renouvelé selon les conditions légales en vigueur en Côte d'Ivoire.</div>
+  </div>
+
+  <!-- LOYER ET CHARGES -->
+  <div class="section">
+    <div class="section-title">Loyer et Charges</div>
+    <div class="article"><span class="article-label">Article 3.</span> Le loyer mensuel est fixé à la somme de <strong>${loyerLabel}</strong> payable d'avance, au plus tard le <strong>${jourPaiement}</strong> de chaque mois.</div>
+    <div class="article"><span class="article-label">Article 4.</span> Les charges locatives sont fixées forfaitairement à la somme de <strong>${chargesLabel}</strong> par mois, payables simultanément avec le loyer.</div>
+    <div class="article"><span class="article-label">Article 5.</span> Le montant total mensuel à régler par le Locataire s'élève à <strong>${totalLabel}</strong>.</div>
+    
+    <table class="table-financial">
+      <thead>
+        <tr>
+          <th>Désignation</th>
+          <th style="text-align:right;">Montant (FCFA)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Loyer mensuel</td>
+          <td style="text-align:right;">${loyerLabel}</td>
+        </tr>
+        <tr>
+          <td>Charges locatives</td>
+          <td style="text-align:right;">${chargesLabel}</td>
+        </tr>
+        <tr class="total-row">
+          <td>Total mensuel</td>
+          <td style="text-align:right;">${totalLabel}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- DÉPÔT DE GARANTIE -->
+  <div class="section">
+    <div class="section-title">Dépôt de Garantie</div>
+    <div class="article"><span class="article-label">Article 6.</span> Le Locataire verse au Bailleur, à la signature du présent bail, un dépôt de garantie d'un montant de <strong>${depotLabel}</strong>.</div>
+    <div class="article">Ce dépôt sera restitué au Locataire dans un délai d'un mois après la restitution des clés, déduction faite des éventuelles dégradations locatives et sommes restant dues.</div>
+  </div>
+
+  <!-- OBLIGATIONS -->
+  <div class="section">
+    <div class="section-title">Obligations des Parties</div>
+    <div class="article"><span class="article-label">Article 7. (Obligations du Bailleur)</span> Le Bailleur s'engage à : délivrer le logement en bon état d'usage et de réparation ; assurer au Locataire la jouissance paisible du logement ; entretenir le logement et faire les réparations autres que locatives.</div>
+    <div class="article"><span class="article-label">Article 8. (Obligations du Locataire)</span> Le Locataire s'engage à : user paisiblement du logement ; payer le loyer et les charges aux échéances convenues ; entretenir le logement et le rendre en bon état ; ne pas sous-louer sans accord écrit du Bailleur ; respecter le règlement de copropriété s'il y a lieu.</div>
+  </div>
+
+  <!-- RÉSILIATION -->
+  <div class="section">
+    <div class="section-title">Résiliation</div>
+    <div class="article"><span class="article-label">Article 9.</span> Toute partie peut mettre fin au présent bail en respectant un préavis de trois (3) mois, notifié par lettre recommandée avec accusé de réception ou remise en main propre contre décharge.</div>
+    <div class="article">En cas de non-paiement du loyer à l'échéance, et huit (8) jours après une mise en demeure restée infructueuse, le Bailleur pourra demander la résiliation judiciaire du bail.</div>
+  </div>
+
+  <!-- JURIDICTION -->
+  <div class="section">
+    <div class="section-title">Juridiction et Loi Applicable</div>
+    <div class="article"><span class="article-label">Article 10.</span> Le présent bail est régi par la loi ivoirienne. Tout litige relatif à son exécution ou à son interprétation sera porté devant les tribunaux compétents du lieu de situation de l'immeuble.</div>
+  </div>
+
+  <!-- SIGNATURES -->
+  <div class="section">
+    <div class="section-title">Signatures</div>
+    <div class="article" style="text-align:center; margin: 4mm 0;">
+      Fait en deux exemplaires originaux, dont un pour chaque partie,
+      après lecture faite et approbation.
+    </div>
+    <div class="signature-zone">
+      <div class="sig-block">
+        <div class="sig-label">Le Bailleur</div>
+        <div class="sig-line"></div>
+        <div class="sig-name">${bailleurPrenom} ${bailleurNom.toUpperCase()}</div>
+        <div class="sig-detail">Précédé de la mention manuscrite :
+          "Lu et approuvé, bon pour bail"</div>
+      </div>
+      <div class="sig-block">
+        <div class="sig-label">Le Locataire</div>
+        <div class="sig-line"></div>
+        <div class="sig-name">${locatairePrenom} ${locataireNom.toUpperCase()}</div>
+        <div class="sig-detail">Précédé de la mention manuscrite :
+          "Lu et approuvé, bon pour bail"</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    Document généré par ${appName} – ${appCompany} le ${new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })} à ${new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+  </div>
+
+</div>
 </body>
 </html>`;
 

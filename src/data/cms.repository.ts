@@ -92,7 +92,7 @@ export const cmsRepository = {
       dbClient
         .from("contact_messages")
         .select("*")
-        .order("created_at", { ascending: false }),
+        .order("created_at"),
     )) as QueryResult<ContactMessageRow[]>;
   },
 

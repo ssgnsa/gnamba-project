@@ -3,6 +3,8 @@
  * Supporte différents fournisseurs : Twilio, MessageBird, etc.
  */
 
+import { apiPost } from "../lib/apiHelpers";
+
 interface WhatsAppConfig {
   provider: "twilio" | "messagebird" | "whatsapp_business_api" | "callmebot";
   accountSid?: string;
@@ -32,24 +34,9 @@ export class WhatsAppService {
    * Envoyer un message WhatsApp
    */
   async sendMessage(message: WhatsAppMessage): Promise<boolean> {
-    try {
-      switch (this.config.provider) {
-        case "twilio":
-          return this.sendViaTwilio(message);
-        case "messagebird":
-          return this.sendViaMessageBird(message);
-        case "whatsapp_business_api":
-          return this.sendViaWhatsAppBusinessAPI(message);
-        case "callmebot":
-          return this.sendViaCallMeBot(message);
-        default:
-          console.error("Fournisseur WhatsApp non supporté:", this.config.provider);
-          return false;
-      }
-    } catch (error) {
-      console.error("Erreur lors de l'envoi WhatsApp:", error);
-      return false;
-    }
+    // Envoi côté client désactivé. Utilisez l'endpoint backend `/api/v1/notifications/whatsapp/send`.
+    console.error("sendMessage côté client désactivé. Utilisez le proxy backend.");
+    return false;
   }
 
   /**
@@ -160,7 +147,13 @@ export class WhatsAppService {
    */
   private async sendViaCallMeBot(message: WhatsAppMessage): Promise<boolean> {
     try {
-      const apiKey = "123456"; // Clé API de test (à remplacer)
+      const apiKey = this.config.apiKey || import.meta.env.VITE_CALLMEBOT_API_KEY || "";
+
+      if (!apiKey) {
+        console.error("Aucun apiKey CallMeBot configuré");
+        return false;
+      }
+
       const response = await fetch(
         `https://api.callmebot.com/whatsapp.php?phone=${message.to}&text=${encodeURIComponent(message.message)}&apikey=${apiKey}`
       );
@@ -206,7 +199,11 @@ export function getWhatsAppConfig(): WhatsAppConfig | null {
   const provider = import.meta.env.VITE_WHATSAPP_PROVIDER;
 
   if (provider === "callmebot") {
-    return { provider };
+    return {
+      provider,
+      apiKey: import.meta.env.VITE_CALLMEBOT_API_KEY || undefined,
+      phoneNumber: import.meta.env.VITE_WHATSAPP_DEFAULT_RECIPIENT || undefined,
+    };
   }
 
   if (import.meta.env.DEV) {
@@ -228,10 +225,6 @@ export async function sendPaymentNotification(
   recipientPhone?: string
 ): Promise<boolean> {
   const config = getWhatsAppConfig();
-  if (!config) {
-    console.error("Configuration WhatsApp non disponible");
-    return false;
-  }
 
   // Numéro par défaut depuis les variables d'environnement ou utiliser celui du locataire
   const toNumber =
@@ -262,8 +255,21 @@ export async function sendPaymentNotification(
 
   message += `\n📅 Date: ${new Date().toLocaleDateString("fr-FR")}\n`;
   message += `\n_Gnamba Services - EGS_`;
+  // Envoi via backend uniquement (plus de fallback côté client pour éviter exposition de clés)
+  try {
+    const resp = await apiPost<{ status: string }, { to: string; message: string }>(
+      "/notifications/whatsapp/send",
+      { to: formattedPhone, message }
+    );
 
-  // Envoyer le message
-  const service = new WhatsAppService(config);
-  return service.sendMessage({ to: formattedPhone, message });
+    if (!resp.error) {
+      return true;
+    }
+
+    console.error("Envoi WhatsApp via backend échoué:", resp.error);
+    return false;
+  } catch (err) {
+    console.error("Erreur appel backend WhatsApp:", err);
+    return false;
+  }
 }

@@ -6,50 +6,77 @@ import {
   CheckCircle2,
   ArrowRight,
   Phone,
+  Sparkles,
+  Shield,
+  Zap,
+  Target,
 } from "lucide-react";
 import { useSiteContent } from "../../context/SiteContentContext";
 import type { PublicPage } from "../../lib/publicRoutes";
+
+// Premium UI Components
+import {
+  Button,
+  Card,
+  CardContent,
+  CardTitle,
+  CardDescription,
+  Badge,
+  Container,
+  Grid,
+  Flex,
+  IconWrapper,
+  Divider,
+} from "../../components/ui";
 
 interface Props {
   onNavigate: (page: PublicPage) => void;
 }
 
 const colorMap = {
-  blue: {
-    bg: "from-blue-600 to-blue-800",
-    light: "bg-blue-50",
-    icon: "text-blue-700",
-    badge: "bg-blue-100 text-blue-700",
-    dot: "bg-blue-600",
-    border: "border-blue-200",
-    check: "text-blue-600",
+  btp: {
+    primary: 'primary',
+    light: 'bg-primary-50',
+    icon: 'text-primary-600',
+    badge: 'bg-primary-100 text-primary-700',
+    border: 'border-primary-200',
+    check: 'text-primary-600',
+    gradient: 'from-primary-500/10 to-primary-600/5',
+    accent: 'bg-primary-600',
+    accentHover: 'hover:bg-primary-700',
   },
-  sky: {
-    bg: "from-sky-500 to-sky-700",
-    light: "bg-sky-50",
-    icon: "text-sky-600",
-    badge: "bg-sky-100 text-sky-700",
-    dot: "bg-sky-600",
-    border: "border-sky-200",
-    check: "text-sky-600",
+  immobilier: {
+    primary: 'sky',
+    light: 'bg-sky-50',
+    icon: 'text-sky-600',
+    badge: 'bg-sky-100 text-sky-700',
+    border: 'border-sky-200',
+    check: 'text-sky-600',
+    gradient: 'from-sky-500/10 to-sky-600/5',
+    accent: 'bg-sky-600',
+    accentHover: 'hover:bg-sky-700',
   },
-  emerald: {
-    bg: "from-emerald-600 to-emerald-800",
-    light: "bg-emerald-50",
-    icon: "text-emerald-600",
-    badge: "bg-emerald-100 text-emerald-700",
-    dot: "bg-emerald-600",
-    border: "border-emerald-200",
-    check: "text-emerald-600",
+  foncier: {
+    primary: 'emerald',
+    light: 'bg-emerald-50',
+    icon: 'text-emerald-600',
+    badge: 'bg-emerald-100 text-emerald-700',
+    border: 'border-emerald-200',
+    check: 'text-emerald-600',
+    gradient: 'from-emerald-500/10 to-emerald-600/5',
+    accent: 'bg-emerald-600',
+    accentHover: 'hover:bg-emerald-700',
   },
-  amber: {
-    bg: "from-amber-500 to-amber-700",
-    light: "bg-amber-50",
-    icon: "text-amber-600",
-    badge: "bg-amber-100 text-amber-700",
-    dot: "bg-amber-600",
-    border: "border-amber-200",
-    check: "text-amber-600",
+  fournitures: {
+    primary: 'amber',
+    light: 'bg-amber-50',
+    icon: 'text-amber-600',
+    badge: 'bg-amber-100 text-amber-700',
+    border: 'border-amber-200',
+    check: 'text-amber-600',
+    gradient: 'from-amber-500/10 to-amber-600/5',
+    accent: 'bg-amber-600',
+    accentHover: 'hover:bg-amber-700',
   },
 };
 
@@ -62,7 +89,7 @@ export default function PublicServices({ onNavigate }: Props) {
       icon: HardHat,
       title: get("services", "btp_title", "BTP & Construction"),
       subtitle: "Du plan au chantier, un suivi sérieux",
-      color: "blue",
+      color: "btp",
       description: get(
         "services",
         "btp_description",
@@ -87,7 +114,7 @@ export default function PublicServices({ onNavigate }: Props) {
       icon: Building2,
       title: get("services", "immobilier_title", "Immobilier"),
       subtitle: "Gestion et valorisation de votre patrimoine",
-      color: "sky",
+      color: "immobilier",
       description: get(
         "services",
         "immobilier_description",
@@ -112,7 +139,7 @@ export default function PublicServices({ onNavigate }: Props) {
       icon: Map,
       title: get("services", "foncier_title", "Foncier sécurisé"),
       subtitle: "Sécurisez votre patrimoine foncier",
-      color: "emerald",
+      color: "foncier",
       description: get(
         "services",
         "foncier_description",
@@ -141,7 +168,7 @@ export default function PublicServices({ onNavigate }: Props) {
         "Fournitures professionnelles",
       ),
       subtitle: "Équipez votre activité sans perdre de temps",
-      color: "amber",
+      color: "fournitures",
       description: get(
         "services",
         "fournitures_description",
@@ -163,133 +190,184 @@ export default function PublicServices({ onNavigate }: Props) {
     },
   ];
 
+  const nav = (page: PublicPage) => {
+    onNavigate(page);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   return (
-    <div className="pt-20">
+    <div className="min-h-screen bg-white">
       {/* Hero */}
-      <section className="py-20 bg-gradient-to-br from-gray-900 to-blue-900 relative overflow-hidden">
+      <section className="relative py-20 sm:py-24 lg:py-28 overflow-hidden" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #1e40af 100%)' }}>
         <div
           className="absolute inset-0 opacity-5"
           style={{
             backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
           }}
         />
-        <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <span className="text-blue-300 font-semibold text-sm uppercase tracking-widest">
-            Ce que nous offrons
-          </span>
-          <h1 className="text-4xl sm:text-5xl font-bold text-white mt-3 mb-5">
-            Nos Services
-          </h1>
-          <p className="text-blue-100/80 text-lg max-w-2xl mx-auto leading-relaxed">
-            Des solutions concrètes, rapides et adaptées au marché ivoirien
-            pour vos besoins en BTP, immobilier, foncier et fournitures.
-          </p>
-        </div>
+        <Container size="xl" className="relative z-10 py-8">
+          <Flex direction="col" align="center" gap="4" className="text-center max-w-4xl mx-auto">
+            <Badge variant="secondary" size="md" className="text-xs bg-white/10 text-white border-white/20">
+              Ce que nous offrons
+            </Badge>
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-tight">
+              Nos <span className="bg-gradient-to-r from-white via-white to-amber-200 bg-clip-text text-transparent">Services</span>
+            </h1>
+            <p className="text-primary-100 text-lg max-w-2xl mx-auto leading-relaxed">
+              Des solutions concrètes, rapides et adaptées au marché ivoirien
+              pour vos besoins en BTP, immobilier, foncier et fournitures.
+            </p>
+            <Flex align="center" justify="center" gap="4" className="pt-4">
+              <IconWrapper size="md" variant="ghost" shape="circle" className="bg-white/10 text-white border-white/20">
+                <Shield size={20} />
+              </IconWrapper>
+              <span className="text-primary-200 text-sm font-medium">Expertise locale certifiée</span>
+              <IconWrapper size="md" variant="ghost" shape="circle" className="bg-white/10 text-white border-white/20">
+                <Zap size={20} />
+              </IconWrapper>
+              <span className="text-primary-200 text-sm font-medium">Réponse sous 24h</span>
+              <IconWrapper size="md" variant="ghost" shape="circle" className="bg-white/10 text-white border-white/20">
+                <Target size={20} />
+              </IconWrapper>
+              <span className="text-primary-200 text-sm font-medium">Résultats garantis</span>
+            </Flex>
+          </Flex>
+        </Container>
       </section>
 
       {/* Services detail */}
-      <section className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-20">
-          {services.map((s, i) => {
-            const Icon = s.icon;
-            const c = colorMap[s.color as keyof typeof colorMap];
-            const isReversed = i % 2 !== 0;
-            return (
-              <div
-                key={s.id}
-                className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center"
-              >
-                <div className={isReversed ? "lg:order-2" : ""}>
-                  <div
-                    className={`inline-flex items-center gap-2 ${c.badge} rounded-full px-3 py-1.5 text-xs font-semibold mb-4`}
-                  >
-                    <Icon size={13} />
-                    {s.title}
-                  </div>
-                  <h2 className="text-3xl font-bold text-gray-900 mb-3">
-                    {s.subtitle}
-                  </h2>
-                  <p className="text-gray-600 leading-relaxed mb-6">
-                    {s.description}
-                  </p>
-                  <ul className="space-y-3 mb-6">
-                    {s.features.map((f) => (
-                      <li key={f} className="flex items-start gap-3">
-                        <CheckCircle2
-                          size={17}
-                          className={`${c.check} mt-0.5 flex-shrink-0`}
-                        />
-                        <span className="text-sm text-gray-700">{f}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <button
-                    onClick={() => {
-                      onNavigate("contact");
-                      window.scrollTo({ top: 0, behavior: "smooth" });
-                    }}
-                    className="flex items-center gap-2 px-6 py-3 bg-blue-700 hover:bg-blue-800 text-white rounded-xl text-sm font-semibold transition-all shadow-sm"
-                  >
-                    <Phone size={15} />
-                    Demander un devis
-                    <ArrowRight size={15} />
-                  </button>
-                </div>
+      <section className="py-20 sm:py-24 lg:py-28 bg-white">
+        <Container size="xl">
+          <div className="space-y-20 lg:space-y-24">
+            {services.map((s, i) => {
+              const Icon = s.icon;
+              const c = colorMap[s.color as keyof typeof colorMap];
+              const isReversed = i % 2 !== 0;
 
-                <div className={isReversed ? "lg:order-1" : ""}>
-                  <div
-                    className={`bg-gradient-to-br ${c.bg} rounded-3xl p-8 relative overflow-hidden`}
-                  >
-                    <div className="absolute -top-6 -right-6 w-24 h-24 bg-white/10 rounded-full" />
-                    <div className="absolute -bottom-6 -left-6 w-32 h-32 bg-white/5 rounded-full" />
-                    <div className="relative z-10">
-                      <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mb-6">
-                        <Icon size={32} className="text-white" />
-                      </div>
-                      <h3 className="text-white font-bold text-lg mb-4">
-                        Exemples de projets
-                      </h3>
-                      <div className="space-y-3">
-                        {s.examples.map((ex) => (
-                          <div
-                            key={ex}
-                            className="flex items-center gap-3 bg-white/10 rounded-xl px-4 py-3"
+              return (
+                <article key={s.id} className={`animate-in slide-in-from-bottom-4 duration-500`} style={{ animationDelay: `${i * 100}ms` }}>
+                  <Grid cols={{ base: 1, lg: 2 }} gap="xl" gapY="md" align="center" className={isReversed ? 'lg:grid-flow-dense' : ''}>
+                    <div className={isReversed ? 'lg:order-2' : 'lg:order-1'}>
+                      <Flex align="center" gap="2" className="mb-4" style={{ width: 'fit-content' }}>
+                        <Badge variant="primary" size="sm" className="gap-1.5">
+                          <Icon size={14} className={c.icon} />
+                          {s.title}
+                        </Badge>
+                      </Flex>
+                      <Flex direction="col" gap="4">
+                        <h2 className="text-3xl sm:text-4xl font-extrabold text-neutral-900 leading-tight">
+                          {s.subtitle}
+                        </h2>
+                        <p className="text-neutral-600 text-lg leading-relaxed max-w-xl">
+                          {s.description}
+                        </p>
+
+                        <ul className="space-y-3 pt-2 border-t border-neutral-100">
+                          {s.features.map((f) => (
+                            <li key={f} className="flex items-start gap-3">
+                              <IconWrapper size="sm" variant={c.primary as any} shape="circle" className="flex-shrink-0 mt-0.5">
+                                <CheckCircle2 size={15} className={c.check} />
+                              </IconWrapper>
+                              <span className="text-sm text-neutral-700 leading-relaxed">{f}</span>
+                            </li>
+                          ))}
+                        </ul>
+
+                        <Flex gap="3" className="pt-4">
+                          <Button
+                            variant={c.primary as any}
+                            size="lg"
+                            onClick={() => nav("contact")}
+                            iconLeft={<Phone size={18} />}
+                            iconRight={<ArrowRight size={18} />}
+                            className="shadow-primary hover:shadow-primaryHover"
                           >
-                            <div className="w-2 h-2 bg-white/60 rounded-full flex-shrink-0" />
-                            <span className="text-white/90 text-sm">{ex}</span>
-                          </div>
-                        ))}
-                      </div>
+                            Demander un devis
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="lg"
+                            onClick={() => nav(s.id === 'btp' ? 'lots' : 'realisations')}
+                            iconRight={<ArrowRight size={18} />}
+                          >
+                            Voir nos projets
+                          </Button>
+                        </Flex>
+                      </Flex>
                     </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+
+                    <div className={isReversed ? 'lg:order-1' : 'lg:order-2'}>
+                      <Card variant="default" padding="none" className="overflow-hidden relative" style={{ borderRadius: '1.5rem' }}>
+                        <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${c.primary === 'primary' ? '#1e40af' : c.primary === 'sky' ? '#0284c7' : c.primary === 'emerald' ? '#059669' : '#d97706'} 0%, ${c.primary === 'primary' ? '#1e3a5f' : c.primary === 'sky' ? '#0369a1' : c.primary === 'emerald' ? '#047857' : '#b45309'} 100%)` }}>
+                          <div className="absolute -top-6 -right-6 w-24 h-24 bg-white/10 rounded-full" />
+                          <div className="absolute -bottom-6 -left-6 w-32 h-32 bg-white/5 rounded-full" />
+                        </div>
+                        <CardContent padding="xl" className="relative z-10 h-full flex flex-col">
+                          <Flex align="center" gap="4" className="mb-6">
+                            <IconWrapper size="xl" variant="ghost" shape="circle" className="bg-white/20 text-white">
+                              <Icon size={32} className="text-white" />
+                            </IconWrapper>
+                          </Flex>
+                          <CardTitle className="text-white font-bold text-lg mb-4">Exemples de projets</CardTitle>
+                          <div className="space-y-3 flex-1">
+                            {s.examples.map((ex) => (
+                              <div
+                                key={ex}
+                                className="flex items-center gap-3 bg-white/10 rounded-xl px-4 py-3 backdrop-blur-sm"
+                              >
+                                <div className="w-2 h-2 bg-white/60 rounded-full flex-shrink-0" />
+                                <span className="text-white/90 text-sm">{ex}</span>
+                              </div>
+                            ))}
+                          </div>
+                          <Button
+                            variant="secondary"
+                            size="md"
+                            onClick={() => nav("realisations")}
+                            iconRight={<ArrowRight size={16} />}
+                            className="mt-6 w-full sm:w-auto bg-white/10 hover:bg-white/20 text-white border-white/20"
+                          >
+                            Voir plus de réalisations
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </Grid>
+
+                  {i < services.length - 1 && (
+                    <Divider variant="dashed" className="my-10" />
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        </Container>
       </section>
 
-      {/* CTA */}
-      <section className="py-16 bg-gray-50 border-t border-gray-100">
-        <div className="max-w-3xl mx-auto px-4 text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-3">
-            Un projet en tête ?
-          </h2>
-          <p className="text-gray-500 mb-6">
-            Contactez notre équipe pour obtenir un devis clair, rapide et
-            réellement adapté à votre budget.
-          </p>
-          <button
-            onClick={() => {
-              onNavigate("contact");
-              window.scrollTo({ top: 0, behavior: "smooth" });
-            }}
-            className="inline-flex items-center gap-2 px-8 py-3.5 bg-blue-700 hover:bg-blue-800 text-white rounded-xl font-semibold transition-all shadow-md"
-          >
-            <Phone size={17} />
-            Demander un devis gratuit
-          </button>
-        </div>
+      {/* CTA Section */}
+      <section className="py-20 sm:py-24 lg:py-28 bg-neutral-50">
+        <Container size="lg">
+          <Card variant="elevated" padding="xl" className="text-center max-w-2xl mx-auto">
+            <Flex direction="col" align="center" gap="4">
+              <IconWrapper size="xl" variant="primary" shape="circle" className="mb-2">
+                <Sparkles size={28} className="text-primary-600" />
+              </IconWrapper>
+              <CardTitle className="text-2xl sm:text-3xl font-extrabold text-neutral-900">Un projet en tête ?</CardTitle>
+              <CardDescription className="text-lg text-neutral-600 max-w-xl mx-auto">
+                Contactez notre équipe pour obtenir un devis clair, rapide et réellement adapté à votre budget.
+              </CardDescription>
+              <Button
+                variant="primary"
+                size="lg"
+                onClick={() => nav("contact")}
+                iconLeft={<Phone size={20} />}
+                className="min-w-[200px] shadow-primary hover:shadow-primaryHover"
+              >
+                Demander un devis gratuit
+              </Button>
+            </Flex>
+          </Card>
+        </Container>
       </section>
     </div>
   );

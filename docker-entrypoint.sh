@@ -25,10 +25,6 @@ for file in /var/www/egs/current/assets/*.js; do
   fi
 done
 
-if [ -f /etc/nginx/conf.d/default.conf.template ]; then
-  envsubst '${VITE_API_URL} ${VITE_LOCAL_API_URL}' < /etc/nginx/conf.d/default.conf.template > /etc/nginx/conf.d/default.conf
-fi
-
 if [ ! -f /etc/nginx/conf.d/default.conf ]; then
   echo "⚠️ Fichier de configuration nginx absent, création minimale"
   printf 'server { listen 80; root /var/www/egs/current; location / { try_files $uri $uri/ /index.html; } }\n' > /etc/nginx/conf.d/default.conf

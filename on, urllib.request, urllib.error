@@ -1,0 +1,7 @@
+            id            |  role   | access_level |              entity_id               
+--------------------------+---------+--------------+--------------------------------------
+ admin-local              | admin   | admin        | d513b0f8-1e9d-416e-8f5d-60e7debd89c8
+ local-user-1785743650013 | employe | employe      | f2c4c971-e4a9-48a4-8e50-2999a9d4126d
+ local-user-1785769883172 | employe | employe      | a1186d14-9d4f-4b8a-9757-9ea76a256e8e
+(3 rows)
+

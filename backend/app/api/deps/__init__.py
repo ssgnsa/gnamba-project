@@ -4,12 +4,12 @@ from typing import Any
 from fastapi import Depends, Header
 from sqlalchemy.orm import Session
 
-from backend.app.core.database import get_db
-from backend.app.core.security import AuthorizationError
-from backend.app.infrastructure.sqlalchemy_user_repository import SqlAlchemyUserRepository
-from backend.app.repositories.user_repository import UserRepositoryPort
-from backend.app.services.auth_service import AuthService
-from backend.app.services.media_service import MediaService
+from app.core.database import get_db
+from app.core.security import AuthorizationError
+from app.infrastructure.sqlalchemy_user_repository import SqlAlchemyUserRepository
+from app.repositories.user_repository import UserRepositoryPort
+from app.services.auth_service import AuthService
+from app.services.media_service import MediaService
 
 
 def get_user_repository(db: Session = Depends(get_db)) -> UserRepositoryPort:

@@ -7,8 +7,8 @@
  * Usage: Call processWorkflows() on schedule or via webhook.
  */
 
-import dbClient from "../data/tableClient";
-import { leadsRepository } from "../data/leads.repository";
+import dbClient from '../lib/dbClient.service';
+import { leadsRepository } from '../lib/dbClient.service';
 
 // ============================================
 // Configuration — Server credentials must not be read from VITE_* variables.
@@ -349,7 +349,7 @@ export async function processWorkflows(): Promise<{
             statut: "active",
             limit: CONFIG.batchSize,
           });
-          const recentLeads = (result.data?.items || []).filter((lead: any) => {
+          const recentLeads = (result.data || []).filter((lead: any) => {
             const createdAt = lead.created_at ?? lead.createdAt;
             return (
               createdAt && createdAt >= oneHourAgo && !lead.last_interaction_at
@@ -365,7 +365,7 @@ export async function processWorkflows(): Promise<{
             statut: "active",
             limit: CONFIG.batchSize,
           });
-          const staleLeads = (staleResult.data?.items || []).filter(
+          const staleLeads = (staleResult.data || []).filter(
             (lead: any) => {
               const lastInteraction = lead.last_interaction_at;
               return lastInteraction && lastInteraction < thirtyDaysAgo;
@@ -451,7 +451,7 @@ export async function processCampaign(
       limit: CONFIG.batchSize,
     });
 
-    const filteredLeads = (leadsResult.data?.items || []).filter(
+    const filteredLeads = (leadsResult.data || []).filter(
       (lead: any) => {
         const segmentFilter = campaign.segment_filter;
         if (!segmentFilter) return true;

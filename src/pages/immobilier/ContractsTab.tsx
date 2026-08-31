@@ -9,22 +9,31 @@ import {
   XCircle,
   Zap,
   AlertCircle,
+  Percent,
+  Calendar,
 } from "lucide-react";
-import type { LeaseContract, Property, Tenant, RentPayment } from "../../types";
+import type { LeaseContract, Property, Tenant, RentPayment, Client } from "../../types";
+import dbClient from "../../lib/dbClient.service";
+import { apiClient } from "../../api/client";
 import Modal from "../../components/ui/Modal";
+import Badge from "../../components/ui/Badge";
+import SelectWithCreate from "../../components/ui/SelectWithCreate";
 import { useSettings } from "../../context/SettingsContext";
 import { useAuth } from "../../context/AuthContext";
+import { useNotifications } from "../../context/NotificationContext";
 import {
   getDemoBlockMessage,
   shouldBlockDestructiveAction,
 } from "../../lib/demoMode";
-import { generateReference } from "../../utils/reference";
+import { generateReference, generateUUID } from "../../utils/reference";
+import { printContratBail } from "../../utils/print";
 import {
   type ManualSyncStatus,
   normalizeManualStatus,
   readManualCache,
   writeManualCache,
 } from "../../lib/manualSyncStore";
+import { syncPendingImmobilier } from "../../lib/manualSyncRunner";
 import {
   getTenantName,
   getPropertyAddress,
@@ -44,11 +53,15 @@ const emptyForm = {
   depot_garantie: "",
   statut: "actif" as LeaseContract["statut"],
   notes: "",
+  commission_rate: "12",
+  jour_echeance: "10",
 };
 
 const CONTRACTS_CACHE_KEY = "egs.immobilier.contracts.local_cache.v1";
 const PROPERTIES_CACHE_KEY = "egs.immobilier.properties.local_cache.v1";
 const PAYMENTS_CACHE_KEY = "egs.immobilier.payments.local_cache.v1";
+const CLIENTS_CACHE_KEY = "egs.clients.local_cache.v1";
+const TENANTS_CACHE_KEY = "egs.immobilier.tenants.local_cache.v1";
 
 type LocalLeaseContract = LeaseContract & {
   sync_status: ManualSyncStatus;
@@ -129,7 +142,7 @@ async function generateMonthlyPayments(
     for (const { mois, moisLabel, lastDay } of monthRange) {
       if (!existingMonths.has(moisLabel) && !existingMonths.has(mois)) {
           const payload: LocalRentPayment = {
-            id: crypto.randomUUID(),
+            id: generateUUID(),
           contract_id: contract.id,
           property_id: contract.property_id,
           montant: contract.loyer_mensuel + (contract.charges || 0),
@@ -219,6 +232,7 @@ export default function ContractsTab({
   onRefresh,
 }: Props) {
   const { settings } = useSettings();
+  const { showToast } = useNotifications();
   const { user, profile } = useAuth();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -235,6 +249,8 @@ export default function ContractsTab({
     skipped: number;
     error?: string;
   } | null>(null);
+  const [syncErrorModalOpen, setSyncErrorModalOpen] = useState(false);
+  const [syncErrorContent, setSyncErrorContent] = useState<string | null>(null);
 
   const inputClass =
     "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400";
@@ -260,6 +276,8 @@ export default function ContractsTab({
       depot_garantie: String(c.depot_garantie),
       statut: c.statut,
       notes: c.notes || "",
+      commission_rate: String(c.commission_rate || 12),
+      jour_echeance: String(c.jour_echeance || 10),
     });
     setEditingId(c.id);
     setError(null);
@@ -290,12 +308,28 @@ export default function ContractsTab({
       notes: form.notes.trim() || null,
       created_at: existingContract?.created_at || new Date().toISOString(),
       updated_at: new Date().toISOString(),
+      commission_rate: parseFloat(form.commission_rate) || 12,
+      jour_echeance: parseInt(form.jour_echeance) || 10,
     };
 
     if (form.statut === "actif" && hasContractOverlap(proposedContract, contracts, editingId)) {
       setError(
         "Ce bien possède déjà un contrat actif sur une période qui se chevauche.",
       );
+      return;
+    }
+
+    // Validate commission rate
+    const rate = parseFloat(form.commission_rate);
+    if (isNaN(rate) || rate < 0 || rate > 100) {
+      setError("Le taux de commission doit être entre 0 et 100%");
+      return;
+    }
+
+    // Validate due date
+    const dueDay = parseInt(form.jour_echeance);
+    if (isNaN(dueDay) || dueDay < 1 || dueDay > 28) {
+      setError("Le jour d'échéance doit être entre 1 et 28");
       return;
     }
 
@@ -315,7 +349,7 @@ export default function ContractsTab({
       const existingLocalContract = cachedContracts.find((c) => c.id === editingId);
       const localContract: LocalLeaseContract = {
         ...(existingLocalContract ?? {}),
-        id: existingLocalContract?.id ?? crypto.randomUUID(),
+        id: existingLocalContract?.id ?? generateUUID(),
         reference: existingLocalContract?.reference ?? generateReference("CTR"),
         property_id: form.property_id,
         locataire_id: form.locataire_id,
@@ -326,6 +360,8 @@ export default function ContractsTab({
         depot_garantie: parseFloat(form.depot_garantie) || 0,
         statut: form.statut,
         notes: form.notes.trim() || null,
+        commission_rate: parseFloat(form.commission_rate) || 12,
+        jour_echeance: parseInt(form.jour_echeance) || 10,
         created_at: existingLocalContract?.created_at || now,
         updated_at: now,
         sync_status: "pending",
@@ -344,6 +380,9 @@ export default function ContractsTab({
       if (form.statut === "actif") {
         await updatePropertyStatus(targetPropertyId, "loue");
       }
+
+      // Check if this is a new active contract (not editing) that should trigger print
+      const isNewActiveContract = !editingId && form.statut === "actif";
 
       if (editingId && existingContract) {
         const oldPropertyId = existingContract.property_id;
@@ -377,6 +416,58 @@ export default function ContractsTab({
 
       setModalOpen(false);
       onRefresh();
+
+      // If this was a new active contract, generate the lease contract for printing
+      if (isNewActiveContract) {
+        const property = properties.find((p) => p.id === form.property_id);
+        const tenant = tenants.find((t) => t.id === form.locataire_id);
+        
+        if (property && tenant) {
+          setTimeout(() => {
+            const today = new Date().toLocaleDateString("fr-FR", {
+              day: "2-digit",
+              month: "long",
+              year: "numeric",
+            });
+            
+            const appName = settings.app_title || "EGS";
+            const appCompany = settings.app_company || "Gnamba Services";
+            const logoUrl = settings.logo_url ?? "";
+
+            printContratBail({
+              reference: localContract.reference || "",
+              bailleur_nom: (property.proprietaire_client?.nom ?? "Propriétaire") as string,
+              bailleur_prenom: (property.proprietaire_client?.prenom ?? "") as string,
+              bailleur_adresse: "",
+              bailleur_telephone: (property.proprietaire_client?.telephone ?? "") as string,
+              bailleur_email: (property.proprietaire_client?.email ?? "") as string,
+              bailleur_cni: "",
+              locataire_nom: tenant.nom,
+              locataire_prenom: tenant.prenom,
+              locataire_adresse: tenant.client?.adresse || "",
+              locataire_telephone: tenant.telephone || "",
+              locataire_email: tenant.email || "",
+              locataire_cni: "",
+              locataire_profession: "",
+              locataire_employeur: "",
+              bien_adresse: property.adresse,
+              bien_type: property.type_bien,
+              bien_superficie: "",
+              date_debut: form.date_debut,
+              date_fin: form.date_fin || "",
+              loyer_mensuel: parseFloat(form.loyer_mensuel) || 0,
+              charges: parseFloat(form.charges) || 0,
+              depot_garantie: parseFloat(form.depot_garantie) || 0,
+              jour_paiement: parseInt(form.jour_echeance) || 10,
+              date_etablissement: today,
+              lieu_etablissement: property.adresse.split(",")[0] || "Abidjan",
+              appName,
+              appCompany,
+              logoUrl,
+            });
+          }, 100);
+        }
+      }
     } catch (err: any) {
       setError(
         err.message || "Une erreur est survenue lors de l'enregistrement",
@@ -388,7 +479,7 @@ export default function ContractsTab({
 
   const handleDelete = async (id: string) => {
     if (destructiveActionsDisabled) {
-      window.alert(getDemoBlockMessage());
+      showToast("error","Mode d\u00e9mo",getDemoBlockMessage());
       return;
     }
     const contractToDelete = contracts.find((c) => c.id === id);
@@ -432,7 +523,7 @@ export default function ContractsTab({
 
       onRefresh();
     } catch (err: any) {
-      alert(`Erreur lors de la suppression locale: ${err.message}`);
+      showToast("error","Erreur suppression",`Erreur lors de la suppression locale: ${err.message}`);
     }
   };
 
@@ -473,7 +564,7 @@ export default function ContractsTab({
 
       onRefresh();
     } catch (err: any) {
-      alert(`Erreur lors du changement de statut: ${err.message}`);
+      showToast("error","Erreur statut",`Erreur lors du changement de statut: ${err.message}`);
     }
   };
 
@@ -513,6 +604,26 @@ export default function ContractsTab({
         >
           <Plus size={16} /> Nouveau Contrat
         </button>
+        <button
+          onClick={async () => {
+            try {
+              showToast('info', 'Synchronisation', 'Synchronisation en cours...');
+              const res = await syncPendingImmobilier();
+              if (res.errors.length === 0) {
+                showToast('success', 'Synchronisation', `Sync OK — ${res.tenantsSynced} locataire(s), ${res.contractsSynced} contrat(s)`);
+              } else {
+                showToast('info', 'Synchronisation partielle', `Sync partiel — ${res.errors.length} erreur(s)`);
+                console.warn('Sync errors', res.errors);
+              }
+              onRefresh();
+            } catch (err: any) {
+              showToast('error', 'Synchronisation', err?.message || String(err));
+            }
+          }}
+          className="ml-3 flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium border"
+        >
+          <RefreshCw size={14} /> Synchroniser maintenant
+        </button>
       </div>
 
       {genResult && (
@@ -537,7 +648,7 @@ export default function ContractsTab({
                 : genResult.created > 0
                   ? `${genResult.created} loyer(s) généré(s) avec succès.`
                   : "Tous les loyers sont déjà générés pour cette période."}
-            </span>
+          </span>
           </div>
           <button
             onClick={() => setGenResult(null)}
@@ -572,7 +683,13 @@ export default function ContractsTab({
                     Période
                   </th>
                   <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">
-                    Loyer
+                    Loyer + Charges
+                  </th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase hidden md:table-cell">
+                    Commission
+                  </th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase hidden lg:table-cell">
+                    Échéance
                   </th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">
                     Statut
@@ -585,6 +702,17 @@ export default function ContractsTab({
                   const tenantName = getTenantName(c.locataires as any);
                   const address = getPropertyAddress(c.properties);
                   const statusCfg = getContractStatusConfig(c.statut);
+                  const totalRent = c.loyer_mensuel + (c.charges || 0);
+                  const localContracts = readManualCache<LocalLeaseContract>(CONTRACTS_CACHE_KEY) || [];
+                  const local = localContracts.find((lc) => lc.id === c.id) || null;
+                  const localStatus = local ? normalizeManualStatus(local.sync_status) : null;
+                  const renderSyncBadge = (status: string | null, error: string | null) => {
+                    if (!status) return null;
+                    if (status === "pending") return <Badge label={"En attente"} color="orange" />;
+                    if (status === "synced") return <Badge label={"Synced"} color="green" />;
+                    if (status === "deleted") return <Badge label={"Supprimé"} color="red" />;
+                    return error ? <Badge label={"Erreur"} color="red" /> : <Badge label={String(status)} color="gray" />;
+                  };
 
                   return (
                     <tr
@@ -592,7 +720,26 @@ export default function ContractsTab({
                       className="hover:bg-gray-50 transition-colors"
                     >
                       <td className="px-4 py-3">
-                        <span className="table-key">{c.reference}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="table-key">{c.reference}</span>
+                          {(() => {
+                            const badgeNode = renderSyncBadge(localStatus, local?.sync_error ?? null);
+                            if (!badgeNode) return null;
+                            const onClick = () => {
+                              if (local?.sync_error) {
+                                setSyncErrorContent(local.sync_error);
+                                setSyncErrorModalOpen(true);
+                              }
+                            };
+                            return (
+                              <span className="ml-2">
+                                <button onClick={onClick} className="focus:outline-none" title={local?.sync_error ?? ''}>
+                                  {badgeNode}
+                                </button>
+                              </span>
+                            );
+                          })()}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <span className="text-sm text-gray-700 font-medium">
@@ -611,13 +758,23 @@ export default function ContractsTab({
                       </td>
                       <td className="px-4 py-3 text-right">
                         <span className="text-sm font-semibold text-green-600">
-                          {formatMontantImmo(c.loyer_mensuel)} FCFA
+                          {formatMontantImmo(totalRent)} FCFA
                         </span>
                         {c.charges > 0 && (
                           <span className="text-xs text-gray-400 block">
                             +{formatMontantImmo(c.charges)} FCFA charges
                           </span>
                         )}
+                      </td>
+                      <td className="px-4 py-3 text-center hidden md:table-cell">
+                        <span className="inline-flex items-center gap-1 text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">
+                          <Percent size={10} /> {c.commission_rate || 12}%
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center hidden lg:table-cell">
+                        <span className="inline-flex items-center gap-1 text-xs text-gray-600 bg-gray-50 px-2 py-0.5 rounded-full">
+                          <Calendar size={10} /> {c.jour_echeance || 10}e
+                        </span>
                       </td>
                       <td className="px-4 py-3">
                         <span
@@ -701,44 +858,286 @@ export default function ContractsTab({
           )}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Bien Immobilier *
-              </label>
-              <select
+              <SelectWithCreate
                 value={form.property_id}
-                onChange={(e) =>
-                  setForm({ ...form, property_id: e.target.value })
-                }
-                className={inputClass}
-              >
-                <option value="">Sélectionner un bien...</option>
-                {(editingId ? properties : availableProperties).map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.adresse}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setForm({ ...form, property_id: val })}
+                options={(editingId ? properties : availableProperties).map((p) => ({
+                  value: p.id,
+                  label: `${p.adresse} (${getPropertyAddress({ type_bien: p.type_bien } as Property)})`
+                }))}
+                placeholder="Sélectionner un bien..."
+                label="Bien Immobilier *"
+                required
+                createModalTitle="Nouveau Bien Immobilier"
+                createFields={[
+                  { key: "adresse", label: "Adresse", type: "text", placeholder: "Ex: Cocody, Rue des Jardins...", required: true },
+                  { key: "type_bien", label: "Type de Bien", type: "select", required: true, options: [
+                    { value: "studio", label: "Studio" },
+                    { value: "chambre", label: "Chambre" },
+                    { value: "chambre-salon", label: "Chambre-Salon" },
+                    { value: "appartement", label: "Appartement" },
+                    { value: "terrain", label: "Terrain" },
+                    { value: "magasin", label: "Magasin" },
+                    { value: "bureau", label: "Bureau" },
+                    { value: "villa", label: "Villa" },
+                  ]},
+                  { key: "loyer_mensuel", label: "Loyer/mois (FCFA)", type: "number", placeholder: "0", required: false },
+                  { key: "charges", label: "Charges/mois (FCFA)", type: "number", placeholder: "0", required: false },
+                  { key: "statut", label: "Statut", type: "select", required: true, options: [
+                    { value: "disponible", label: "Disponible" },
+                    { value: "loue", label: "Loué" },
+                    { value: "en_vente", label: "En Vente" },
+                    { value: "vendu", label: "Vendu" },
+                  ]},
+                  { key: "proprietaire_id", label: "Propriétaire", type: "select", required: false },
+                  { key: "description", label: "Description", type: "textarea", placeholder: "Caractéristiques, équipements...", required: false },
+                ]}
+                validateCreateForm={(data) => {
+                  const errors: Record<string, string> = {};
+                  if (!data.adresse?.trim()) errors.adresse = "L'adresse est obligatoire";
+                  return Object.keys(errors).length > 0 ? errors : null;
+                }}
+                onCreate={async (data) => {
+                  const now = new Date().toISOString();
+                  const payload = {
+                    type_bien: data.type_bien || "studio",
+                    adresse: data.adresse.trim(),
+                    proprietaire_id: data.proprietaire_id || null,
+                    loyer_mensuel: parseFloat(data.loyer_mensuel) || 0,
+                    charges: parseFloat(data.charges) || 0,
+                    statut: data.statut || "disponible",
+                    description: data.description || null,
+                    updated_at: now,
+                  };
+                  const { data: newProp, error } = await dbClient.from("properties").insert(payload).select("id").single();
+                  if (error) throw error;
+                  // Update local cache
+                  const cached = readManualCache<any>(PROPERTIES_CACHE_KEY);
+                  const updated = { ...newProp, sync_status: "pending", sync_error: null, deleted_at: null };
+                  writeManualCache(PROPERTIES_CACHE_KEY, [...cached, updated]);
+                  return { value: newProp.id, label: `${data.adresse} (${data.type_bien})` };
+                }}
+                // fetchCreateData to load proprietaires for the select
+                fetchCreateData={async () => {
+                  const cached = readManualCache<Client>(CLIENTS_CACHE_KEY);
+                  return {
+                    proprietaire_id: cached
+                      .map(c => ({ value: c.id, label: `${c.prenom} ${c.nom}` }))
+                  };
+                }}
+              />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Locataire *
-              </label>
-              <select
+              <SelectWithCreate
                 value={form.locataire_id}
-                onChange={(e) =>
-                  setForm({ ...form, locataire_id: e.target.value })
-                }
-                className={inputClass}
-              >
-                <option value="">Sélectionner...</option>
-                {tenants
+                onChange={(val) => setForm({ ...form, locataire_id: val })}
+                options={tenants
                   .filter((t) => t.statut === "actif")
-                  .map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.prenom} {t.nom}
-                    </option>
-                  ))}
-              </select>
+                  .map((t) => ({ value: t.id, label: `${t.prenom} ${t.nom}` }))}
+                placeholder="Sélectionner..."
+                label="Locataire *"
+                required
+                createModalTitle="Nouveau Locataire"
+                createFields={[
+                  { key: "client_id", label: "Client (obligatoire)", type: "select", required: true },
+                  { key: "prenom", label: "Prénom", type: "text", placeholder: "Prénom", required: false },
+                  { key: "nom", label: "Nom", type: "text", placeholder: "Nom", required: false },
+                  { key: "telephone", label: "Téléphone", type: "tel", placeholder: "+225 07 00 00 00", required: false },
+                  { key: "email", label: "Email", type: "email", placeholder: "email@exemple.com", required: false },
+                  { key: "loyer", label: "Loyer (FCFA)", type: "number", placeholder: "0", required: false },
+                  { key: "depot_garantie", label: "Dépôt de garantie", type: "number", placeholder: "0", required: false },
+                  { key: "statut", label: "Statut", type: "select", required: true, options: [
+                    { value: "actif", label: "Actif" },
+                    { value: "inactif", label: "Inactif" },
+                  ]},
+                ]}
+                validateCreateForm={(data) => {
+                  const errors: Record<string, string> = {};
+                  // If no client_id, require nom/prenom/telephone directly
+                  if (!data.client_id && (!data.nom?.trim() || !data.prenom?.trim())) {
+                    errors.nom = "Le nom est requis si aucun client n'est sélectionné";
+                  }
+                  return Object.keys(errors).length > 0 ? errors : null;
+                }}
+                onCreate={async (data) => {
+                  const now = new Date().toISOString();
+                  const nom = data.nom;
+                  const prenom = data.prenom;
+                  const telephone = data.telephone;
+                  const email = data.email;
+
+                  const tenantPayload = {
+                    client_id: data.client_id || null,
+                    nom: nom || "Locataire",
+                    prenom: prenom || "",
+                    telephone: telephone || null,
+                    email: email || null,
+                    property_id: null,
+                    date_debut_contrat: null,
+                    date_fin_contrat: null,
+                    loyer: parseFloat(data.loyer) || 0,
+                    depot_garantie: parseFloat(data.depot_garantie) || 0,
+                    statut: data.statut || "actif",
+                    updated_at: now,
+                  };
+
+                  // Create tenant in local cache
+                  const cachedTenants = readManualCache<any>(TENANTS_CACHE_KEY);
+                  const newTenant = {
+                    ...tenantPayload,
+                    id: generateUUID(),
+                    created_at: now,
+                    sync_status: "pending",
+                    sync_error: null,
+                    deleted_at: null,
+                  };
+                  writeManualCache(TENANTS_CACHE_KEY, [...cachedTenants, newTenant]);
+                  // Confirmation toast
+                  try {
+                    showToast("success", "Locataire créé", `${prenom} ${nom} créé(e)`);
+                  } catch (e) {
+                    // ignore if notifications unavailable
+                  }
+
+                  // If online, try to persist to backend immediately: create client -> contract -> tenant linkage
+                  if (typeof navigator !== "undefined" && navigator.onLine) {
+                    try {
+                      // Create client (entity) on backend
+                      const clientPayload = {
+                        type_client: "particulier",
+                        nom: nom || undefined,
+                        prenom: prenom || undefined,
+                        telephone: telephone || undefined,
+                        email: email || undefined,
+                      };
+
+                      const clientRes = await apiClient.clients.create(clientPayload);
+                      if (clientRes.error || !clientRes.data) {
+                        throw new Error(clientRes.error || "Erreur création client");
+                      }
+                      const createdClient = clientRes.data as any;
+
+                      // If contract data present, create contract on backend
+                      let createdContract: any = null;
+                      if (form.property_id && form.date_debut) {
+                        const contractPayload = {
+                          property_id: form.property_id,
+                          locataire_entity_id: createdClient.id,
+                          date_debut: form.date_debut,
+                          date_fin: form.date_fin || null,
+                          loyer_mensuel: parseFloat(form.loyer_mensuel) || parseFloat(data.loyer) || 0,
+                          charges_mensuelles: parseFloat(form.charges) || 0,
+                          depot_garantie: parseFloat(form.depot_garantie) || 0,
+                          statut: form.statut || "actif",
+                          notes: form.notes?.trim() || null,
+                          commission_rate: parseFloat(form.commission_rate) || 12,
+                          jour_echeance: parseInt(form.jour_echeance) || 10,
+                        };
+
+                        const contractRes = await apiClient.request('/immobilier/contracts', {
+                          method: 'POST',
+                          body: JSON.stringify(contractPayload),
+                        });
+                        if (contractRes.error || !contractRes.data) {
+                          throw new Error(contractRes.error || 'Erreur création contrat');
+                        }
+                        createdContract = contractRes.data as any;
+                      }
+
+                      // Create tenant linkage on backend (optional, but keep server-side mapping)
+                      const tenantCreatePayload: any = { entity_id: createdClient.id };
+                      if (createdContract) {
+                        tenantCreatePayload.property_id = createdContract.property_id;
+                        tenantCreatePayload.contract_id = createdContract.id;
+                      } else if (form.property_id) {
+                        tenantCreatePayload.property_id = form.property_id;
+                      }
+
+                      const tenantRes = await apiClient.request('/tenants', {
+                        method: 'POST',
+                        body: JSON.stringify(tenantCreatePayload),
+                      });
+                      if (tenantRes.error || !tenantRes.data) {
+                        // Non-fatal: server may accept contract without tenant linkage
+                        console.warn('Tenant linkage creation failed on server:', tenantRes.error);
+                      }
+
+                      // Mark local entries as synced
+                      const updatedTenants = readManualCache<any>(TENANTS_CACHE_KEY).map((t: any) =>
+                        t.id === newTenant.id ? { ...t, sync_status: 'synced' } : t,
+                      );
+                      writeManualCache(TENANTS_CACHE_KEY, updatedTenants);
+
+                      if (createdContract) {
+                        const cachedContracts = readManualCache<any>(CONTRACTS_CACHE_KEY);
+                        const updatedContracts = cachedContracts.map((c: any) =>
+                          c.locataire_id === newTenant.id || c.id === createdContract.id
+                            ? { ...c, sync_status: 'synced' }
+                            : c,
+                        );
+                        writeManualCache(CONTRACTS_CACHE_KEY, sortContracts(updatedContracts));
+                      }
+
+                      showToast('success', 'Synchronisation', 'Les données ont été enregistrées sur le serveur');
+                    } catch (err: any) {
+                      console.error('Persist backend failed:', err);
+                      showToast('error', 'Synchronisation', `Échec synchronisation: ${err.message || err}`);
+                      // keep local pending entries for later sync
+                    }
+                  }
+
+                  // If the contract modal already has enough data, create the contract in the local cache too
+                  try {
+                    // `form` is in scope from the ContractsTab component and contains current contract inputs
+                    if (form.property_id && form.date_debut) {
+                      const cachedContracts = readManualCache<any>(CONTRACTS_CACHE_KEY);
+                      const newContract = {
+                        id: generateUUID(),
+                        reference: generateReference("CTR"),
+                        property_id: form.property_id,
+                        locataire_id: newTenant.id,
+                        date_debut: form.date_debut,
+                        date_fin: form.date_fin || null,
+                        loyer_mensuel: parseFloat(form.loyer_mensuel) || parseFloat(data.loyer) || 0,
+                        charges: parseFloat(form.charges) || 0,
+                        depot_garantie: parseFloat(form.depot_garantie) || 0,
+                        statut: form.statut || "actif",
+                        notes: form.notes?.trim() || null,
+                        commission_rate: parseFloat(form.commission_rate) || 12,
+                        jour_echeance: parseInt(form.jour_echeance) || 10,
+                        created_at: now,
+                        updated_at: now,
+                        sync_status: "pending",
+                        sync_error: null,
+                        deleted_at: null,
+                      };
+                      writeManualCache(CONTRACTS_CACHE_KEY, sortContracts(cachedContracts.concat(newContract)));
+
+                      // Update property status to 'loue' when creating an active contract
+                      if (newContract.statut === "actif") {
+                        await updatePropertyStatus(newContract.property_id, "loue");
+                      }
+                      try {
+                        showToast("success", "Contrat créé", `Contrat ${newContract.reference} créé pour ${prenom} ${nom}`);
+                      } catch (e) {
+                        // ignore toast errors
+                      }
+                    }
+                  } catch (err) {
+                    // don't block tenant creation on contract failures
+                    console.error("Failed to create linked contract:", err);
+                  }
+
+                  return { value: newTenant.id, label: `${prenom} ${nom}` };
+                }}
+                fetchCreateData={async () => {
+                  const cached = readManualCache<Client>(CLIENTS_CACHE_KEY);
+                  return {
+                    client_id: cached
+                      .map(c => ({ value: c.id, label: `${c.prenom} ${c.nom} (${c.telephone})` }))
+                  };
+                }}
+              />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -810,25 +1209,61 @@ export default function ContractsTab({
               />
             </div>
           </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Statut
-            </label>
-            <select
-              value={form.statut}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  statut: e.target.value as LeaseContract["statut"],
-                })
-              }
-              className={inputClass}
-            >
-              <option value="actif">Actif</option>
-              <option value="termine">Terminé</option>
-              <option value="resilie">Résilié</option>
-              <option value="renouvele">Renouvelé</option>
-            </select>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Commission (%)*
+                <span className="text-gray-400 font-normal"> (Part entreprise)</span>
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                value={form.commission_rate}
+                onChange={(e) =>
+                  setForm({ ...form, commission_rate: e.target.value })
+                }
+                className={inputClass}
+                placeholder="12"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Jour d'échéance *
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="28"
+                value={form.jour_echeance}
+                onChange={(e) =>
+                  setForm({ ...form, jour_echeance: e.target.value })
+                }
+                className={inputClass}
+                placeholder="10"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Statut
+              </label>
+              <select
+                value={form.statut}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    statut: e.target.value as LeaseContract["statut"],
+                  })
+                }
+                className={inputClass}
+              >
+                <option value="actif">Actif</option>
+                <option value="termine">Terminé</option>
+                <option value="resilie">Résilié</option>
+                <option value="renouvele">Renouvelé</option>
+              </select>
+            </div>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -866,6 +1301,17 @@ export default function ContractsTab({
               {saving ? "Enregistrement..." : "Enregistrer"}
             </button>
           </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={syncErrorModalOpen}
+        onClose={() => setSyncErrorModalOpen(false)}
+        title={"Détails d'erreur de synchronisation"}
+        size="sm"
+      >
+        <div className="text-sm text-gray-700">
+          <pre className="whitespace-pre-wrap break-words text-xs bg-gray-50 p-3 rounded-md border border-gray-100">{syncErrorContent}</pre>
         </div>
       </Modal>
     </>

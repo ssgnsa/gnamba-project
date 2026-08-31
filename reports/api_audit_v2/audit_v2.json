@@ -1,0 +1,114 @@
+{
+  "routers": 21,
+  "prefixes": [
+    {
+      "file": "backend/app/api/v1/tasks.py",
+      "prefix": "/api/v1/tasks"
+    },
+    {
+      "file": "backend/app/api/v1/leads.py",
+      "prefix": "/api/v1/leads"
+    },
+    {
+      "file": "backend/app/api/v1/rpc.py",
+      "prefix": "/api/v1/rpc"
+    },
+    {
+      "file": "backend/app/api/v1/tenants.py",
+      "prefix": "/api/v1/tenants"
+    },
+    {
+      "file": "backend/app/api/v1/clients.py",
+      "prefix": "/api/v1/clients"
+    },
+    {
+      "file": "backend/app/api/v1/tables.py",
+      "prefix": "/api/v1/tables"
+    },
+    {
+      "file": "backend/app/api/v1/media/__init__.py",
+      "prefix": "/api/media"
+    },
+    {
+      "file": "backend/app/api/v1/media/__init__.py",
+      "prefix": "/api/v1/media"
+    },
+    {
+      "file": "backend/app/api/v1/projects/__init__.py",
+      "prefix": "/api/v1/projects"
+    },
+    {
+      "file": "backend/app/api/v1/foncier/routes.py",
+      "prefix": "/api/v1/foncier"
+    },
+    {
+      "file": "backend/app/api/v1/employees/__init__.py",
+      "prefix": "/api/v1/employees"
+    },
+    {
+      "file": "backend/app/api/v1/suppliers/__init__.py",
+      "prefix": "/api/v1/suppliers"
+    },
+    {
+      "file": "backend/app/api/v1/finance/__init__.py",
+      "prefix": "/api/v1/finance"
+    },
+    {
+      "file": "backend/app/api/v1/auth/__init__.py",
+      "prefix": "/api/auth"
+    },
+    {
+      "file": "backend/app/api/v1/auth/router.py",
+      "prefix": "/api/v1/auth"
+    },
+    {
+      "file": "backend/app/api/v1/settings/__init__.py",
+      "prefix": "/api/settings"
+    },
+    {
+      "file": "backend/app/api/v1/settings/__init__.py",
+      "prefix": "/api/v1/settings"
+    },
+    {
+      "file": "backend/app/api/v1/settings/__init__.py",
+      "prefix": "/api/site-content"
+    },
+    {
+      "file": "backend/app/api/v1/settings/__init__.py",
+      "prefix": "/api/v1/site-content"
+    },
+    {
+      "file": "backend/app/api/v1/users/__init__.py",
+      "prefix": "/api/users"
+    },
+    {
+      "file": "backend/app/api/v1/users/router.py",
+      "prefix": "/api/v1/users"
+    },
+    {
+      "file": "backend/app/api/v1/products/__init__.py",
+      "prefix": "/api/v1/products"
+    },
+    {
+      "file": "backend/app/api/v1/dashboard/router.py",
+      "prefix": "/api/v1/dashboard"
+    },
+    {
+      "file": "backend/app/api/v1/immobilier/__init__.py",
+      "prefix": "/api/v1/immobilier"
+    }
+  ],
+  "duplicate_prefixes": {},
+  "orphan_python_files": [
+    "backend/app/api/v1/tasks.py",
+    "backend/app/api/v1/leads.py",
+    "backend/app/api/v1/rpc.py",
+    "backend/app/api/v1/tenants.py",
+    "backend/app/api/v1/clients.py",
+    "backend/app/api/v1/tables.py",
+    "backend/app/api/v1/foncier/routes.py",
+    "backend/app/api/v1/auth/router.py",
+    "backend/app/api/v1/users/router.py",
+    "backend/app/api/v1/dashboard/router.py"
+  ]
+}

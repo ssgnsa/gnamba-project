@@ -1,120 +1,96 @@
-# =====================
-# ENV
-# =====================
-.env
-.env.*
-!.env.example
-
-# =====================
-# NODE / FRONTEND
-# =====================
-node_modules/
-dist/
-dist-local/
-.vite/
-coverage/
-
-# logs
-logs/
-*.log
-
-# =====================
-# BACKUP / TEMP
-# =====================
-_archive/
-.tmp/
-*.bak
-*.tmp
-
-# corrupted installs
-node_modules.corrupt.*/
-node_modules.*.corrupt*/
-
-# =====================
-# SUPABASE
-# =====================
-supabase/.branches/
-supabase/.temp/
-supabase/logs/
-supabase/seed/.temp/
-
-# =====================
-# SYSTEM / OS
-# =====================
-.DS_Store
-Thumbs.db
-
-# =====================
-# REPO-SPECIFIC NOISE
-# =====================
-.secrets/
-backups/
-dist_old/
-.sync-config
-
-# =====================
-# FILEBROWSER
-# =====================
+# Filebrowser
+filebrowser/config/
 filebrowser/database/
-
-# Python environment
-.venv/
-venv/
-env/
-
-# Python cache
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Node
-node_modules/
-
-# Logs
-*.log
-*.log~
-
-# Temporary files
-*.tmp
-*.bak
-*.backup
-*.restored
-
 
 # Python
 .venv/
 venv/
 __pycache__/
-*.py[cod]
+*.pyc
 
 # Node
 node_modules/
 
-# IDE
-.vscode/
-.cursor/
-.continue/
-.claude/
+# Docker volumes
+**/volumes/
 
-# Runtime generated files
-backend/storage/uploads/
-*.log
-*.tmp
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Secrets
+.env
+.env.*
+!.env.example
+.aider*
+
+# --- Custom ignores for EGS ERP ---
+# Backup files
 *.bak
-*.backup*
-.last-cycle-result.json
-loop_state.json
-loop-run-log.md
-
-# Local AI tools
-.claude/
-.cursor/
-.continue/
-.grok/
+*.backup
+*~
+# Temporary files
+*.tmp
+*.temp
+# Log files
+*.log
+lint_output.txt
+# Directories
+_archive/
+audit_report/
+backups/
+coverage/
+dist/
+node_modules/
+.venv/
 .amplitude/
+.claude/
+.continue/
+.cursor/
+.grok/
+.secrets/
+# Specific files
+.gitignore.*
+.*-*
+.sylius*
+.microchip
+Dockerfile.*
+docker-compose.yml.*
+AUDIT_FONCTIONNEL_COMPLET.md
+AUDIT_REPORT.md
+CLAUDE.md
+IMPLEMENTATION_PLAN.md
+INVENTORY.md
+RISK_REGISTER.md
+SECURITY_AUDIT.md
+SERVICE_CRITICALITY_MATRIX.md
+VULNERABILITY_REGISTER.md
 
-# Temporary tests
-test_write.txt
-*.backup2
-.mcp.json
+# Backup and temporary files
+*~
+*.bak*
+*.backup*
+*.orig
+*.rej
+.*.swp
+.swo
+.*.swo
+# Logs
+*.log
+lint_output.txt
+# Misc
+.DS_Store
+Thumbs.db
+.ma_cle_api
+# Uploads (user-generated content)
+backend/storage/uploads/
 
+# Additional ignores
+logs/
+log*.md
+*.tar.gz
+*.zip
+*.7z
+*.rar
+*log*.md

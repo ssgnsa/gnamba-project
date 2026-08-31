@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from backend.app.application.user_service import UserApplicationService
-from backend.app.repositories.user_repository import UserRepositoryPort
+from app.application.user_service import UserApplicationService
+from app.repositories.user_repository import UserRepositoryPort
 
 
 class AuthService(UserApplicationService):

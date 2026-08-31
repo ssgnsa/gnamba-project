@@ -50,16 +50,34 @@ def test_finance_module_flow():
 
 def test_immobilier_module_flow():
     response = client.post(
-        "/api/v1/immobilier",
-        json={"titre": "Villa Nord", "ville": "Abidjan", "prix": 120000000},
+        "/api/v1/immobilier/properties",
+        json={
+            "type_bien": "villa",
+            "adresse": "Villa Nord, Abidjan",
+            "proprietaire_name": "Alpha Koné",
+            "valeur": 120000000,
+            "loyer_mensuel": 2500000,
+            "charges_mensuelles": 150000,
+            "statut": "disponible",
+            "description": "Villa test",
+        },
     )
-    assert response.status_code == 200, response.text
+    assert response.status_code == 201, response.text
     payload = response.json()
-    assert payload["titre"] == "Villa Nord"
+    assert payload["adresse"] == "Villa Nord, Abidjan"
 
-    list_response = client.get("/api/v1/immobilier")
+    list_response = client.get("/api/v1/immobilier/properties")
     assert list_response.status_code == 200
-    assert any(item["id"] == payload["id"] for item in list_response.json())
+    assert any(item["id"] == payload["id"] for item in list_response.json()["items"])
+
+
+def test_immobilier_routes_are_not_duplicated():
+    paths = sorted({route.path for route in app.routes if getattr(route, "path", None) and "/immobilier" in route.path})
+
+    assert "/api/v1/immobilier/properties" in paths
+    assert "/api/v1/immobilier/properties/{property_id}" in paths
+    assert "/api/v1/immobilier/api/v1/immobilier/properties" not in paths
+    assert "/api/v1/immobilier/api/v1/immobilier" not in paths
 
 
 def test_foncier_module_flow():

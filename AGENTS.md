@@ -6,7 +6,7 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
 
 EGS (Enterprise Gnamba System) is a full-stack ERP for **Gnamba Services**, a multi-service company in Côte d'Ivoire. It manages BTP/construction projects, real estate, land management, supplies, finances, HR, and documents. The UI is entirely in **French**.
 
-Stack: React 18, TypeScript, Vite, Tailwind CSS, Supabase (PostgreSQL + Auth + Storage).
+Stack: React 18, TypeScript, Vite, Tailwind CSS, **Python/FastAPI (backend)**, PostgreSQL (database).
 
 ## Build and Development Commands
 
@@ -18,21 +18,18 @@ npm run typecheck        # TypeScript type checking (tsc --noEmit -p tsconfig.ap
 npm run preview          # Preview production build
 ```
 
-### Supabase (database)
+### Backend Database (Python/FastAPI + Alembic)
+
+The project uses a self-hosted Python/FastAPI backend with PostgreSQL. Database schema is managed by **alembic migrations** in the backend:
 
 ```powershell
-supabase start           # Start local Supabase services
-supabase stop            # Stop local services
-supabase db push         # Apply migrations from supabase/migrations/
-supabase db dump -f backup.sql  # Export database
+cd backend
+alembic upgrade head     # Apply all migrations
+alembic revision --autogenerate -m "description"  # Create new migration
+alembic downgrade -1     # Rollback last migration
 ```
 
-Migrations are in `supabase/migrations/` as sequential SQL files. The schema uses RLS (Row Level Security) on all tables.
-
-In this shared workspace:
-
-- EGS owns `supabase/migrations/`
-- Do not mix active EGS migrations with archived references
+Migrations are in `backend/alembic/versions/` as sequential Python files (18 complete migrations covering all modules).
 
 ### Docker
 
@@ -41,7 +38,7 @@ docker-compose up -d     # Start the EGS frontend container only
 docker-compose down      # Stop containers
 ```
 
-Local Supabase is managed by `supabase start` / `supabase stop`, not by `docker-compose.yml`.
+Local PostgreSQL is managed separately (not by docker-compose.yml).
 
 ## Architecture
 
@@ -59,13 +56,13 @@ All page components are eagerly imported in `App.tsx`. To add a new page, add it
 
 Three contexts wrap the app in this order: `AuthProvider` → `SettingsProvider` → `AppContent`.
 
-- **AuthContext** — Supabase auth session, user profile from `user_profiles` table, sign in/out. Exports `hasAccess(role, module)` which enforces role-based module visibility. Roles: `admin` (all access), `gestionnaire` (most modules), `employe` (limited).
-- **SettingsContext** — Loads brand settings (title, colors, logo) from `app_settings` table. Falls back to `media_files` brand assets for the logo. Provides `useSettings()`.
-- **SiteContentContext** — Loads CMS key-value pairs from `site_content` table. Provides `useSiteContent().get(section, key, fallback)`.
+- **AuthContext** — Local auth session via API (`/auth/me`, `/auth/refresh`), user profile from `user_profiles` table, sign in/out. Exports `hasAccess(role, module)` which enforces role-based module visibility. Roles: `admin` (all access), `gestionnaire` (most modules), `employe` (limited).
+- **SettingsContext** — Loads brand settings (title, colors, logo) from `app_settings` table via API. Falls back to `media_files` brand assets for the logo. Provides `useSettings()`.
+- **SiteContentContext** — Loads CMS key-value pairs from `site_content` table via API. Provides `useSiteContent().get(section, key, fallback)`.
 
 ### Data Layer
 
-There is no API layer or data-fetching abstraction. Each page component directly calls `supabase.from('table')` for queries, inserts, updates, and deletes. The Supabase client is initialized in `src/lib/supabase.ts` using `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` from `.env`.
+Data is fetched via a **local API client** (`src/api/client.ts`) that communicates with the Python/FastAPI backend. Each page component uses repository functions from `src/lib/dbClient.service.ts` which wrap the API client. The API client uses JWT authentication with tokens stored in localStorage.
 
 ### Key Modules
 
@@ -77,7 +74,7 @@ There is no API layer or data-fetching abstraction. Each page component directly
 
 ### Types
 
-All shared TypeScript interfaces are in `src/types/index.ts`. This includes every database entity type. Supabase queries use these types for casting responses. Joined relations use `Pick<>` to type the included fields.
+All shared TypeScript interfaces are in `src/types/index.ts`. This includes every database entity type. API responses use these types for casting. Joined relations use `Pick<>` to type the included fields.
 
 ### Styling
 
@@ -87,26 +84,15 @@ Tailwind CSS with custom CSS variables `--color-primary` and `--color-secondary`
 
 Required in `.env` at the project root:
 
-**Cloud Mode (Default):**
+**Production:**
 
-- `VITE_SUPABASE_URL` — Supabase Cloud API URL
-- `VITE_SUPABASE_ANON_KEY` — Supabase Cloud anonymous key
+- `VITE_API_URL` — Backend API URL (e.g., https://api.gnamba.local/api/v1)
 
-**Local Mode (Development):**
+**Local Development:**
 
-- `VITE_SUPABASE_LOCAL_URL` — Supabase Local URL (http://localhost:54321)
-- `VITE_SUPABASE_LOCAL_ANON_KEY` — Supabase Local anonymous key
-- `POSTGRES_PASSWORD` — Local PostgreSQL password
-- `JWT_SECRET` — JWT secret for local Supabase (min. 32 characters)
+- `VITE_API_URL` — Local backend API URL (e.g., http://localhost:8000/api/v1)
 
-**Switching Modes:**
-
-- Copy `.env.local.example` to `.env` for local development
-- Copy `.env.example` to `.env` for cloud/production
-- Ensure `VITE_SUPABASE_MODE` matches the chosen mode
-- Rebuild container after switching: `docker-compose build --no-cache egs-frontend`
-
-See `README.md` for the current mode and local development instructions.
+The backend requires its own `.env` in the `backend/` folder with PostgreSQL connection details.
 
 ### Formatting Conventions
 

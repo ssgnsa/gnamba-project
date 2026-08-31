@@ -7,7 +7,7 @@
  * Usage: Call generateAndPublish() to auto-create from ERP events.
  */
 
-import dbClient from "../data/tableClient";
+import dbClient from '../lib/dbClient.service';
 
 // ============================================
 // Configuration

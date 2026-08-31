@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import os
 import time
 from abc import ABC, abstractmethod
 from typing import Any
 
-from backend.app.core.security import hash_password
-from backend.app.domain.user import User
+from app.core.security import hash_password
+from app.domain.user import User
 
 
 class UserRepositoryPort(ABC):
@@ -43,10 +44,12 @@ class InMemoryUserRepository(UserRepositoryPort):
     def _seed_default_admin(self) -> None:
         if self._users_by_email:
             return
+        admin_password = os.getenv("INITIAL_ADMIN_PASSWORD", "Admin@EGS2025!")
         admin = User(
             id="local-admin",
+            entity_id="local-admin-entity",
             email="admin@egs.local",
-            password_hash=hash_password("deadsoulja28@"),
+            password_hash=hash_password(admin_password),
             full_name="Admin Local",
             role="admin",
             access_level="admin",
@@ -70,9 +73,11 @@ class InMemoryUserRepository(UserRepositoryPort):
         user = self._users_by_id.get(user_id)
         if not user:
             return None
-        for field in ("full_name", "role", "access_level", "poste", "department", "phone"):
+        for field in ("full_name", "role", "access_level", "poste", "department", "phone", "email", "entity_id"):
             if field in payload and payload[field] is not None:
                 setattr(user, field, payload[field])
+        if "password_hash" in payload and payload["password_hash"] is not None:
+            user.password_hash = payload["password_hash"]
         return user
 
     def delete(self, user_id: str) -> bool:
@@ -85,6 +90,7 @@ class InMemoryUserRepository(UserRepositoryPort):
     def create(self, payload: dict[str, Any]) -> User:
         user = User(
             id=f"local-user-{int(time.time() * 1000)}",
+            entity_id=f"local-entity-{int(time.time() * 1000)}",
             email=payload["email"],
             password_hash=hash_password(payload["password"]),
             full_name=payload.get("full_name", ""),

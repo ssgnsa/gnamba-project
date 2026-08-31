@@ -1,61 +1,54 @@
 import { useState, useMemo } from "react";
 import {
   Plus,
-  DollarSign,
   CreditCard as Edit,
   Trash2,
-  Printer,
   FileText,
-  Download,
-  Eye,
-  Filter,
   CheckCircle,
-  AlertCircle,
   Clock,
+  XCircle,
+  DollarSign,
+  User,
 } from "lucide-react";
-import type { RentPayment, Tenant, Property, LeaseContract } from "../../types";
+import type { RentPayment, LeaseContract, Tenant, Property } from "../../types";
 import Modal from "../../components/ui/Modal";
-import Badge from "../../components/ui/Badge";
+import SelectWithCreate from "../../components/ui/SelectWithCreate";
 import { useSettings } from "../../context/SettingsContext";
 import { useAuth } from "../../context/AuthContext";
+import { useNotifications } from "../../context/NotificationContext";
 import {
   getDemoBlockMessage,
   shouldBlockDestructiveAction,
 } from "../../lib/demoMode";
-import { generateReference } from "../../utils/reference";
-import { printQuittance, printRecuLoyer } from "../../utils/print";
-import {
-  getTenantName,
-  getPropertyAddress,
-  getPaymentStatusConfig,
-  getPaymentModeLabel,
-  formatMontantImmo,
-} from "../../lib/immobilier";
-import { formatMontant, formatDate } from "../../utils/reference";
+import { generateReference, generateUUID } from "../../utils/reference";
 import {
   type ManualSyncStatus,
   normalizeManualStatus,
   readManualCache,
   writeManualCache,
 } from "../../lib/manualSyncStore";
+import {
+  getTenantName,
+  formatMontantImmo,
+  getPaymentStatusConfig,
+} from "../../lib/immobilier";
 
 const emptyForm = {
   contract_id: "",
-  locataire_id: "",
-  property_id: "",
   montant: "",
-  date_paiement: new Date().toISOString().split("T")[0],
+  date_paiement: "",
   date_echeance: "",
-  date_paiement_effectif: "",
   mois_concerne: "",
-  mois_concerne_date: "",
   mode_paiement: "especes" as RentPayment["mode_paiement"],
-  statut: "paye" as RentPayment["statut"],
+  statut: "en_attente" as RentPayment["statut"],
   notes: "",
-  reference: "",
+  locataire_id: "",
 };
 
 const PAYMENTS_CACHE_KEY = "egs.immobilier.payments.local_cache.v1";
+const CONTRACTS_CACHE_KEY = "egs.immobilier.contracts.local_cache.v1";
+const PROPERTIES_CACHE_KEY = "egs.immobilier.properties.local_cache.v1";
+const TENANTS_CACHE_KEY = "egs.immobilier.tenants.local_cache.v1";
 
 type LocalRentPayment = RentPayment & {
   updated_at: string;
@@ -72,48 +65,47 @@ function sortPayments(items: LocalRentPayment[]): LocalRentPayment[] {
   );
 }
 
+// Get last month in YYYY-MM format
+function getLastMonth(): string {
+  const now = new Date();
+  const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  return lastMonth.toISOString().slice(0, 7); // YYYY-MM
+}
+
+// Get due date (10th of current month)
+function getDueDate(): string {
+  const now = new Date();
+  const dueDate = new Date(now.getFullYear(), now.getMonth(), 10);
+  return dueDate.toISOString().split("T")[0];
+}
+
 interface Props {
   payments: RentPayment[];
   contracts: LeaseContract[];
   tenants: Tenant[];
   properties: Property[];
   search: string;
-  tenantIdColumn: "locataire_id" | "tenant_id";
   onRefresh: () => void;
 }
 
-type DateFilter = "all" | "this_month" | "last_month" | "this_year" | "custom";
-type StatusFilter = "all" | "paye" | "en_attente" | "retard" | "partiel";
-type OwnerFilter = "all" | string;
-
 export default function PaymentsTab({
-  payments,
+  payments: paymentsProp,
   contracts,
   tenants,
-  properties,
   search,
-  tenantIdColumn: _tenantIdColumn,
   onRefresh,
 }: Props) {
   const { settings } = useSettings();
+  const { showToast } = useNotifications();
   const { user, profile } = useAuth();
-
-  // Filters
-  const [dateFilter, setDateFilter] = useState<DateFilter>("all");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [ownerFilter, setOwnerFilter] = useState<OwnerFilter>("all");
-  const [customDateStart, setCustomDateStart] = useState("");
-  const [customDateEnd, setCustomDateEnd] = useState("");
-
-  // Modal states
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Preview modal for remote verification
-  const [previewOpen, setPreviewOpen] = useState(false);
+  const [filterStatus, setFilterStatus] = useState<RentPayment["statut"] | "all">(
+    "all",
+  );
   const destructiveActionsDisabled = shouldBlockDestructiveAction(
     user,
     profile,
@@ -121,228 +113,107 @@ export default function PaymentsTab({
 
   const inputClass =
     "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400";
-  const today = new Date().toISOString().split("T")[0];
-  const currentMonth = today.slice(0, 7);
 
-  // Get unique owners from properties
-  const uniqueOwners = useMemo(() => {
-    const owners = properties
-      .map((p) => p.proprietaire)
-      .filter((v, i, a) => v && v.trim() && a.indexOf(v) === i)
-      .sort();
-    return owners;
-  }, [properties]);
+  // Group payments by tenant/client
+  const paymentsByTenant = useMemo(() => {
+    const grouped: Record<string, RentPayment[]> = {};
+    
+    const filtered = paymentsProp.filter((p) =>
+      `${p.reference} ${getTenantName(p.locataires as any)}`
+        .toLowerCase()
+        .includes(search.toLowerCase()),
+    ).filter((p) => filterStatus === "all" || p.statut === filterStatus);
 
-  // Month label helpers
-  const monthLabelFromInput = (monthValue: string) => {
-    if (!monthValue) return "";
-    const [year, month] = monthValue.split("-").map(Number);
-    return new Date(year, month - 1, 1).toLocaleDateString("fr-FR", {
-      month: "long",
-      year: "numeric",
-    });
-  };
+    for (const payment of filtered) {
+      const tenantId = payment.locataire_id || '';
+      const key = tenantId || `unknown-${payment.id}`;
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(payment);
+    }
+    return grouped;
+  }, [paymentsProp, search, filterStatus]);
 
-  const monthInputFromDate = (dateStr?: string | null) => {
-    if (!dateStr) return "";
-    return String(dateStr).slice(0, 7);
-  };
+  // Sort tenants by name for display
+  const sortedTenantGroups = useMemo(() => {
+    return Object.entries(paymentsByTenant)
+      .map(([tenantId, payments]) => {
+        // Find tenant info
+        const firstPayment = payments[0];
+        const contract = contracts.find(c => c.id === firstPayment.contract_id);
+        const locataireId = contract?.locataire_id;
+        const tenant = tenants.find(t => t.id === locataireId);
+        const client = tenant?.client;
+        const tenantName = client ? `${client.prenom} ${client.nom}` : getTenantName(({ prenom: tenant?.prenom, nom: tenant?.nom } as any));
+        
+        // Sort payments by date (newest first)
+        const sortedPayments = [...payments].sort((a, b) => 
+          new Date(b.date_paiement || b.created_at).getTime() - 
+          new Date(a.date_paiement || a.created_at).getTime()
+        );
+        
+        return { tenantId, tenantName, payments: sortedPayments, tenant, contract };
+      })
+      .sort((a, b) => a.tenantName.localeCompare(b.tenantName));
+  }, [paymentsByTenant, contracts, tenants]);
 
-  const lastDayFromMonth = (monthValue: string) => {
-    if (!monthValue) return "";
-    const [year, month] = monthValue.split("-").map(Number);
-    return new Date(year, month, 0).toISOString().split("T")[0];
-  };
-
-  // Filter payments with advanced filters
-  const filteredPayments = useMemo(() => {
-    return payments.filter((p) => {
-      // Search filter
-      const tenantName = getTenantName(p.locataires as any);
-      const searchMatch =
-        `${tenantName} ${p.mois_concerne} ${p.reference || ""}`
-          .toLowerCase()
-          .includes(search.toLowerCase());
-
-      if (!searchMatch) return false;
-
-      // Status filter
-      if (statusFilter !== "all" && p.statut !== statusFilter) return false;
-
-      // Date filter
-      if (dateFilter !== "all") {
-        const paymentDate = p.date_paiement || p.date_echeance || "";
-        const paymentMonth = paymentDate.slice(0, 7);
-
-        if (dateFilter === "this_month" && paymentMonth !== currentMonth)
-          return false;
-        if (dateFilter === "last_month") {
-          const lastMonth = new Date(
-            new Date().getFullYear(),
-            new Date().getMonth() - 1,
-            1,
-          )
-            .toISOString()
-            .slice(0, 7);
-          if (paymentMonth !== lastMonth) return false;
-        }
-        if (dateFilter === "this_year") {
-          const currentYear = new Date().getFullYear().toString();
-          if (!paymentDate.startsWith(currentYear)) return false;
-        }
-        if (dateFilter === "custom" && customDateStart && customDateEnd) {
-          if (paymentDate < customDateStart || paymentDate > customDateEnd)
-            return false;
-        }
-      }
-
-      // Owner filter
-      if (ownerFilter !== "all") {
-        const property = properties.find((prop) => prop.id === p.property_id);
-        if (property?.proprietaire !== ownerFilter) return false;
-      }
-
-      return true;
-    });
-  }, [
-    payments,
-    search,
-    statusFilter,
-    dateFilter,
-    ownerFilter,
-    customDateStart,
-    customDateEnd,
-    properties,
-    currentMonth,
-  ]);
-
-  // Last month paid payments for remote verification
-  const lastMonthPaid = useMemo(() => {
-    const lastMonth = new Date(
-      new Date().getFullYear(),
-      new Date().getMonth() - 1,
-      1,
-    )
-      .toISOString()
-      .slice(0, 7);
-
-    return payments.filter((p) => {
-      const paymentMonth = (p.date_paiement || p.date_echeance || "").slice(
-        0,
-        7,
-      );
-      return paymentMonth === lastMonth && p.statut === "paye";
-    });
-  }, [payments]);
-
-  // Statistics
-  const stats = useMemo(() => {
-    const total = filteredPayments.length;
-    const paid = filteredPayments.filter((p) => p.statut === "paye").length;
-    const pending = filteredPayments.filter(
-      (p) => p.statut === "en_attente",
-    ).length;
-    const late = filteredPayments.filter((p) => p.statut === "retard").length;
-    const partial = filteredPayments.filter(
-      (p) => p.statut === "partiel",
-    ).length;
-
-    const totalAmount = filteredPayments
-      .filter((p) => p.statut === "paye")
-      .reduce((sum, p) => sum + (p.montant || 0), 0);
-
-    const pendingAmount = filteredPayments
-      .filter((p) => p.statut === "en_attente" || p.statut === "retard")
-      .reduce((sum, p) => sum + (p.montant || 0), 0);
-
-    return { total, paid, pending, late, partial, totalAmount, pendingAmount };
-  }, [filteredPayments]);
-
-  // Open modals
   const openAdd = () => {
-    const monthValue = today.slice(0, 7);
+    const lastMonth = getLastMonth();
+    const dueDate = getDueDate();
     setForm({
       ...emptyForm,
-      reference: generateReference("QTT"),
-      mois_concerne_date: monthValue,
-      mois_concerne: monthLabelFromInput(monthValue),
-      date_echeance: lastDayFromMonth(monthValue),
-      date_paiement: today,
+      date_paiement: new Date().toISOString().split("T")[0],
+      date_echeance: dueDate,
+      mois_concerne: lastMonth,
+      locataire_id: "",
     });
     setEditingId(null);
     setError(null);
     setModalOpen(true);
   };
 
-  const openEdit = (pay: RentPayment) => {
-    const monthValue = pay.mois_concerne_date
-      ? String(pay.mois_concerne_date).slice(0, 7)
-      : monthInputFromDate(pay.date_echeance || pay.date_paiement);
+  const handleContractChange = (contractId: string) => {
+    const contract = contracts.find((c) => c.id === contractId);
+    if (contract) {
+      const lastMonth = getLastMonth();
+      const dueDate = getDueDate();
+      setForm((f) => ({
+        ...f,
+        contract_id: contractId,
+        locataire_id: contract.locataire_id || "",
+        montant: String(contract.loyer_mensuel + (contract.charges || 0)),
+        date_echeance: dueDate,
+        mois_concerne: lastMonth,
+      }));
+    } else {
+      setForm((f) => ({ ...f, contract_id: "", locataire_id: "", montant: "" }));
+    }
+  };
+
+  const openEdit = (p: RentPayment) => {
     setForm({
-      contract_id: pay.contract_id || "",
-      locataire_id: pay.locataire_id || "",
-      property_id: pay.property_id || "",
-      montant: String(pay.montant),
-      date_paiement: pay.date_paiement || today,
-      date_echeance: pay.date_echeance || "",
-      date_paiement_effectif:
-        pay.date_paiement_effectif ||
-        (pay.statut === "paye" || pay.statut === "partiel"
-          ? pay.date_paiement || today
-          : ""),
-      mois_concerne: pay.mois_concerne || monthLabelFromInput(monthValue),
-      mois_concerne_date: monthValue,
-      mode_paiement: pay.mode_paiement,
-      statut: pay.statut,
-      notes: pay.notes || "",
-      reference: pay.reference || generateReference("QTT"),
+      contract_id: p.contract_id || "",
+      montant: String(p.montant),
+      date_paiement: p.date_paiement || p.date_paiement_effectif || "",
+      date_echeance: p.date_echeance || "",
+      mois_concerne: p.mois_concerne || "",
+      mode_paiement: p.mode_paiement,
+      statut: p.statut,
+      notes: p.notes || "",
+      locataire_id: p.locataire_id || "",
     });
-    setEditingId(pay.id);
+    setEditingId(p.id);
     setError(null);
     setModalOpen(true);
   };
 
-  const openPreview = () => setPreviewOpen(true);
-
-  // Handle form changes
-  const handleContractChange = (contractId: string) => {
-    const contract = contracts.find((c) => c.id === contractId);
-    if (contract) {
-      setForm((f) => ({
-        ...f,
-        contract_id: contractId,
-        locataire_id: contract.locataire_id,
-        property_id: contract.property_id,
-        montant: String(contract.loyer_mensuel + (contract.charges || 0)),
-      }));
-    } else {
-      setForm((f) => ({ ...f, contract_id: "" }));
-    }
-  };
-
-  // Save payment
   const handleSave = async () => {
-    if (!form.montant || (!form.mois_concerne_date && !form.mois_concerne)) {
-      setError("Le montant et le mois concerné sont obligatoires");
+    if (!form.contract_id || !form.montant || !form.date_paiement) {
+      setError("Contrat, montant et date de paiement sont obligatoires");
       return;
     }
 
     setSaving(true);
     setError(null);
-
-    const monthValue = form.mois_concerne_date;
-    const moisLabel = monthValue
-      ? monthLabelFromInput(monthValue)
-      : form.mois_concerne;
-    const dateEcheance =
-      form.date_echeance ||
-      (monthValue ? lastDayFromMonth(monthValue) : form.date_paiement);
-    const datePaiementEffectif =
-      form.statut === "paye" || form.statut === "partiel"
-        ? form.date_paiement_effectif || form.date_paiement || today
-        : null;
-    const datePaiement =
-      datePaiementEffectif || dateEcheance || form.date_paiement || today;
 
     try {
       const now = new Date().toISOString();
@@ -357,28 +228,24 @@ export default function PaymentsTab({
       const existing = cached.find((payment) => payment.id === editingId);
       const localPayment: LocalRentPayment = {
         ...(existing ?? {}),
-        id: existing?.id ?? crypto.randomUUID(),
-        contract_id: form.contract_id || null,
-        property_id: form.property_id || null,
+        id: existing?.id ?? generateUUID(),
+        reference: existing?.reference ?? generateReference("QTT"),
+        contract_id: form.contract_id,
+        property_id: existing?.property_id ?? "",
         montant: parseFloat(form.montant) || 0,
-        date_paiement: datePaiement,
-        date_echeance: dateEcheance || null,
-        date_paiement_effectif: datePaiementEffectif,
-        mois_concerne: moisLabel || "",
-        mois_concerne_date: monthValue ? `${monthValue}-01` : null,
+        date_paiement: form.date_paiement || "",
+        date_echeance: form.date_echeance || null,
+        mois_concerne: form.mois_concerne || "",
         mode_paiement: form.mode_paiement,
         statut: form.statut,
         notes: form.notes.trim() || null,
-        reference: form.reference || generateReference("QTT"),
         locataire_id: form.locataire_id || null,
-        created_at: existing?.created_at ?? now,
-        updated_at: now,
-        last_document_type: existing?.last_document_type ?? null,
-        last_document_at: existing?.last_document_at ?? null,
-        last_document_by: existing?.last_document_by ?? null,
         sync_status: "pending",
         sync_error: null,
         deleted_at: null,
+        date_paiement_effectif: null,
+        created_at: existing?.created_at ?? now,
+        updated_at: now,
       };
 
       const next = sortPayments(
@@ -396,10 +263,9 @@ export default function PaymentsTab({
     }
   };
 
-  // Delete payment
   const handleDelete = async (id: string) => {
     if (destructiveActionsDisabled) {
-      window.alert(getDemoBlockMessage());
+      showToast("error","Mode démo",getDemoBlockMessage());
       return;
     }
     if (!confirm("Supprimer ce paiement ? Cette action est irréversible."))
@@ -425,546 +291,339 @@ export default function PaymentsTab({
       writeManualCache(PAYMENTS_CACHE_KEY, sortPayments(next));
       onRefresh();
     } catch (err: any) {
-      alert(`Erreur lors de la suppression locale: ${err.message}`);
+      showToast("error","Erreur suppression",`Erreur lors de la suppression locale: ${err.message}`);
     }
   };
 
-  // Document audit
-  const updateDocumentAudit = async (
-    id: string,
-    type: "quittance" | "recu",
-  ) => {
-    const cached = readManualCache<LocalRentPayment>(PAYMENTS_CACHE_KEY);
-    const now = new Date().toISOString();
-    const next = cached.map((payment) =>
-      payment.id === id
-        ? {
-            ...payment,
-            last_document_type: type,
-            last_document_at: now,
-            last_document_by: null,
-            updated_at: now,
-            sync_status:
-              normalizeManualStatus(payment.sync_status) === "synced"
-                ? "pending"
-                : normalizeManualStatus(payment.sync_status),
-          }
-        : payment,
-    );
-    writeManualCache(PAYMENTS_CACHE_KEY, sortPayments(next));
+  const handleStatusChange = async (p: RentPayment, newStatus: RentPayment["statut"]) => {
+    try {
+      const now = new Date().toISOString();
+      const cached = readManualCache<LocalRentPayment>(PAYMENTS_CACHE_KEY);
+      const next = cached.map((payment) =>
+        payment.id === p.id
+          ? {
+              ...payment,
+              statut: newStatus,
+              updated_at: now,
+              date_paiement_effectif:
+                newStatus === "paye" ? new Date().toISOString().split("T")[0] : payment.date_paiement_effectif,
+              sync_status:
+                normalizeManualStatus(payment.sync_status) === "synced"
+                  ? "pending"
+                  : normalizeManualStatus(payment.sync_status),
+            }
+          : payment,
+      );
+      writeManualCache(PAYMENTS_CACHE_KEY, sortPayments(next));
+      onRefresh();
+    } catch (err: any) {
+      showToast("error","Erreur",`Erreur lors du changement de statut: ${err.message}`);
+    }
   };
 
-  // Print functions
-  const resolvePaymentDate = (pay: RentPayment) =>
-    pay.date_paiement_effectif ||
-    pay.date_paiement ||
-    pay.date_echeance ||
-    today;
-
-  const handlePrintQuittance = async (pay: RentPayment) => {
-    if (pay.statut !== "paye") return;
-    const tenantName = getTenantName(pay.locataires as any);
-    const address = getPropertyAddress(pay.properties as any);
-
-    printQuittance({
-      reference: pay.reference || generateReference("QTT"),
-      locataire_nom: tenantName.split(" ").pop() || tenantName,
-      locataire_prenom:
-        tenantName.split(" ").slice(0, -1).join(" ") || tenantName,
-      bien_adresse: address,
-      mois_concerne: pay.mois_concerne,
-      montant: pay.montant,
-      date_paiement: new Date(resolvePaymentDate(pay)).toLocaleDateString(
-        "fr-FR",
-      ),
-      mode_paiement: pay.mode_paiement,
-      appName: settings.app_title,
-      appCompany: settings.app_company,
-      logoUrl: settings.logo_url,
-    });
-    await updateDocumentAudit(pay.id, "quittance");
-  };
-
-  const handlePrintRecu = async (pay: RentPayment) => {
-    if (pay.statut !== "paye" && pay.statut !== "partiel") return;
-    const tenantName = getTenantName(pay.locataires as any);
-    const address = getPropertyAddress(pay.properties as any);
-
-    printRecuLoyer({
-      reference: pay.reference || generateReference("QTT"),
-      locataire_nom: tenantName.split(" ").pop() || tenantName,
-      locataire_prenom:
-        tenantName.split(" ").slice(0, -1).join(" ") || tenantName,
-      bien_adresse: address,
-      mois_concerne: pay.mois_concerne,
-      montant: pay.montant,
-      date_paiement: new Date(resolvePaymentDate(pay)).toLocaleDateString(
-        "fr-FR",
-      ),
-      mode_paiement: pay.mode_paiement,
-      appName: settings.app_title,
-      appCompany: settings.app_company,
-      logoUrl: settings.logo_url,
-    });
-    await updateDocumentAudit(pay.id, "recu");
-  };
-
-  // Export to CSV
-  const exportToCSV = () => {
-    const headers = [
-      "Référence",
-      "Locataire",
-      "Bien",
-      "Contrat",
-      "Montant",
-      "Mois",
-      "Statut",
-      "Mode",
-      "Date paiement",
-      "Propriétaire",
-    ];
-    const rows = filteredPayments.map((p) => {
-      const property = properties.find((prop) => prop.id === p.property_id);
-      const contract = contracts.find((c) => c.id === p.contract_id);
-      return [
-        p.reference || "",
-        getTenantName(p.locataires as any),
-        getPropertyAddress(p.properties as any) || property?.adresse || "",
-        contract?.reference || "",
-        p.montant,
-        p.mois_concerne,
-        p.statut,
-        getPaymentModeLabel(p.mode_paiement),
-        p.date_paiement,
-        property?.proprietaire || "",
-      ];
+  // Get active contracts for dropdown
+  const activeContracts = contracts
+    .filter((c) => c.statut === "actif")
+    .sort((a, b) => {
+      const contractTenantIdA = a.locataire_id;
+      const contractTenantIdB = b.locataire_id;
+      const tenantA = tenants.find((t) => t.id === contractTenantIdA);
+      const tenantB = tenants.find((t) => t.id === contractTenantIdB);
+      return getTenantName(tenantA).localeCompare(getTenantName(tenantB));
     });
 
-    const csv = [headers, ...rows]
-      .map((row) => row.map((cell) => String(cell).replace(/"/g, '""')).join(";"))
-      .join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `paiements_${new Date().toISOString().split("T")[0]}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
+  const totalCollected = paymentsProp
+    .filter((p) => p.statut === "paye")
+    .reduce((sum, p) => sum + p.montant, 0);
+  const totalPending = paymentsProp
+    .filter((p) => p.statut === "en_attente")
+    .reduce((sum, p) => sum + p.montant, 0);
+  const totalOverdue = paymentsProp
+    .filter((p) => p.statut === "retard")
+    .reduce((sum, p) => sum + p.montant, 0);
 
   return (
     <>
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Total Paiements</p>
-              <p className="text-2xl font-bold text-gray-800">{stats.total}</p>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center">
-              <DollarSign size={24} className="text-blue-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Payés</p>
-              <p className="text-2xl font-bold text-green-600">{stats.paid}</p>
-              <p className="text-xs text-green-600 mt-1">
-                {formatMontant(stats.totalAmount)} FCFA
-              </p>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-green-50 flex items-center justify-center">
-              <CheckCircle size={24} className="text-green-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-gray-500 mb-1">En Attente</p>
-              <p className="text-2xl font-bold text-amber-600">
-                {stats.pending}
-              </p>
-              <p className="text-xs text-amber-600 mt-1">
-                {formatMontant(stats.pendingAmount)} FCFA
-              </p>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center">
-              <Clock size={24} className="text-amber-600" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-gray-500 mb-1">Retard</p>
-              <p className="text-2xl font-bold text-red-600">{stats.late}</p>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center">
-              <AlertCircle size={24} className="text-red-600" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Filter size={16} className="text-gray-500" />
-          <span className="text-sm font-semibold text-gray-700">Filtres</span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {/* Date Filter */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Période
-            </label>
-            <select
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value as DateFilter)}
-              className={inputClass}
-            >
-              <option value="all">Toute la période</option>
-              <option value="this_month">Ce mois</option>
-              <option value="last_month">Mois dernier</option>
-              <option value="this_year">Cette année</option>
-              <option value="custom">Personnalisé</option>
-            </select>
-          </div>
-
-          {/* Status Filter */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Statut
-            </label>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-              className={inputClass}
-            >
-              <option value="all">Tous les statuts</option>
-              <option value="paye">Payé</option>
-              <option value="en_attente">En attente</option>
-              <option value="retard">Retard</option>
-              <option value="partiel">Partiel</option>
-            </select>
-          </div>
-
-          {/* Owner Filter */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Propriétaire
-            </label>
-            <select
-              value={ownerFilter}
-              onChange={(e) => setOwnerFilter(e.target.value as OwnerFilter)}
-              className={inputClass}
-            >
-              <option value="all">Tous les propriétaires</option>
-              {uniqueOwners.map((owner) => (
-                <option key={owner} value={owner || undefined}>
-                  {owner}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Custom Date Range */}
-          {dateFilter === "custom" && (
-            <>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Du
-                </label>
-                <input
-                  type="date"
-                  value={customDateStart}
-                  onChange={(e) => setCustomDateStart(e.target.value)}
-                  className={inputClass}
-                />
+      <div className="mb-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
+                <CheckCircle size={16} className="text-green-600" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Au
-                </label>
-                <input
-                  type="date"
-                  value={customDateEnd}
-                  onChange={(e) => setCustomDateEnd(e.target.value)}
-                  className={inputClass}
-                />
+                <p className="text-xs text-gray-500">Encaissé</p>
+                <p className="text-lg font-bold text-green-600">
+                  {formatMontantImmo(totalCollected)} FCFA
+                </p>
               </div>
-            </>
-          )}
-        </div>
-
-        {/* Last Month Quick View */}
-        {lastMonthPaid.length > 0 && (
-          <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-xl">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Eye size={18} className="text-green-600" />
-                <div>
-                  <p className="text-sm font-semibold text-green-800">
-                    Paiements du mois dernier (vérification à distance)
-                  </p>
-                  <p className="text-xs text-green-600 mt-1">
-                    {lastMonthPaid.length} loyer
-                    {lastMonthPaid.length > 1 ? "s" : ""} payé
-                    {lastMonthPaid.length > 1 ? "s" : ""} -{" "}
-                    <span className="font-semibold">
-                      {formatMontant(
-                        lastMonthPaid.reduce(
-                          (sum, p) => sum + (p.montant || 0),
-                          0,
-                        ),
-                      )}{" "}
-                      FCFA
-                    </span>
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={openPreview}
-                className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
-              >
-                Voir détails
-              </button>
             </div>
           </div>
-        )}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
+                <Clock size={16} className="text-amber-600" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">En attente</p>
+                <p className="text-lg font-bold text-amber-600">
+                  {formatMontantImmo(totalPending)} FCFA
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center">
+                <XCircle size={16} className="text-red-600" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">En retard</p>
+                <p className="text-lg font-bold text-red-600">
+                  {formatMontantImmo(totalOverdue)} FCFA
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                <DollarSign size={16} className="text-blue-600" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Total</p>
+                <p className="text-lg font-bold text-gray-800">
+                  {formatMontantImmo(totalCollected + totalPending + totalOverdue)} FCFA
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Action Buttons */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          {stats.pending > 0 && (
-            <span className="px-3 py-1.5 bg-amber-50 text-amber-700 text-xs font-medium rounded-xl border border-amber-200">
-              {stats.pending} loyer{stats.pending > 1 ? "s" : ""} en attente
-            </span>
-          )}
-          {stats.late > 0 && (
-            <span className="px-3 py-1.5 bg-red-50 text-red-700 text-xs font-medium rounded-xl border border-red-200">
-              {stats.late} en retard
-            </span>
-          )}
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={exportToCSV}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+        <div className="flex-1">
+          <select
+            value={filterStatus}
+            onChange={(e) =>
+              setFilterStatus(e.target.value as RentPayment["statut"] | "all")
+            }
+            className={inputClass}
           >
-            <Download size={16} /> Exporter
-          </button>
-          <button
-            onClick={openAdd}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm font-medium hover:opacity-90"
-            style={{
-              backgroundColor: settings.primary_color,
-              color: "var(--color-on-primary)",
-            }}
-          >
-            <Plus size={16} /> Nouveau Paiement
-          </button>
+            <option value="all">Tous les statuts</option>
+            <option value="en_attente">En attente</option>
+            <option value="paye">Payé</option>
+            <option value="en_retard">En retard</option>
+            <option value="annule">Annulé</option>
+          </select>
         </div>
+        <button
+          onClick={openAdd}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm font-medium hover:opacity-90 whitespace-nowrap"
+          style={{
+            backgroundColor: settings.primary_color,
+            color: "var(--color-on-primary)",
+          }}
+        >
+          <Plus size={16} /> Nouvelle Quittance
+        </button>
       </div>
 
-      {/* Payments Table */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        {filteredPayments.length === 0 ? (
+        {sortedTenantGroups.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 text-gray-400">
-            <DollarSign size={40} className="mb-2 opacity-30" />
-            <p className="text-sm">Aucun paiement enregistré</p>
+            <FileText size={40} className="mb-2 opacity-30" />
+            <p className="text-sm">Aucun paiement trouvé</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full egs-table">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase hidden md:table-cell">
-                    Référence
-                  </th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">
-                    Locataire
-                  </th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase hidden sm:table-cell">
-                    Mois
-                  </th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase hidden lg:table-cell">
-                    Mode
-                  </th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">
-                    Statut
-                  </th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase">
-                    Montant
-                  </th>
-                  <th className="px-4 py-3"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {filteredPayments.map((pay) => {
-                  const tenantName = getTenantName(pay.locataires as any);
-                  const statusCfg = getPaymentStatusConfig(pay.statut);
-                  const modeLabel = getPaymentModeLabel(pay.mode_paiement);
-
-                  return (
-                    <tr
-                      key={pay.id}
-                      className="hover:bg-gray-50 transition-colors"
-                    >
-                      <td className="px-4 py-3 table-key hidden md:table-cell">
-                        {pay.reference || "—"}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        {tenantName || "Locataire inconnu"}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-500 hidden sm:table-cell">
-                        {pay.mois_concerne}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-500 hidden lg:table-cell">
-                        {modeLabel}
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge
-                          label={statusCfg.label}
-                          color={statusCfg.color as any}
-                        />
-                      </td>
-                      <td className="px-4 py-3 text-sm font-semibold text-right text-green-600">
-                        {formatMontantImmo(pay.montant)} FCFA
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1 justify-end">
-                          <button
-                            onClick={() => handlePrintQuittance(pay)}
-                            disabled={pay.statut !== "paye"}
-                            title={
-                              pay.statut === "paye"
-                                ? "Imprimer Quittance"
-                                : "Quittance disponible seulement si payé"
-                            }
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                          >
-                            <Printer size={15} />
-                          </button>
-                          <button
-                            onClick={() => handlePrintRecu(pay)}
-                            disabled={
-                              pay.statut !== "paye" && pay.statut !== "partiel"
-                            }
-                            title={
-                              pay.statut === "paye" || pay.statut === "partiel"
-                                ? "Imprimer Reçu"
-                                : "Reçu disponible pour paiement effectué"
-                            }
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                          >
-                            <FileText size={15} />
-                          </button>
-                          <button
-                            onClick={() => openEdit(pay)}
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                            title="Modifier"
-                          >
-                            <Edit size={15} />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(pay.id)}
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                            title="Supprimer"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Preview Modal for Remote Verification */}
-      <Modal
-        isOpen={previewOpen}
-        onClose={() => setPreviewOpen(false)}
-        title="Paiements du Mois Dernier - Vérification à Distance"
-      >
-        <div className="space-y-4">
-          <div className="p-4 bg-green-50 border border-green-200 rounded-xl">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-green-800">
-                Total Encaissé
-              </span>
-              <span className="text-lg font-bold text-green-600">
-                {formatMontant(
-                  lastMonthPaid.reduce((sum, p) => sum + (p.montant || 0), 0),
-                )}{" "}
-                FCFA
-              </span>
-            </div>
-            <p className="text-xs text-green-600">
-              {lastMonthPaid.length} paiements
-            </p>
-          </div>
-
-          <div className="max-h-96 overflow-y-auto space-y-2">
-            {lastMonthPaid.map((pay) => {
-              const tenantName = getTenantName(pay.locataires as any);
-              const address = getPropertyAddress(pay.properties as any);
+          <div className="divide-y divide-gray-50">
+            {sortedTenantGroups.map(({ tenantId, tenantName, payments, tenant, contract }) => {
+              const commissionRate = contract?.commission_rate || 12;
+              const ownerShare = 100 - commissionRate;
+              
               return (
-                <div
-                  key={pay.id}
-                  className="p-3 bg-gray-50 rounded-xl border border-gray-200"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-gray-800">
-                        {tenantName}
-                      </p>
-                      <p className="text-xs text-gray-500">{address}</p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {pay.mois_concerne}
-                      </p>
+                <div key={tenantId} className="p-4">
+                  {/* Tenant Header */}
+                  <div className="mb-4 pb-3 border-b border-gray-100">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                          <User size={18} className="text-blue-600" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-gray-900 text-lg">
+                            {tenantName || "Locataire inconnu"}
+                          </h3>
+                          {tenant?.client && (
+                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                              Client EGS
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4 text-sm">
+                        {contract && (
+                          <>
+                            <span className="px-2 py-1 bg-green-50 text-green-700 rounded-lg font-medium">
+                              Commission: {commissionRate}% (Entreprise)
+                            </span>
+                            <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded-lg font-medium">
+                              Propriétaire: {ownerShare}%
+                            </span>
+                          </>
+                        )}
+                        <span className="text-gray-500">{payments.length} paiement(s)</span>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-bold text-green-600">
-                        {formatMontantImmo(pay.montant)} FCFA
+                    {tenant?.telephone && (
+                      <p className="text-sm text-gray-500 mt-1 flex items-center gap-1">
+                        📞 {tenant.telephone}
                       </p>
-                      <p className="text-xs text-gray-500">
-                        {formatDate(pay.date_paiement)}
-                      </p>
-                    </div>
+                    )}
+                  </div>
+
+                  {/* Payments table for this tenant */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-100">
+                          <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase">
+                            Référence
+                          </th>
+                          <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase">
+                            Période
+                          </th>
+                          <th className="text-right px-4 py-2 text-xs font-semibold text-gray-500 uppercase">
+                            Montant
+                          </th>
+                          <th className="text-right px-4 py-2 text-xs font-semibold text-gray-500 uppercase hidden md:table-cell">
+                            Part Entreprise
+                          </th>
+                          <th className="text-right px-4 py-2 text-xs font-semibold text-gray-500 uppercase hidden md:table-cell">
+                            Part Propriétaire
+                          </th>
+                          <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase hidden sm:table-cell">
+                            Échéance
+                          </th>
+                          <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase">
+                            Mode
+                          </th>
+                          <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase">
+                            Statut
+                          </th>
+                          <th className="px-4 py-2"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {payments.map((p) => {
+                          const statusCfg = getPaymentStatusConfig(p.statut);
+                          const contractForPayment = contracts.find(c => c.id === p.contract_id);
+                          const rate = contractForPayment?.commission_rate || 12;
+                          const enterpriseShare = Math.round((p.montant * rate) / 100);
+                          const ownerShareAmount = p.montant - enterpriseShare;
+                          
+                          return (
+                            <tr
+                              key={p.id}
+                              className="hover:bg-gray-50 transition-colors"
+                            >
+                              <td className="px-4 py-3">
+                                <span className="table-key">{p.reference}</span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className="text-sm text-gray-700">
+                                  {p.mois_concerne || "—"}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                <span className="text-sm font-semibold text-green-600">
+                                  {formatMontantImmo(p.montant)} FCFA
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-right hidden md:table-cell">
+                                <span className="text-sm text-blue-700 font-medium">
+                                  {formatMontantImmo(enterpriseShare)} FCFA
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-right hidden md:table-cell">
+                                <span className="text-sm text-green-700 font-medium">
+                                  {formatMontantImmo(ownerShareAmount)} FCFA
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 hidden sm:table-cell">
+                                <span className="text-xs text-gray-500">
+                                  {p.date_echeance ? new Date(p.date_echeance).toLocaleDateString("fr-FR") : "—"}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className="inline-flex items-center gap-1 text-xs text-gray-600 bg-gray-50 px-2 py-0.5 rounded-full">
+                                  <DollarSign size={10} /> {p.mode_paiement}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <span
+                                  className={`text-xs px-2 py-1 rounded-full font-medium ${statusCfg.color === 'green' ? 'bg-green-100 text-green-700' : statusCfg.color === 'red' ? 'bg-red-100 text-red-700' : statusCfg.color === 'yellow' ? 'bg-yellow-100 text-yellow-700' : 'bg-orange-100 text-orange-700'}`}
+                                >
+                                  {statusCfg.label}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-1 justify-end">
+                                  {p.statut === "en_attente" && (
+                                    <button
+                                      onClick={() =>
+                                        handleStatusChange(p, "paye")
+                                      }
+                                      className="p-1.5 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors"
+                                      title="Marquer comme payé"
+                                    >
+                                      <CheckCircle size={15} className="text-green-500" />
+                                    </button>
+                                  )}
+                                  {p.statut === "retard" && (
+                                    <button
+                                      onClick={() =>
+                                        handleStatusChange(p, "paye")
+                                      }
+                                      className="p-1.5 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors"
+                                      title="Marquer comme payé"
+                                    >
+                                      <CheckCircle size={15} className="text-green-500" />
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => openEdit(p)}
+                                    className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                                    title="Modifier"
+                                  >
+                                    <Edit size={15} />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDelete(p.id)}
+                                    className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                    title="Supprimer"
+                                  >
+                                    <Trash2 size={15} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               );
             })}
           </div>
+        )}
+      </div>
 
-          <button
-            onClick={() => setPreviewOpen(false)}
-            className="w-full px-4 py-2.5 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-medium transition-colors"
-          >
-            Fermer
-          </button>
-        </div>
-      </Modal>
-
-      {/* Add/Edit Payment Modal */}
       <Modal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
-        title={editingId ? "Modifier le Paiement" : "Nouveau Paiement de Loyer"}
+        title={editingId ? "Modifier le Paiement" : "Nouveau Paiement / Quittance"}
       >
         <div className="space-y-4">
           {error && (
@@ -972,78 +631,92 @@ export default function PaymentsTab({
               {error}
             </div>
           )}
-          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
-            <span className="text-xs text-gray-500">Référence quittance</span>
-            <span className="text-xs font-mono font-bold text-gray-700">
-              {form.reference}
-            </span>
+          
+          {/* Auto-fill info banner */}
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
+            <p className="text-xs text-blue-800">
+              <strong>Période par défaut :</strong> Mois dernier ({getLastMonth()}) — 
+              <strong>Échéance :</strong> 10 du mois en cours ({getDueDate().split("-").reverse().join("/")})
+            </p>
           </div>
+
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Contrat lié{" "}
-              <span className="text-gray-400 font-normal">(recommandé)</span>
-            </label>
-            <select
+            <SelectWithCreate
               value={form.contract_id}
-              onChange={(e) => handleContractChange(e.target.value)}
-              className={inputClass}
-            >
-              <option value="">Sélectionner un contrat...</option>
-              {contracts
-                .filter((c) => c.statut === "actif")
-                .map((c) => {
-                  const tenantName = getTenantName(c.locataires as any);
-                  const address = getPropertyAddress(c.properties as any);
-                  return (
-                    <option key={c.id} value={c.id}>
-                      {tenantName} — {address}
-                    </option>
-                  );
-                })}
-            </select>
+              onChange={(val) => handleContractChange(val)}
+              options={activeContracts.map((c) => {
+                const contractTenantId = c.locataire_id;
+                const tenant = tenants.find(
+                  (t) => t.id === contractTenantId,
+                );
+                const locataireName = tenant
+                  ? getTenantName(tenant)
+                  : "Inconnu";
+                return {
+                  value: c.id,
+                  label: `${c.reference} — ${locataireName} (${c.loyer_mensuel + (c.charges || 0)} FCFA)`
+                };
+              })}
+              placeholder="Sélectionner un contrat..."
+              label="Contrat de location *"
+              required
+              createModalTitle="Nouveau Contrat de Location"
+              createFields={[
+                { key: "property_id", label: "Bien Immobilier", type: "select", required: true },
+                { key: "locataire_id", label: "Locataire", type: "select", required: true },
+                { key: "date_debut", label: "Date début", type: "date", required: true },
+                { key: "date_fin", label: "Date fin", type: "date", required: false },
+                { key: "loyer_mensuel", label: "Loyer mensuel (FCFA)", type: "number", placeholder: "0", required: true },
+                { key: "charges", label: "Charges (FCFA)", type: "number", placeholder: "0", required: false },
+                { key: "depot_garantie", label: "Dépôt de garantie", type: "number", placeholder: "0", required: false },
+                { key: "statut", label: "Statut", type: "select", required: true, options: [
+                  { value: "actif", label: "Actif" },
+                  { value: "termine", label: "Terminé" },
+                  { value: "resilie", label: "Résilié" },
+                  { value: "renouvele", label: "Renouvelé" },
+                ]},
+              ]}
+              validateCreateForm={(data) => {
+                const errors: Record<string, string> = {};
+                if (!data.property_id) errors.property_id = "Le bien est obligatoire";
+                if (!data.locataire_id) errors.locataire_id = "Le locataire est obligatoire";
+                if (!data.date_debut) errors.date_debut = "La date de début est obligatoire";
+                if (!data.loyer_mensuel) errors.loyer_mensuel = "Le loyer est obligatoire";
+                return Object.keys(errors).length > 0 ? errors : null;
+              }}
+              onCreate={async (data) => {
+                const now = new Date().toISOString();
+                const payload = {
+                  property_id: data.property_id,
+                  locataire_id: data.locataire_id,
+                  date_debut: data.date_debut,
+                  date_fin: data.date_fin || null,
+                  loyer_mensuel: parseFloat(data.loyer_mensuel) || 0,
+                  charges: parseFloat(data.charges) || 0,
+                  depot_garantie: parseFloat(data.depot_garantie) || 0,
+                  statut: data.statut || "actif",
+                  updated_at: now,
+                };
+                const cached = readManualCache<any>(CONTRACTS_CACHE_KEY);
+                const newContract = { ...payload, id: generateUUID(), created_at: now, reference: generateReference("CTR"), sync_status: "pending", sync_error: null, deleted_at: null };
+                writeManualCache(CONTRACTS_CACHE_KEY, [...cached, newContract]);
+                return { value: newContract.id, label: `${newContract.reference} — ${tenants.find(t => t.id === data.locataire_id)?.prenom || "Locataire"} (${data.loyer_mensuel} FCFA)` };
+              }}
+              fetchCreateData={async () => {
+                const cachedProps = readManualCache<any>(PROPERTIES_CACHE_KEY);
+                const cachedTenants = readManualCache<any>(TENANTS_CACHE_KEY);
+                return {
+                  property_id: cachedProps
+                    .filter((p: any) => p.statut === "disponible")
+                    .map((p: any) => ({ value: p.id, label: p.adresse })),
+                  locataire_id: cachedTenants
+                    .filter((t: any) => t.statut === "actif")
+                    .map((t: any) => ({ value: t.id, label: `${t.prenom} ${t.nom}` }))
+                };
+              }}
+            />
           </div>
-          {!form.contract_id && (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Locataire
-                </label>
-                <select
-                  value={form.locataire_id}
-                  onChange={(e) =>
-                    setForm({ ...form, locataire_id: e.target.value })
-                  }
-                  className={inputClass}
-                >
-                  <option value="">Sélectionner...</option>
-                  {tenants.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.prenom} {t.nom}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Bien Immobilier
-                </label>
-                <select
-                  value={form.property_id}
-                  onChange={(e) =>
-                    setForm({ ...form, property_id: e.target.value })
-                  }
-                  className={inputClass}
-                >
-                  <option value="">Sélectionner...</option>
-                  {properties.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.adresse}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          )}
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -1052,33 +725,28 @@ export default function PaymentsTab({
               <input
                 type="number"
                 value={form.montant}
-                onChange={(e) => setForm({ ...form, montant: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, montant: e.target.value })
+                }
                 className={inputClass}
                 placeholder="0"
               />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">
-                Mois Concerné *
+                Date de paiement *
               </label>
               <input
-                type="month"
-                value={form.mois_concerne_date}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setForm({
-                    ...form,
-                    mois_concerne_date: value,
-                    mois_concerne: monthLabelFromInput(value),
-                    date_echeance: value
-                      ? lastDayFromMonth(value)
-                      : form.date_echeance,
-                  });
-                }}
+                type="date"
+                value={form.date_paiement}
+                onChange={(e) =>
+                  setForm({ ...form, date_paiement: e.target.value })
+                }
                 className={inputClass}
               />
             </div>
           </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -1095,49 +763,42 @@ export default function PaymentsTab({
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">
-                Mode de Paiement
+                Mois concerné (YYYY-MM)
+              </label>
+              <input
+                type="month"
+                value={form.mois_concerne}
+                onChange={(e) =>
+                  setForm({ ...form, mois_concerne: e.target.value })
+                }
+                className={inputClass}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Mode de paiement
               </label>
               <select
                 value={form.mode_paiement}
                 onChange={(e) =>
                   setForm({
                     ...form,
-                    mode_paiement: e.target
-                      .value as RentPayment["mode_paiement"],
+                    mode_paiement: e.target.value as RentPayment["mode_paiement"],
                   })
                 }
                 className={inputClass}
               >
-                <option value="virement">Virement</option>
                 <option value="especes">Espèces</option>
+                <option value="virement">Virement</option>
                 <option value="mobile_money">Mobile Money</option>
+                <option value="carte">Carte</option>
                 <option value="cheque">Chèque</option>
               </select>
             </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            {(form.statut === "paye" || form.statut === "partiel") && (
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Date de Paiement
-                </label>
-                <input
-                  type="date"
-                  value={form.date_paiement_effectif}
-                  onChange={(e) =>
-                    setForm({ ...form, date_paiement_effectif: e.target.value })
-                  }
-                  className={inputClass}
-                />
-              </div>
-            )}
-            <div
-              className={
-                form.statut === "paye" || form.statut === "partiel"
-                  ? ""
-                  : "col-span-2"
-              }
-            >
+            <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">
                 Statut
               </label>
@@ -1151,13 +812,27 @@ export default function PaymentsTab({
                 }
                 className={inputClass}
               >
+                <option value="en_attente">En attente</option>
                 <option value="paye">Payé</option>
-                <option value="partiel">Partiel</option>
-                <option value="en_attente">En Attente</option>
-                <option value="retard">Retard</option>
+                <option value="en_retard">En retard</option>
+                <option value="annule">Annulé</option>
               </select>
             </div>
           </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Notes
+            </label>
+            <textarea
+              value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              rows={2}
+              className={`${inputClass} resize-none`}
+              placeholder="Remarques, référence externe..."
+            />
+          </div>
+
           <div className="flex gap-3 pt-2">
             <button
               onClick={() => setModalOpen(false)}
@@ -1168,9 +843,7 @@ export default function PaymentsTab({
             <button
               onClick={handleSave}
               disabled={
-                saving ||
-                !form.montant ||
-                (!form.mois_concerne_date && !form.mois_concerne)
+                saving || !form.contract_id || !form.montant || !form.date_paiement
               }
               className="flex-1 px-4 py-2.5 rounded-xl text-white text-sm font-medium hover:opacity-90 disabled:opacity-50"
               style={{

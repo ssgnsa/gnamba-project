@@ -2,7 +2,7 @@
  * Lead API - Direct API locale Integration (No backend)
  */
 
-import { leadsRepository } from "../data/leads.repository";
+import { leadsRepository } from '../lib/dbClient.service';
 
 export async function captureLead(req: Request): Promise<Response> {
   try {

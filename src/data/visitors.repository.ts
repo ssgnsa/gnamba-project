@@ -17,7 +17,7 @@ export const visitorsRepository = {
         .from("visiteurs")
         .select("*")
         .is("deleted_at", null)
-        .order("created_at", { ascending: false })
+        .order("created_at")
         .limit(100),
     )) as QueryResult<VisitorRow[]>;
   },

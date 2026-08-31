@@ -99,6 +99,10 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: string | null }>;
+  changePassword: (
+    currentPassword: string,
+    newPassword: string,
+  ) => Promise<{ error: string | null; code: string | null }>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -110,6 +114,7 @@ const AuthContext = createContext<AuthContextType>({
   signOut: async () => {},
   refreshProfile: async () => {},
   resetPassword: async () => ({ error: null }),
+  changePassword: async () => ({ error: null, code: null }),
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -252,7 +257,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshLocalSession]);
 
   const signIn = useCallback(
     async (
@@ -260,18 +265,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password: string,
     ): Promise<{ error: string | null; code: string | null }> => {
       if (isSelfHostedMode()) {
-        const payload = await apiClient.auth.login(email, password);
-        if (payload.error || !payload.access_token) {
+        const result = await apiClient.auth.login(email, password);
+        if (result.error || !result.data?.access_token) {
           return {
-            code: payload.code ?? null,
-            error: payload.error || "Identifiants invalides",
+            code: result.data?.code ?? null,
+            error: result.error || "Identifiants invalides",
           };
         }
 
-        persistLocalAuthToken(payload.access_token, payload.refresh_token);
-        setUser(mapLocalUser(payload.user as Record<string, any>));
+        const access_token = result.data!.access_token!;
+        const refresh_token = result.data!.refresh_token!;
+        const user = result.data!.user;
+        persistLocalAuthToken(access_token, refresh_token);
+        setUser(mapLocalUser(user as Record<string, any>));
         setSession(null);
-        setProfile(payload.user as UserProfile);
+        setProfile(user as UserProfile);
         return { error: null, code: null };
       }
 
@@ -287,14 +295,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (isSelfHostedMode()) {
       await apiClient.auth.logout().catch(() => undefined);
       clearStoredLocalAuthToken();
-      setUser(null);
-      setSession(null);
-      setProfile(null);
-      return;
     }
+
     setUser(null);
     setSession(null);
     setProfile(null);
+
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", "/");
+      window.location.assign("/");
+    }
   }, []);
 
   const resetPassword = useCallback(
@@ -308,6 +318,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return {
         error: "La réinitialisation locale n'est pas encore implémentée.",
       };
+    },
+    [],
+  );
+
+  const changePassword = useCallback(
+    async (
+      currentPassword: string,
+      newPassword: string,
+    ): Promise<{ error: string | null; code: string | null }> => {
+      if (!isSelfHostedMode()) {
+        return {
+          error: "Le mode self-hosted est requis pour l’API locale.",
+          code: null,
+        };
+      }
+
+      const result = await apiClient.auth.updatePassword(
+        currentPassword,
+        newPassword,
+      );
+
+      if (result.error || !result.data) {
+        return {
+          code: result.status === 401 ? "invalid_current_password" : null,
+          error:
+            result.status === 401
+              ? "Le mot de passe actuel est incorrect."
+              : result.error || "Impossible de modifier le mot de passe.",
+        };
+      }
+
+      return { error: null, code: null };
     },
     [],
   );
@@ -390,6 +432,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signOut,
         refreshProfile,
         resetPassword,
+        changePassword,
       }}
     >
       {children}

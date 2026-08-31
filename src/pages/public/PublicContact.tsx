@@ -8,6 +8,10 @@ import {
   CheckCircle2,
   MessageSquare,
   MessageCircle,
+  Shield,
+  Zap,
+  ArrowRight,
+  Sparkles,
 } from "lucide-react";
 import dbClient from "../../data/tableClient";
 import { useSiteContent } from "../../context/SiteContentContext";
@@ -18,6 +22,24 @@ import {
   buildGoogleMapsEmbedUrl,
   buildWhatsAppUrl,
 } from "../../lib/officialContact";
+
+// Premium UI Components
+import {
+  Button,
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  Badge,
+  Container,
+  Grid,
+  Flex,
+  IconWrapper,
+  Input,
+  Textarea,
+  Select,
+  Divider,
+} from "../../components/ui";
 
 const subjects = [
   "BTP & Construction",
@@ -42,7 +64,7 @@ export default function PublicContact() {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
 
-  // FIX: Anti-abus - Rate limiting (max 5 messages par heure)
+  // Anti-abus - Rate limiting (max 5 messages par heure)
   const RATE_LIMIT_MAX = 5;
   const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 heure
 
@@ -59,16 +81,14 @@ export default function PublicContact() {
       localStorage.getItem(storageKey) || '{"count": 0, "windowStart": 0}',
     );
 
-    // Si la fenêtre de temps est écoulée, réinitialiser
     if (now - data.windowStart > RATE_LIMIT_WINDOW_MS) {
       return { allowed: true };
     }
 
-    // Vérifier si la limite est atteinte
     if (data.count >= RATE_LIMIT_MAX) {
       const resetIn = Math.ceil(
         (data.windowStart + RATE_LIMIT_WINDOW_MS - now) / 60000,
-      ); // minutes
+      );
       return { allowed: false, resetIn };
     }
 
@@ -84,7 +104,6 @@ export default function PublicContact() {
       localStorage.getItem(storageKey) || '{"count": 0, "windowStart": 0}',
     );
 
-    // Réinitialiser si nouvelle fenêtre
     if (now - data.windowStart > RATE_LIMIT_WINDOW_MS) {
       localStorage.setItem(
         storageKey,
@@ -115,13 +134,10 @@ export default function PublicContact() {
   const whatsappLink = buildWhatsAppUrl(phone);
   const quoteEmail = OFFICIAL_CONTACT.quoteEmail;
 
-  // FIX: Sanitize mapsEmbed HTML to prevent XSS attacks
-  // Only allow safe iframe tags from Google Maps
   const [sanitizedMapsEmbed, setSanitizedMapsEmbed] = useState<string>("");
 
   useEffect(() => {
     if (mapsEmbed) {
-      // Configure DOMPurify to only allow iframe with safe attributes
       const clean = DOMPurify.sanitize(mapsEmbed, {
         ALLOWED_TAGS: ["iframe"],
         ALLOWED_ATTR: [
@@ -165,7 +181,6 @@ export default function PublicContact() {
     e.preventDefault();
     if (!form.name || !form.email || !form.message) return;
 
-    // FIX: Vérifier le rate limit avant envoi
     const rateLimit = checkRateLimit();
     if (!rateLimit.allowed) {
       setError(
@@ -176,24 +191,22 @@ export default function PublicContact() {
 
     setSending(true);
     setError("");
-    // FIX: Removed console.log with PII (name, email) for production security
     const { error: err } = await dbClient
       .from("contact_messages")
       .insert({
-        name: form.name,
-        phone: form.phone,
+        nom: form.name,
+        telephone: form.phone,
         email: form.email,
-        subject: form.subject,
+        sujet: form.subject || "Contact via formulaire",
         message: form.message,
+        statut: "nouveau",
       })
       .select();
 
-    // FIX: Incrémenter le compteur de rate limit après envoi réussi
     if (!err) {
       incrementRateLimit();
     }
 
-    // FIX: Removed console.log with PII - only log errors for debugging
     setSending(false);
     if (err) {
       setError(
@@ -205,351 +218,285 @@ export default function PublicContact() {
   };
 
   return (
-    <div className="pt-20">
+    <div className="min-h-screen bg-white">
       {/* Hero */}
-      <section className="py-20 bg-gradient-to-br from-gray-900 to-blue-900 relative overflow-hidden">
+      <section className="relative py-20 sm:py-24 lg:py-28 overflow-hidden" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #1e40af 100%)' }}>
         <div
           className="absolute inset-0 opacity-5"
           style={{
             backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
           }}
         />
-        <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <span className="text-blue-300 font-semibold text-sm uppercase tracking-widest">
-            Contactez-nous
-          </span>
-          <h1 className="text-4xl sm:text-5xl font-bold text-white mt-3 mb-5">
-            Parlons de votre projet
-          </h1>
-          <p className="text-blue-100/80 text-lg max-w-2xl mx-auto leading-relaxed">
-            Notre équipe vous répond vite, vous oriente clairement et vous
-            accompagne jusqu'à la prochaine étape de votre projet.
-          </p>
-        </div>
+        <Container size="xl" className="relative z-10 py-8">
+          <Flex direction="col" align="center" gap="4" className="text-center max-w-4xl mx-auto">
+            <Badge variant="secondary" size="md" className="text-xs bg-white/10 text-white border-white/20">
+              Contactez-nous
+            </Badge>
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-tight">
+              Parlons de votre <span className="bg-gradient-to-r from-white via-white to-amber-200 bg-clip-text text-transparent">projet</span>
+            </h1>
+            <p className="text-primary-100 text-lg max-w-2xl mx-auto leading-relaxed">
+              Notre équipe vous répond vite, vous oriente clairement et vous
+              accompagne jusqu'à la prochaine étape de votre projet.
+            </p>
+            <Flex align="center" justify="center" gap="4" className="pt-4">
+              <IconWrapper size="md" variant="ghost" shape="circle" className="bg-white/10 text-white border-white/20">
+                <Shield size={20} />
+              </IconWrapper>
+              <span className="text-primary-200 text-sm font-medium">Réponse sous 24h</span>
+              <IconWrapper size="md" variant="ghost" shape="circle" className="bg-white/10 text-white border-white/20">
+                <Zap size={20} />
+              </IconWrapper>
+              <span className="text-primary-200 text-sm font-medium">Devis gratuit</span>
+              <IconWrapper size="md" variant="ghost" shape="circle" className="bg-white/10 text-white border-white/20">
+                <Sparkles size={20} />
+              </IconWrapper>
+              <span className="text-primary-200 text-sm font-medium">Accompagnement complet</span>
+            </Flex>
+          </Flex>
+        </Container>
       </section>
 
       {/* Main content */}
-      <section className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+      <section className="py-20 sm:py-24 lg:py-28 bg-neutral-50">
+        <Container size="xl">
+          <Grid cols={{ base: 1, lg: 3 }} gap="xl" gapY="md">
             {/* Contact info */}
-            <div className="space-y-5">
-              <div className="bg-white rounded-2xl p-5 border border-blue-100 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-600 mb-2">
-                  Réponse rapide
-                </p>
-                <h2 className="text-xl font-bold text-gray-900">
-                  Contact & Devis gratuit
-                </h2>
-                <p className="text-sm text-gray-500 mt-2 leading-relaxed">
-                  Notre équipe répond sous {OFFICIAL_CONTACT.responseTime} par
-                  téléphone, WhatsApp ou email selon votre besoin.
-                </p>
-                <div className="mt-4 grid gap-3">
-                  <a
-                    href={whatsappLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600"
-                  >
-                    <MessageCircle size={15} />
-                    WhatsApp
-                  </a>
+            <div className="space-y-6 lg:col-span-1" id="contact-info">
+              <Card variant="elevated" padding="lg" className="sticky top-24">
+                <Flex direction="col" gap="4" className="mb-6">
+                  <Badge variant="primary" size="sm" className="w-fit">Réponse rapide</Badge>
+                  <CardTitle className="text-xl font-bold text-neutral-900">Contact & Devis gratuit</CardTitle>
+                  <CardDescription className="">Notre équipe répond sous {OFFICIAL_CONTACT.responseTime} par téléphone, WhatsApp ou email selon votre besoin.</CardDescription>
+                </Flex>
+
+                <Flex direction="col" gap="3" className="mb-6">
+                  {whatsappLink && (
+                    <a
+                      href={whatsappLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 min-h-[48px]"
+                    >
+                      <MessageCircle size={18} />
+                      WhatsApp
+                    </a>
+                  )}
                   <a
                     href={`tel:${phone.replace(/\s+/g, "")}`}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+                    className="flex items-center justify-center gap-2 rounded-xl bg-neutral-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-neutral-800 min-h-[48px]"
                   >
-                    <Phone size={15} />
+                    <Phone size={18} />
                     Appeler maintenant
                   </a>
                   <a
                     href={`mailto:${email}`}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-teal-700"
+                    className="flex items-center justify-center gap-2 rounded-xl bg-teal-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-teal-700 min-h-[48px]"
                   >
-                    <Mail size={15} />
+                    <Mail size={18} />
                     Envoyer un email
                   </a>
                   <a
                     href="#formulaire-devis"
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600"
+                    className="flex items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-amber-700 min-h-[48px]"
                   >
-                    <Send size={15} />
+                    <Send size={18} />
                     Demander un devis
                   </a>
-                </div>
-                <p className="mt-3 text-xs leading-5 text-gray-500">
+                </Flex>
+
+                <p className="text-xs text-neutral-500 leading-relaxed">
                   Pour un devis écrit, vous pouvez aussi écrire à{" "}
                   <a
                     href={`mailto:${quoteEmail}`}
-                    className="font-semibold text-orange-600 hover:text-orange-700"
+                    className="font-semibold text-amber-600 hover:text-amber-700 transition-colors"
                   >
                     {quoteEmail}
                   </a>
                   .
                 </p>
-              </div>
 
-              <div>
-                <h2 className="text-xl font-bold text-gray-900 mb-1">
-                  Nos coordonnées
-                </h2>
-                <p className="text-sm text-gray-500">
-                  Plusieurs moyens de nous joindre
-                </p>
-              </div>
+                <Divider className="my-6" />
 
-              {contactInfo.map((info) => {
-                const Icon = info.icon;
-                return (
-                  <div
-                    key={info.label}
-                    className="bg-white rounded-2xl p-5 border border-gray-100 flex items-start gap-4 shadow-sm"
-                  >
-                    <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                      <Icon size={18} className="text-blue-700" />
-                    </div>
-                    <div>
-                      <div className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">
-                        {info.label}
-                      </div>
-                      {info.label === "Téléphone" ? (
-                        <a
-                          href={`tel:${info.value.replace(/\s+/g, "")}`}
-                          className="text-gray-700 font-medium text-sm hover:text-blue-700 transition-colors"
-                        >
-                          {info.value}
-                        </a>
-                      ) : info.label === "Email" ? (
-                        <a
-                          href={`mailto:${info.value}`}
-                          className="text-gray-700 font-medium text-sm hover:text-blue-700 transition-colors"
-                        >
-                          {info.value}
-                        </a>
-                      ) : (
-                        <div className="text-gray-700 font-medium text-sm">
-                          {info.value}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+                <CardTitle className="text-lg font-bold text-neutral-900 mb-4">Nos coordonnées</CardTitle>
+                <Flex direction="col" gap="4">
+                  {contactInfo.map((info) => {
+                    const Icon = info.icon;
+                    return (
+                      <Flex key={info.label} align="center" gap="4" className="group">
+                        <IconWrapper size="md" variant="primary" shape="circle">
+                          <Icon size={20} className="text-primary-600 group-hover:text-primary-700 transition-colors" />
+                        </IconWrapper>
+                        <Flex direction="col" gap="0.5">
+                          <span className="text-xs font-medium text-neutral-400 uppercase tracking-wide">{info.label}</span>
+                          {info.label === "Téléphone" ? (
+                            <a href={`tel:${info.value.replace(/\s+/g, "")}`} className="text-neutral-700 font-medium text-sm hover:text-primary-600 transition-colors">{info.value}</a>
+                          ) : info.label === "Email" ? (
+                            <a href={`mailto:${info.value}`} className="text-neutral-700 font-medium text-sm hover:text-primary-600 transition-colors">{info.value}</a>
+                          ) : (
+                            <span className="text-neutral-700 font-medium text-sm">{info.value}</span>
+                          )}
+                        </Flex>
+                      </Flex>
+                    );
+                  })}
+                </Flex>
+              </Card>
 
-              <div className="bg-blue-700 rounded-2xl p-6 text-white">
-                <MessageSquare size={28} className="text-blue-300 mb-3" />
-                <h3 className="font-bold mb-2">Réponse rapide garantie</h3>
-                <p className="text-blue-200 text-sm leading-relaxed">
-                  Nous nous engageons à répondre à toutes les demandes dans un
-                  délai de {OFFICIAL_CONTACT.responseTime}, avec un retour
-                  orienté devis ou rendez-vous selon votre besoin.
-                </p>
-              </div>
+              <Card variant="primary" padding="xl" className="text-white">
+                <Flex direction="col" align="start" gap="4">
+                  <IconWrapper size="lg" variant="secondary" shape="circle" className="bg-amber-500/20 text-amber-300">
+                    <MessageSquare size={24} />
+                  </IconWrapper>
+                  <CardTitle className="text-xl font-bold">Réponse rapide garantie</CardTitle>
+                  <CardDescription className="text-primary-100">
+                    Nous nous engageons à répondre à toutes les demandes dans un
+                    délai de {OFFICIAL_CONTACT.responseTime}, avec un retour
+                    orienté devis ou rendez-vous selon votre besoin.
+                  </CardDescription>
+                </Flex>
+              </Card>
 
               {whatsappLink && (
                 <a
                   href={whatsappLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="bg-emerald-600 hover:bg-emerald-700 rounded-2xl p-5 text-white flex items-center justify-between gap-4 shadow-sm transition-colors"
+                  className="block bg-emerald-600 hover:bg-emerald-700 rounded-2xl p-5 text-white flex items-center justify-between gap-4 shadow-lg transition-all duration-200 group"
                 >
                   <div>
                     <h3 className="font-bold mb-1">Échangez sur WhatsApp</h3>
-                    <p className="text-emerald-100 text-sm leading-relaxed">
-                      Pour une réponse plus rapide, écrivez-nous directement.
-                    </p>
+                    <p className="text-emerald-100 text-sm leading-relaxed">Pour une réponse plus rapide, écrivez-nous directement.</p>
                   </div>
-                  <span className="text-sm font-semibold whitespace-nowrap">
+                  <span className="text-sm font-semibold whitespace-nowrap group-hover:underline">
                     Ouvrir WhatsApp
+                    <ArrowRight size={16} className="inline-block ml-1 group-hover:translate-x-1 transition-transform" />
                   </span>
                 </a>
               )}
 
-              <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-                <h3 className="font-bold text-gray-900 mb-3">Localisation</h3>
-                <div className="overflow-hidden rounded-xl border border-gray-100">
+              <Card variant="elevated" padding="lg" className="overflow-hidden">
+                <CardTitle className="font-bold text-neutral-900 mb-4">Localisation</CardTitle>
+                <div className="overflow-hidden rounded-xl border border-neutral-200">
                   <iframe
                     title="Google Maps GNAMBA SERVICES"
                     src={mapsSrc}
-                    className="h-56 w-full border-0"
+                    className="h-64 w-full border-0"
                     loading="lazy"
                     referrerPolicy="strict-origin-when-cross-origin"
                     allowFullScreen
                   />
                 </div>
-                <div className="mt-3 flex flex-wrap gap-2">
+                <Flex wrap gap="3" className="mt-4">
                   <a
                     href={mapsDirectionsUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-800"
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-700 min-h-[44px]"
                   >
-                    <MapPin size={15} />
+                    <MapPin size={16} />
                     Ouvrir Google Maps
                   </a>
                   <a
-                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                      OFFICIAL_CONTACT.address,
-                    )}`}
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(OFFICIAL_CONTACT.address)}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:border-blue-300 hover:text-blue-700"
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-neutral-200 px-4 py-2.5 text-sm font-semibold text-neutral-700 transition hover:border-primary-300 hover:text-primary-600 min-h-[44px]"
                   >
                     Itinéraire
                   </a>
-                </div>
-              </div>
+                </Flex>
+              </Card>
             </div>
 
             {/* Contact form */}
             <div className="lg:col-span-2">
-              <div
-                id="formulaire-devis"
-                className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100"
-              >
+              <Card variant="elevated" padding="xl" id="formulaire-devis">
                 {sent ? (
-                  <div className="text-center py-12">
-                    <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-5">
+                  <Flex direction="col" align="center" gap="4" className="py-16 text-center">
+                    <IconWrapper size="xl" variant="success" shape="circle" className="mb-2">
                       <CheckCircle2 size={40} className="text-emerald-600" />
-                    </div>
-                    <h2 className="text-2xl font-bold text-gray-900 mb-3">
-                      Message envoyé avec succès !
-                    </h2>
-                    <p className="text-gray-500 mb-2">
-                      Merci pour votre message,{" "}
-                      <span className="font-semibold text-gray-700">
-                        {form.name}
-                      </span>
-                      .
-                    </p>
-                    <p className="text-gray-500 mb-8">
-                      Notre équipe vous contactera rapidement pour préciser
-                      votre besoin et proposer la meilleure suite.
-                    </p>
-                    <button
-                      onClick={() => {
-                        setSent(false);
-                        setForm({
-                          name: "",
-                          phone: "",
-                          email: "",
-                          subject: "",
-                          message: "",
-                        });
-                      }}
-                      className="px-6 py-3 bg-blue-700 hover:bg-blue-800 text-white rounded-xl text-sm font-semibold transition-colors min-h-[44px]"
-                    >
+                    </IconWrapper>
+                    <CardTitle className="text-2xl font-bold text-neutral-900">Message envoyé avec succès !</CardTitle>
+                    <CardDescription className="max-w-md">Merci pour votre message, <span className="font-semibold text-neutral-700">{form.name}</span>.</CardDescription>
+                    <CardDescription className="max-w-md">Notre équipe vous contactera rapidement pour préciser votre besoin et proposer la meilleure suite.</CardDescription>
+                    <Button variant="primary" size="lg" onClick={() => { setSent(false); setForm({ name: "", phone: "", email: "", subject: "", message: "" }); }} iconLeft={<Sparkles size={18} />}>
                       Envoyer un autre message
-                    </button>
-                  </div>
+                    </Button>
+                  </Flex>
                 ) : (
                   <>
-                    <h2 className="text-xl font-bold text-gray-900 mb-6">
-                      Formulaire de contact
-                    </h2>
+                    <CardHeader className="mb-6">
+                      <CardTitle className="text-xl font-bold text-neutral-900">Formulaire de contact</CardTitle>
+                    </CardHeader>
                     {error && (
-                      <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm">
+                      <div role="alert" className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-start gap-2">
+                        <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" /></svg>
                         {error}
                       </div>
                     )}
-                    <form onSubmit={handleSubmit} className="space-y-5">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                            Nom complet *
-                          </label>
-                          <input
-                            value={form.name}
-                            onChange={(e) =>
-                              setForm({ ...form, name: e.target.value })
-                            }
-                            placeholder="Votre nom complet"
-                            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition"
-                            required
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                            Téléphone
-                          </label>
-                          <input
-                            value={form.phone}
-                            onChange={(e) =>
-                              setForm({ ...form, phone: e.target.value })
-                            }
-                            placeholder="+225 XX XX XX XX XX"
-                            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                          Email *
-                        </label>
-                        <input
-                          type="email"
-                          value={form.email}
-                          onChange={(e) =>
-                            setForm({ ...form, email: e.target.value })
-                          }
-                          placeholder="votre@email.com"
-                          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition"
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                      <Grid cols={{ base: 1, sm: 2 }} gap="md">
+                        <Input
+                          label="Nom complet *"
+                          value={form.name}
+                          onChange={(e) => setForm({ ...form, name: e.target.value })}
+                          placeholder="Votre nom complet"
                           required
                         />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                          Sujet
-                        </label>
-                        <select
-                          value={form.subject}
-                          onChange={(e) =>
-                            setForm({ ...form, subject: e.target.value })
-                          }
-                          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition bg-white"
-                        >
-                          <option value="">Sélectionner un sujet</option>
-                          {subjects.map((s) => (
-                            <option key={s} value={s}>
-                              {s}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                          Message *
-                        </label>
-                        <textarea
-                          value={form.message}
-                          onChange={(e) =>
-                            setForm({ ...form, message: e.target.value })
-                          }
-                          placeholder="Décrivez votre besoin, votre budget ou votre zone d'intérêt..."
-                          rows={6}
-                          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition resize-none"
-                          required
+                        <Input
+                          label="Téléphone"
+                          value={form.phone}
+                          onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                          placeholder="+225 XX XX XX XX XX"
+                          iconLeft={<Phone size={18} />}
                         />
-                      </div>
+                      </Grid>
 
-                      <button
+                      <Input
+                        label="Email *"
+                        type="email"
+                        value={form.email}
+                        onChange={(e) => setForm({ ...form, email: e.target.value })}
+                        placeholder="votre@email.com"
+                        required
+                        iconLeft={<Mail size={18} />}
+                      />
+
+                      <Select
+                        label="Sujet"
+                        value={form.subject}
+                        onChange={(e) => setForm({ ...form, subject: e.target.value })}
+                        placeholder="Sélectionner un sujet"
+                        options={subjects.map(s => ({ value: s, label: s }))}
+                      />
+
+                      <Textarea
+                        label="Message *"
+                        value={form.message}
+                        onChange={(e) => setForm({ ...form, message: e.target.value })}
+                        placeholder="Décrivez votre besoin, votre budget ou votre zone d'intérêt..."
+                        rows={6}
+                        required
+                      />
+
+                      <Button
                         type="submit"
                         disabled={sending}
-                        className="w-full flex items-center justify-center gap-2 py-3.5 bg-blue-700 hover:bg-blue-800 disabled:opacity-70 text-white rounded-xl font-semibold transition-all shadow-sm text-sm"
+                        loading={sending}
+                        size="lg"
+                        className="w-full min-h-[52px]"
+                        iconLeft={<Send size={20} />}
                       >
-                        <Send size={15} />
-                        {sending ? "Envoi en cours..." : "Envoyer le message"}
-                      </button>
+                        Envoyer le message
+                      </Button>
                     </form>
                   </>
                 )}
-              </div>
+              </Card>
             </div>
-          </div>
-        </div>
+          </Grid>
+        </Container>
       </section>
     </div>
   );

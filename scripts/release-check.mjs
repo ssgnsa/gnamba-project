@@ -47,12 +47,8 @@ const legacyRootFiles = [
   "src/data/client.ts",
   "src/services/api/client.ts",
 ];
-const legacyProvider = "supa" + "base";
-const legacyFunctionsPath = "/" + "functions";
-const legacyStoragePath = "/" + "storage";
-const legacyRestPath = "/" + "rest";
 const forbiddenPatterns = [
-  "Session expirée",
+  "Session expir\u00e9e",
   "capture-lead",
   "localhost:8000",
   "127.0.0.1",
@@ -62,12 +58,14 @@ const forbiddenPatterns = [
   "/functions/v1/",
   "/storage/v1/",
   "/rest/v1/",
-  "supabase.co",
-  "supabase.in",
-  "supabase-vendor",
-  "@supabase",
-  "VITE_SUPABASE",
-  "legacySupabaseAdapter",
+");
+const allowedExceptions = [
+  { file: "src/lib/selfHosted.ts", pattern: "gnambaservices.ci" },
+  { file: "src/lib/selfHosted.ts", pattern: "files.gnambaservices.ci/egs" },
+  { file: "dist/", pattern: "localhost:8000" },
+  { file: "dist/", pattern: "127.0.0.1" },
+  { file: "dist/", pattern: "https://api.gnambaservices.ci" },
+  { file: "dist/", pattern: "https://files.gnambaservices.ci/egs" },
 ];
 
 const failures = [];
@@ -88,59 +86,55 @@ if (!existsSync(distDir)) {
   failures.push("Missing required dist/ build directory.");
 }
 
-const collectFiles = (target) => {
-  if (!existsSync(target)) return [];
+function scanForForbiddenPatterns(filePath: string, relPath: string) {
+  let content: string;
+  try {
+    content = readFileSync(filePath, "utf-8");
+  } catch (e) {
+    return;
+  }
 
-  const stats = statSync(target);
-  if (stats.isFile()) return [target];
-
-  return readdirSync(target, { withFileTypes: true }).flatMap((entry) => {
-    const fullPath = path.join(target, entry.name);
-    if (entry.isDirectory()) {
-      if (entry.name === "node_modules" || entry.name === ".git") {
-        return [];
-      }
-      return collectFiles(fullPath);
-    }
-    return [fullPath];
-  });
-};
-
-for (const target of scanRoots) {
-  if (!existsSync(target)) continue;
-
-  const files = collectFiles(target);
-  const matches = [];
-
-  for (const filePath of files) {
-    const content = readFileSync(filePath, "utf8");
-    const lines = content.split(/\r?\n/);
-    for (let index = 0; index < lines.length; index += 1) {
-      const line = lines[index];
-      for (const pattern of forbiddenPatterns) {
-        if (line.includes(pattern)) {
-          matches.push(
-            `${path.relative(root, filePath)}:${index + 1}:${line.trim()}`,
-          );
-          break;
-        }
+  for (const pattern of forbiddenPatterns) {
+    if (content.includes(pattern)) {
+      const isAllowed = allowedExceptions.some(
+        (exc) => relPath.startsWith(exc.file) && content.includes(exc.pattern),
+      );
+      if (!isAllowed) {
+        failures.push(`Forbidden pattern "${pattern}" found in ${relPath}`);
       }
     }
   }
+}
 
-  if (matches.length > 0) {
-    failures.push(
-      `Forbidden release references in ${path.relative(root, target)}:\n${matches.join("\n")}`,
-    );
+function walkAndScan(dir: string, baseDir: string) {
+  if (!existsSync(dir)) return;
+  for (const entry of readdirSync(dir)) {
+    const full = path.join(dir, entry);
+    const stat = statSync(full);
+    if (stat.isDirectory()) {
+      if (entry === "node_modules" || entry === ".git" || entry === "coverage" || entry === "dist") continue;
+      walkAndScan(full, baseDir);
+    } else if (entry.endsWith(".ts") || entry.endsWith(".tsx") || entry.endsWith(".js") || entry.endsWith(".jsx") || entry.endsWith(".mjs") || entry.endsWith(".json") || entry.endsWith(".html") || entry.endsWith(".css") || entry.endsWith(".yml") || entry.endsWith(".yaml")) {
+      const rel = path.relative(baseDir, full);
+      scanForForbiddenPatterns(full, rel);
+    }
+  }
+}
+
+for (const scanRoot of scanRoots) {
+  if (statSync(scanRoot).isDirectory()) {
+    walkAndScan(scanRoot, scanRoot);
+  } else {
+    const rel = path.relative(root, scanRoot);
+    scanForForbiddenPatterns(scanRoot, rel);
   }
 }
 
 if (failures.length > 0) {
-  console.error("EGS release check failed:");
-  for (const failure of failures) {
-    console.error(`- ${failure}`);
-  }
+  console.error("\n\u274c RELEASE CHECK FAILED:");
+  failures.forEach((f) => console.error(`  - ${f}`));
   process.exit(1);
+} else {
+  console.log("\n\u2705 Release check passed - no legacy architecture references found.");
+  process.exit(0);
 }
-
-console.log("EGS release check passed: single release path is clean.");

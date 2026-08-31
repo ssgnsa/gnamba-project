@@ -4,10 +4,10 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Header
 
-from backend.app.api.deps import get_auth_service
-from backend.app.core.security import AuthenticationError, AuthorizationError, get_http_exception_for_error
-from backend.app.schemas.auth import AuthTokenResponse, CreateUserRequest, UpdateUserRequest, UserResponse
-from backend.app.services.auth_service import AuthService
+from app.api.deps import get_auth_service
+from app.core.security import AuthenticationError, AuthorizationError, get_http_exception_for_error
+from app.schemas.auth import AuthTokenResponse, CreateUserRequest, UpdateUserRequest, UserResponse
+from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/api/v1/users", tags=["users"])
 
@@ -24,7 +24,7 @@ def create_user(payload: CreateUserRequest, auth_service: AuthService = Depends(
 def list_users(authorization: str | None = Header(default=None), auth_service: AuthService = Depends(get_auth_service)) -> list[UserResponse]:
     try:
         current_user = auth_service.get_current_user(authorization)
-        if current_user["role"] != "admin":
+        if current_user.get("role") != "admin":
             raise AuthorizationError("Accès refusé")
         return [UserResponse(**user) for user in auth_service.list_users()]
     except (AuthenticationError, AuthorizationError) as exc:
@@ -35,7 +35,7 @@ def list_users(authorization: str | None = Header(default=None), auth_service: A
 def update_user(user_id: str, payload: UpdateUserRequest, authorization: str | None = Header(default=None), auth_service: AuthService = Depends(get_auth_service)) -> UserResponse:
     try:
         current_user = auth_service.get_current_user(authorization)
-        if current_user["role"] != "admin":
+        if current_user.get("role") != "admin":
             raise AuthorizationError("Accès refusé")
         return UserResponse(**auth_service.update_user(user_id, payload.model_dump(exclude_unset=True)))
     except (AuthenticationError, AuthorizationError) as exc:
@@ -46,7 +46,7 @@ def update_user(user_id: str, payload: UpdateUserRequest, authorization: str | N
 def delete_user(user_id: str, authorization: str | None = Header(default=None), auth_service: AuthService = Depends(get_auth_service)) -> dict[str, str]:
     try:
         current_user = auth_service.get_current_user(authorization)
-        if current_user["role"] != "admin":
+        if current_user.get("role") != "admin":
             raise AuthorizationError("Accès refusé")
         auth_service.delete_user(user_id)
         return {"status": "ok", "message": "Utilisateur supprimé"}

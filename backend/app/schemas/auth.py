@@ -14,6 +14,11 @@ class ResetPasswordRequest(BaseModel):
     password: str
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
 class CreateUserRequest(BaseModel):
     email: str
     password: str
@@ -37,6 +42,7 @@ class UpdateUserRequest(BaseModel):
 
 class UserResponse(BaseModel):
     id: str
+    entity_id: str
     email: str
     full_name: str
     role: str
@@ -63,3 +69,8 @@ class RefreshTokenResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     user: UserResponse
+
+
+class PersistTokenRequest(BaseModel):
+    access_token: str
+    refresh_token: str

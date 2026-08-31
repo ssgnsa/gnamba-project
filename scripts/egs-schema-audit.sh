@@ -4,8 +4,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC_DIR="$ROOT_DIR/src"
-MIGRATIONS_DIR="$ROOT_DIR/supabase/migrations"
-SCHEMA_MANIFEST="$ROOT_DIR/supabase/generated/egs-schema.json"
+MIGRATIONS_DIR="$ROOT_DIR/backend/alembic/versions"
+SCHEMA_MANIFEST="$ROOT_DIR/backend/schema/egs-schema.json"
 
 if [ ! -d "$SRC_DIR" ] || [ ! -d "$MIGRATIONS_DIR" ]; then
   echo "Expected directories not found." >&2

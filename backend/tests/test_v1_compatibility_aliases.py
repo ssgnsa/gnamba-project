@@ -72,3 +72,46 @@ def test_v1_media_aliases_cover_upload_usage_and_lifecycle() -> None:
     assert purge_response.status_code == 200
     assert purge_response.json()["status"] == "purged"
 
+
+def test_media_schema_guard_handles_missing_columns(monkeypatch) -> None:
+    class FakeResult:
+        def __init__(self, rows=None):
+            self._rows = rows or []
+
+        def fetchall(self):
+            return self._rows
+
+        def fetchone(self):
+            return self._rows[0] if self._rows else None
+
+    class FakeSession:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def execute(self, statement, params=None):
+            sql = str(statement).lower()
+            if "information_schema.columns" in sql:
+                return FakeResult([])
+            if "alter table media_files alter column uploaded_by" in sql:
+                raise AssertionError("should not alter a missing uploaded_by column")
+            if "alter table media_files alter column deleted_by" in sql:
+                raise AssertionError("should not alter a missing deleted_by column")
+            if "alter table media_versions alter column replaced_by" in sql:
+                raise AssertionError("should not alter a missing replaced_by column")
+            if "alter table media_audit_logs alter column actor_id" in sql:
+                raise AssertionError("should not alter a missing actor_id column")
+            return FakeResult([])
+
+        def commit(self):
+            return None
+
+    monkeypatch.setattr("app.infrastructure.sqlalchemy_media_repository.SessionLocal", lambda: FakeSession())
+
+    from app.infrastructure.sqlalchemy_media_repository import SqlAlchemyMediaRepository
+
+    repo = SqlAlchemyMediaRepository()
+    assert repo.ensure_schema() is None
+

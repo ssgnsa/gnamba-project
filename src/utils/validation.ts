@@ -2,16 +2,16 @@
  * Utilitaires de validation pour les paramètres de l'application
  */
 import type { BrandSettings } from "../types";
+import { validateIvoryCoastPhone } from "../lib/phone/ivoryCoastPhone";
 
 // ============================================
 // EXPRESSIONS RÉGULIÈRES
 // ============================================
 
 const EMAIL_REGEX = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
-const PHONE_CI_REGEX =
-  /^\+225\s?[0-9]{2}\s?[0-9]{2}\s?[0-9]{2}\s?[0-9]{2}\s?[0-9]{2}$/;
+// Suppression de la duplication - on utilise maintenant l'utilitaire centralisé
 const URL_REGEX = /^https?:\/\/.+/i;
-const RELAXED_URL_REGEX = /^(https?:\/\/)?[\w-]+(\.[\w-]+)+([\w-.,@?^=%&:/~+#]*[\w-@?^=%&/~+#])?$/i;
+const RELAXED_URL_REGEX = /^(https?:\/\/)?[\w-]+(\.[\w-]+)+([\w-.,@?^=%&/~+#]*[\w-@?^=%&/~+#])?$/i;
 const HEX_COLOR_REGEX = /^#[0-9A-Fa-f]{6}$/;
 
 function normalizeUrl(value: string): string {
@@ -70,17 +70,19 @@ export function validateEmail(
 
 /**
  * Valide un numéro de téléphone (format Côte d'Ivoire)
+ * DÉPRÉCÉE : Utiliser validateIvoryCoastPhone de ../lib/phone/ivoryCoastPhone à la place
+ * Gardée pour compatibilité ascendante
  */
 export function validatePhone(
   phone: string,
   fieldName: string = "phone",
 ): ValidationError | null {
-  if (!phone) return null;
-  const cleaned = phone.replace(/\s/g, "");
-  if (!PHONE_CI_REGEX.test(phone) && !/^\+225[0-9]{9}$/.test(cleaned)) {
+  // Delegation à la fonction centralisée
+  const error = validateIvoryCoastPhone(phone);
+  if (error) {
     return {
       field: fieldName,
-      message: "Format invalide. Utilisez: +225 XX XX XX XX XX",
+      message: error,
       type: "format",
     };
   }
@@ -242,7 +244,7 @@ export function validateSettings(form: BrandSettings): ValidationResult {
   const emailError = validateEmail(form.contact_email, "contact_email");
   if (emailError) errors.push(emailError);
 
-  // Téléphone
+  // Téléphone - Utilisation de la fonction centralisée via validatePhone (pour compatibilité)
   const phoneError = validatePhone(form.contact_phone, "contact_phone");
   if (phoneError) errors.push(phoneError);
 

@@ -113,6 +113,14 @@ class FileBrowserServiceClass {
       return storedToken;
     }
 
+    // Auto-login with default credentials if no valid token
+    try {
+      const token = await this.login("admin", "gnambaAdmin2025!");
+      return token;
+    } catch (error) {
+      if (import.meta.env.DEV) console.error("FileBrowser auto-login failed:", error);
+    }
+
     return null;
   }
 

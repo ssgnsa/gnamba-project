@@ -47,7 +47,16 @@ export type FoncierConfigKey =
   | "logo_url"
   | "village_logo_url"
   | "primary_color"
-  | "layout_preference";
+  | "secondary_color"
+  | "layout_preference"
+  | "registre_volume"
+  | "registre_next_numero"
+  | "arrete_lotissement"
+  | "arrete_date"
+  | "limites_nord"
+  | "limites_sud"
+  | "limites_est"
+  | "limites_ouest";
 
 export type FoncierConfigMap = Record<FoncierConfigKey, string>;
 
@@ -63,7 +72,16 @@ export const emptyConfig: FoncierConfigMap = {
   logo_url: "",
   village_logo_url: "",
   primary_color: "",
+  secondary_color: "",
   layout_preference: "",
+  registre_volume: "",
+  registre_next_numero: "",
+  arrete_lotissement: "",
+  arrete_date: "",
+  limites_nord: "",
+  limites_sud: "",
+  limites_est: "",
+  limites_ouest: "",
 };
 
 export type AttestationTemoinForm = {
@@ -107,6 +125,8 @@ export type AttestationForm = {
   original: boolean;
   validation_agent_nom: string;
   validation_chef_nom: string;
+  reference?: string;
+  date_etablissement?: string;
 };
 
 export type AuditRecord = {
@@ -134,6 +154,77 @@ export type AttestationHistoryItem = {
   date_etablissement: string | null;
   deleted_at: string | null;
   validation_chef_date: string | null;
+};
+
+export type AttestationFull = AttestationHistoryItem & {
+  numero_enregistrement: string | null;
+  original: boolean;
+  mode_acquisition: string | null;
+  historique_possession: string | null;
+  domicile: string | null;
+  limites_nord: string | null;
+  limites_sud: string | null;
+  limites_est: string | null;
+  limites_ouest: string | null;
+  gps_lat: string | null;
+  gps_lng: string | null;
+  gps_precision: string | null;
+  gps_points: string | null;
+  registre_volume: string | null;
+  registre_page: string | null;
+  registre_ligne: string | null;
+  control_number: string | null;
+  qr_payload: string | null;
+  hash_sha256: string | null;
+  validation_agent_nom: string | null;
+  validation_chef_nom: string | null;
+  type: string | null;
+  chef_empreinte_url: string | null;
+  cedant_nom: string | null;
+  cedant_prenom: string | null;
+  cedant_cni_numero: string | null;
+  cedant_telephone: string | null;
+  cedant_domicile: string | null;
+  foncier_attestation_temoins: Array<{
+    id: string;
+    nom: string;
+    prenom: string;
+    profession: string;
+    telephone: string;
+    cni: string;
+  }> | null;
+  lot: {
+    reference: string;
+    numero_lot: string;
+    village: string;
+    superficie: number | string;
+    quartier: string | null;
+    nom_lotissement: string | null;
+    proprietaire_nom: string | null;
+    proprietaire_prenom: string | null;
+    proprietaire_naissance_date: string | null;
+    proprietaire_naissance_lieu: string | null;
+    proprietaire_cni_numero: string | null;
+    proprietaire_cni_date: string | null;
+    proprietaire_cni_lieu: string | null;
+    proprietaire_profession: string | null;
+    proprietaire_telephone: string | null;
+    chef_village: string | null;
+    date_cession: string | null;
+    prix_cession: string | null;
+  } | null;
+  village_config: {
+    region: string | null;
+    departement: string | null;
+    commune: string | null;
+    village: string | null;
+    chef_village: string | null;
+    arrete_prefectoral: string | null;
+    nom_chef_signe: string | null;
+    lieu_signature: string | null;
+    logo_url: string | null;
+    village_logo_url: string | null;
+  } | null;
 };
 
 export type AttestationScan = { url: string; original_name: string };
@@ -207,7 +298,7 @@ export const createEmptyForm = () => ({
   notes: "",
 });
 
-export const createAttestationForm = (): AttestationForm => ({
+export const createAttestationForm = (overrides: Partial<AttestationForm> = {}): AttestationForm => ({
   attestation_type: "standard",
   mode_acquisition: "",
   historique_possession: "",
@@ -244,6 +335,17 @@ export const createAttestationForm = (): AttestationForm => ({
   original: true,
   validation_agent_nom: "",
   validation_chef_nom: "",
+  reference: "",
+  date_etablissement: "",
+  ...overrides,
+});
+
+export const createEmptyTemoinForm = (): AttestationTemoinForm => ({
+  nom: "",
+  prenom: "",
+  profession: "",
+  telephone: "",
+  cni: "",
 });
 
 export const getAttestationStatusInfo = (
@@ -420,3 +522,46 @@ export const configFields: {
     placeholder: "ex: Kokoti-Kouamékro",
   },
 ];
+
+export type VerificationUrlParams = {
+  reference?: string | null;
+  control_number?: string | null;
+  hash_sha256?: string | null;
+  baseUrl?: string | null;
+};
+
+import { cleanText } from "../../utils/reference";
+import { getLocalApiBaseUrl } from "../../lib/selfHosted";
+
+export const buildAttestationVerificationUrl = (
+  params: VerificationUrlParams,
+): string => {
+  const { reference, control_number, hash_sha256, baseUrl } = params;
+  const origin =
+    typeof window !== "undefined" && window.location
+      ? window.location.origin
+      : getLocalApiBaseUrl();
+  const fallbackUrl = new URL("/verification-attestation", origin);
+
+  let targetUrl = fallbackUrl;
+  if (baseUrl && baseUrl.trim()) {
+    try {
+      targetUrl = new URL(baseUrl, origin);
+    } catch {
+      targetUrl = fallbackUrl;
+    }
+  }
+
+  const ref = cleanText(reference || "");
+  const control = cleanText(control_number || "");
+  const hash = cleanText(hash_sha256 || "");
+
+  if (ref) targetUrl.searchParams.set("ref", ref);
+  if (control) targetUrl.searchParams.set("control", control);
+  if (hash) targetUrl.searchParams.set("hash", hash);
+
+  return targetUrl.toString();
+};
+
+export { FONCIER_ATTESTATION_WITH_TEMOINS_SELECT } from "../../lib/foncierAttestation";
+

@@ -1,21 +1,23 @@
-import { getLocalStorageBaseUrl } from "../lib/selfHosted";
-import { apiClient } from "../api/client";
+import { getLocalStorageBaseUrl } from "../lib/selfHosted.ts";
+import { apiClient } from "../api/client.ts";
 
 type Filter = {
   column: string;
   value: unknown;
-  operator: "eq" | "neq" | "gte" | "lte" | "in" | "is";
+  operator: "eq" | "neq" | "gte" | "lte" | "in" | "is" | "or";
 };
 
 const tableEndpoints: Record<string, string> = {
-  projects: "/api/v1/projects",
-  employees: "/api/v1/employees",
-  suppliers: "/api/v1/suppliers",
-  products: "/api/v1/products",
-  finances: "/api/v1/finance",
-  immobilier_items: "/api/v1/immobilier",
-  foncier_items: "/api/v1/foncier",
-  media_files: "/api/v1/media",
+  projects: "/projects",
+  employees: "/employees",
+  suppliers: "/suppliers",
+  products: "/products",
+  finances: "/finance",
+  immobilier_items: "/immobilier",
+  foncier_items: "/foncier",
+  media_files: "/media",
+  // Mapping legacy french table name to API endpoint
+  locataires: "/tenants",
 };
 
 class ApiTableQuery {
@@ -27,6 +29,9 @@ class ApiTableQuery {
   private singleRow = false;
   private countMode = false;
   private headMode = false;
+  private limitCount: number | null = null;
+  private rangeFrom: number | null = null;
+  private rangeTo: number | null = null;
 
   constructor(private readonly table: string) {}
 
@@ -85,6 +90,12 @@ class ApiTableQuery {
     return this;
   }
 
+  or(conditions: string) {
+    // Store the OR condition as a special filter
+    this.filters.push({ column: "_or", value: conditions, operator: "or" });
+    return this;
+  }
+
   is(column: string, value: unknown) {
     this.filters.push({ column, value, operator: "is" });
     return this;
@@ -105,7 +116,14 @@ class ApiTableQuery {
     return this;
   }
 
-  limit(_count: number) {
+  limit(count: number) {
+    this.limitCount = count;
+    return this;
+  }
+
+  range(from: number, to: number) {
+    this.rangeFrom = from;
+    this.rangeTo = to;
     return this;
   }
 
@@ -117,7 +135,7 @@ class ApiTableQuery {
   }
 
   private endpoint() {
-    return tableEndpoints[this.table] ?? `/api/v1/tables/${encodeURIComponent(this.table)}`;
+    return tableEndpoints[this.table] ?? `/tables/${encodeURIComponent(this.table)}`;
   }
 
   private idFilter(): string | null {
@@ -135,6 +153,12 @@ class ApiTableQuery {
     if (this.orderBy) {
       params.set("order_by", this.orderBy.column);
       params.set("ascending", String(this.orderBy.ascending));
+    }
+    if (this.rangeFrom !== null && this.rangeTo !== null) {
+      params.set("offset", String(this.rangeFrom));
+      params.set("limit", String(this.rangeTo - this.rangeFrom + 1));
+    } else if (this.limitCount !== null) {
+      params.set("limit", String(this.limitCount));
     }
     const qs = params.toString();
     return qs ? `?${qs}` : "";
@@ -156,6 +180,23 @@ class ApiTableQuery {
         if (filter.operator === "is") {
           return filter.value === null ? value === null || value === undefined : value === filter.value;
         }
+        if (filter.operator === "or") {
+          // Handle OR conditions like "name.ilike.%john%,email.ilike.%john%"
+          const conditions = String(filter.value).split(",");
+          return conditions.some((cond) => {
+            const match = cond.match(/^(\w+)\.(ilike|like|eq|neq)\.%?(.*)%?$/i);
+            if (!match) return false;
+            const [, field, op, searchTerm] = match;
+            const fieldValue = String(row?.[field] ?? "").toLowerCase();
+            const searchLower = searchTerm.toLowerCase();
+            if (op === "ilike" || op === "like") {
+              return fieldValue.includes(searchLower);
+            }
+            if (op === "eq") return fieldValue === searchLower;
+            if (op === "neq") return fieldValue !== searchLower;
+            return false;
+          });
+        }
         return true;
       }),
     );
@@ -168,9 +209,16 @@ class ApiTableQuery {
         const result = await apiClient.request<any>(
           `${this.endpoint()}${this.queryString()}`,
         );
-        const rows = Array.isArray(result.data)
+        let rows = Array.isArray(result.data)
           ? this.applyFilters(result.data)
           : result.data;
+        if (Array.isArray(rows)) {
+          if (this.rangeFrom !== null && this.rangeTo !== null) {
+            rows = rows.slice(this.rangeFrom, this.rangeTo + 1);
+          } else if (this.limitCount !== null) {
+            rows = rows.slice(0, this.limitCount);
+          }
+        }
         const data = this.headMode
           ? null
           : this.singleRow && Array.isArray(rows)
@@ -238,7 +286,7 @@ const storageFrom = (_bucket: string) => ({
       for (const p of paths) {
         // Attempt a DELETE against a conventional storage endpoint.
         await apiClient.request(
-          `/api/v1/storage/media/${encodeURIComponent(p)}`,
+          `/storage/media/${encodeURIComponent(p)}`,
           {
             method: "DELETE",
           },
@@ -258,7 +306,7 @@ const tableClient = {
 
     async rpc(name: string, params?: Record<string, any>) {
     const res = await apiClient.request<any>(
-      `/api/v1/rpc/${encodeURIComponent(name)}`,
+      `/rpc/${encodeURIComponent(name)}`,
       {
         method: "POST",
         body: JSON.stringify(params || {}),

@@ -46,7 +46,7 @@ export async function loadVillageConfig(
 export async function saveVillageConfig(
   villageName: string,
   config: FoncierConfigMap,
-): Promise<void> {
+): Promise<boolean> {
   const entries = Object.entries(config)
     .filter(([, value]) => value !== undefined)
     .map(([key, value]) => ({
@@ -54,5 +54,7 @@ export async function saveVillageConfig(
       value: String(value),
     }));
 
-  await apiClient.settings.upsert(entries);
+  const result = await apiClient.settings.upsert(entries);
+  if (result.error) return false;
+  return true;
 }

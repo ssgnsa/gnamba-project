@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useSettings } from "../context/SettingsContext";
 import BrandLogo from "../components/BrandLogo";
-import dbClient from "../data/tableClient";
+import dbClient from '../lib/dbClient.service';
 import {
   Visiteur,
   Visite,
@@ -34,6 +34,7 @@ import { FormulaireVisiteur } from "./registre/FormulaireVisiteur";
 import SyncRemoteButton from "../components/ui/SyncRemoteButton";
 import { apiClient } from "../api/client";
 import { isSelfHostedMode } from "../lib/selfHosted";
+import { generateUUID } from "../utils/reference";
 
 // ============================================
 // PAGE REGISTRE VISITEUR
@@ -261,7 +262,7 @@ export default function RegistreVisiteur() {
           .from("visiteurs")
           .select("*")
           .is("deleted_at", null)
-          .order("created_at", { ascending: false })
+          .order("created_at")
           .limit(100);
         const seededVisiteurs = sortVisiteurs(
           ((visData || []) as Visiteur[]).map((item) => ({
@@ -636,7 +637,7 @@ export default function RegistreVisiteur() {
       } else {
         // 1. Créer le visiteur localement
         visiteurData = {
-          id: crypto.randomUUID(),
+          id: generateUUID(),
           nom_complet: visiteurForm.nom_complet,
           type_piece: visiteurForm.type_piece,
           numero_piece: visiteurForm.numero_piece,
@@ -667,7 +668,7 @@ export default function RegistreVisiteur() {
 
       // 2. Créer la visite localement
       const visiteData: LocalVisite = {
-        id: crypto.randomUUID(),
+        id: generateUUID(),
         visiteur_id: visiteurData.id,
         date_arrivee: now,
         date_depart: null,

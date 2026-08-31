@@ -31,7 +31,7 @@ export const tasksRepository = {
               )
             : query.eq("assignee_id", filters.assigneeId);
         }
-        return query.order("created_at", { ascending: false });
+        return query.order("created_at");
       })(),
     )) as { data: Task[] | null; error: unknown };
     const normalized = fromQueryResult<Task[]>(

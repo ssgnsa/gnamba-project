@@ -3,6 +3,7 @@ import {
   generateReference,
   generateFoncierReference,
   normalizeCode,
+  formatMontant,
 } from "../reference";
 
 describe("generateReference", () => {
@@ -43,6 +44,14 @@ describe("generateFoncierReference", () => {
   it("should generate foncier reference with date components", () => {
     const ref = generateFoncierReference();
     expect(ref).toMatch(/^FONC-2026-04-09-\d{5}$/);
+  });
+});
+
+describe("formatMontant", () => {
+  it("should not crash on null or undefined monetary values", () => {
+    expect(formatMontant(null)).toBe("0");
+    expect(formatMontant(undefined)).toBe("0");
+    expect(formatMontant("1250000")).toBe("1\u202f250\u202f000");
   });
 });
 

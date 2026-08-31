@@ -10,7 +10,7 @@
  * - Ou via cron: 0 9 5 * * (le 5 du mois à 9h)
  */
 
-import dbClient from "../data/tableClient";
+import dbClient from '../lib/dbClient.service';
 
 interface TenantWithContact {
   id: string;

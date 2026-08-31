@@ -2,6 +2,25 @@
 // AUTH TYPES (replaces API locale types)
 // ============================================
 
+import type { LeadScoreBreakdown } from "../lib/leadScoring";
+import type {
+  EntityResponse,
+  PaginatedEntityResponse,
+  EntitySearchParams,
+  EntitySummary,
+  EntityCreate,
+  EntityUpdate
+} from "./entity";
+
+export type {
+  EntityResponse,
+  PaginatedEntityResponse,
+  EntitySearchParams,
+  EntitySummary,
+  EntityCreate,
+  EntityUpdate
+};
+
 /**
  * Represents an authenticated user session
  * Replaces API locale User type
@@ -73,25 +92,31 @@ export interface Project {
 export interface Property {
   id: string;
   type_bien:
+    | "studio"
+    | "chambre"
+    | "chambre-salon"
     | "appartement"
-    | "villa"
-    | "bureau"
-    | "commerce"
     | "terrain"
-    | "autre";
+    | "magasin"
+    | "bureau"
+    | "villa";
   adresse: string;
-  proprietaire: string | null;
-  valeur: number;
+  proprietaire_id: string | null; // Reference to Client
+  proprietaire?: string | null; // For backward compatibility
   loyer_mensuel: number;
+  charges: number; // Charges mensuelles
   statut: "disponible" | "loue" | "en_vente" | "vendu";
   description: string | null;
   cover_image_url: string | null;
   created_at: string;
   updated_at: string;
+  // Relation data
+  proprietaire_client?: Pick<Client, "id" | "nom" | "prenom" | "telephone" | "email">;
 }
 
 export interface Tenant {
   id: string;
+  client_id: string | null; // Reference to Client - tenant must be a client
   nom: string;
   prenom: string;
   telephone: string | null;
@@ -104,7 +129,9 @@ export interface Tenant {
   statut: "actif" | "inactif";
   created_at: string;
   updated_at: string;
+  // Relation data
   properties?: Pick<Property, "adresse">;
+  client?: Pick<Client, "id" | "nom" | "prenom" | "telephone" | "email" | "adresse">;
 }
 
 export interface RentPayment {
@@ -126,9 +153,10 @@ export interface RentPayment {
   last_document_at?: string | null;
   last_document_by?: string | null;
   created_at: string;
-  locataires?: Pick<Tenant, "nom" | "prenom">;
-  properties?: Pick<Property, "adresse">;
-  lease_contracts?: Pick<LeaseContract, "reference">;
+  // Relation data
+  locataires?: Pick<Tenant, "nom" | "prenom" | "client_id">;
+  properties?: Pick<Property, "adresse" | "proprietaire_id" | "loyer_mensuel" | "charges">;
+  lease_contracts?: Pick<LeaseContract, "reference" | "loyer_mensuel" | "charges" | "date_debut" | "date_fin">;
 }
 
 export interface LeaseContract {
@@ -145,8 +173,14 @@ export interface LeaseContract {
   notes: string | null;
   created_at: string;
   updated_at: string;
-  properties?: Pick<Property, "adresse" | "type_bien">;
-  locataires?: Pick<Tenant, "nom" | "prenom" | "telephone">;
+  // Commission settings
+  commission_rate: number; // Percentage for company (default 12%)
+  commission_part_owner?: number; // Owner's share (100 - commission_rate)
+  // Due date: 10th of each month
+  jour_echeance: number; // Default 10
+  // Relation data
+  properties?: Pick<Property, "adresse" | "type_bien" | "proprietaire_id" | "loyer_mensuel" | "charges">;
+  locataires?: Pick<Tenant, "nom" | "prenom" | "telephone" | "client_id">;
 }
 
 export interface LandFile {
@@ -201,6 +235,7 @@ export interface Finance {
   id: string;
   type_transaction: "recette" | "depense";
   categorie: string;
+  statut?: string;
   montant: number;
   date_transaction: string;
   mode_paiement: "virement" | "especes" | "mobile_money" | "cheque";
@@ -351,6 +386,7 @@ export interface VitrineLot {
   commune: string;
   departement: string;
   region: string;
+  type_bien?: string;
   superficie: number;
   prix_vente: number;
   statut: "disponible" | "reserve" | "vendu";
@@ -453,6 +489,196 @@ export interface FoncierAttestationTemoin {
   created_at: string;
 }
 
+// ============================================
+// LEADS & CAMPAIGNS TYPES
+// ============================================
+
+/**
+ * Lead — Type unifié Frontend ↔ Backend
+ * Correspond à la table `leads` (via Entity type='lead') + champs calculés
+ * Backend stocke: first_name, last_name, phone, email, source, metadata_json{source_page, source_form, channels_optin, statut, assigned_to, notes, campaign_id, tags}
+ * Frontend utilise: status (alias statut), score (persisté + calculé), pipeline_stage, etc.
+ */
+export interface Lead {
+  // Identifiants
+  id: string;
+  reference?: string;           // Référence unique (ex: LEAD-20250115-ABC1)
+  
+  // Identité
+  first_name: string | null;
+  last_name: string | null;
+  phone: string;
+  email: string | null;
+  
+  // Source & Attribution
+  source: string;               // 'landing_page' | 'web_form' | 'referral' | 'phone_call' | 'walk_in' | 'social_media' | 'email_campaign' | 'direct' | 'unknown'
+  source_page: string | null;   // URL page d'origine
+  source_form: string | null;   // Nom/ID formulaire
+  campaign_id: string | null;   // Campagne d'origine
+  utm_source?: string | null;   // UTM tracking
+  utm_medium?: string | null;
+  utm_campaign?: string | null;
+  utm_content?: string | null;
+  utm_term?: string | null;
+  
+  // Statut & Pipeline (aligné backend: nouveau | contacte | qualifie | proposition | negociation | converti | perdu | archive)
+  status: LeadStatus;           // Frontend: 'active' | 'opted_out' | 'converted' | 'bounced' — Backend: 'nouveau' | 'contacte' | 'qualifie' | 'proposition' | 'negociation' | 'converti' | 'perdu' | 'archive'
+  
+  // Pipeline commercial (pour Kanban)
+  pipeline_stage?: PipelineStage;  // 'nouveau' | 'qualifie' | 'proposition' | 'negociation' | 'gagne' | 'perdu'
+  estimated_value?: number;       // Valeur estimée du deal (FCFA)
+  next_action?: string;           // Description prochaine action
+  next_action_date?: string | null; // Date prévue
+  assigned_to?: string | null;    // User ID assigné
+  
+  // Canaux de communication (opt-in RGPD)
+  channels_optin: {
+    sms: boolean;
+    whatsapp: boolean;
+    email: boolean;
+    telegram: boolean;
+  };
+  
+  // Tags & Catégorisation
+  tags: string[];
+  
+  // Scoring (persisté en DB + calculé côté client)
+  score: number;                // Score 0-100 (persisté, mis à jour par trigger/automation)
+  score_breakdown?: LeadScoreBreakdown; // Détail du dernier calcul
+  
+  // Métadonnées
+  notes?: string | null;        // Notes internes
+  metadata_json?: Record<string, any>; // Champs additionnels flexibles
+  
+  // Timestamps
+  created_at: string;
+  updated_at: string;
+  last_interaction_at: string | null; // Dernière interaction (appel, message, meeting)
+  deleted_at?: string | null;
+}
+
+// Types pour le statut (alignés backend)
+export type LeadStatus = 
+  | 'nouveau' 
+  | 'contacte' 
+  | 'qualifie' 
+  | 'proposition' 
+  | 'negociation' 
+  | 'converti' 
+  | 'perdu' 
+  | 'archive'
+  // Alias frontend (compatibilité)
+  | 'active' 
+  | 'opted_out' 
+  | 'converted' 
+  | 'bounced';
+
+// Mapping statut frontend → backend
+export const LEAD_STATUS_MAP: Record<LeadStatus, LeadStatus> = {
+  'nouveau': 'nouveau',
+  'contacte': 'contacte',
+  'qualifie': 'qualifie',
+  'proposition': 'proposition',
+  'negociation': 'negociation',
+  'converti': 'converti',
+  'perdu': 'perdu',
+  'archive': 'archive',
+  'active': 'nouveau',      // Frontend 'active' = Backend 'nouveau'
+  'opted_out': 'perdu',     // Frontend 'opted_out' = Backend 'perdu'
+  'converted': 'converti',  // Frontend 'converted' = Backend 'converti'
+  'bounced': 'perdu',       // Frontend 'bounced' = Backend 'perdu'
+};
+
+// Pipeline stages (pour Kanban)
+export type PipelineStage = 
+  | 'nouveau' 
+  | 'qualifie' 
+  | 'proposition' 
+  | 'negociation' 
+  | 'gagne' 
+  | 'perdu';
+
+export const PIPELINE_STAGE_LABELS: Record<PipelineStage, string> = {
+  'nouveau': 'Nouveau',
+  'qualifie': 'Qualifié',
+  'proposition': 'Proposition',
+  'negociation': 'Négociation',
+  'gagne': 'Gagné',
+  'perdu': 'Perdu',
+};
+
+export const PIPELINE_STAGE_ORDER: PipelineStage[] = [
+  'nouveau', 'qualifie', 'proposition', 'negociation', 'gagne', 'perdu'
+];
+
+
+export interface Campaign {
+  id: string;
+  name: string;
+  description: string | null;
+  status: string;
+  channels: string[];
+  segment_filter: {
+    status?: string | null;
+    channel?: string | null;
+    search?: string | null;
+    lead_count?: number;
+    tags?: string[];
+    min_score?: number;
+    tier?: string | null;
+    source?: string;
+    repeat?: boolean;
+  } | null;
+  template_content: Record<string, string>;
+  stats: {
+    sent: number;
+    delivered: number;
+    read: number;
+    failed: number;
+    opted_out: number;
+  };
+  budget: number | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LeadInteraction {
+  id: string;
+  lead_id: string;
+  channel: string;
+  type: string;
+  content: string;
+  status: 'sent' | 'delivered' | 'read' | 'failed' | 'opted_out';
+  template_id: string | null;
+  metadata: Record<string, any> | null;
+  sent_at: string | null;
+  delivered_at: string | null;
+  read_at: string | null;
+  created_at: string;
+}
+
+export interface BotWorkflow {
+  id: string;
+  name: string;
+  description: string | null;
+  trigger_type: 'event' | 'schedule' | 'manual';
+  trigger_config: Record<string, any>;
+  actions: Array<{
+    channel: string;
+    template: string;
+    delay_minutes: number;
+    workflow_type: string;
+    workflow_name: string;
+  }>;
+  status: 'active' | 'inactive' | 'draft';
+  execution_count: number;
+  last_executed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface FoncierConfig {
   key: string;
   value: string;
@@ -466,6 +692,47 @@ export interface FoncierVillage {
   departement: string;
   commune: string;
 }
+
+export interface FoncierLotissement {
+  id: string;
+  nom: string;
+  code: string;
+  village_id: string;
+  village?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FoncierIlot {
+  id: string;
+  nom: string;
+  code: string;
+  lotissement_id: string;
+  lotissement?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Page type for navigation
+export type Page =
+  | 'dashboard'
+  | 'clients'
+  | 'projets'
+  | 'finances'
+  | 'employes'
+  | 'fournisseurs'
+  | 'fournitures'
+  | 'foncier'
+  | 'immobilier'
+  | 'documents'
+  | 'media'
+  | 'leads'
+  | 'taches'
+  | 'statistiques'
+  | 'parametres'
+  | 'diagnostic'
+  | 'utilisateurs'
+  | 'site-editor';
 
 export interface UserVillageAccess {
   id: string;
@@ -583,6 +850,28 @@ export interface BrandSettings {
   brand_watermark_url: string;
   // Site vitrine backgrounds
   hero_background_url: string;
+  // Immobilier settings
+  commission_rate: string;
+  rent_due_day: string;
+}
+
+export interface ActivityLog {
+  id: string;
+  type: ActiviteType;
+  titre: string;
+  description: string | null;
+  icone: string;
+  priorite: Priorite;
+  auteur_id: string | null;
+  auteur_nom: string | null;
+  entity_type: string | null;
+  entity_id: string | null;
+  created_at: string;
+}
+
+export interface ValidationError {
+  field: string;
+  message: string;
 }
 
 // UserProfile pour la compatibilité

@@ -21,6 +21,7 @@ export interface TenantRecord extends Tenant {
 export function normalizeTenantRow(row: Record<string, any>): TenantRecord {
   return {
     id: row.id,
+    client_id: row.client_id ?? null,
     nom: row.nom ?? "",
     prenom: row.prenom ?? "",
     telephone: row.telephone ?? "",
@@ -54,7 +55,7 @@ export const tenantsRepository = {
         .from("parties")
         .select("*, party_roles(*)", { count: "exact" })
         .eq("party_roles.role", "locataire")
-        .order("created_at", { ascending: false });
+        .order("created_at");
 
       if (filters.statut) {
         query = query.eq("party_roles.status", filters.statut);

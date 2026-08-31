@@ -40,11 +40,21 @@ export async function normalizeLogoUrl(url: string): Promise<string> {
     return await convertToSignedUrl(url);
   }
   
-  // Pour les autres URLs, vérifier si valide
+  // URLs absolues valides → retourner directement
   try {
     new URL(url);
     return url;
   } catch {
+    // URLs relatives (ex: "/egslogo.png" ou "egslogo.png") → résoudre via window.location.origin
+    if (typeof window !== 'undefined') {
+      try {
+        const resolved = new URL(url, window.location.origin);
+        return resolved.href;
+      } catch {
+        // Si la résolution échoue aussi, on laisse tomber
+      }
+    }
+    // Dernier recours : URL invalide → retourner le SVG d'attente
     return FALLBACK_LOGO_SVG;
   }
 }
