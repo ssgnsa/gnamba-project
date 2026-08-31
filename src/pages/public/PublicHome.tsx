@@ -29,9 +29,10 @@ import { useSettings } from "../../context/SettingsContext";
 import type { PublicPage } from "../../lib/publicRoutes";
 import type { VitrineLot } from "../../types";
 import { formatMontant } from "../../utils/reference";
-import PublicSocialWall from "../../components/public/PublicSocialWall";
 import TrustBadges from "../../components/public/TrustBadges";
 import ProjectSelector from "../../components/public/ProjectSelector";
+import ProcessSteps from "../../components/public/ProcessSteps";
+import Testimonials from "../../components/public/Testimonials";
 import { OFFICIAL_CONTACT, buildWhatsAppUrl } from "../../lib/officialContact";
 
 // Premium UI Components
@@ -890,8 +891,8 @@ export default function PublicHome({ onNavigate }: Props) {
         </section>
       )}
 
-      {/* Social Wall */}
-      <PublicSocialWall />
+      {/* Social Wall - Commenté jusqu'à contenu réel */}
+      {/* <PublicSocialWall /> */}
 
       {/* Why Choose Us */}
       <section className="py-20 sm:py-24 lg:py-28 bg-neutral-50">
@@ -918,6 +919,12 @@ export default function PublicHome({ onNavigate }: Props) {
           </Grid>
         </Container>
       </section>
+
+      {/* Process Steps - Comment on travaille */}
+      <ProcessSteps />
+
+      {/* Testimonials - Voix de nos clients */}
+      <Testimonials />
 
       {/* CTA Band */}
       <section className="relative py-20 sm:py-24 lg:py-28 overflow-hidden" style={{ background: `linear-gradient(135deg, #1e3a5f 0%, ${primaryColor}40 40%, ${primaryColor} 100%)` }}>
