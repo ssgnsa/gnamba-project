@@ -26,15 +26,8 @@ class UserApplicationService:
             raise AuthenticationError("Identifiants invalides")
 
         # Normal password verification
-        if verify_password(password, user.password_hash):
-            pass
-        else:
-            # Fallback for test/dev bootstrap admin account: allow the INITIAL_ADMIN_PASSWORD
-            # when bcrypt verification unexpectedly fails (helps test environments).
-            admin_password = os.getenv("INITIAL_ADMIN_PASSWORD", "Admin@EGS2025!")
-            legacy_passwords = {"Admin@EGS2025!", "EgsAdminInitialPass2026Secure!", admin_password}
-            if not (user.id == "local-admin" or getattr(user, 'id', None) == "00000000-0000-0000-0000-000000000001") or password not in legacy_passwords:
-                raise AuthenticationError("Identifiants invalides")
+        if not verify_password(password, user.password_hash):
+            raise AuthenticationError("Identifiants invalides")
         return {
             "access_token": issue_token(user.to_payload(), "access"),
             "refresh_token": issue_token(user.to_payload(), "refresh"),
