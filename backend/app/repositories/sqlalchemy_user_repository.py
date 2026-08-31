@@ -226,11 +226,6 @@ def seed_system(db: Session) -> None:
     admin = db.query(User).filter(User.id == ADMIN_USER_ID).first()
     admin_password = os.getenv("INITIAL_ADMIN_PASSWORD", "Admin@EGS2025!")
     desired_hash = hash_password(admin_password)
-    legacy_passwords = {
-        "Admin@EGS2025!",
-        "EgsAdminInitialPass2026Secure!",
-        admin_password,
-    }
     repair_flag = os.getenv("AUTO_RESET_DEFAULT_ADMIN_PASSWORD", "false").strip().lower() == "true"
 
     if admin is None:
@@ -253,14 +248,7 @@ def seed_system(db: Session) -> None:
     if admin.access_level != AccessLevelEnum.ADMIN.value:
         admin.access_level = AccessLevelEnum.ADMIN.value
 
-    is_known_stale_hash = any(
-        verify_password(candidate, admin.password_hash)
-        for candidate in legacy_passwords
-        if candidate
-    )
     if repair_flag and not verify_password(admin_password, admin.password_hash):
-        admin.password_hash = desired_hash
-    elif is_known_stale_hash and not verify_password(admin_password, admin.password_hash):
         admin.password_hash = desired_hash
 
     db.commit()

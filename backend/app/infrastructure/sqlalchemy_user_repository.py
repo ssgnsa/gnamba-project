@@ -97,11 +97,7 @@ class SqlAlchemyUserRepository(UserRepositoryPort):
         existing = self.db.query(SqlAlchemyUser).filter(SqlAlchemyUser.id == ADMIN_USER_ID).first()
         admin_password = os.getenv("INITIAL_ADMIN_PASSWORD", "Admin@EGS2025!")
         desired_hash = hash_password(admin_password)
-        legacy_passwords = {
-            "Admin@EGS2025!",
-            "EgsAdminInitialPass2026Secure!",
-            admin_password,
-        }
+        repair_flag = os.getenv("AUTO_RESET_DEFAULT_ADMIN_PASSWORD", "false").strip().lower() == "true"
 
         if existing is None:
             existing = SqlAlchemyUser(
@@ -123,12 +119,7 @@ class SqlAlchemyUserRepository(UserRepositoryPort):
         if existing.access_level != AccessLevelEnum.ADMIN.value:
             existing.access_level = AccessLevelEnum.ADMIN.value
 
-        is_known_stale_hash = any(
-            verify_password(candidate, existing.password_hash)
-            for candidate in legacy_passwords
-            if candidate
-        )
-        if is_known_stale_hash and not verify_password(admin_password, existing.password_hash):
+        if repair_flag and not verify_password(admin_password, existing.password_hash):
             existing.password_hash = desired_hash
 
         self.db.commit()
