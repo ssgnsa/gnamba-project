@@ -95,7 +95,7 @@ def _employee_payload_to_entity_create(payload: EmployeeCreateRequest) -> Entity
 
     return EntityCreate(
         type="employee",
-        subtype="permanent",
+        subtype="particulier",
         status=entity_status,
         display_name=f"{payload.prenom} {payload.nom.upper()}",
         first_name=payload.prenom,

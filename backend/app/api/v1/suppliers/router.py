@@ -81,10 +81,13 @@ def _supplier_payload_to_entity_create(payload: SupplierCreateRequest) -> Entity
 
     return EntityCreate(
         type="supplier",
-        subtype="fournisseur",
+        subtype="entreprise",
         status=entity_status,
         display_name=payload.nom,
         company_name=payload.nom,
+        # EntityCreate requires first_name/last_name — use company name as fallback
+        first_name=payload.nom,
+        last_name="",
         phone=payload.telephone,
         email=payload.email,
         address=payload.adresse,
