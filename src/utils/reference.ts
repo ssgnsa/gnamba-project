@@ -8,13 +8,18 @@ export function generateReference(prefix: string): string {
 }
 
 // Référence foncière: FONC-YYYY-MM-DD-XXXXX
-export function generateFoncierReference(): string {
+export function generateFoncierReference(prefix: string = "FONC", villageConfig?: Record<string, string>): string {
   const now = new Date();
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");
   const rand = Math.floor(10000 + Math.random() * 90000);
-  return `FONC-${year}-${month}-${day}-${rand}`;
+  
+  // Include commune/village in reference if available
+  const location = villageConfig?.commune || villageConfig?.village || "";
+  const locationPart = location ? `-${normalizeCode(location, 8)}` : "";
+  
+  return `${prefix}-${year}-${month}-${day}${locationPart}-${rand}`;
 }
 
 export function normalizeCode(value: string, maxLen: number): string {
@@ -81,8 +86,22 @@ export function formatDateLong(dateStr?: string): string {
   });
 }
 
-export function formatMontant(montant: number): string {
-  return montant.toLocaleString("fr-FR");
+export function getLocalDateInput(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+export function formatMontant(
+  montant: number | string | null | undefined,
+): string {
+  const numericValue = Number(montant ?? 0);
+  if (!Number.isFinite(numericValue)) {
+    return "0";
+  }
+  return numericValue.toLocaleString("fr-FR");
 }
 
 /**
@@ -90,7 +109,7 @@ export function formatMontant(montant: number): string {
  * Retourne une chaîne vide si la date est invalide
  */
 export function normalizeFrDate(value: string): string {
-  const trimmed = value.trim();
+  const trimmed = value?.trim() ?? "";
   if (!trimmed) return "";
 
   // Si déjà ISO, retourner tel quel
@@ -114,7 +133,7 @@ export function normalizeFrDate(value: string): string {
  * Vérifie si une date au format français est valide
  */
 export function isValidFrDate(value: string): boolean {
-  const trimmed = value.trim();
+  const trimmed = value?.trim() ?? "";
   if (!trimmed) return true; // Champ vide considéré comme valide (optionnel)
 
   const match = /^(\d{2})\s*\/\s*(\d{2})\s*\/\s*(\d{4})$/.exec(trimmed);
@@ -148,8 +167,8 @@ export function parseNumberInput(value: string): number | null {
 /**
  * Nettoie un texte : supprime les espaces superflus
  */
-export function cleanText(value: string): string {
-  return value.trim();
+export function cleanText(value: string | null | undefined): string {
+  return value?.trim() ?? "";
 }
 
 /**

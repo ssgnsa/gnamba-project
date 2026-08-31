@@ -1,5 +1,5 @@
+/* eslint-disable react-refresh/only-export-components */
 import {
-  createContext,
   useContext,
   useState,
   useCallback,
@@ -8,8 +8,9 @@ import {
 } from "react";
 import { assistantCore } from "../lib/assistant-egs";
 import type { Agent, AgentMessage, AssistantContext, AgentAction } from "../lib/assistant-egs/types";
+import { AssistantContext as AssistantContextValue } from "./AssistantContextValue";
 
-interface AssistantContextType {
+export interface AssistantContextType {
   currentAgent: Agent | null;
   currentContext: AssistantContext | null;
   greeting: AgentMessage | null;
@@ -20,10 +21,6 @@ interface AssistantContextType {
   setContext(context: AssistantContext): Promise<void>;
   processQuery(query: string): Promise<AgentMessage>;
 }
-
-const AssistantContext = createContext<AssistantContextType | undefined>(
-  undefined,
-);
 
 export function AssistantProvider({ children }: { children: ReactNode }) {
   const [currentAgent, setCurrentAgent] = useState<Agent | null>(null);
@@ -108,14 +105,14 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <AssistantContext.Provider value={value}>
+    <AssistantContextValue.Provider value={value}>
       {children}
-    </AssistantContext.Provider>
+    </AssistantContextValue.Provider>
   );
 }
 
 export function useAssistant(): AssistantContextType {
-  const context = useContext(AssistantContext);
+  const context = useContext(AssistantContextValue);
   if (!context) {
     throw new Error("useAssistant must be used within AssistantProvider");
   }

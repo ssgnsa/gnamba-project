@@ -17,7 +17,7 @@ export const projectsRepository = {
       dbClient
         .from("projects")
         .select("*, clients(nom, prenom)")
-        .order("created_at", { ascending: false }),
+        .order("created_at"),
     )) as { data: Project[] | null; error: unknown };
     const normalized = fromQueryResult<Project[]>(
       result,

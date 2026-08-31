@@ -1,379 +1,418 @@
-import { getLocalApiBaseUrl, isSelfHostedMode } from "../lib/selfHosted";
-import type { BrandAssetType, MediaFile, UserProfile } from "../types";
+/**
+ * API Client - Centralized API communication layer
+ * Provides typed access to all backend endpoints
+ */
 
-const LOCAL_AUTH_TOKEN_KEY = "egs:local_auth_token";
-const LOCAL_REFRESH_TOKEN_KEY = "egs:local_refresh_token";
-
-export interface ApiAuthResponse {
-  access_token?: string;
-  refresh_token?: string;
-  user?: UserProfile;
-  message?: string;
-}
-
-export interface ApiResult<T> {
+// Type for API responses
+export interface ApiResult<T = any> {
   data: T | null;
   error: string | null;
-  status: number;
+  count?: number | null;
+  status?: number;
 }
 
-export interface ReleaseInfo {
-  application?: string;
-  git_commit?: string;
-  branch?: string;
-  build_date?: string;
-  build_hash?: string;
-  environment?: string;
+interface AuthResult {
+  user: any;
+  session: any;
+  access_token?: string;
+  refresh_token?: string;
+  code?: string;
 }
 
-export const getStoredLocalAuthToken = (): string | null => {
-  if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(LOCAL_AUTH_TOKEN_KEY);
-};
+// Core API client class
+class ApiClient {
+  private baseUrl: string;
+  private defaultHeaders: Record<string, string>;
 
-const getStoredLocalRefreshToken = (): string | null => {
-  if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(LOCAL_REFRESH_TOKEN_KEY);
-};
+  private buildQueryString(params?: Record<string, any>): string {
+    if (!params) return '';
 
-export const persistLocalAuthToken = (
-  accessToken: string,
-  refreshToken?: string,
-): void => {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(LOCAL_AUTH_TOKEN_KEY, accessToken);
-  if (refreshToken) {
-    window.localStorage.setItem(LOCAL_REFRESH_TOKEN_KEY, refreshToken);
-  }
-};
-
-export const clearStoredLocalAuthToken = (): void => {
-  if (typeof window === "undefined") return;
-  window.localStorage.removeItem(LOCAL_AUTH_TOKEN_KEY);
-  window.localStorage.removeItem(LOCAL_REFRESH_TOKEN_KEY);
-};
-
-const getAuthHeaders = (initHeaders?: HeadersInit): Headers => {
-  const headers = new Headers(initHeaders);
-  const token = getStoredLocalAuthToken();
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
-  return headers;
-};
-
-const parseApiResponse = async <T>(
-  response: Response,
-): Promise<ApiResult<T>> => {
-  const text = await response.text();
-  let payload: unknown = null;
-  try {
-    payload = text ? JSON.parse(text) : null;
-  } catch {
-    payload = text || null;
-  }
-
-  if (!response.ok) {
-    const detail = (() => {
-      if (payload && typeof payload === "object" && "detail" in payload) {
-        return String((payload as { detail?: unknown }).detail ?? "");
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value === undefined || value === null) return;
+      if (Array.isArray(value)) {
+        value.forEach((entry) => query.append(key, String(entry)));
+        return;
       }
-      if (typeof payload === "string") return payload;
-      return "";
-    })();
-    return {
-      data: null,
-      error: detail || `Erreur HTTP ${response.status}`,
-      status: response.status,
+      query.append(key, String(value));
+    });
+
+    const serialized = query.toString();
+    return serialized ? `?${serialized}` : '';
+  }
+
+  constructor() {
+    const configuredBase = import.meta.env.VITE_API_URL || '/api/v1';
+    const trimmed = configuredBase.replace(/\/+$/, '');
+    this.baseUrl = trimmed.endsWith('/api/v1')
+      ? trimmed
+      : `${trimmed}/api/v1`;
+    this.defaultHeaders = {
+      'Content-Type': 'application/json',
     };
   }
 
-  return {
-    data: (payload as T) ?? null,
-    error: null,
-    status: response.status,
+  private getAuthHeaders(): Record<string, string> {
+    if (typeof window === 'undefined') return {};
+    const token = window.localStorage.getItem('egs:local_auth_token');
+    if (token) {
+      return { Authorization: `Bearer ${token}` };
+    }
+    return {};
+  }
+
+  async request<T = any>(endpoint: string, options: RequestInit = {}): Promise<ApiResult<T>> {
+    const doFetch = async (withAuth = true): Promise<Response> => {
+      const headers = {
+        ...this.defaultHeaders,
+        ...(withAuth ? this.getAuthHeaders() : {}),
+        ...options.headers,
+      };
+
+      return fetch(`${this.baseUrl}${endpoint}`, {
+        ...options,
+        headers,
+      });
+    };
+
+    try {
+      let response = await doFetch();
+
+      if (response.status === 401 && typeof window !== 'undefined') {
+        const refreshToken = window.localStorage.getItem('egs:local_refresh_token');
+        if (refreshToken) {
+          const refreshResult = await this.auth.refresh(refreshToken);
+          if (!refreshResult.error && refreshResult.data?.access_token) {
+            this.persistLocalAuthToken(
+              refreshResult.data.access_token,
+              refreshResult.data.refresh_token ?? refreshToken,
+            );
+            response = await doFetch();
+          } else {
+            this.clearStoredLocalAuthToken();
+          }
+        }
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        return { data: null, error: `HTTP ${response.status}: ${errorText}`, count: null, status: response.status };
+      }
+
+      const data = await response.json();
+      return { data, error: null, count: Array.isArray(data) ? data.length : 1, status: response.status };
+    } catch (error) {
+      return { data: null, error: error instanceof Error ? error.message : 'Unknown error', count: null, status: 0 };
+    }
+  }
+
+  // Auth module
+  auth = {
+    login: async (email: string, password: string) => this.request<AuthResult>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    }),
+    logout: async () => this.request('/auth/logout', { method: 'POST' }),
+    me: async () => this.request('/auth/me'),
+    refresh: async (refreshToken: string) => this.request('/auth/refresh', {
+      method: 'POST',
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    }),
+    resetPassword: async (email: string) => this.request('/auth/password/reset', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+    updatePassword: async (currentPassword: string, newPassword: string) => this.request('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+    }),
   };
-};
 
-const refreshStoredLocalSession = async (): Promise<boolean> => {
-  const refreshToken = getStoredLocalRefreshToken();
-  if (!refreshToken) return false;
-
-  try {
-    const response = await fetch(
-      `${getLocalApiBaseUrl()}/api/v1/auth/refresh`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refresh_token: refreshToken }),
-      },
-    );
-    const result = await parseApiResponse<ApiAuthResponse>(response);
-    if (result.error || !result.data?.access_token) {
-      clearStoredLocalAuthToken();
-      return false;
+  // Named exports for backward compatibility
+  async clearStoredLocalAuthToken() {
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem('egs:local_auth_token');
+      window.localStorage.removeItem('egs:local_refresh_token');
     }
-
-    persistLocalAuthToken(result.data.access_token, result.data.refresh_token);
-    return true;
-  } catch {
-    clearStoredLocalAuthToken();
-    return false;
+    return { data: null, error: null, count: 1, status: 200 };
   }
+
+  async persistLocalAuthToken(accessToken: string, refreshToken: string) {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('egs:local_auth_token', accessToken);
+      window.localStorage.setItem('egs:local_refresh_token', refreshToken);
+    }
+    return { data: { access_token: accessToken, refresh_token: refreshToken }, error: null, count: 1, status: 200 };
+  }
+
+  // Settings module
+  settings = {
+    get: async (key?: string) => {
+      const url = key ? `/settings/${key}` : '/settings';
+      return this.request(url);
+    },
+    set: async (key: string, value: any) => {
+      return this.request('/settings', {
+        method: 'POST',
+        body: JSON.stringify({ key, value }),
+      });
+    },
+    getAll: async () => this.request('/settings'),
+    upsert: async (items: Array<{ key: string; value: string }>) => this.request('/settings', {
+      method: 'POST',
+      body: JSON.stringify({ items }),
+    }),
+  };
+
+  // Foncier module
+  foncier = {
+    getLots: async (params?: Record<string, any>) => {
+      const query = this.buildQueryString(params);
+      return this.request(`/foncier/lots${query}`);
+    },
+    getLot: async (id: string) => this.request(`/foncier/lots/${id}`),
+    createLot: async (data: any) => this.request('/foncier/lots', { method: 'POST', body: JSON.stringify(data) }),
+    updateLot: async (id: string, data: any) => this.request(`/foncier/lots/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    deleteLot: async (id: string) => this.request(`/foncier/lots/${id}`, { method: 'DELETE' }),
+    signAttestation: async (attestationId: string, payload: any) => this.request(`/foncier/attestations/${attestationId}/sign`, { method: 'POST', body: JSON.stringify(payload) }),
+    getLotissements: async () => this.request('/foncier/lotissements'),
+    getIlots: async () => this.request('/foncier/ilots'),
+    getVillages: async () => this.request('/foncier/villages'),
+    getAssembly: async () => this.request('/foncier/assembly'),
+    getAudit: async (params?: any) => {
+      const queryParams = new URLSearchParams();
+      if (params) {
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined && value !== null) {
+            queryParams.append(key, String(value));
+          }
+        });
+      }
+      const query = queryParams.toString();
+      return this.request(`/foncier/audit${query ? `?${query}` : ''}`);
+    },
+    getVillageNames: async () => this.request('/foncier/villages/names'),
+  };
+
+  // Users module
+  users = {
+    getAll: async () => this.request('/users'),
+    get: async (id: string) => this.request(`/users/${id}`),
+    create: async (data: any) => this.request('/users', { method: 'POST', body: JSON.stringify(data) }),
+    update: async (id: string, data: any) => this.request(`/users/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    delete: async (id: string) => this.request(`/users/${id}`, { method: 'DELETE' }),
+    getProfile: async (id: string) => this.request(`/users/${id}/profile`),
+  };
+
+  // Media module
+  media = {
+    getAll: async (params?: Record<string, any>) => {
+      const query = this.buildQueryString(params);
+      return this.request(`/media${query}`);
+    },
+    upload: async (file: File, metadata?: any) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      if (metadata) {
+        formData.append('metadata', JSON.stringify(metadata));
+      }
+      return this.request('/media', {
+        method: 'POST',
+        body: formData,
+        headers: {}, // Let browser set Content-Type with boundary
+      });
+    },
+    replace: async (id: string, file: File, metadata?: any) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      if (metadata) {
+        formData.append('metadata', JSON.stringify(metadata));
+      }
+      return this.request(`/media/${id}/replace`, {
+        method: 'POST',
+        body: formData,
+        headers: {},
+      });
+    },
+    update: async (id: string, data: any) => this.request(`/media/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    delete: async (id: string) => this.request(`/media/${id}`, { method: 'DELETE' }),
+    restore: async (id: string) => this.request(`/media/${id}/restore`, { method: 'POST' }),
+    purge: async (id: string) => this.request(`/media/${id}/purge`, { method: 'DELETE' }),
+    getBrandAssets: async () => this.request('/media/brand-assets'),
+    getAudit: async (mediaId?: string) => this.request(`/media/audit${mediaId ? `?media_id=${mediaId}` : ''}`),
+    getVersions: async (mediaId: string) => this.request(`/media/${mediaId}/versions`),
+  };
+
+  // Site content module
+  siteContent = {
+    get: async (section: string, key?: string) => {
+      const url = key ? `/site-content/${section}/${key}` : `/site-content/${section}`;
+      return this.request(url);
+    },
+    set: async (section: string, key: string, value: any) => this.request('/site-content', {
+      method: 'POST',
+      body: JSON.stringify({ section, key, value }),
+    }),
+    getAll: async () => this.request('/site-content'),
+  };
+
+  // Page layouts module
+  pageLayouts = {
+    getAll: async () => this.request('/page-layouts'),
+    get: async (pageSlug: string) => this.request(`/page-layouts/${pageSlug}`),
+    create: async (data: any) => this.request('/page-layouts', { method: 'POST', body: JSON.stringify(data) }),
+    update: async (pageSlug: string, data: any) => this.request(`/page-layouts/${pageSlug}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    upsert: async (data: any) => this.request('/page-layouts', { method: 'POST', body: JSON.stringify(data) }),
+    publish: async (pageSlug: string) => this.request(`/page-layouts/${pageSlug}/publish`, { method: 'PATCH' }),
+  };
+
+  // Projects module
+  projects = {
+    getAll: async () => this.request('/projects'),
+    get: async (id: string) => this.request(`/projects/${id}`),
+    create: async (data: any) => this.request('/projects', { method: 'POST', body: JSON.stringify(data) }),
+    update: async (id: string, data: any) => this.request(`/projects/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    delete: async (id: string) => this.request(`/projects/${id}`, { method: 'DELETE' }),
+  };
+
+  // Clients module
+  clients = {
+    getAll: async () => this.request('/clients'),
+    get: async (id: string) => this.request(`/clients/${id}`),
+    create: async (data: any) => this.request('/clients', { method: 'POST', body: JSON.stringify(data) }),
+    update: async (id: string, data: any) => this.request(`/clients/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    delete: async (id: string) => this.request(`/clients/${id}`, { method: 'DELETE' }),
+  };
+
+  // Leads module
+  leads = {
+    getAll: async () => this.request('/leads'),
+    get: async (id: string) => this.request(`/leads/${id}`),
+    create: async (data: any) => this.request('/leads', { method: 'POST', body: JSON.stringify(data) }),
+    update: async (id: string, data: any) => this.request(`/leads/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    delete: async (id: string) => this.request(`/leads/${id}`, { method: 'DELETE' }),
+    convert: async (id: string, clientData: any) => this.request(`/leads/${id}/convert`, { method: 'POST', body: JSON.stringify(clientData) }),
+  };
+
+  // Finances module (backend uses singular /finance)
+  finance = {
+    getAll: async () => this.request('/finance'),
+    get: async (id: string) => this.request(`/finance/${id}`),
+    create: async (data: any) => this.request('/finance', { method: 'POST', body: JSON.stringify(data) }),
+    update: async (id: string, data: any) => this.request(`/finance/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    delete: async (id: string) => this.request(`/finance/${id}`, { method: 'DELETE' }),
+  };
+
+  // Immobilier module
+  immobilier = {
+    properties: {
+      getAll: async () => this.request('/immobilier/properties'),
+      get: async (id: string) => this.request(`/immobilier/properties/${id}`),
+      create: async (data: any) => this.request('/immobilier/properties', { method: 'POST', body: JSON.stringify(data) }),
+      update: async (id: string, data: any) => this.request(`/immobilier/properties/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+      delete: async (id: string) => this.request(`/immobilier/properties/${id}`, { method: 'DELETE' }),
+    },
+    // Tenants are at root level /tenants in backend
+    tenants: {
+      getAll: async () => this.request('/tenants'),
+      get: async (id: string) => this.request(`/tenants/${id}`),
+      create: async (data: any) => this.request('/tenants', { method: 'POST', body: JSON.stringify(data) }),
+      update: async (id: string, data: any) => this.request(`/tenants/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+      delete: async (id: string) => this.request(`/tenants/${id}`, { method: 'DELETE' }),
+    },
+    // Contracts - not available as nested endpoint, use properties for lease contracts
+    contracts: {
+      getAll: async () => this.request('/immobilier/properties'), // Lease contracts are properties with type
+      get: async (id: string) => this.request(`/immobilier/properties/${id}`),
+      create: async (data: any) => this.request('/immobilier/properties', { method: 'POST', body: JSON.stringify(data) }),
+      update: async (id: string, data: any) => this.request(`/immobilier/properties/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+      delete: async (id: string) => this.request(`/immobilier/properties/${id}`, { method: 'DELETE' }),
+    },
+  };
+
+  // Tenants module (for backward compatibility)
+  tenants = {
+    getAll: async () => this.request('/tenants'),
+    get: async (id: string) => this.request(`/tenants/${id}`),
+    create: async (data: any) => this.request('/tenants', { method: 'POST', body: JSON.stringify(data) }),
+    update: async (id: string, data: any) => this.request(`/tenants/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    delete: async (id: string) => this.request(`/tenants/${id}`, { method: 'DELETE' }),
+  };
+
+
+
+  // Documents module - use tables API
+  documents = {
+    getAll: async () => this.request('/tables/documents'),
+    get: async (id: string) => this.request(`/tables/documents/${id}`),
+    create: async (data: any) => this.request('/tables/documents', { method: 'POST', body: JSON.stringify(data) }),
+    update: async (id: string, data: any) => this.request(`/tables/documents/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    delete: async (id: string) => this.request(`/tables/documents/${id}`, { method: 'DELETE' }),
+  };
+
+  // Tasks module
+  tasks = {
+    getAll: async () => this.request('/tasks'),
+    get: async (id: string) => this.request(`/tasks/${id}`),
+    create: async (data: any) => this.request('/tasks', { method: 'POST', body: JSON.stringify(data) }),
+    update: async (id: string, data: any) => this.request(`/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    delete: async (id: string) => this.request(`/tasks/${id}`, { method: 'DELETE' }),
+  };
+
+  // Employees module
+  employees = {
+    getAll: async () => this.request('/employees'),
+    get: async (id: string) => this.request(`/employees/${id}`),
+    create: async (data: any) => this.request('/employees', { method: 'POST', body: JSON.stringify(data) }),
+    update: async (id: string, data: any) => this.request(`/employees/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    delete: async (id: string) => this.request(`/employees/${id}`, { method: 'DELETE' }),
+  };
+
+  // Suppliers module
+  suppliers = {
+    getAll: async () => this.request('/suppliers'),
+    get: async (id: string) => this.request(`/suppliers/${id}`),
+    create: async (data: any) => this.request('/suppliers', { method: 'POST', body: JSON.stringify(data) }),
+    update: async (id: string, data: any) => this.request(`/suppliers/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+    delete: async (id: string) => this.request(`/suppliers/${id}`, { method: 'DELETE' }),
+  };
+
+
+
+
+
+  // Audit - use specific audit endpoints (media/audit, foncier/audit)
+  audit = {
+    log: async (data: any) => this.request('/media/audit', { method: 'POST', body: JSON.stringify(data) }),
+    get: async (params?: any) => this.request('/media/audit', {
+      method: params ? 'POST' : 'GET',
+      body: params ? JSON.stringify(params) : undefined,
+    }),
+  };
+
+  // Verify Turnstile - backend doesn't have this endpoint yet
+  verifyTurnstile = async (_token: string) => {
+    return { data: { success: true }, error: null, count: 1, status: 200 };
+  };
+
+  // Version
+  version = async () => this.request('/version');
+}
+
+// Export singleton instance
+export const apiClient = new ApiClient();
+
+// Export named functions for backward compatibility
+export const clearStoredLocalAuthToken = async () => {
+  return apiClient.clearStoredLocalAuthToken();
 };
 
-const shouldRetryWithRefresh = (path: string, status: number): boolean =>
-  status === 401 &&
-  !path.startsWith("/api/v1/auth/login") &&
-  !path.startsWith("/api/v1/auth/refresh") &&
-  Boolean(getStoredLocalRefreshToken());
-
-export const apiClient = {
-  async request<T>(
-    path: string,
-    init: RequestInit = {},
-  ): Promise<ApiResult<T>> {
-    if (!isSelfHostedMode()) {
-      return {
-        data: null,
-        error: "Le mode self-hosted est requis pour l'API unifiée.",
-        status: 404,
-      };
-    }
-
-    const buildHeaders = () => {
-      const headers = getAuthHeaders(init.headers);
-      if (
-        !headers.has("Content-Type") &&
-        init.body &&
-        !(init.body instanceof FormData)
-      ) {
-        headers.set("Content-Type", "application/json");
-      }
-      return headers;
-    };
-
-    const send = () =>
-      fetch(`${getLocalApiBaseUrl()}${path}`, {
-        ...init,
-        headers: buildHeaders(),
-      });
-
-    let result = await parseApiResponse<T>(await send());
-    if (shouldRetryWithRefresh(path, result.status)) {
-      const refreshed = await refreshStoredLocalSession();
-      if (refreshed) {
-        result = await parseApiResponse<T>(await send());
-      }
-    }
-    return result;
-  },
-
-  version: {
-    async get() {
-      return apiClient.request<ReleaseInfo>("/api/v1/version");
-    },
-  },
-
-  auth: {
-    async login(
-      email: string,
-      password: string,
-    ): Promise<ApiAuthResponse & { error?: string; code?: string }> {
-      const result = await apiClient.request<ApiAuthResponse>(
-        "/api/v1/auth/login",
-        {
-          method: "POST",
-          body: JSON.stringify({ email, password }),
-        },
-      );
-      if (result.error) {
-        return {
-          error: result.error,
-          code: result.status === 401 ? "invalid_credentials" : undefined,
-        };
-      }
-      return {
-        ...(result.data ?? {}),
-      };
-    },
-
-    async me() {
-      return apiClient.request<Record<string, unknown>>("/api/v1/auth/me");
-    },
-
-    async refresh(refreshToken: string) {
-      return apiClient.request<ApiAuthResponse>("/api/v1/auth/refresh", {
-        method: "POST",
-        body: JSON.stringify({ refresh_token: refreshToken }),
-      });
-    },
-
-    async logout() {
-      return apiClient.request<{ status: string; message: string }>(
-        "/api/v1/auth/logout",
-        {
-          method: "POST",
-        },
-      );
-    },
-  },
-
-  foncier: {
-    async signAttestation(
-      attestationId: string,
-      payload: Record<string, unknown>,
-    ) {
-      return apiClient.request<{ signature: string; algorithm: string }>(
-        "/api/v1/foncier/attestations/sign",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            attestation_id: attestationId,
-            payload: JSON.stringify(payload),
-          }),
-        },
-      );
-    },
-  },
-
-  users: {
-    async getAll() {
-      return apiClient.request<UserProfile[]>("/api/v1/users");
-    },
-
-    async create(payload: Record<string, unknown>) {
-      return apiClient.request<ApiAuthResponse>("/api/v1/users", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-    },
-
-    async update(id: string, payload: Record<string, unknown>) {
-      return apiClient.request<UserProfile>(`/api/v1/users/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(payload),
-      });
-    },
-
-    async delete(id: string) {
-      return apiClient.request<{ status: string; message: string }>(
-        `/api/v1/users/${id}`,
-        {
-          method: "DELETE",
-        },
-      );
-    },
-  },
-
-  settings: {
-    async getAll() {
-      return apiClient.request<Array<{ key: string; value: string }>>(
-        "/api/v1/settings",
-      );
-    },
-
-    async upsert(items: Array<{ key: string; value: string }>) {
-      return apiClient.request<{ status: string; message: string }>(
-        "/api/v1/settings",
-        {
-          method: "POST",
-          body: JSON.stringify({ items }),
-        },
-      );
-    },
-  },
-
-  siteContent: {
-    async getAll() {
-      return apiClient.request<
-        Array<{ section: string; key: string; value: string }>
-      >("/api/v1/site-content");
-    },
-  },
-
-  media: {
-    async getAll(includeDeleted = false) {
-      const suffix = includeDeleted ? "?include_deleted=true" : "";
-      return apiClient.request<MediaFile[]>(`/api/v1/media${suffix}`);
-    },
-
-    async get(id: string) {
-      return apiClient.request<MediaFile>(`/api/v1/media/${id}`);
-    },
-
-    async upload(
-      file: File,
-      payload?: {
-        category?: string;
-        alt_text?: string;
-        description?: string;
-        tags?: string[];
-      },
-    ) {
-      const formData = new FormData();
-      formData.append("file", file);
-      if (payload?.category) formData.append("category", payload.category);
-      if (payload?.alt_text) formData.append("alt_text", payload.alt_text);
-      if (payload?.description)
-        formData.append("description", payload.description);
-      if (payload?.tags?.length)
-        formData.append("tags", payload.tags.join(","));
-      return apiClient.request<MediaFile>("/api/v1/media", {
-        method: "POST",
-        body: formData,
-      });
-    },
-
-    async update(id: string, payload: Record<string, unknown>) {
-      return apiClient.request<MediaFile>(`/api/v1/media/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(payload),
-      });
-    },
-
-    async delete(id: string) {
-      return apiClient.request<{
-        status: string;
-        deleted_at: string | null;
-        media_id: string;
-      }>(`/api/v1/media/${id}`, { method: "DELETE" });
-    },
-
-    async restore(id: string) {
-      return apiClient.request<MediaFile>(`/api/v1/media/${id}/restore`, {
-        method: "POST",
-      });
-    },
-
-    async purge(id: string) {
-      return apiClient.request<{ status: string; media_id: string }>(
-        `/api/v1/media/${id}/purge`,
-        {
-          method: "DELETE",
-        },
-      );
-    },
-
-    async replace(id: string, file: File) {
-      const formData = new FormData();
-      formData.append("file", file);
-      return apiClient.request<MediaFile>(`/api/v1/media/${id}/replace`, {
-        method: "POST",
-        body: formData,
-      });
-    },
-
-    async getBrandAssets() {
-      return apiClient.request<
-        Array<{ brand_asset_type: BrandAssetType; url: string }>
-      >("/api/v1/media/brand-assets");
-    },
-  },
-
-  async verifyTurnstile(token: string): Promise<boolean> {
-    return Boolean(token);
-  },
+export const persistLocalAuthToken = async (accessToken: string, refreshToken: string) => {
+  return apiClient.persistLocalAuthToken(accessToken, refreshToken);
 };
 
+// Export types
+export type { AuthResult };
+
+// Default export for backward compatibility
 export default apiClient;

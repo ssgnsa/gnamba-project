@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from "react";
 import type { Toast, ToastType } from "../components/ui/Toast";
+import { generateUUID } from "../utils/reference";
 
 interface NotificationContextType {
   toasts: Toast[];
@@ -15,7 +16,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   const showToast = useCallback((type: ToastType, title: string, message: string, duration?: number) => {
     const newToast: Toast = {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       type,
       title,
       message,

@@ -1,4 +1,4 @@
-import { FC, useState } from 'react';
+import { FC, useEffect, useState } from 'react';
 import { z } from 'zod';
 import { foncierRepository } from '../../data/foncier.repository';
 import { foncierLotFormSchema, type FoncierLotFormInput, validateFoncierForm } from '../../lib/foncierValidation';
@@ -7,6 +7,7 @@ interface FoncierLotFormProps {
   onClose: () => void;
   onSuccess: () => void;
   initialData?: Partial<FoncierLotFormInput>;
+  onClientSelected?: (partyId: string) => void;
 }
 
 export const FoncierLotForm: FC<FoncierLotFormProps> = ({ onClose, onSuccess, initialData }) => {
@@ -122,6 +123,19 @@ export const FoncierLotForm: FC<FoncierLotFormProps> = ({ onClose, onSuccess, in
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedPartyId, setSelectedPartyId] = useState<string | null>(null);
+
+    // Charger les données du client si on édite un lot existant avec un propriétaire déjà sélectionné
+  useEffect(() => {
+    if (!initialData) return;
+
+    // Si on est en mode édition et qu'on a un proprietaire_client_id dans les données initiales
+    // alors on configure le formulaire client pour l'édition
+    if (initialData.proprietaire_client_id) {
+      setSelectedPartyId(initialData.proprietaire_client_id);
+      // Client selection is tracked via selectedPartyId, no legacy form state needed.
+    }
+  }, [initialData]);
 
   // Handle form field changes
   const handleChange = <K extends keyof FormState>(field: K, value: FormState[K]) => {
@@ -152,9 +166,31 @@ export const FoncierLotForm: FC<FoncierLotFormProps> = ({ onClose, onSuccess, in
       if (!parsedData) throw new Error('No parsed data from validation');
 
       // Ensure statut has a default value
+      // Vérifier qu'un propriétaire a été sélectionné
+      if (!selectedPartyId) {
+        setError('Veuillez sélectionner ou créer un propriétaire pour ce lot');
+        setLoading(false);
+        return;
+      }
+
+      // Construire les données de sauvegarde en utilisant la référence client au lieu de dupliquer les données
       const saveData = {
         ...parsedData,
         statut: parsedData.statut || 'actif',
+        proprietaire_client_id: selectedPartyId, // Référence vers la table parties (source de vérité)
+
+        // NE PAS copier les données du client propriétaire puisque nous utilisons la référence
+        // Ces champs seraient dupliqués et pourraient devenir incohérents
+        proprietaire_nom: undefined,
+        proprietaire_prenom: undefined,
+        proprietaire_naissance_date: undefined,
+        proprietaire_naissance_lieu: undefined,
+        proprietaire_cni_numero: undefined,
+        proprietaire_cni_date: undefined,
+        proprietaire_cni_lieu: undefined,
+        proprietaire_profession: undefined,
+        proprietaire_telephone: undefined,
+        proprietaire_email: undefined,
       };
 
       const result = await foncierRepository.saveLot(saveData, false);

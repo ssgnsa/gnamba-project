@@ -1,4 +1,5 @@
 import type { FoncierLot } from "../types";
+import { generateUUID } from "../utils/reference";
 
 export type OfflineQueueItem = {
   id: string;
@@ -95,15 +96,10 @@ export const getDeviceId = (): string => {
   const existing = window.localStorage.getItem(key);
   if (existing) return existing;
   let generated = "";
-  if (
-    typeof crypto !== "undefined" &&
-    typeof crypto.randomUUID === "function"
-  ) {
-    try {
-      generated = crypto.randomUUID();
-    } catch {
-      generated = "";
-    }
+  try {
+    generated = generateUUID();
+  } catch {
+    generated = "";
   }
   if (!generated) {
     generated = `${Date.now()}-${Math.random().toString(16).slice(2)}`;

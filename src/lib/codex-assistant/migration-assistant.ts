@@ -7,6 +7,7 @@ import type {
   RollbackPoint,
   ServerContext,
 } from "./types";
+import { spawnSync } from "node:child_process";
 
 type PhaseDefinition = {
   id: MigrationPhase;
@@ -191,13 +192,16 @@ export class MigrationAssistant {
 
     try {
       for (const script of task.scripts) {
-        await this.executeScript(script);
+        const result = await this.executeScript(script);
+        if (!result.success) {
+          throw new Error(`Script échoué: ${script} — ${result.error}`);
+        }
       }
 
       for (const validation of task.validation) {
-        const valid = await this.executeScript(validation);
-        if (!valid) {
-          throw new Error(`Validation échouée: ${validation}`);
+        const result = await this.executeScript(validation);
+        if (!result.success) {
+          throw new Error(`Validation échouée: ${validation} — ${result.error}`);
         }
       }
 
@@ -242,11 +246,43 @@ export class MigrationAssistant {
     return context.migration.rollbackPoints.slice(-1)[0] ?? null;
   }
 
-  private async executeScript(script: string): Promise<boolean> {
-    // Le scaffold ne parle pas encore à Docker ou au shell.
-    // On journalise simplement les scripts pour préparer l'intégration future.
-    console.log(`📝 Exécution: ${script}`);
-    return true;
+  private async executeScript(script: string, options: { dryRun?: boolean; timeout?: number; captureOutput?: boolean } = {}): Promise<{ success: boolean; output: string; error?: string }> {
+    const { dryRun = false, timeout = 300000, captureOutput = true } = options;
+
+    if (dryRun) {
+      console.log(`🔍 [DRY-RUN] ${script}`);
+      return { success: true, output: "[dry-run] command not executed" };
+    }
+
+    console.log(`⚙️  Exécution: ${script}`);
+
+    try {
+      const result = spawnSync("bash", ["-c", script], {
+        encoding: "utf8",
+        timeout,
+        stdio: captureOutput ? "pipe" : "inherit",
+        env: { ...process.env, PATH: process.env.PATH },
+      });
+
+      const output = captureOutput ? (result.stdout?.toString() || "") + (result.stderr?.toString() || "") : "";
+
+      if (result.status !== 0) {
+        console.error(`❌ Échec (code ${result.status}): ${script}`);
+        if (output) console.error(output);
+        return { success: false, output, error: `Exit code ${result.status}` };
+      }
+
+      console.log(`✅ Succès: ${script}`);
+      return { success: true, output };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`💥 Exception: ${script} — ${message}`);
+      return { success: false, output: "", error: message };
+    }
+  }
+
+  async executeScriptStandalone(script: string, options?: { dryRun?: boolean; timeout?: number }): Promise<{ success: boolean; output: string; error?: string }> {
+    return this.executeScript(script, options);
   }
 
   private getNextSteps(task: MigrationTask): string[] {

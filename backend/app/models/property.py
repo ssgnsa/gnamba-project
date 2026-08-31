@@ -32,6 +32,10 @@ class Property(Base):
     cover_image_url = Column(String, nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), default=datetime.utcnow, nullable=False)
     updated_at = Column(TIMESTAMP(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_by = Column(UUID(as_uuid=False), nullable=True)
+    updated_by = Column(UUID(as_uuid=False), nullable=True)
+    deleted_at = Column(TIMESTAMP(timezone=True), nullable=True)
+    deleted_by = Column(UUID(as_uuid=False), nullable=True)
 
     # Relationships
     proprietaire_entity = relationship("Entity", foreign_keys=[proprietaire_entity_id])
@@ -63,6 +67,8 @@ class LeaseContract(Base):
     jour_echeance = Column(Integer, default=10)
     created_at = Column(TIMESTAMP(timezone=True), default=datetime.utcnow, nullable=False)
     updated_at = Column(TIMESTAMP(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    deleted_at = Column(TIMESTAMP(timezone=True), nullable=True)
+    deleted_by = Column(UUID(as_uuid=False), nullable=True)
 
     # Relationships
     property = relationship("Property", back_populates="lease_contracts")
@@ -97,6 +103,8 @@ class RentPayment(Base):
     last_document_by = Column(UUID(as_uuid=False), nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), default=datetime.utcnow, nullable=False)
     updated_at = Column(TIMESTAMP(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    deleted_at = Column(TIMESTAMP(timezone=True), nullable=True)
+    deleted_by = Column(UUID(as_uuid=False), nullable=True)
 
     # Relationships
     property = relationship("Property", back_populates="rent_payments")

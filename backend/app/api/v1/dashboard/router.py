@@ -9,7 +9,20 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, get_current_user
 from app.services.dashboard.service import DashboardService
 
-router = APIRouter()
+router = APIRouter(prefix="/api/v1/dashboard", tags=["dashboard"])
+
+
+@router.get("")
+def get_dashboard(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get dashboard statistics (alias for /stats)
+    """
+    dashboard_service = DashboardService(db)
+    stats = dashboard_service.get_dashboard_data()
+    return stats
 
 
 @router.get("/stats")
@@ -21,7 +34,7 @@ def get_dashboard_stats(
     Get dashboard statistics
     """
     dashboard_service = DashboardService(db)
-    stats = dashboard_service.get_dashboard_stats()
+    stats = dashboard_service.get_dashboard_data()
     return stats
 
 

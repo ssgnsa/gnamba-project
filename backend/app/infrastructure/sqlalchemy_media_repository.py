@@ -7,10 +7,10 @@ from typing import Any
 from fastapi import UploadFile
 from sqlalchemy import text
 
-from backend.app.core.database import SessionLocal
-from backend.app.domain.media import MediaAsset
-from backend.app.repositories.media_repository import MediaRepositoryPort
-from backend.app.services.storage_provider import StorageProvider
+from app.core.database import SessionLocal
+from app.domain.media import MediaAsset
+from app.repositories.media_repository import MediaRepositoryPort
+from app.services.storage_provider import StorageProvider
 
 
 class SqlAlchemyMediaRepository(MediaRepositoryPort):
@@ -30,7 +30,7 @@ class SqlAlchemyMediaRepository(MediaRepositoryPort):
                         url TEXT NOT NULL DEFAULT '',
                         thumbnail_url TEXT,
                         category TEXT NOT NULL DEFAULT 'autre',
-                        uploaded_by UUID,
+                        uploaded_by TEXT,
                         upload_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
                         size BIGINT NOT NULL DEFAULT 0,
                         type TEXT NOT NULL DEFAULT '',
@@ -42,7 +42,7 @@ class SqlAlchemyMediaRepository(MediaRepositoryPort):
                         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
                         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
                         deleted_at TIMESTAMP WITH TIME ZONE,
-                        deleted_by UUID,
+                        deleted_by TEXT,
                         width INTEGER,
                         height INTEGER
                     )
@@ -94,6 +94,48 @@ class SqlAlchemyMediaRepository(MediaRepositoryPort):
                 )
             )
             session.execute(text("ALTER TABLE media_files ADD COLUMN IF NOT EXISTS storage_key TEXT"))
+
+            column_names_by_table = {
+                "media_files": {"uploaded_by", "deleted_by"},
+                "media_versions": {"replaced_by"},
+                "media_audit_logs": {"actor_id"},
+            }
+
+            for table_name, columns in column_names_by_table.items():
+                existing_columns = session.execute(
+                    text(
+                        """
+                        SELECT column_name
+                        FROM information_schema.columns
+                        WHERE table_schema = current_schema()
+                          AND table_name = :table_name
+                        """
+                    ),
+                    {"table_name": table_name},
+                ).fetchall()
+                existing_names = {row[0] for row in existing_columns}
+                for column_name in sorted(columns):
+                    if column_name not in existing_names:
+                        continue
+
+                    if table_name == "media_files" and column_name in {"uploaded_by", "deleted_by"}:
+                        session.execute(
+                            text(
+                                f"ALTER TABLE media_files ALTER COLUMN {column_name} TYPE TEXT USING {column_name}::text"
+                            )
+                        )
+                    elif table_name == "media_versions" and column_name == "replaced_by":
+                        session.execute(
+                            text(
+                                "ALTER TABLE media_versions ALTER COLUMN replaced_by TYPE TEXT USING replaced_by::text"
+                            )
+                        )
+                    elif table_name == "media_audit_logs" and column_name == "actor_id":
+                        session.execute(
+                            text(
+                                "ALTER TABLE media_audit_logs ALTER COLUMN actor_id TYPE TEXT USING actor_id::text"
+                            )
+                        )
             session.commit()
 
     def _uuid(self) -> str:
@@ -175,7 +217,7 @@ class SqlAlchemyMediaRepository(MediaRepositoryPort):
         storage_provider: StorageProvider | None = None,
     ) -> dict[str, Any]:
         if storage_provider is None:
-            from backend.app.services.storage_provider import get_storage_provider
+            from app.services.storage_provider import get_storage_provider
             storage_provider = get_storage_provider()
         filename = f"{category}/{self._now().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:8]}_{upload_file.filename or 'file'}"
         storage_key = filename.replace("//", "/")
@@ -284,7 +326,7 @@ class SqlAlchemyMediaRepository(MediaRepositoryPort):
 
     def purge(self, media_id: str, storage_provider: StorageProvider | None = None) -> bool:
         if storage_provider is None:
-            from backend.app.services.storage_provider import get_storage_provider
+            from app.services.storage_provider import get_storage_provider
             storage_provider = get_storage_provider()
         with SessionLocal() as session:
             row = session.execute(text("SELECT filename FROM media_files WHERE id = :media_id"), {"media_id": media_id}).fetchone()
@@ -298,7 +340,7 @@ class SqlAlchemyMediaRepository(MediaRepositoryPort):
 
     def replace(self, media_id: str, upload_file: UploadFile, user_id: str | None, storage_provider: StorageProvider | None = None) -> MediaAsset | None:
         if storage_provider is None:
-            from backend.app.services.storage_provider import get_storage_provider
+            from app.services.storage_provider import get_storage_provider
             storage_provider = get_storage_provider()
         existing = self.get_media(media_id)
         if not existing:
@@ -446,3 +488,66 @@ class SqlAlchemyMediaRepository(MediaRepositoryPort):
             result = session.execute(text("DELETE FROM media_usage WHERE id = :usage_id"), {"usage_id": usage_id})
             session.commit()
         return result.rowcount > 0
+
+    def list_media_versions(self, media_id: str) -> list[dict[str, Any]]:
+        with SessionLocal() as session:
+            rows = session.execute(
+                text(
+                    """
+                    SELECT id, media_id, version_number, old_url, old_filename, replaced_at, replaced_by
+                    FROM media_versions
+                    WHERE media_id = :media_id
+                    ORDER BY version_number DESC
+                    """
+                ),
+                {"media_id": media_id},
+            ).fetchall()
+        return [
+            {
+                "id": str(row[0]) if row[0] is not None else None,
+                "media_id": str(row[1]) if row[1] is not None else None,
+                "version_number": row[2],
+                "old_url": row[3],
+                "old_filename": row[4],
+                "replaced_at": row[5],
+                "replaced_by": str(row[6]) if row[6] is not None else None,
+            }
+            for row in rows
+        ]
+
+    def list_media_audit_logs(self, media_id: str | None = None) -> list[dict[str, Any]]:
+        with SessionLocal() as session:
+            if media_id:
+                rows = session.execute(
+                    text(
+                        """
+                        SELECT id, media_id, action, actor_id, metadata, created_at
+                        FROM media_audit_logs
+                        WHERE media_id = :media_id
+                        ORDER BY created_at DESC
+                        """
+                    ),
+                    {"media_id": media_id},
+                ).fetchall()
+            else:
+                rows = session.execute(
+                    text(
+                        """
+                        SELECT id, media_id, action, actor_id, metadata, created_at
+                        FROM media_audit_logs
+                        ORDER BY created_at DESC
+                        LIMIT 100
+                        """
+                    )
+                ).fetchall()
+        return [
+            {
+                "id": str(row[0]) if row[0] is not None else None,
+                "media_id": str(row[1]) if row[1] is not None else None,
+                "action": row[2],
+                "actor_id": str(row[3]) if row[3] is not None else None,
+                "metadata": row[4],
+                "created_at": row[5],
+            }
+            for row in rows
+        ]

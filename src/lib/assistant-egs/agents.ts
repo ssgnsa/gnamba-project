@@ -673,7 +673,7 @@ action: () => {
         // Simulate fetching data for the report
         const now = new Date();
         // Simulated data: replace with actual data fetching logic
-        const filtered = [
+        const filtered: Record<string, any>[] = [
           { date: "2024-01-01", value1: 10, value2: 20 },
           { date: "2024-01-02", value1: 15, value2: 25 },
         ];
@@ -683,15 +683,14 @@ action: () => {
             headers.join(","),
             ...Array.from({ length: 30 }, (_, i) => {
               const date = new Date(now.getFullYear(), now.getMonth(), i + 1);
-              return [\`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}\`, "0", "0"].join(",");
+              return [`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`, "0", "0"].join(",");
             })
-          ].join("
-");
+          ].join("\n");
           const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
           const url = URL.createObjectURL(blob);
           const link = document.createElement("a");
           link.setAttribute("href", url);
-          link.setAttribute("download", \`rapport_mensuel_${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}.csv\`);
+          link.setAttribute("download", `rapport_mensuel_${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}.csv`);
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
@@ -703,19 +702,18 @@ action: () => {
           const values = headers.map(header => {
             let val = record[header];
             if (typeof val === "string" && val.includes(",")) {
-              val = `\`"${val.replace(/"/g, '""')}"\`;
+              val = `"${val.replace(/"/g, '""')}"`;
             }
             return val;
           });
           rows.push(values.join(","));
         }
-        const csvContent = rows.join("
-");
+        const csvContent = rows.join("\n");
         const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.setAttribute("href", url);
-        link.setAttribute("download", \`rapport_mensuel_${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}.csv\`);
+        link.setAttribute("download", `rapport_mensuel_${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);

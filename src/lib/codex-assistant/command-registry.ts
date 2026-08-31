@@ -89,7 +89,7 @@ export class CommandRegistry {
 
   async status(): Promise<CommandResult> {
     const context = await this.contextManager.loadContext();
-    const health = this.diagnosticEngine.healthCheck(context);
+    const health = await this.diagnosticEngine.healthCheck(context);
 
     return {
       success: true,
@@ -105,7 +105,7 @@ export class CommandRegistry {
   }
 
   async health(): Promise<CommandResult> {
-    const health = this.diagnosticEngine.healthCheck(await this.contextManager.loadContext());
+    const health = await this.diagnosticEngine.healthCheck(await this.contextManager.loadContext());
 
     return {
       success: true,
@@ -239,7 +239,7 @@ export class CommandRegistry {
 
   async optimize(): Promise<CommandResult> {
     const context = await this.contextManager.loadContext();
-    const health = this.diagnosticEngine.healthCheck(context);
+    const health = await this.diagnosticEngine.healthCheck(context);
     const recommendations = health.recommendations.filter((recommendation) =>
       recommendation.priority !== "LOW",
     );

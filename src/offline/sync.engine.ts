@@ -5,8 +5,8 @@
  */
 
 import { offlineQueue } from './queue';
-import { foncierRepository } from '../data/foncier.repository';
-import { leadsRepository } from '../data/leads.repository';
+import { foncierRepository } from '../lib/dbClient.service';
+import { leadsRepository } from '../lib/dbClient.service';
 
 const MAX_ATTEMPTS = 5;
 

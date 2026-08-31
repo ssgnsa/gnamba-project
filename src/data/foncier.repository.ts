@@ -91,7 +91,7 @@ export const foncierRepository = {
     pageSize: number;
     actionFilter?: string;
   }) {
-    return dataService.getAudit(params);
+    return dataService.getAudit(params.page, params.pageSize, params.actionFilter);
   },
 
   async getVillagesList() {
@@ -101,5 +101,17 @@ export const foncierRepository = {
         .select("id, nom, logo_url, region, commune, departement")
         .order("nom"),
     );
+  },
+
+  async createVillage(villageData: Partial<Record<string, unknown>>) {
+    return dataService.createVillage(villageData);
+  },
+
+  async updateVillage(id: string, villageData: Partial<Record<string, unknown>>) {
+    return dataService.updateVillage(id, villageData);
+  },
+
+  async deleteVillage(id: string) {
+    return dataService.deleteVillage(id);
   },
 };

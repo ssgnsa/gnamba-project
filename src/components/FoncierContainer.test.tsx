@@ -9,7 +9,7 @@ vi.mock('../data/foncier.repository', () => ({
 }));
 
 import { FoncierContainer } from './FoncierContainer';
-import { foncierRepository } from '../data/foncier.repository';
+import { foncierRepository } from '../lib/dbClient.service';
 
 const mockedRepository = vi.mocked(foncierRepository);
 

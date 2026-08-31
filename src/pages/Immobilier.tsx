@@ -8,8 +8,8 @@ import {
   AlertCircle,
   BarChart3,
 } from "lucide-react";
-import dbClient from "../data/tableClient";
-import { tenantsRepository } from "../data/tenants.repository";
+import dbClient from '../lib/dbClient.service';
+import { tenantsRepository } from '../lib/dbClient.service';
 import type { Property, Tenant, RentPayment, LeaseContract } from "../types";
 import { useSettings } from "../context/SettingsContext";
 import PropertiesTab from "./immobilier/PropertiesTab";
@@ -92,18 +92,16 @@ export default function Immobilier() {
       const [propRes, tenantRes] = await Promise.all([
         dbClient
           .from("properties")
-          .select("*")
-          .order("created_at", { ascending: false }),
+          .select("*").order("created_at"),
         tenantsRepository.getAll({ limit: 1000 }),
       ]);
 
-      const tenantsData: Tenant[] = tenantRes.data?.items ?? [];
+      const tenantsData: Tenant[] = tenantRes.data ?? [];
 
       const [contractRes, payRes] = await Promise.all([
         dbClient
           .from("lease_contracts")
-          .select("*")
-          .order("created_at", { ascending: false }),
+          .select("*").order("created_at"),
         dbClient
           .from("rent_payments")
           .select("*")
@@ -324,7 +322,8 @@ export default function Immobilier() {
       );
       writeManualCache(PROPERTIES_CACHE_KEY, syncedProperties);
 
-      const syncedTenants = await syncCollection(localTenants, tenantTableName);
+      // Use server-side endpoint name 'tenants' to avoid legacy '/tables/locataires' 404
+      const syncedTenants = await syncCollection(localTenants, "tenants");
       writeManualCache(TENANTS_CACHE_KEY, syncedTenants);
 
       const syncedContracts = await syncCollection(
@@ -505,7 +504,6 @@ export default function Immobilier() {
               tenants={tenants}
               properties={properties}
               search={search}
-              tenantIdColumn={tenantIdColumn}
               onRefresh={fetchData}
             />
           )}
@@ -513,10 +511,7 @@ export default function Immobilier() {
             <PaymentReportsTab
               payments={payments}
               contracts={activeContracts}
-              tenants={tenants}
               properties={properties}
-              tenantIdColumn={tenantIdColumn}
-              onRefresh={fetchData}
             />
           )}
         </>

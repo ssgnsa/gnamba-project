@@ -243,7 +243,7 @@ async function run() {
   console.log(`Metadata : ${metaPath}`);
 
   // If SUPABASE config present, attempt to attach metadata via RPC using service role
-  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseUrl = process.env.API_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (supabaseUrl && serviceRoleKey && (data.attestation_id || data.ref)) {
     try {

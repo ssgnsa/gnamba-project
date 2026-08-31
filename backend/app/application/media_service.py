@@ -4,9 +4,9 @@ from typing import Any
 
 from fastapi import UploadFile
 
-from backend.app.domain.media import MediaAsset
-from backend.app.repositories.media_repository import MediaRepositoryPort
-from backend.app.services.storage_provider import StorageProvider
+from app.domain.media import MediaAsset
+from app.repositories.media_repository import MediaRepositoryPort
+from app.services.storage_provider import StorageProvider
 
 
 class MediaApplicationService:
@@ -62,3 +62,9 @@ class MediaApplicationService:
 
     def delete_media_usage(self, usage_id: str) -> bool:
         return self.media_repository.delete_media_usage(usage_id)
+
+    def list_media_versions(self, media_id: str) -> list[dict[str, Any]]:
+        return self.media_repository.list_media_versions(media_id)
+
+    def list_media_audit_logs(self, media_id: str | None = None) -> list[dict[str, Any]]:
+        return self.media_repository.list_media_audit_logs(media_id)

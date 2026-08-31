@@ -9,7 +9,6 @@ TARGETS=(
   "dist"
   "dist-local"
   "dist_old"
-  "supabase/migrations/*.bak"
   "src/App.tsx.bak2"
 )
 

@@ -125,7 +125,7 @@ export const mediaRepository = {
         .from("media_usage")
         .select("*")
         .eq("media_id", mediaId)
-        .order("created_at", { ascending: false }),
+        .order("created_at"),
     )) as QueryResult<MediaUsage[]>;
     const { data } = result;
     return data || [];
@@ -204,7 +204,7 @@ export const mediaRepository = {
         .select("*")
         .eq("is_brand_asset", true)
         .eq("brand_asset_type", type)
-        .order("updated_at", { ascending: false })
+        .order("updated_at")
         .limit(1)
         .maybeSingle(),
     )) as QueryResult<MediaFile>;

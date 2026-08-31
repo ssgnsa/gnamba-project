@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from backend.app.application.media_service import MediaApplicationService
-from backend.app.infrastructure.sqlalchemy_media_repository import SqlAlchemyMediaRepository
-from backend.app.services.storage_provider import get_storage_provider
+from app.application.media_service import MediaApplicationService
+from app.infrastructure.sqlalchemy_media_repository import SqlAlchemyMediaRepository
+from app.services.storage_provider import get_storage_provider
 
 
 class MediaService(MediaApplicationService):

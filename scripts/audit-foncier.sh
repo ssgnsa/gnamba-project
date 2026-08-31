@@ -20,11 +20,11 @@ if [ ! -f "${ENV_FILE}" ]; then
   exit 1
 fi
 
-HOST="$(read_env 'SUPABASE_DB_HOST')"
-PORT="$(read_env 'SUPABASE_DB_PORT')"
-DB_NAME="$(read_env 'SUPABASE_DB_NAME')"
-DB_USER="$(read_env 'SUPABASE_DB_USER')"
-DB_PASSWORD="$(read_env 'SUPABASE_DB_PASSWORD')"
+HOST="$(read_env 'DB_HOST')"
+PORT="$(read_env 'DB_PORT')"
+DB_NAME="$(read_env 'DB_NAME')"
+DB_USER="$(read_env 'DB_USER')"
+DB_PASSWORD="$(read_env 'DB_PASSWORD')"
 VITE_SUPABASE_URL="$(read_env 'VITE_SUPABASE_URL')"
 
 if [ -z "${HOST}" ] && [ -n "${VITE_SUPABASE_URL}" ]; then
@@ -35,7 +35,7 @@ if [ -z "${HOST}" ] && [ -n "${VITE_SUPABASE_URL}" ]; then
 fi
 
 if [ -z "${HOST}" ] || [ -z "${DB_PASSWORD}" ]; then
-  echo "[ERROR] SUPABASE_DB_HOST and SUPABASE_DB_PASSWORD are required in ${ENV_FILE}" >&2
+  echo "[ERROR] DB_HOST and DB_PASSWORD are required in ${ENV_FILE}" >&2
   exit 1
 fi
 

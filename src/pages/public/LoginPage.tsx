@@ -51,7 +51,7 @@ export default function LoginPage({ onSuccess, onForgotPassword }: Props) {
     if (typeof window === "undefined") return;
     const reason = window.localStorage.getItem("egs:logout_reason");
     if (reason === "idle") {
-      setNotice("Votre session a expiré après une période d’inactivité.");
+      setNotice("Votre session a expiré après une période d'inactivité.");
       window.localStorage.removeItem("egs:logout_reason");
     }
   }, []);
@@ -127,7 +127,7 @@ export default function LoginPage({ onSuccess, onForgotPassword }: Props) {
     if (turnstileSiteKey) {
       if (!turnstileToken) {
         setLoading(false);
-        setError("Veuillez confirmer que vous n’êtes pas un robot.");
+        setError("Veuillez confirmer que vous n'êtes pas un robot.");
         return;
       }
       const verified = await apiClient.verifyTurnstile(turnstileToken);
@@ -458,14 +458,16 @@ export default function LoginPage({ onSuccess, onForgotPassword }: Props) {
                     <p className="font-semibold">Compte administrateur local</p>
                     <p className="mt-1">
                       Email:{" "}
-                      <span className="font-mono">ssgnabia@gmail.com</span>
+                      <span className="font-mono">admin@egs.local</span>
                     </p>
                     <p>
                       Mot de passe:{" "}
-                      <span className="font-mono">deadsoulja28@</span>
+                      <span className="font-mono">
+                        {import.meta.env.VITE_INITIAL_ADMIN_PASSWORD || "(non configuré)"}
+                      </span>
                     </p>
                     <p className="mt-2 text-xs text-amber-800">
-                      Si ce compte n’apparaît pas, relancez `dbClient db reset`
+                      Si ce compte n'apparaît pas, relancez `dbClient db reset`
                       puis `dbClient start` pour rejouer le seed local.
                     </p>
                   </div>

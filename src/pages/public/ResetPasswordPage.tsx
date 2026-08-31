@@ -63,7 +63,7 @@ export default function ResetPasswordPage({ onSuccess }: Props) {
     setError("");
 
     const result = await apiClient.request<{ message?: string }>(
-      "/api/v1/auth/reset-password",
+      "/auth/reset-password",
       {
         method: "POST",
         body: JSON.stringify({ password }),

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Plus, Search, CreditCard as Edit, Trash2, Truck } from "lucide-react";
-import dbClient from "../data/tableClient";
+import dbClient from '../lib/dbClient.service';
 import { Supplier } from "../types";
 import Modal from "../components/ui/Modal";
 import Badge from "../components/ui/Badge";

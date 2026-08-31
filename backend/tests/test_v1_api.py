@@ -57,6 +57,26 @@ class UnifiedV1ApiTests(unittest.TestCase):
         assert response.status_code == 200
         assert len(response.json()) >= 1
 
+    def test_legacy_user_without_entity_still_maps_identity_fields(self) -> None:
+        from app.infrastructure.sqlalchemy_user_repository import _to_domain
+        from app.models.user import User as SqlAlchemyUser
+
+        legacy_user = SqlAlchemyUser(
+            id="legacy-user-1",
+            email="legacy@egs.local",
+            full_name="Legacy User",
+            password_hash="hash",
+            role="employe",
+            access_level="employe",
+            entity_id=None,
+        )
+
+        domain_user = _to_domain(legacy_user)
+
+        assert domain_user.email == "legacy@egs.local"
+        assert domain_user.full_name == "Legacy User"
+        assert domain_user.entity_id == "legacy-user-1"
+
     def test_v1_lead_capture_endpoint_is_mounted(self) -> None:
         response = self.client.post(
             "/api/v1/leads/capture",

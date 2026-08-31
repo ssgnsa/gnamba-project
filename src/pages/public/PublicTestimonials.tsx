@@ -1,6 +1,19 @@
-import { ArrowRight, MessageCircle, Quote, Star, UserRound } from "lucide-react";
+import { ArrowRight, MessageCircle, Quote, Star, User, Shield, Sparkles, CheckCircle2 } from "lucide-react";
 import type { PublicPage } from "../../lib/publicRoutes";
 import { OFFICIAL_CONTACT, buildWhatsAppUrl } from "../../lib/officialContact";
+
+// Premium UI Components
+import {
+  Button,
+  Card,
+  CardTitle,
+  CardDescription,
+  Badge,
+  Container,
+  Grid,
+  Flex,
+  IconWrapper,
+} from "../../components/ui";
 
 interface Props {
   onNavigate: (page: PublicPage) => void;
@@ -22,105 +35,167 @@ const testimonials = [
     role: "Suivi de chantier",
     text: "Les échanges ont été simples et rapides, avec des réponses claires à chaque étape.",
   },
+  {
+    name: "Investisseur immobilier",
+    role: "Gestion locative",
+    text: "La réactivité sur les états des lieux et l'encaissement des loyers a grandement facilité la gestion.",
+  },
+  {
+    name: "Famille expatriée",
+    role: "Achat villa clé en main",
+    text: "Du premier contact à la remise des clés, tout a été géré professionnellement sans que je me déplace.",
+  },
+  {
+    name: "Artisan local",
+    role: "Fournitures chantier",
+    text: "Livraison rapide, matériel conforme, facturation claire. Un partenaire fiable pour nos chantiers.",
+  },
 ];
 
 export default function PublicTestimonials({ onNavigate }: Props) {
   const whatsappUrl = buildWhatsAppUrl(OFFICIAL_CONTACT.phone);
 
+  const nav = (page: PublicPage) => {
+    onNavigate(page);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   return (
-    <div className="pt-20">
-      <section className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 py-20 text-white">
-        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_top_right,_rgba(59,130,246,0.55),_transparent_30%),radial-gradient(circle_at_bottom_left,_rgba(16,185,129,0.3),_transparent_35%)]" />
-        <div className="relative z-10 mx-auto max-w-4xl px-4 text-center sm:px-6 lg:px-8">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.24em] text-white/80">
-            Témoignages
-          </div>
-          <h1 className="mt-5 text-4xl font-bold leading-tight sm:text-5xl">
-            Ce que disent nos clients
-          </h1>
-          <p className="mx-auto mt-5 max-w-2xl text-base text-white/75 sm:text-lg">
-            Une vitrine simple pour mettre en avant les retours clients avec
-            transparence.
-          </p>
-          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <button
-              onClick={() => onNavigate("contact")}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-6 py-3 text-sm font-semibold text-slate-900 shadow-lg hover:bg-slate-100"
-            >
-              Laisser un message
-              <ArrowRight size={16} />
-            </button>
-            <a
-              href={whatsappUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-6 py-3 text-sm font-semibold text-white shadow-lg hover:bg-emerald-600"
-            >
-              <MessageCircle size={16} />
-              WhatsApp
-            </a>
-          </div>
-        </div>
+    <div className="min-h-screen bg-white">
+      {/* Hero */}
+      <section className="relative py-20 sm:py-24 lg:py-28 overflow-hidden" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0284c7 100%)' }}>
+        <div
+          className="absolute inset-0 opacity-10"
+          style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+          }}
+        />
+        <Container size="xl" className="relative z-10 py-8">
+          <Flex direction="col" align="center" gap="4" className="text-center max-w-4xl mx-auto">
+            <Flex align="center" justify="center" gap="2" className="mb-2">
+              <IconWrapper size="sm" variant="secondary" shape="circle" className="bg-white/10 text-white border-white/20">
+                <MessageCircle size={14} />
+              </IconWrapper>
+              <Badge variant="secondary" size="md" className="text-xs bg-white/10 text-white border-white/20">
+                Témoignages
+              </Badge>
+            </Flex>
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-tight">
+              Ce que disent <span className="bg-gradient-to-r from-white via-white to-sky-200 bg-clip-text text-transparent">nos clients</span>
+            </h1>
+            <p className="text-sky-100 text-lg max-w-2xl mx-auto leading-relaxed">
+              Une vitrine transparente pour mettre en avant les retours d'expérience
+              de ceux qui nous ont fait confiance.
+            </p>
+            <Flex align="center" justify="center" gap="4" className="pt-4">
+              <Button size="lg" variant="secondary" onClick={() => nav("contact")} iconRight={<ArrowRight size={20} />} className="shadow-lg">
+                Laisser un message
+              </Button>
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-semibold text-base transition-all duration-200 shadow-lg"
+              >
+                <MessageCircle size={18} />
+                WhatsApp
+              </a>
+            </Flex>
+          </Flex>
+        </Container>
       </section>
 
-      <section className="bg-slate-50 py-20">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            {testimonials.map((item) => (
-              <div
-                key={item.name}
-                className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
-              >
-                <Quote size={22} className="text-blue-700" />
-                <p className="mt-4 text-sm leading-7 text-slate-600">
-                  {item.text}
-                </p>
-                <div className="mt-6 flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-50 text-blue-700">
-                    <UserRound size={18} />
-                  </div>
-                  <div>
-                    <div className="text-sm font-semibold text-slate-900">
-                      {item.name}
-                    </div>
-                    <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                      {item.role}
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-4 flex items-center gap-1 text-amber-500">
-                  {[0, 1, 2, 3, 4].map((star) => (
-                    <Star key={star} size={14} fill="currentColor" />
-                  ))}
-                </div>
-              </div>
+      {/* Stats */}
+      <section className="py-12 bg-white border-y border-neutral-100">
+        <Container size="xl">
+          <Grid cols={{ base: 2, lg: 4 }} gap="md" className="text-center">
+            {[
+              { n: "100+", l: "Clients satisfaits", icon: User },
+              { n: "4.9/5", l: "Note moyenne", icon: Star },
+              { n: "95%", l: "Recommandent", icon: CheckCircle2 },
+              { n: "5+", l: "Années d'expérience", icon: Shield },
+            ].map((s) => (
+              <Flex key={s.l} direction="col" align="center" gap="2">
+                <IconWrapper size="md" variant="secondary" shape="circle" className="mb-2">
+                  <s.icon size={24} className="text-sky-600" />
+                </IconWrapper>
+                <div className="text-3xl font-extrabold text-neutral-900">{s.n}</div>
+                <div className="text-sm text-neutral-500">{s.l}</div>
+              </Flex>
             ))}
-          </div>
+          </Grid>
+        </Container>
+      </section>
 
-          <div className="mt-10 rounded-3xl bg-slate-950 p-6 text-white shadow-xl">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-[0.24em] text-white/50">
-                  Et après ?
-                </div>
-                <h2 className="mt-2 text-2xl font-bold">
-                  Les retours nous aident à mieux vous accompagner
-                </h2>
-                <p className="mt-2 max-w-2xl text-sm text-white/70">
-                  Pour une nouvelle demande, contactez GNAMBA SERVICES au{" "}
-                  {OFFICIAL_CONTACT.phone} ou utilisez le formulaire de contact.
-                </p>
-              </div>
-              <button
-                onClick={() => onNavigate("contact")}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-900 hover:bg-slate-100"
+      {/* Testimonials Grid */}
+      <section className="py-20 sm:py-24 lg:py-28 bg-neutral-50">
+        <Container size="xl">
+          <Flex direction="col" align="center" gap="4" className="mb-12 text-center max-w-3xl mx-auto">
+            <Badge variant="primary" size="md" className="text-xs">Retours d'expérience</Badge>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-neutral-900 leading-tight">Avis Clients</h2>
+            <p className="text-neutral-500 text-lg leading-relaxed">Des clients partagent leur expérience avec GNAMBA SERVICES.</p>
+          </Flex>
+
+          <Grid cols={{ base: 1, md: 2, lg: 3 }} gap="lg">
+            {testimonials.map((item, index) => (
+              <Card
+                key={index}
+                variant="elevated"
+                padding="xl"
+                interactive
+                className="h-full flex flex-col group"
               >
-                Contact
-                <ArrowRight size={16} />
-              </button>
-            </div>
-          </div>
-        </div>
+                <Flex justify="between" align="start" className="mb-4">
+                  <IconWrapper size="md" variant="secondary" shape="circle" className="text-sky-200">
+                    <Quote size={22} className="text-sky-600" />
+                  </IconWrapper>
+                  <Flex gap="0.5" className="text-amber-500">
+                    {[0, 1, 2, 3, 4].map((star) => (
+                      <Star key={star} size={16} fill="currentColor" />
+                    ))}
+                  </Flex>
+                </Flex>
+                <p className="text-sm text-neutral-600 leading-relaxed mb-6 flex-1">{item.text}</p>
+                <Flex align="center" gap="3" className="pt-4 border-t border-neutral-100">
+                  <div className="w-11 h-11 bg-gradient-to-br from-primary-600 to-primary-800 rounded-full flex items-center justify-center flex-shrink-0">
+                    <User size={20} className="text-white" />
+                  </div>
+                  <Flex direction="col" gap="0.5">
+                    <span className="text-sm font-semibold text-neutral-900">{item.name}</span>
+                    <Badge variant="outline" size="sm" style={{ width: 'fit-content' }}>
+                      {item.role}
+                    </Badge>
+                  </Flex>
+                </Flex>
+              </Card>
+            ))}
+          </Grid>
+        </Container>
+      </section>
+
+      {/* CTA */}
+      <section className="py-20 sm:py-24 lg:py-28 bg-white border-t border-neutral-100">
+        <Container size="lg">
+          <Card variant="elevated" padding="xl" className="text-center max-w-2xl mx-auto">
+            <Flex direction="col" align="center" gap="4">
+              <IconWrapper size="xl" variant="secondary" shape="circle" className="mb-2">
+                <Sparkles size={28} className="text-sky-600" />
+              </IconWrapper>
+              <CardTitle className="text-2xl sm:text-3xl font-extrabold text-neutral-900">Et Après ?</CardTitle>
+              <CardDescription className="text-lg text-neutral-600 max-w-xl mx-auto">
+                Les retours nous aident à mieux vous accompagner. Pour une nouvelle demande, contactez-nous.
+              </CardDescription>
+              <Flex gap="4" wrap justify="center">
+                <Button variant="primary" size="lg" onClick={() => nav("contact")} iconLeft={<MessageCircle size={20} />} className="min-w-[200px] shadow-primary hover:shadow-primaryHover">
+                  Nous contacter
+                </Button>
+                <Button variant="outline" size="lg" onClick={() => nav("realisations")} iconRight={<ArrowRight size={20} />}>
+                  Voir nos réalisations
+                </Button>
+              </Flex>
+            </Flex>
+          </Card>
+        </Container>
       </section>
     </div>
   );

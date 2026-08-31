@@ -4,6 +4,7 @@
  */
 
 import type { Tenant, Property, LeaseContract, RentPayment } from "../types";
+import { validateIvoryCoastPhone } from "./phone/ivoryCoastPhone";
 
 /**
  * Résout le nom complet d'un locataire depuis différents contextes
@@ -121,13 +122,11 @@ export function isValidEmail(email: string): boolean {
 }
 
 /**
- * Valide un téléphone (format international ou local)
+ * Valide un téléphone (format international ou local Côte d'Ivoire)
  */
 export function isValidPhone(phone: string): boolean {
   if (!phone) return false;
-  // Accepte: +225 XX XX XX XX, 0X XX XX XX XX, XX XX XX XX
-  const cleaned = phone.replace(/\s|-/g, "");
-  return /^(\+225|0)?[0-9]{8,10}$/.test(cleaned);
+  return validateIvoryCoastPhone(phone) === null;
 }
 
 /**
@@ -292,12 +291,14 @@ export function getPaymentStatusConfig(statut: string): {
  */
 export function getPropertyTypeLabel(type: string): string {
   const labels: Record<string, string> = {
+    studio: "Studio",
+    chambre: "Chambre",
+    "chambre-salon": "Chambre-Salon",
     appartement: "Appartement",
-    villa: "Villa",
-    bureau: "Bureau",
-    commerce: "Commerce",
     terrain: "Terrain",
-    autre: "Autre",
+    magasin: "Magasin",
+    bureau: "Bureau",
+    villa: "Villa",
   };
 
   return labels[type] || type || "Autre";

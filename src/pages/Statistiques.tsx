@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import dbClient from "../data/tableClient";
-import { clientsRepository } from "../data/clients.repository";
+import dbClient from '../lib/dbClient.service';
+import { clientsRepository } from '../lib/dbClient.service';
 import { useSettings } from "../context/SettingsContext";
 import {
   TrendingUp,
@@ -57,7 +57,7 @@ export default function Statistiques() {
         supRes,
         projStatRes,
       ] = await Promise.all([
-        clientsRepository.getAll({ limit: 1000 }),
+        clientsRepository.getAll(),
         dbClient.from("projects").select("id", { count: "exact", head: true }),
         dbClient
           .from("properties")
@@ -84,7 +84,7 @@ export default function Statistiques() {
         .reduce((s: number, f) => s + Number(f.montant || 0), 0);
 
       setTotals({
-        clients: cliRes.data?.total || 0,
+        clients: cliRes.count || 0,
         projects: projRes.count || 0,
         properties: propRes.count || 0,
         products: prodRes.count || 0,

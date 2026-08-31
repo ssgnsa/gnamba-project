@@ -2,6 +2,7 @@ import Docker from "dockerode";
 import { execSync } from "node:child_process";
 import { promises as fs } from "node:fs";
 import os from "node:os";
+import path from "node:path";
 import type {
   Container,
   Image,
@@ -14,7 +15,6 @@ import type {
   Volume,
 } from "./types";
 
-const CONTEXT_STORE = new Map<string, ServerContext>();
 const docker = new Docker();
 
 const createServiceStatus = (
@@ -470,7 +470,7 @@ const mergeRollbackPoints = (
 export class ContextManager {
   private context: ServerContext | null = null;
 
-  private contextPath = ".codex/context";
+  private contextPath = ".codex/context/server-context.json";
 
   constructor(initialContext?: ServerContext) {
     if (initialContext) {
@@ -481,8 +481,9 @@ export class ContextManager {
   }
 
   private ensureDirectories(): void {
-    // Le scaffold reste volontairement sans accès disque direct.
-    // La persistance est simulée en mémoire pour rester compatible avec le bundle frontend.
+    // Create the directory for persistence
+    // Note: We can't use fs.mkdirSync here because this might run in browser context
+    // The actual directory creation happens in loadFromDisk/saveToDisk
   }
 
   getSnapshot(): ServerContext {
@@ -593,8 +594,13 @@ export class ContextManager {
   }
 
   private async loadFromDisk(): Promise<ServerContext | null> {
-    const saved = CONTEXT_STORE.get(this.contextPath);
-    return saved ? cloneContext(saved) : null;
+    try {
+      const content = await fs.readFile(this.contextPath, "utf8");
+      return JSON.parse(content) as ServerContext;
+    } catch {
+      // File doesn't exist or invalid JSON - return null to use defaults
+      return null;
+    }
   }
 
   private async saveToDisk(): Promise<void> {
@@ -602,7 +608,13 @@ export class ContextManager {
       return;
     }
 
-    CONTEXT_STORE.set(this.contextPath, cloneContext(this.context));
+    try {
+      const dir = path.dirname(this.contextPath);
+      await fs.mkdir(dir, { recursive: true });
+      await fs.writeFile(this.contextPath, JSON.stringify(this.context, null, 2), "utf8");
+    } catch (error) {
+      console.warn("Codex assistant: impossible de sauvegarder le contexte sur disque.", error);
+    }
   }
 
   private async getDockerContainers(): Promise<Container[]> {

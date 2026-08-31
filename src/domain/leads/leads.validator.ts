@@ -3,13 +3,16 @@
  */
 
 import { z } from 'zod';
+import { validateIvoryCoastPhone } from '../../lib/phone/ivoryCoastPhone';
 
 export const leadSchema = z.object({
   phone: z
     .string()
-    .min(7, 'Téléphone trop court')
     .max(20, 'Téléphone trop long')
-    .regex(/^\+?[\d\s\-().]{7,20}$/, 'Format téléphone invalide'),
+    .refine(
+      (v) => !v || validateIvoryCoastPhone(v) === null,
+      'Format de téléphone invalide. Ex: +225 07 07 38 15 63 ou 0707381563'
+    ),
   first_name: z.string().max(100).optional().nullable(),
   last_name: z.string().max(100).optional().nullable(),
   email: z.string().email('Email invalide').max(255).optional().nullable(),

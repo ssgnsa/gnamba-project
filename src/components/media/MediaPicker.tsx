@@ -56,8 +56,8 @@ export default function MediaPicker({
       setLoading(true);
       if (isSelfHostedMode()) {
         const result = await apiClient.media.getAll();
-        const mediaFiles = (result.data || []).filter(
-          (file) => !file.deleted_at,
+        const mediaFiles = ((result.data || []) as MediaFile[]).filter(
+          (file: MediaFile) => !file.deleted_at,
         );
         if (currentOffset === 0) {
           setFiles(mediaFiles);
@@ -66,7 +66,7 @@ export default function MediaPicker({
         }
         setHasMore(false);
         const tags = Array.from(
-          new Set(mediaFiles.flatMap((f) => f.tags || [])),
+          new Set(mediaFiles.flatMap((f: MediaFile) => f.tags || [])),
         ).sort();
         setAllTags((prev) => Array.from(new Set([...prev, ...tags])).sort());
         setLoading(false);
@@ -94,7 +94,7 @@ export default function MediaPicker({
       setHasMore(mediaFiles.length === PAGE_SIZE);
 
       const tags = Array.from(
-        new Set(mediaFiles.flatMap((f) => f.tags || [])),
+        new Set(mediaFiles.flatMap((f: MediaFile) => f.tags || [])),
       ).sort();
       setAllTags((prev) => Array.from(new Set([...prev, ...tags])).sort());
       setLoading(false);

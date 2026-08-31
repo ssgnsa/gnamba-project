@@ -9,7 +9,7 @@ import {
   Image,
   X,
 } from "lucide-react";
-import dbClient from "../data/tableClient";
+import dbClient from '../lib/dbClient.service';
 import { Product } from "../types";
 import Modal from "../components/ui/Modal";
 import Badge from "../components/ui/Badge";
@@ -21,6 +21,12 @@ const categorieLabels: Record<string, string> = {
   materiel_informatique: "Matériel Info",
   mobilier: "Mobilier",
   autre: "Autre",
+};
+
+const unknownCategorieLabel = "Autre";
+
+const getCategorieLabel = (categorie: string): string => {
+  return categorieLabels[categorie] || unknownCategorieLabel;
 };
 
 const emptyForm = {
@@ -52,9 +58,27 @@ export default function Fournitures() {
 
   const fetchProducts = async () => {
     setLoading(true);
-    const { data } = await dbClient.from("products").select("*").order("nom");
-    setProducts((data as Product[]) || []);
-    setLoading(false);
+    try {
+      const { data, error } = await dbClient.from("products").select("*").order("nom");
+      if (error) {
+        console.error("[Fournitures] Error fetching products:", error);
+        setProducts([]);
+      } else {
+        // Ensure numeric fields are numbers (Supabase may return strings for numeric types)
+        const typedProducts = (data || []).map((p: Product) => ({
+          ...p,
+          prix_unitaire: Number(p.prix_unitaire) || 0,
+          stock_actuel: Number(p.stock_actuel) || 0,
+          stock_minimum: Number(p.stock_minimum) || 0,
+        })) as Product[];
+        setProducts(typedProducts);
+      }
+    } catch (err) {
+      console.error("[Fournitures] Unexpected error in fetchProducts:", err);
+      setProducts([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const openAdd = () => {
@@ -243,7 +267,7 @@ export default function Fournitures() {
                       </td>
                       <td className="px-4 py-3 hidden sm:table-cell">
                         <Badge
-                          label={categorieLabels[p.categorie]}
+                          label={getCategorieLabel(p.categorie)}
                           color="gray"
                         />
                       </td>

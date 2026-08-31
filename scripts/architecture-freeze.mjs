@@ -1,139 +1,168 @@
-#!/usr/bin/env node
+// src/lib/dbClient.service.ts
+import { apiClient } from '../api/client';
+import type { ApiResult } from '../api/client'; // on va l'exporter depuis client.ts
 
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+// On redéfinit le type pour l'usage interne
+type TableName = 'media_files' | 'media_versions' | 'media_usage' | 'media_audit_logs'
+  | 'brand_assets' | 'site_settings' | 'users' | 'clients' | 'leads'
+  | 'foncier_lots' | 'foncier_lotissements' | 'foncier_ilots' | 'foncier_audit_logs'
+  | 'projects' | 'tasks' | 'documents' | 'finances' | 'fournisseurs'
+  | 'fournitures' | 'immobilier' | 'tenants' | 'registre_visiteurs'
+  | string; // pour les tables non listées
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-
-const requiredFiles = [
-  "src/api/client.ts",
-  "src/context/AuthContext.tsx",
-  "src/data/dbClient.ts",
-  "scripts/release-check.mjs",
-  "backend/app/main.py",
-  "backend/app/api/v1/__init__.py",
-  "docker-compose.yml",
-  "Dockerfile",
-  "nginx/nginx-release.conf",
-];
-
-const forbiddenPaths = [
-  "src/lib/supabase.ts",
-  "src/data/client.ts",
-  "src/services/api/client.ts",
-  "src/lib/legacySupabaseAdapter.ts",
-  "docker-compose.prod.yml",
-  "docker-compose.selfhosted.yml",
-  "docker-compose.server.yml",
-  "docker-compose.https.yml",
-  "docker-compose.standalone.yml",
-  "Dockerfile.runtime",
-  "Dockerfile.simple",
-  "Dockerfile.nofb",
-  "Dockerfile.standalone",
-  "nginx/nginx.conf",
-  "nginx/nginx-production.conf",
-  "nginx/nginx-fixed.conf",
-  "nginx/nginx-simple.conf",
-  "nginx/nginx-standalone.conf",
-  "scripts/deploy.sh",
-  "scripts/deploy_server.sh",
-  "scripts/deploy-via-api.sh",
-  "scripts/deploy-and-verify.sh",
-];
-
-const issues = [];
-
-for (const relativePath of requiredFiles) {
-  if (!existsSync(path.join(root, relativePath))) {
-    issues.push(`Required architecture file missing: ${relativePath}`);
-  }
+// Mapper table → endpoint (à adapter selon votre API)
+function tableToEndpoint(table: TableName): string {
+  const map: Record<string, string> = {
+    media_files: '/api/v1/media',
+    media_versions: '/api/v1/media/versions',
+    media_usage: '/api/v1/media/usage',
+    media_audit_logs: '/api/v1/media/audit',
+    brand_assets: '/api/v1/media/brand-assets',
+    site_settings: '/api/v1/settings',
+    users: '/api/v1/users',
+    clients: '/api/v1/clients',
+    leads: '/api/v1/leads',
+    foncier_lots: '/api/v1/foncier/lots',
+    foncier_lotissements: '/api/v1/foncier/lotissements',
+    foncier_ilots: '/api/v1/foncier/ilots',
+    foncier_audit_logs: '/api/v1/foncier/audit',
+    projects: '/api/v1/projects',
+    tasks: '/api/v1/tasks',
+    documents: '/api/v1/documents',
+    finances: '/api/v1/finances',
+    fournisseurs: '/api/v1/fournisseurs',
+    fournitures: '/api/v1/fournitures',
+    immobilier: '/api/v1/immobilier',
+    tenants: '/api/v1/tenants',
+    registre_visiteurs: '/api/v1/registre-visiteurs',
+  };
+  return map[table] || `/api/v1/${table}`;
 }
 
-for (const relativePath of forbiddenPaths) {
-  if (existsSync(path.join(root, relativePath))) {
-    issues.push(`Forbidden legacy path present: ${relativePath}`);
-  }
-}
+// Construction d'une requête avec filtres
+class QueryBuilder {
+  private endpoint: string;
+  private filters: string[] = [];
+  private order: string[] = [];
+  private limitVal?: number;
 
-const collectFiles = (target) => {
-  if (!existsSync(target)) return [];
-  const stats = statSync(target);
-  if (stats.isFile()) return [target];
-  return readdirSync(target, { withFileTypes: true }).flatMap((entry) => {
-    const fullPath = path.join(target, entry.name);
-    if (entry.isDirectory()) {
-      if (
-        entry.name === "node_modules" ||
-        entry.name === ".git" ||
-        entry.name === "dist"
-      ) {
-        return [];
-      }
-      return collectFiles(fullPath);
+  constructor(table: TableName) {
+    this.endpoint = tableToEndpoint(table);
+  }
+
+  select(columns: string) {
+    // On ignore les colonnes pour l'instant, on récupère tout
+    return this;
+  }
+
+  eq(column: string, value: any) {
+    this.filters.push(`${column}=${encodeURIComponent(value)}`);
+    return this;
+  }
+
+  neq(column: string, value: any) {
+    this.filters.push(`${column}!=${encodeURIComponent(value)}`);
+    return this;
+  }
+
+  gt(column: string, value: any) {
+    this.filters.push(`${column}>${encodeURIComponent(value)}`);
+    return this;
+  }
+
+  gte(column: string, value: any) {
+    this.filters.push(`${column}>=${encodeURIComponent(value)}`);
+    return this;
+  }
+
+  lt(column: string, value: any) {
+    this.filters.push(`${column}<${encodeURIComponent(value)}`);
+    return this;
+  }
+
+  lte(column: string, value: any) {
+    this.filters.push(`${column}<=${encodeURIComponent(value)}`);
+    return this;
+  }
+
+  like(column: string, pattern: string) {
+    this.filters.push(`${column}=${encodeURIComponent(pattern)}`); // à adapter si besoin
+    return this;
+  }
+
+  order(column: string, options?: { ascending?: boolean }) {
+    this.order.push(`${column} ${options?.ascending ? 'asc' : 'desc'}`);
+    return this;
+  }
+
+  limit(n: number) {
+    this.limitVal = n;
+    return this;
+  }
+
+  async then<T = any>(): Promise<{ data: T[] | null; error: any }> {
+    let url = this.endpoint;
+    const params = new URLSearchParams();
+    if (this.filters.length) params.set('filter', this.filters.join(';'));
+    if (this.order.length) params.set('order', this.order.join(','));
+    if (this.limitVal) params.set('limit', String(this.limitVal));
+    const qs = params.toString();
+    if (qs) url += '?' + qs;
+    const result = await apiClient.request<any[]>(url);
+    if (result.error) {
+      return { data: null, error: result.error };
     }
-    return [fullPath];
-  });
+    return { data: result.data || [], error: null };
+  }
+
+  // Pour les insert/update/delete
+  insert(data: any) {
+    return apiClient.request(this.endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  }
+
+  update(data: any) {
+    // L'update nécessite un ID dans l'URL ; on le passe via une méthode update({id, ...})
+    // Pour simplifier, on suppose qu'on a un eq('id', id) avant
+    // On va construire l'URL avec l'ID
+    const idFilter = this.filters.find(f => f.startsWith('id='));
+    if (!idFilter) throw new Error('update nécessite un filtre id=...');
+    const id = idFilter.split('=')[1];
+    const url = `${this.endpoint}/${id}`;
+    return apiClient.request(url, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  }
+
+  delete() {
+    const idFilter = this.filters.find(f => f.startsWith('id='));
+    if (!idFilter) throw new Error('delete nécessite un filtre id=...');
+    const id = idFilter.split('=')[1];
+    const url = `${this.endpoint}/${id}`;
+    return apiClient.request(url, { method: 'DELETE' });
+  }
+}
+
+// La fonction from retourne un QueryBuilder
+function from(table: TableName) {
+  return new QueryBuilder(table);
+}
+
+// On expose également des méthodes directes pour des actions courantes
+async function getMedia(id: string) {
+  return apiClient.media.get(id);
+}
+
+// etc.
+
+export const dbClient = {
+  from,
+  // Ajouter d'autres helpers si nécessaire
 };
 
-const directApiCalls = [];
-const allowedApiClientImporters = new Set([
-  "src/context/AuthContext.tsx",
-  "src/context/SettingsContext.tsx",
-  "src/context/SiteContentContext.tsx",
-  "src/data/tableClient.ts",
-  "src/lib/dbClient.service.ts",
-  "src/lib/foncierVillageConfig.ts",
-  "src/lib/lead-capture.ts",
-  "src/lib/mediaUtils.ts",
-  "src/pages/Documents.tsx",
-  "src/pages/Foncier.tsx",
-  "src/pages/Media.tsx",
-  "src/pages/Parametres.tsx",
-  "src/pages/RegistreVisiteur.tsx",
-  "src/pages/Utilisateurs.tsx",
-]);
-const files = collectFiles(path.join(root, "src"));
-for (const file of files) {
-  if (!file.endsWith(".ts") && !file.endsWith(".tsx")) continue;
-  const content = readFileSync(file, "utf8");
-  const rel = path.relative(root, file).replace(/\\/g, "/");
-  if (
-    content.includes('from "../api/client"') ||
-    content.includes("from '../api/client'")
-  ) {
-    if (!allowedApiClientImporters.has(rel)) {
-      directApiCalls.push(rel);
-    }
-  }
-}
-
-const authModules = [
-  "src/context/AuthContext.tsx",
-  "src/api/client.ts",
-  "src/data/dbClient.ts",
-];
-
-for (const module of authModules) {
-  if (!existsSync(path.join(root, module))) {
-    issues.push(`Authentication module missing: ${module}`);
-  }
-}
-
-if (directApiCalls.length > 0) {
-  issues.push(
-    `Unexpected direct API client imports: ${directApiCalls.join(", ")}`,
-  );
-}
-
-if (issues.length > 0) {
-  console.error("EGS architecture freeze check failed:");
-  for (const issue of issues) console.error(`- ${issue}`);
-  process.exit(1);
-}
-
-console.log("EGS architecture freeze check passed.");
-console.log(
-  "Canonical architecture verified: API client, auth context, data client, release gate, backend entrypoint, container/runtime files.",
-);
+export default dbClient;

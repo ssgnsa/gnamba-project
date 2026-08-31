@@ -20,7 +20,7 @@ import type { AccessLevel, UserRole } from "../types";
 import MediaPicker from "../components/media/MediaPicker";
 import { isSelfHostedMode } from "../lib/selfHosted";
 import { apiClient } from "../api/client";
-import dbClient from "../data/tableClient";
+import dbClient from '../lib/dbClient.service';
 
 interface UserProfileRow {
   id: string;

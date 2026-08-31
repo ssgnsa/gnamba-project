@@ -30,9 +30,6 @@ TELEGRAM_CHAT_ID="${TELEGRAM_CHAT_ID:-}"
 DISK_THRESHOLD="${DISK_THRESHOLD:-90}"
 BACKUP_MAX_AGE="${BACKUP_MAX_AGE:-24}" # heures
 GIT_ALERT_THRESHOLD="${GIT_ALERT_THRESHOLD:-100}"
-SUPABASE_MODE="${SUPABASE_MODE:-local}"
-SUPABASE_URL="${SUPABASE_URL:-${VITE_SUPABASE_LOCAL_URL:-http://localhost:54321}}"
-SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:-${VITE_SUPABASE_LOCAL_ANON_KEY:-}}"
 MONITOR_CONTAINERS="${MONITOR_CONTAINERS:-egs-frontend egs-nginx-proxy egs-filebrowser}"
 MONITOR_CRITICAL_TABLES="${MONITOR_CRITICAL_TABLES:-app_settings user_profiles foncier_lots properties}"
 
@@ -78,22 +75,16 @@ get_env_value() {
 }
 
 resolve_supabase_config() {
-    SUPABASE_MODE="local"
-    [ -n "${SUPABASE_URL}" ] || SUPABASE_URL="$(get_env_value VITE_SUPABASE_LOCAL_URL http://localhost:54321)"
-    [ -n "${SUPABASE_ANON_KEY}" ] || SUPABASE_ANON_KEY="$(get_env_value VITE_SUPABASE_LOCAL_ANON_KEY)"
 }
 
 supabase_health_code() {
     resolve_supabase_config
 
-    if [ -z "${SUPABASE_URL}" ]; then
         printf '000'
         return 0
     fi
 
     curl -sS -o /dev/null -w "%{http_code}" --max-time 15 \
-        "${SUPABASE_URL%/}/auth/v1/health" \
-        -H "apikey: ${SUPABASE_ANON_KEY}" 2>/dev/null || printf '000'
 }
 
 # Créer les répertoires de logs
@@ -206,7 +197,6 @@ check_supabase_services() {
 
     resolve_supabase_config
 
-    if [ -z "${SUPABASE_URL}" ] || [ -z "${SUPABASE_ANON_KEY}" ]; then
         error "Configuration Supabase locale incomplète"
         alert "Supabase local monitoring misconfigured"
         return 1
@@ -215,7 +205,6 @@ check_supabase_services() {
     local code
     code="$(supabase_health_code)"
     if [ "${code}" = "200" ]; then
-        success "Supabase local auth health opérationnel (${SUPABASE_URL})"
         return 0
     fi
 
@@ -237,9 +226,6 @@ check_database_tables() {
         local code
         code="$(
             curl -sS -o /dev/null -w "%{http_code}" --max-time 20 \
-                "${SUPABASE_URL%/}/rest/v1/${table}?select=*&limit=1" \
-                -H "apikey: ${SUPABASE_ANON_KEY}" \
-                -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" 2>/dev/null || printf '000'
         )"
 
         case "${code}" in
@@ -389,7 +375,6 @@ generate_report() {
 
 ## État des services
 - Docker: $(docker ps | wc -l) conteneurs actifs
-- Supabase mode: ${SUPABASE_MODE}
 - Supabase API: ${supabase_api_status}
 - Base de données: ${database_status}
 

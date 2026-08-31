@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Plus,
   User,
@@ -7,11 +7,13 @@ import {
   Phone,
   Mail,
 } from "lucide-react";
-import type { Tenant, LeaseContract } from "../../types";
+import type { Tenant, LeaseContract, Client } from "../../types";
 import Modal from "../../components/ui/Modal";
 import Badge from "../../components/ui/Badge";
+import SelectWithCreate from "../../components/ui/SelectWithCreate";
 import { useSettings } from "../../context/SettingsContext";
 import { useAuth } from "../../context/AuthContext";
+import { useNotifications } from "../../context/NotificationContext";
 import {
   getDemoBlockMessage,
   shouldBlockDestructiveAction,
@@ -23,8 +25,11 @@ import {
   readManualCache,
   writeManualCache,
 } from "../../lib/manualSyncStore";
+import { clientsRepository } from "../../lib/dbClient.service";
+import { generateUUID } from "../../utils/reference";
 
 const emptyForm = {
+  client_id: "",
   nom: "",
   prenom: "",
   telephone: "",
@@ -35,6 +40,7 @@ const emptyForm = {
 };
 
 const TENANTS_CACHE_KEY = "egs.immobilier.tenants.local_cache.v1";
+const CLIENTS_CACHE_KEY = "egs.clients.local_cache.v1";
 
 type LocalTenant = Tenant & {
   sync_status: ManualSyncStatus;
@@ -65,8 +71,11 @@ export default function TenantsTab({
   onRefresh,
 }: Props) {
   const { settings } = useSettings();
+  const { showToast } = useNotifications();
   const { user, profile } = useAuth();
   const [modalOpen, setModalOpen] = useState(false);
+  const [syncErrorModalOpen, setSyncErrorModalOpen] = useState(false);
+  const [syncErrorContent, setSyncErrorContent] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
@@ -75,6 +84,18 @@ export default function TenantsTab({
     user,
     profile,
   );
+
+  // Get clients from cache for tenant selection
+  const clients = useMemo(() => {
+    const cached = readManualCache<Client>(CLIENTS_CACHE_KEY);
+    return cached.sort((a, b) => 
+        `${a.nom} ${a.prenom}`.localeCompare(`${b.nom} ${b.prenom}`)
+      );
+  }, []);
+
+  const localTenants = useMemo(() => {
+    return readManualCache<LocalTenant>(TENANTS_CACHE_KEY) || [];
+  }, []);
 
   const inputClass =
     "w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400";
@@ -88,6 +109,7 @@ export default function TenantsTab({
 
   const openEdit = (t: Tenant) => {
     setForm({
+      client_id: t.client_id || "",
       nom: t.nom,
       prenom: t.prenom,
       telephone: t.telephone || "",
@@ -101,9 +123,23 @@ export default function TenantsTab({
     setModalOpen(true);
   };
 
+  const handleClientChange = (clientId: string) => {
+    const client = clients.find(c => c.id === clientId);
+    if (client) {
+      setForm(prev => ({
+        ...prev,
+        nom: client.nom,
+        prenom: client.prenom,
+        telephone: client.telephone || "",
+        email: client.email || "",
+        client_id: client.id,
+      }));
+    }
+  };
+
   const handleSave = async () => {
-    if (!form.nom.trim()) {
-      setError("Le nom est obligatoire");
+    if (!form.client_id.trim()) {
+      setError("Le client est obligatoire (choisir dans la liste des clients)");
       return;
     }
 
@@ -131,11 +167,14 @@ export default function TenantsTab({
         }),
       );
       const existing = cached.find((tenant) => tenant.id === editingId);
+      const selectedClient = clients.find(c => c.id === form.client_id);
+      
       const localTenant: LocalTenant = {
         ...(existing ?? {}),
-        id: existing?.id ?? crypto.randomUUID(),
-        nom: form.nom.trim(),
-        prenom: form.prenom.trim(),
+        id: existing?.id ?? generateUUID(),
+        client_id: form.client_id.trim() || null,
+        nom: selectedClient?.nom || form.nom.trim(),
+        prenom: selectedClient?.prenom || form.prenom.trim(),
         telephone: form.telephone.trim() || null,
         email: form.email.trim() || null,
         property_id: existing?.property_id ?? null,
@@ -168,7 +207,7 @@ export default function TenantsTab({
 
   const handleDelete = async (id: string) => {
     if (destructiveActionsDisabled) {
-      window.alert(getDemoBlockMessage());
+      showToast("error","Mode démo",getDemoBlockMessage());
       return;
     }
     if (
@@ -198,7 +237,7 @@ export default function TenantsTab({
       writeManualCache(TENANTS_CACHE_KEY, sortTenants(next));
       onRefresh();
     } catch (err: any) {
-      alert(`Erreur lors de la suppression locale: ${err.message}`);
+      showToast("error","Erreur suppression",`Erreur lors de la suppression locale: ${err.message}`);
     }
   };
 
@@ -207,12 +246,19 @@ export default function TenantsTab({
       (c) => c.locataire_id === tenantId && c.statut === "actif",
     );
 
+  const getClientName = (tenant: Tenant) => {
+    if (tenant.client) {
+      return `${tenant.client.prenom} ${tenant.client.nom}`;
+    }
+    return `${tenant.prenom} ${tenant.nom}`;
+  };
+
   const filtered = tenants.filter((t) => {
-    const fullName = `${t.nom} ${t.prenom}`.toLowerCase();
+    const clientName = getClientName(t);
     const phone = (t.telephone || "").toLowerCase();
     const email = (t.email || "").toLowerCase();
     return (
-      fullName.includes(search.toLowerCase()) ||
+      clientName.toLowerCase().includes(search.toLowerCase()) ||
       phone.includes(search.toLowerCase()) ||
       email.includes(search.toLowerCase())
     );
@@ -245,7 +291,7 @@ export default function TenantsTab({
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">
-                    Locataire
+                    Locataire (Client)
                   </th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase hidden sm:table-cell">
                     Contact
@@ -266,6 +312,8 @@ export default function TenantsTab({
                 {filtered.map((t) => {
                   const contract = getTenantContract(t.id);
                   const prop = contract?.properties;
+                  const clientName = getClientName(t);
+
                   return (
                     <tr
                       key={t.id}
@@ -276,9 +324,33 @@ export default function TenantsTab({
                           <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
                             <User size={14} className="text-blue-600" />
                           </div>
-                          <span className="text-sm font-medium text-gray-800">
-                            {t.prenom} {t.nom}
-                          </span>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-gray-800">
+                                {clientName}
+                              </span>
+                              {(() => {
+                                const local = localTenants.find((lt) => lt.id === t.id) || null;
+                                const status = local ? normalizeManualStatus(local.sync_status) : null;
+                                if (!status) return null;
+                                const onClick = () => {
+                                  if (local?.sync_error) {
+                                    setSyncErrorContent(local.sync_error);
+                                    setSyncErrorModalOpen(true);
+                                  }
+                                };
+                                if (status === "pending") return <button onClick={onClick} title={local?.sync_error ?? ''}><Badge label="En attente" color="orange" /></button>;
+                                if (status === "synced") return <button onClick={onClick} title={local?.sync_error ?? ''}><Badge label="Synced" color="green" /></button>;
+                                if (status === "deleted") return <button onClick={onClick} title={local?.sync_error ?? ''}><Badge label="Supprimé" color="red" /></button>;
+                                return local?.sync_error ? <button onClick={onClick} title={local?.sync_error ?? ''}><Badge label="Erreur" color="red" /></button> : null;
+                              })()}
+                            </div>
+                            {t.client && (
+                              <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
+                                Client EGS
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </td>
                       <td className="px-4 py-3 hidden sm:table-cell">
@@ -360,6 +432,71 @@ export default function TenantsTab({
               {error}
             </div>
           )}
+          
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-2">
+            <p className="text-sm text-blue-800 mb-2">
+              <strong>Associer à un client EGS :</strong> Le locataire doit être un client enregistré.
+              Le contrat de bail sera stocké dans le filebrowser.
+            </p>
+            <div>
+              <SelectWithCreate
+                value={form.client_id}
+                onChange={(val) => handleClientChange(val)}
+                options={clients.map((client) => ({ value: client.id, label: `${client.prenom} ${client.nom} (${client.telephone})` }))}
+                placeholder="Sélectionner un client..."
+                label="Client *"
+                required
+                createModalTitle="Nouveau Client (Locataire)"
+                createFields={[
+                  { key: "prenom", label: "Prénom", type: "text", placeholder: "Prénom", required: true },
+                  { key: "nom", label: "Nom", type: "text", placeholder: "Nom", required: true },
+                  { key: "telephone", label: "Téléphone", type: "tel", placeholder: "+225 07 00 00 00", required: true },
+                  { key: "email", label: "Email", type: "email", placeholder: "email@exemple.com", required: false },
+                  { key: "adresse", label: "Adresse", type: "text", placeholder: "Adresse...", required: false },
+                  { key: "type_client", label: "Type de Client", type: "select", required: true, options: [
+                    { value: "particulier", label: "Particulier" },
+                    { value: "entreprise", label: "Entreprise" },
+                    { value: "promoteur_immobilier", label: "Promoteur Immobilier" },
+                    { value: "institution", label: "Institution" },
+                  ]},
+                  { key: "notes", label: "Notes", type: "textarea", placeholder: "Notes...", required: false },
+                ]}
+                validateCreateForm={(data) => {
+                  const errors: Record<string, string> = {};
+                  if (!data.prenom?.trim()) errors.prenom = "Le prénom est obligatoire";
+                  if (!data.nom?.trim()) errors.nom = "Le nom est obligatoire";
+                  if (!data.telephone?.trim()) errors.telephone = "Le téléphone est obligatoire";
+                  if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+                    errors.email = "Format d'email invalide";
+                  }
+                  return Object.keys(errors).length > 0 ? errors : null;
+                }}
+                onCreate={async (data) => {
+                  const now = new Date().toISOString();
+                  const payload = {
+                    nom: data.nom,
+                    prenom: data.prenom,
+                    telephone: data.telephone,
+                    email: data.email || null,
+                    adresse: data.adresse || null,
+                    type_client: data.type_client || "particulier",
+                    notes: data.notes || null,
+                    updated_at: now,
+                  };
+                  const { data: newClient, error } = await clientsRepository.create(payload);
+                  if (error) throw new Error(error);
+                  // Refresh clients list from cache
+                  const cached = readManualCache<Client>(CLIENTS_CACHE_KEY);
+                  const updated = [...cached, newClient].sort((a, b) =>
+                    `${a.nom} ${a.prenom}`.localeCompare(`${b.nom} ${b.prenom}`)
+                  );
+                  writeManualCache(CLIENTS_CACHE_KEY, updated);
+                  return { value: newClient.id, label: `${data.prenom} ${data.nom} (${data.telephone})` };
+                }}
+              />
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -371,6 +508,7 @@ export default function TenantsTab({
                 onChange={(e) => setForm({ ...form, prenom: e.target.value })}
                 className={inputClass}
                 placeholder="Ex: Kouamé"
+                readOnly={!!form.client_id}
               />
             </div>
             <div>
@@ -383,6 +521,7 @@ export default function TenantsTab({
                 onChange={(e) => setForm({ ...form, nom: e.target.value })}
                 className={inputClass}
                 placeholder="Ex: Konan"
+                readOnly={!!form.client_id}
               />
             </div>
           </div>
@@ -399,6 +538,7 @@ export default function TenantsTab({
                 }
                 className={inputClass}
                 placeholder="Ex: 07 07 07 07 07"
+                readOnly={!!form.client_id}
               />
             </div>
             <div>
@@ -411,6 +551,7 @@ export default function TenantsTab({
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 className={inputClass}
                 placeholder="Ex: konan@example.com"
+                readOnly={!!form.client_id}
               />
             </div>
           </div>
@@ -468,7 +609,7 @@ export default function TenantsTab({
             </button>
             <button
               onClick={handleSave}
-              disabled={saving || !form.nom.trim()}
+              disabled={saving || !form.client_id.trim()}
               className="flex-1 px-4 py-2.5 rounded-xl text-white text-sm font-medium hover:opacity-90 disabled:opacity-50"
               style={{
                 backgroundColor: settings.primary_color,
@@ -478,6 +619,16 @@ export default function TenantsTab({
               {saving ? "Enregistrement..." : "Enregistrer"}
             </button>
           </div>
+        </div>
+      </Modal>
+      <Modal
+        isOpen={syncErrorModalOpen}
+        onClose={() => setSyncErrorModalOpen(false)}
+        title={"Détails d'erreur de synchronisation"}
+        size="sm"
+      >
+        <div className="text-sm text-gray-700">
+          <pre className="whitespace-pre-wrap break-words text-xs bg-gray-50 p-3 rounded-md border border-gray-100">{syncErrorContent}</pre>
         </div>
       </Modal>
     </>

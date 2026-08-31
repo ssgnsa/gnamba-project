@@ -32,7 +32,7 @@ export const employeeDashboardRepository = {
       dbClient
         .from("messages_direction")
         .select("*")
-        .order("created_at", { ascending: false }),
+        .order("created_at"),
     )) as QueryResult<MessageDirection[]>;
   },
 
@@ -90,7 +90,7 @@ export const employeeDashboardRepository = {
       dbClient
         .from("activites_journal")
         .select("*")
-        .order("created_at", { ascending: false })
+        .order("created_at")
         .limit(5),
     )) as QueryResult<ActiviteJournal[]>;
   },

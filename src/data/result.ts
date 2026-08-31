@@ -1,11 +1,13 @@
 export interface ApiSuccess<T> {
   data: T;
   error: null;
+  status?: number;
 }
 
 export interface ApiError {
   data: null;
   error: string;
+  status?: number;
 }
 
 export type ApiResult<T> = ApiSuccess<T> | ApiError;
@@ -35,16 +37,16 @@ export function toErrorMessage(error: unknown): string {
   return "Erreur inconnue";
 }
 
-export function apiError(message: string): ApiError {
-  return { data: null, error: message };
+export function apiError(message: string, status = 500): ApiError {
+  return { data: null, error: message, status };
 }
 
 export function fromQueryResult<T>(
   result: QueryResultLike<T>,
-  fallbackMessage = "Erreur de requête",
+  fallbackMessage = "Erreur de requete",
 ): ApiResult<T | null> {
   if (result.error) {
     return apiError(toErrorMessage(result.error) || fallbackMessage);
   }
-  return { data: result.data, error: null };
+  return { data: result.data, error: null, status: 200 };
 }

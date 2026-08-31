@@ -1,12 +1,11 @@
-import { isLikelyLoopback } from "./loopback";
+import { isLikelyLoopback } from "./loopback.ts";
 
 const OFFICIAL_API_BASE_URL = "https://api.gnambaservices.ci";
 const OFFICIAL_FILES_BASE_URL = "https://files.gnambaservices.ci/egs";
 
 export const isSelfHostedMode = (): boolean => {
   const explicit = import.meta.env.VITE_SELFHOSTED_MODE;
-  if (explicit === "false") return false;
-  return true;
+  return explicit === "true";
 };
 
 export const getLocalApiBaseUrl = (): string => {

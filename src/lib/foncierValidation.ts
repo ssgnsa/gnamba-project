@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { validateIvoryCoastPhone } from "../lib/phone/ivoryCoastPhone";
 
 /**
  * Schéma de validation pour un lot foncier
@@ -69,14 +70,14 @@ const frenchDateSchema = z
     return `${y}-${m}-${d}`;
   });
 
-// Téléphone ivoirien
+// Téléphone ivoirien - Utilisation de la même regex que dans l'utilitaire centralisé
 const phoneSchema = z
   .string()
   .optional()
   .nullable()
   .refine(
-    (v) => !v || /^(\+225|00225)?\s*\d{10}$/.test(v.replace(/\s/g, "")),
-    "Format invalide (10 chiffres, ex: 0707084041)",
+    (v) => !v || validateIvoryCoastPhone(v) === null,
+    "Format invalide (10 chiffres, ex: +225 07 08 09 10 11 ou 0708091011)",
   );
 
 // CNI: format CI + chiffres
@@ -145,6 +146,7 @@ export const foncierLotFormSchema = z
     proprietaire_cni_lieu: optionalString,
     proprietaire_profession: optionalString,
     proprietaire_telephone: phoneSchema,
+    proprietaire_client_id: z.string().uuid().optional().nullable(),
 
     // Section: Administratif (optionnel)
     chef_village: optionalString,

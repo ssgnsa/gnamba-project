@@ -27,9 +27,7 @@ if [ -f "/home/soma/gnamba-project/.env" ]; then
 fi
 
 # Valeurs par défaut
-VITE_SUPABASE_LOCAL_URL="${VITE_SUPABASE_LOCAL_URL:-${VITE_LOCAL_API_URL:-}}"
-VITE_SUPABASE_LOCAL_ANON_KEY="${VITE_SUPABASE_LOCAL_ANON_KEY:-}"
-VITE_SUPABASE_MODE="${VITE_SUPABASE_MODE:-local}"
+VITE_API_URL="${VITE_API_URL:-http://localhost:8000/api/v1}"
 
 echo -e "${BLUE}╔════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║     🚀 DÉMARRAGE EGS + FILEBROWSER + SERVICES          ║${NC}"
@@ -126,9 +124,7 @@ docker run -d \
     --network gnamba-network \
     --restart unless-stopped \
     -p 8080:80 \
-    -e VITE_SUPABASE_LOCAL_URL="$VITE_SUPABASE_LOCAL_URL" \
-    -e VITE_SUPABASE_LOCAL_ANON_KEY="$VITE_SUPABASE_LOCAL_ANON_KEY" \
-    -e VITE_SUPABASE_MODE="$VITE_SUPABASE_MODE" \
+    -e VITE_API_URL="$VITE_API_URL" \
     egs-web:runtime
 
 echo -e "${GREEN}✅ EGS démarré sur http://localhost:8080${NC}"

@@ -1,5 +1,5 @@
 import { FC, useState, useMemo, useEffect } from 'react';
-import { foncierRepository } from '../data/foncier.repository';
+import { foncierRepository } from '../lib/dbClient.service';
 import type { FoncierLot } from '../types';
 import { FoncierLotForm } from './foncier/FoncierLotForm';
 

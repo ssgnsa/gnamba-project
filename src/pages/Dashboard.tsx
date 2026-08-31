@@ -18,8 +18,8 @@ import {
   ExternalLink,
   Bot,
 } from "lucide-react";
-import dbClient from "../data/tableClient";
-import { clientsRepository } from "../data/clients.repository";
+import dbClient from '../lib/dbClient.service';
+import { clientsRepository } from '../lib/dbClient.service';
 import { resolveAccessLevel, useAuth } from "../context/AuthContext";
 import { isOllamaEnabled, ollama } from "../lib/ollama";
 import isLikelyLoopback from "../lib/loopback";
@@ -28,12 +28,12 @@ import RevenueChart from "../components/dashboard/RevenueChart";
 import CategoryDonutChart from "../components/dashboard/CategoryDonutChart";
 import AlertsWidget from "../components/dashboard/AlertsWidget";
 
-interface MonthlyAgg {
+export interface MonthlyAgg {
   month: string;
   recettes: number;
   depenses: number;
 }
-interface CategoryAgg {
+export interface CategoryAgg {
   label: string;
   value: number;
   color: string;
@@ -46,7 +46,7 @@ interface RecentTx {
   montant: number;
   date_transaction: string;
 }
-interface AlertItem {
+export interface AlertItem {
   id: string;
   type: "warning" | "danger" | "info" | "success";
   message: string;
@@ -64,7 +64,7 @@ interface ServiceLink {
   status: "online" | "offline";
 }
 
-interface DashboardData {
+export interface DashboardData {
   currentRecettes: number;
   prevRecettes: number;
   currentDepenses: number;
@@ -142,6 +142,7 @@ export default function Dashboard() {
   const { profile } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState(new Date());
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
@@ -200,6 +201,7 @@ export default function Dashboard() {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const now = new Date();
       const y = now.getFullYear();
@@ -212,7 +214,7 @@ export default function Dashboard() {
       // Si l'utilisateur ne peut pas voir les finances, on ne charge que les données non sensibles
       if (!canViewFinances) {
         const [clientRes, projets, biens, loyers, taches] = await Promise.all([
-          clientsRepository.getAll({ limit: 1000 }),
+          clientsRepository.getAll(),
           dbClient
             .from("projects")
             .select("id", { count: "exact", head: true })
@@ -264,7 +266,7 @@ export default function Dashboard() {
           currentDepenses: 0,
           prevDepenses: 0,
           beneficeNet: 0,
-          totalClients: clientRes.data?.total ?? 0,
+          totalClients: clientRes.count ?? 0,
           projetsActifs: projets.count ?? 0,
           biensImmobiliers: biens.count ?? 0,
           loyersEnAttente,
@@ -292,7 +294,7 @@ export default function Dashboard() {
             .select("type_transaction,montant")
             .gte("date_transaction", firstPrev)
             .lte("date_transaction", lastPrev),
-          clientsRepository.getAll({ limit: 1000 }),
+          clientsRepository.getAll(),
           dbClient
             .from("projects")
             .select("id", { count: "exact", head: true })
@@ -425,7 +427,7 @@ export default function Dashboard() {
         currentDepenses,
         prevDepenses,
         beneficeNet: currentRecettes - currentDepenses,
-        totalClients: clients.data?.total ?? 0,
+        totalClients: clients.count ?? 0,
         projetsActifs: projets.count ?? 0,
         biensImmobiliers: biens.count ?? 0,
         loyersEnAttente,
@@ -437,6 +439,13 @@ export default function Dashboard() {
         alerts,
       });
       setLastRefresh(new Date());
+    } catch (err) {
+      console.error("Dashboard: erreur de chargement", err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Erreur de chargement du tableau de bord",
+      );
     } finally {
       setLoading(false);
     }
@@ -547,6 +556,22 @@ export default function Dashboard() {
               className="h-32 rounded-2xl bg-slate-100 animate-pulse"
             />
           ))}
+        </div>
+      ) : error && !data ? (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-6 flex items-start gap-3">
+          <AlertTriangle className="text-red-600 flex-shrink-0 mt-0.5" size={24} />
+          <div>
+            <p className="text-sm font-medium text-red-800">
+              Impossible de charger le tableau de bord
+            </p>
+            <p className="text-xs text-red-600 mt-1">{error}</p>
+            <button
+              onClick={fetchData}
+              className="mt-3 px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Réessayer
+            </button>
+          </div>
         </div>
       ) : data ? (
         <>

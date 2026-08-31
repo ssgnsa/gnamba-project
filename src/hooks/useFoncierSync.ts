@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { dataService, withBackoff } from "../lib/dbClient.service";
 export { withBackoff } from "../lib/dbClient.service";
 import type { FoncierLot } from "../types";
@@ -18,6 +18,24 @@ import { generateUUID } from "../utils/reference";
  */
 export function useFoncierSync() {
   const deviceId = getDeviceId();
+  const [syncing, setSyncing] = useState(false);
+  const [syncPending, setSyncPending] = useState(0);
+  const [syncProgress, setSyncProgress] = useState(0);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
+
+  const syncQueue = useCallback(async () => {
+    setSyncing(true);
+    setSyncError(null);
+    try {
+      const count = await countQueueItems();
+      setSyncPending(count);
+    } catch (error: any) {
+      setSyncError(error?.message || "Erreur de synchronisation");
+    } finally {
+      setSyncing(false);
+    }
+  }, []);
 
   // ============ FETCH LOTS ============
   const fetchData = useCallback(
@@ -100,7 +118,7 @@ export function useFoncierSync() {
 
   // ============ FETCH VILLAGE STATS ============
   const fetchVillageStats = useCallback(
-    async (showArchived: boolean, isOnline: boolean) => {
+    async (showArchived: boolean, isOnline: boolean = navigator.onLine) => {
       if (!isOnline) {
         const cached = await getCachedLots();
         const map: Record<string, { total: number; count: number }> = {};
@@ -144,7 +162,7 @@ export function useFoncierSync() {
   );
 
   // ============ LOAD VILLAGES ============
-  const loadVillages = useCallback(async (isOnline: boolean) => {
+  const loadVillages = useCallback(async (isOnline: boolean = navigator.onLine) => {
     if (!isOnline) {
       return { data: null, error: "Mode hors-ligne" };
     }
@@ -164,7 +182,7 @@ export function useFoncierSync() {
   }, []);
 
   // ============ REFRESH CACHE ============
-  const refreshCache = useCallback(async (isOnline: boolean) => {
+  const refreshCache = useCallback(async (isOnline: boolean = navigator.onLine) => {
     if (!isOnline) return { error: "Mode hors-ligne" };
 
     const { data, error } = await dataService.searchLots({
@@ -225,12 +243,21 @@ export function useFoncierSync() {
 
   return {
     deviceId,
+    isOnline,
+    setIsOnline,
+    syncing,
+    syncPending,
+    syncProgress,
+    syncError,
+    setSyncProgress,
+    setSyncError,
     fetchData,
     fetchVillageStats,
     loadVillages,
     refreshCache,
     loadCachedLots,
     refreshQueueCount,
+    syncQueue,
     upsertLot,
     queueOperation,
     dequeueOperation,

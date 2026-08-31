@@ -11,12 +11,16 @@ import {
   Calendar,
   Download,
   X,
+  ChevronLeft,
+  ChevronRight,
+  RotateCcw,
 } from "lucide-react";
-import dbClient from "../data/tableClient";
-import { clientsRepository } from "../data/clients.repository";
+import dbClient from '../lib/dbClient.service';
+import { clientsRepository } from '../lib/dbClient.service';
 import { Finance, Client, Project } from "../types";
 import Modal from "../components/ui/Modal";
 import Badge from "../components/ui/Badge";
+import SelectWithCreate from "../components/ui/SelectWithCreate";
 import { useSettings } from "../context/SettingsContext";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -26,6 +30,8 @@ import {
 import { generateReference } from "../utils/reference";
 import { printRecu } from "../utils/print";
 import MobileCard from "../components/ui/MobileCard";
+
+const PAGE_SIZE = 50;
 
 const modeLabels: Record<string, string> = {
   virement: "Virement",
@@ -65,9 +71,11 @@ export default function Finances() {
   const { settings } = useSettings();
   const { user, profile } = useAuth();
   const [transactions, setTransactions] = useState<Finance[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [clients, setClients] = useState<Client[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
@@ -85,21 +93,25 @@ export default function Finances() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
+      const from = page * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
       const [finRes, cliRes, projRes] = await Promise.all([
         dbClient
           .from("finances")
-          .select("*, clients(nom, prenom)")
+          .select("*", { count: "exact" })
+          .range(from, to)
           .order("date_transaction", { ascending: false }),
-        clientsRepository.getAll({ limit: 1000 }),
+        clientsRepository.getAll(),
         dbClient.from("projects").select("id, nom").order("nom"),
       ]);
-      setTransactions(finRes.data || []);
-      setClients((cliRes.data?.items as Client[]) || []);
+      setTransactions((finRes.data as Finance[]) || []);
+      setTotalCount(finRes.count || finRes.data?.length || 0);
+      setClients((cliRes.data as Client[]) || []);
       setProjects((projRes.data as Project[]) || []);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page]);
 
   useEffect(() => {
     fetchData();
@@ -153,6 +165,7 @@ export default function Finances() {
       description: form.description,
       client_id: form.client_id || null,
       project_id: form.project_id || null,
+      statut: "valide",
       updated_at: new Date().toISOString(),
     };
 
@@ -193,6 +206,19 @@ export default function Finances() {
     fetchData();
   };
 
+  const handleRestore = async (id: string) => {
+    if (!confirm("Restaurer cette transaction annulée ?")) return;
+    const { error } = await dbClient
+      .from("finances")
+      .update({ statut: "valide" })
+      .eq("id", id);
+    if (error) {
+      setFormError(error.message);
+      return;
+    }
+    fetchData();
+  };
+
   const handlePrintRecu = (t: Finance) => {
     const client = clients.find((c) => c.id === t.client_id);
     printRecu({
@@ -211,22 +237,35 @@ export default function Finances() {
     });
   };
 
-  const filtered = transactions.filter((t) => {
-    const matchSearch = `${t.categorie} ${t.description} ${t.reference}`
-      .toLowerCase()
-      .includes(search.toLowerCase());
+  // Filtre côté client (sur les données paginées) + exclut les annulées
+  const filtered = transactions
+    .filter((t) => t.statut !== "annule")
+    .filter((t) => {
+      const matchSearch = `${t.categorie} ${t.description} ${t.reference}`
+        .toLowerCase()
+        .includes(search.toLowerCase());
+      const matchType = !filterType || t.type_transaction === filterType;
+      const matchDateFrom = ! dateFrom || t.date_transaction >= dateFrom;
+      const matchDateTo = !dateTo || t.date_transaction <= dateTo;
+      return matchSearch && matchType && matchDateFrom && matchDateTo;
+    });
+
+  // Toutes les transactions (inclure les annulées pour les totaux)
+  const allForCalc = transactions.filter((t) => {
     const matchType = !filterType || t.type_transaction === filterType;
     const matchDateFrom = !dateFrom || t.date_transaction >= dateFrom;
     const matchDateTo = !dateTo || t.date_transaction <= dateTo;
-    return matchSearch && matchType && matchDateFrom && matchDateTo;
+    return matchType && matchDateFrom && matchDateTo;
   });
 
-  const totalRecettes = filtered
+  const totalRecettes = allForCalc
     .filter((t) => t.type_transaction === "recette")
     .reduce((s, t) => s + t.montant, 0);
-  const totalDepenses = filtered
+  const totalDepenses = allForCalc
     .filter((t) => t.type_transaction === "depense")
     .reduce((s, t) => s + t.montant, 0);
+
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
   const exportCSV = () => {
     const headers = [
@@ -513,7 +552,7 @@ export default function Finances() {
                   {filtered.map((t) => (
                     <tr
                       key={t.id}
-                      className="hover:bg-gray-50 transition-colors"
+                      className={`hover:bg-gray-50 transition-colors ${t.statut === "annule" ? "opacity-50" : ""}`}
                     >
                       <td className="px-4 py-3 table-key hidden md:table-cell">
                         {t.reference || "—"}
@@ -524,16 +563,21 @@ export default function Finances() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <Badge
-                          label={
-                            t.type_transaction === "recette"
-                              ? "Recette"
-                              : "Dépense"
-                          }
-                          color={
-                            t.type_transaction === "recette" ? "green" : "red"
-                          }
-                        />
+                        <div className="flex items-center gap-1">
+                          <Badge
+                            label={
+                              t.type_transaction === "recette"
+                                ? "Recette"
+                                : "Dépense"
+                            }
+                            color={
+                              t.type_transaction === "recette" ? "green" : "red"
+                            }
+                          />
+                          {t.statut === "annule" && (
+                            <Badge label="Annulé" color="gray" />
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
                         {t.categorie}
@@ -556,18 +600,30 @@ export default function Finances() {
                           >
                             <Printer size={15} />
                           </button>
-                          <button
-                            onClick={() => openEdit(t)}
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                          >
-                            <Edit size={15} />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(t.id)}
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                          >
-                            <Trash2 size={15} />
-                          </button>
+                          {t.statut !== "annule" ? (
+                            <>
+                              <button
+                                onClick={() => openEdit(t)}
+                                className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                              >
+                                <Edit size={15} />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(t.id)}
+                                className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              onClick={() => handleRestore(t.id)}
+                              title="Restaurer"
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                            >
+                              <RotateCcw size={15} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -575,6 +631,31 @@ export default function Finances() {
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-gray-50">
+                <span className="text-xs text-gray-500">
+                  {totalCount} transaction{totalCount > 1 ? "s" : ""} — Page {page + 1}/{totalPages}
+                </span>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => setPage((p) => Math.max(0, p - 1))}
+                    disabled={page === 0}
+                    className="p-2 rounded-lg text-gray-500 hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <button
+                    onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                    disabled={page >= totalPages - 1}
+                    className="p-2 rounded-lg text-gray-500 hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -689,38 +770,104 @@ export default function Finances() {
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Client
-            </label>
-            <select
+            <SelectWithCreate
               value={form.client_id}
-              onChange={(e) => setForm({ ...form, client_id: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
-            >
-              <option value="">Sélectionner...</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.prenom} {c.nom}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setForm({ ...form, client_id: val })}
+              options={clients.map((c) => ({ value: c.id, label: `${c.prenom} ${c.nom}` }))}
+              placeholder="Sélectionner un client..."
+              label="Client"
+              createModalTitle="Nouveau Client"
+              createFields={[
+                { key: "prenom", label: "Prénom", type: "text", placeholder: "Prénom", required: true },
+                { key: "nom", label: "Nom", type: "text", placeholder: "Nom", required: true },
+                { key: "telephone", label: "Téléphone", type: "tel", placeholder: "+225 07 00 00 00", required: true },
+                { key: "email", label: "Email", type: "email", placeholder: "email@exemple.com", required: false },
+                { key: "adresse", label: "Adresse", type: "text", placeholder: "Adresse...", required: false },
+                { key: "type_client", label: "Type de Client", type: "select", required: true, options: [
+                  { value: "particulier", label: "Particulier" },
+                  { value: "entreprise", label: "Entreprise" },
+                  { value: "promoteur_immobilier", label: "Promoteur Immobilier" },
+                  { value: "institution", label: "Institution" },
+                ]},
+                { key: "notes", label: "Notes", type: "textarea", placeholder: "Notes...", required: false },
+              ]}
+              validateCreateForm={(data) => {
+                const errors: Record<string, string> = {};
+                if (!data.prenom?.trim()) errors.prenom = "Le prénom est obligatoire";
+                if (!data.nom?.trim()) errors.nom = "Le nom est obligatoire";
+                if (!data.telephone?.trim()) errors.telephone = "Le téléphone est obligatoire";
+                if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+                  errors.email = "Format d'email invalide";
+                }
+                return Object.keys(errors).length > 0 ? errors : null;
+              }}
+              onCreate={async (data) => {
+                const now = new Date().toISOString();
+                const payload = {
+                  nom: data.nom,
+                  prenom: data.prenom,
+                  telephone: data.telephone,
+                  email: data.email || null,
+                  adresse: data.adresse || null,
+                  type_client: data.type_client || "particulier",
+                  notes: data.notes || null,
+                  updated_at: now,
+                };
+                const { data: newClient, error } = await clientsRepository.create(payload);
+                if (error) throw error;
+                return { value: newClient.id, label: `${data.prenom} ${data.nom}` };
+              }}
+            />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Projet (optionnel)
-            </label>
-            <select
+            <SelectWithCreate
               value={form.project_id}
-              onChange={(e) => setForm({ ...form, project_id: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
-            >
-              <option value="">Aucun projet</option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nom}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setForm({ ...form, project_id: val })}
+              options={projects.map((p) => ({ value: p.id, label: p.nom }))}
+              placeholder="Aucun projet"
+              label="Projet (optionnel)"
+              createModalTitle="Nouveau Projet"
+              createFields={[
+                { key: "nom", label: "Nom du Projet", type: "text", placeholder: "Ex: Construction Villa", required: true },
+                { key: "type_projet", label: "Type de Projet", type: "text", placeholder: "Construction, Rénovation...", required: false },
+                { key: "localisation", label: "Localisation", type: "text", placeholder: "Ex: Cocody, Abidjan", required: false },
+                { key: "budget", label: "Budget (FCFA)", type: "number", placeholder: "0", required: false },
+                { key: "date_debut", label: "Date Début", type: "date", required: false },
+                { key: "date_fin", label: "Date Fin", type: "date", required: false },
+                { key: "statut", label: "Statut", type: "select", required: true, options: [
+                  { value: "devis", label: "Devis" },
+                  { value: "valide", label: "Validé" },
+                  { value: "en_cours", label: "En Cours" },
+                  { value: "termine", label: "Terminé" },
+                  { value: "facture", label: "Facturé" },
+                ]},
+                { key: "description", label: "Description", type: "textarea", placeholder: "Description...", required: false },
+                { key: "notes", label: "Notes", type: "textarea", placeholder: "Notes...", required: false },
+              ]}
+              validateCreateForm={(data) => {
+                const errors: Record<string, string> = {};
+                if (!data.nom?.trim()) errors.nom = "Le nom du projet est obligatoire";
+                return Object.keys(errors).length > 0 ? errors : null;
+              }}
+              onCreate={async (data) => {
+                const now = new Date().toISOString();
+                const payload = {
+                  nom: data.nom,
+                  type_projet: data.type_projet || null,
+                  localisation: data.localisation || null,
+                  budget: parseFloat(data.budget) || 0,
+                  date_debut: data.date_debut || null,
+                  date_fin: data.date_fin || null,
+                  statut: data.statut || "devis",
+                  description: data.description || null,
+                  notes: data.notes || null,
+                  updated_at: now,
+                };
+                const { data: newProj, error } = await dbClient.from("projects").insert(payload).select("id").single();
+                if (error) throw error;
+                return { value: newProj.id, label: data.nom };
+              }}
+            />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">

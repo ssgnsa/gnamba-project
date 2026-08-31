@@ -29,6 +29,8 @@ import {
   readManualCache,
   writeManualCache,
 } from "../lib/manualSyncStore";
+import { validateIvoryCoastPhone } from "../lib/phone/ivoryCoastPhone";
+import { generateUUID } from "../utils/reference";
 
 const CLIENTS_CACHE_KEY = "egs.clients.local_cache.v1";
 
@@ -45,6 +47,18 @@ const typeLabels: Record<
   promoteur_immobilier: { label: "Promoteur", color: "orange" },
   institution: { label: "Institution", color: "gray" },
 };
+
+export function getClientTypeMeta(type?: string | null) {
+  if (!type || !typeLabels[type]) {
+    return { label: "Client", color: "gray" as const };
+  }
+  return typeLabels[type];
+}
+
+export function getClientDisplayName(client?: Partial<Client> | null) {
+  const fullName = `${client?.prenom ?? ""} ${client?.nom ?? ""}`.trim();
+  return fullName || "Client";
+}
 
 const typeOptions = [
   { value: "", label: "Tous les types" },
@@ -85,8 +99,6 @@ function sortClients(items: LocalClient[]): LocalClient[] {
 
 // Validation helpers
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const IVORIAN_PHONE_REGEX =
-  /^(?:(?:\+225|00225|0)[\s-])?[56789]\d{2}[\s-]?\d{2}[\s-]?\d{2}[\s-]?\d{2}$/;
 
 function validateEmail(email: string): string | null {
   if (!email) return null; // email is optional
@@ -98,15 +110,8 @@ function validateEmail(email: string): string | null {
 
 function validatePhone(phone: string): string | null {
   if (!phone.trim()) return "Le téléphone est obligatoire.";
-  // Normalize: remove spaces and dashes for validation
-  const normalized = phone.replace(/[\s-]/g, "");
-  if (
-    !IVORIAN_PHONE_REGEX.test(normalized) &&
-    !IVORIAN_PHONE_REGEX.test(phone)
-  ) {
-    return "Format de téléphone invalide. Ex: +225 07 00 00 00 ou 07000000.";
-  }
-  return null;
+  const error = validateIvoryCoastPhone(phone);
+  return error ?? null;
 }
 
 export default function Clients() {
@@ -217,7 +222,7 @@ export default function Clients() {
       const existing = clients.find((client) => client.id === editingId);
       const localClient: LocalClient = {
         ...(existing ?? {}),
-        id: existing?.id ?? crypto.randomUUID(),
+        id: existing?.id ?? generateUUID(),
         nom: form.nom.trim(),
         prenom: form.prenom.trim(),
         telephone: form.telephone.trim(),
@@ -468,11 +473,12 @@ export default function Clients() {
           <>
             <div className="md:hidden p-3 space-y-3">
               {paginated.map((c) => {
-                const t = typeLabels[c.type_client];
+                const t = getClientTypeMeta(c.type_client);
+                const safeDisplayName = getClientDisplayName(c);
                 return (
                   <MobileCard
                     key={c.id}
-                    title={`${c.prenom} ${c.nom}`.trim() || c.nom}
+                    title={safeDisplayName}
                     subtitle={c.email || c.telephone || "Client"}
                     icon={
                       <div
@@ -482,9 +488,9 @@ export default function Clients() {
                           color: "var(--color-on-primary)",
                         }}
                       >
-                        {c.prenom[0]?.toUpperCase() ||
-                          c.nom[0]?.toUpperCase() ||
-                          "?"}
+                        {(c.prenom?.[0] ?? c.nom?.[0] ?? "?")
+                          .toString()
+                          .toUpperCase()}
                       </div>
                     }
                     fields={[
@@ -547,7 +553,8 @@ export default function Clients() {
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {paginated.map((c) => {
-                    const t = typeLabels[c.type_client];
+                    const t = getClientTypeMeta(c.type_client);
+                    const safeDisplayName = getClientDisplayName(c);
                     return (
                       <tr
                         key={c.id}
@@ -562,13 +569,13 @@ export default function Clients() {
                                 color: "var(--color-on-primary)",
                               }}
                             >
-                              {c.prenom[0]?.toUpperCase() ||
-                                c.nom[0]?.toUpperCase() ||
-                                "?"}
+                              {(c.prenom?.[0] ?? c.nom?.[0] ?? "?")
+                                .toString()
+                                .toUpperCase()}
                             </div>
                             <div>
                               <div className="text-sm font-medium text-gray-800">
-                                {c.prenom} {c.nom}
+                                {safeDisplayName}
                               </div>
                             </div>
                           </div>

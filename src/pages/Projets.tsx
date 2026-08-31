@@ -9,11 +9,12 @@ import {
   X,
   Users,
 } from "lucide-react";
-import dbClient from "../data/tableClient";
+import dbClient from '../lib/dbClient.service';
 import { Project, Client } from "../types";
-import { clientsRepository } from "../data/clients.repository";
+import { clientsRepository } from '../lib/dbClient.service';
 import Modal from "../components/ui/Modal";
 import Badge from "../components/ui/Badge";
+import SelectWithCreate from "../components/ui/SelectWithCreate";
 import { useSettings } from "../context/SettingsContext";
 import MediaPicker from "../components/media/MediaPicker";
 import MobileCard from "../components/ui/MobileCard";
@@ -33,6 +34,10 @@ const statutConfig: Record<
   termine: { label: "Terminé", color: "green" },
   facture: { label: "Facturé", color: "yellow" },
 };
+
+// Fallback for unknown status values
+const unknownStatut = { label: "Inconnu", color: "gray" as const };
+const getStatutConfig = (statut: string) => statutConfig[statut] || unknownStatut;
 
 const emptyForm = {
   nom: "",
@@ -82,19 +87,38 @@ export default function Projets() {
 
   const fetchData = async () => {
     setLoading(true);
-    const [projRes, cliRes] = await Promise.all([
-      dbClient
-        .from("projects")
-        .select("*, clients(nom, prenom)")
-        .order("created_at", { ascending: false }),
-      clientsRepository.getAll({ limit: 1000 }),
-    ]);
-    setProjects((projRes.data as Project[]) || []);
-    setClients(
-      (cliRes.data?.items as Array<Pick<Client, "id" | "nom" | "prenom">>) ||
-        [],
-    );
-    setLoading(false);
+    try {
+      const [projRes, cliRes] = await Promise.all([
+        dbClient
+          .from("projects")
+          .select("*, clients(nom, prenom)")
+          .order("created_at", { ascending: false }),
+        clientsRepository.getAll(),
+      ]);
+      
+      // Check for API errors
+      if (projRes.error) {
+        console.error("[Projets] Error fetching projects:", projRes.error);
+        setProjects([]);
+      } else {
+        setProjects((projRes.data as Project[]) || []);
+      }
+      
+      if (cliRes.error) {
+        console.error("[Projets] Error fetching clients:", cliRes.error);
+        setClients([]);
+      } else {
+        setClients(
+          ((cliRes.data as Array<Pick<Client, "id" | "nom" | "prenom">>) || []) ,
+        );
+      }
+    } catch (error) {
+      console.error("[Projets] Unexpected error in fetchData:", error);
+      setProjects([]);
+      setClients([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const openAdd = () => {
@@ -281,7 +305,7 @@ export default function Projets() {
           <>
             <div className="md:hidden p-3 space-y-3">
               {filtered.map((p) => {
-                const st = statutConfig[p.statut];
+                const st = getStatutConfig(p.statut);
                 return (
                   <MobileCard
                     key={p.id}
@@ -370,7 +394,7 @@ export default function Projets() {
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {filtered.map((p) => {
-                    const st = statutConfig[p.statut];
+                    const st = getStatutConfig(p.statut);
                     return (
                       <tr
                         key={p.id}
@@ -511,23 +535,54 @@ export default function Projets() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Client
-              </label>
-              <select
+              <SelectWithCreate
                 value={form.client_id}
-                onChange={(e) =>
-                  setForm({ ...form, client_id: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
-              >
-                <option value="">Sélectionner...</option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.prenom} {c.nom}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setForm({ ...form, client_id: val })}
+                options={clients.map((c) => ({ value: c.id, label: `${c.prenom} ${c.nom}` }))}
+                placeholder="Sélectionner un client..."
+                label="Client"
+                createModalTitle="Nouveau Client"
+                createFields={[
+                  { key: "prenom", label: "Prénom", type: "text", placeholder: "Prénom", required: true },
+                  { key: "nom", label: "Nom", type: "text", placeholder: "Nom", required: true },
+                  { key: "telephone", label: "Téléphone", type: "tel", placeholder: "+225 07 00 00 00", required: true },
+                  { key: "email", label: "Email", type: "email", placeholder: "email@exemple.com", required: false },
+                  { key: "adresse", label: "Adresse", type: "text", placeholder: "Adresse...", required: false },
+                  { key: "type_client", label: "Type de Client", type: "select", required: true, options: [
+                    { value: "particulier", label: "Particulier" },
+                    { value: "entreprise", label: "Entreprise" },
+                    { value: "promoteur_immobilier", label: "Promoteur Immobilier" },
+                    { value: "institution", label: "Institution" },
+                  ]},
+                  { key: "notes", label: "Notes", type: "textarea", placeholder: "Notes...", required: false },
+                ]}
+                validateCreateForm={(data) => {
+                  const errors: Record<string, string> = {};
+                  if (!data.prenom?.trim()) errors.prenom = "Le prénom est obligatoire";
+                  if (!data.nom?.trim()) errors.nom = "Le nom est obligatoire";
+                  if (!data.telephone?.trim()) errors.telephone = "Le téléphone est obligatoire";
+                  if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+                    errors.email = "Format d'email invalide";
+                  }
+                  return Object.keys(errors).length > 0 ? errors : null;
+                }}
+                onCreate={async (data) => {
+                  const now = new Date().toISOString();
+                  const payload = {
+                    nom: data.nom,
+                    prenom: data.prenom,
+                    telephone: data.telephone,
+                    email: data.email || null,
+                    adresse: data.adresse || null,
+                    type_client: data.type_client || "particulier",
+                    notes: data.notes || null,
+                    updated_at: now,
+                  };
+                  const { data: newClient, error } = await clientsRepository.create(payload);
+                  if (error) throw error;
+                  return { value: newClient.id, label: `${data.prenom} ${data.nom}` };
+                }}
+              />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">

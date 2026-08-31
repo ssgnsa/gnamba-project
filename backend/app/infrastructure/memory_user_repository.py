@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import os
 import time
 from typing import Any
 
-from backend.app.core.security import hash_password
-from backend.app.domain.user import User
-from backend.app.repositories.user_repository import UserRepositoryPort
+from app.core.security import hash_password
+from app.domain.user import User
+from app.repositories.user_repository import UserRepositoryPort
 
 
 class InMemoryUserRepository(UserRepositoryPort):
@@ -17,10 +18,11 @@ class InMemoryUserRepository(UserRepositoryPort):
     def _seed_default_admin(self) -> None:
         if self._users_by_email:
             return
+        admin_password = os.getenv("INITIAL_ADMIN_PASSWORD", "Admin@EGS2025!")
         admin = User(
             id="local-admin",
             email="admin@egs.local",
-            password_hash=hash_password("deadsoulja28@"),
+            password_hash=hash_password(admin_password),
             full_name="Admin Local",
             role="admin",
             access_level="admin",

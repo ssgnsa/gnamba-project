@@ -65,7 +65,6 @@ export const PAGE_TO_AGENT_ROLE: Record<string, AgentRole> = {
   projets: "project-manager",
   immobilier: "immobilier",
   foncier: "foncier",
-  "foncier-villages": "foncier",
   "catalogue-lots": "foncier",
   fournitures: "analytics",
   finances: "comptabilité",

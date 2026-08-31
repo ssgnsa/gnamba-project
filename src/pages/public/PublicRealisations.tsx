@@ -7,8 +7,27 @@ import {
   MapPin,
   Calendar,
   Search,
+  Shield,
+  Award,
+  Sparkles,
 } from "lucide-react";
 import dbClient from "../../data/tableClient";
+
+// Premium UI Components
+import {
+  Button,
+  Card,
+  CardContent,
+  CardTitle,
+  CardDescription,
+  Badge,
+  Container,
+  Grid,
+  Flex,
+  IconWrapper,
+  Skeleton,
+  Input,
+} from "../../components/ui";
 
 interface Realisation {
   id: string;
@@ -18,6 +37,7 @@ interface Realisation {
   year: number;
   location: string;
   featured: boolean;
+  image_url?: string;
 }
 
 const categories = [
@@ -36,36 +56,6 @@ const categoryIcons: Record<
   immobilier: Building2,
   foncier: Map,
   fournitures: Package,
-};
-
-const categoryColors: Record<
-  string,
-  { bg: string; text: string; from: string; to: string }
-> = {
-  btp: {
-    bg: "bg-blue-100",
-    text: "text-blue-700",
-    from: "from-blue-600",
-    to: "to-blue-800",
-  },
-  immobilier: {
-    bg: "bg-sky-100",
-    text: "text-sky-700",
-    from: "from-sky-500",
-    to: "to-sky-700",
-  },
-  foncier: {
-    bg: "bg-emerald-100",
-    text: "text-emerald-700",
-    from: "from-emerald-600",
-    to: "to-emerald-800",
-  },
-  fournitures: {
-    bg: "bg-amber-100",
-    text: "text-amber-700",
-    from: "from-amber-500",
-    to: "to-amber-700",
-  },
 };
 
 export default function PublicRealisations() {
@@ -101,141 +91,182 @@ export default function PublicRealisations() {
     return matchCat && matchSearch;
   });
 
+  const getCategoryStyles = (category: string) => {
+    const styles: Record<string, { bg: string; text: string; light: string; icon: string }> = {
+      btp: { bg: 'bg-primary-100', text: 'text-primary-700', light: 'bg-primary-50', icon: 'text-primary-600' },
+      immobilier: { bg: 'bg-sky-100', text: 'text-sky-700', light: 'bg-sky-50', icon: 'text-sky-600' },
+      foncier: { bg: 'bg-emerald-100', text: 'text-emerald-700', light: 'bg-emerald-50', icon: 'text-emerald-600' },
+      fournitures: { bg: 'bg-amber-100', text: 'text-amber-700', light: 'bg-amber-50', icon: 'text-amber-600' },
+    };
+    return styles[category] || styles.btp;
+  };
+
   return (
-    <div className="pt-20">
+    <div className="min-h-screen bg-white">
       {/* Hero */}
-      <section className="py-20 bg-gradient-to-br from-gray-900 to-blue-900 relative overflow-hidden">
+      <section className="relative py-20 sm:py-24 lg:py-28 overflow-hidden" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #1e40af 100%)' }}>
         <div
           className="absolute inset-0 opacity-5"
           style={{
             backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
           }}
         />
-        <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <span className="text-blue-300 font-semibold text-sm uppercase tracking-widest">
-            Notre portfolio
-          </span>
-          <h1 className="text-4xl sm:text-5xl font-bold text-white mt-3 mb-5">
-            Nos Réalisations
-          </h1>
-          <p className="text-blue-100/80 text-lg max-w-2xl mx-auto leading-relaxed">
-            Découvrez des projets livrés avec méthode, qualité et sens du
-            résultat à travers la Côte d'Ivoire.
-          </p>
-        </div>
+        <Container size="xl" className="relative z-10 py-8">
+          <Flex direction="col" align="center" gap="4" className="text-center max-w-4xl mx-auto">
+            <Badge variant="secondary" size="md" className="text-xs bg-white/10 text-white border-white/20">
+              Notre portfolio
+            </Badge>
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-tight">
+              Nos <span className="bg-gradient-to-r from-white via-white to-amber-200 bg-clip-text text-transparent">Réalisations</span>
+            </h1>
+            <p className="text-primary-100 text-lg max-w-2xl mx-auto leading-relaxed">
+              Découvrez des projets livrés avec méthode, qualité et sens du
+              résultat à travers la Côte d'Ivoire.
+            </p>
+            <Flex align="center" justify="center" gap="4" className="pt-4">
+              <IconWrapper size="md" variant="ghost" shape="circle" className="bg-white/10 text-white border-white/20">
+                <Shield size={20} />
+              </IconWrapper>
+              <span className="text-primary-200 text-sm font-medium">Projets certifiés</span>
+              <IconWrapper size="md" variant="ghost" shape="circle" className="bg-white/10 text-white border-white/20">
+                <Award size={20} />
+              </IconWrapper>
+              <span className="text-primary-200 text-sm font-medium">Qualité garantie</span>
+              <IconWrapper size="md" variant="ghost" shape="circle" className="bg-white/10 text-white border-white/20">
+                <Sparkles size={20} />
+              </IconWrapper>
+              <span className="text-primary-200 text-sm font-medium">Expertise reconnue</span>
+            </Flex>
+          </Flex>
+        </Container>
       </section>
 
-      {/* Filters */}
-      <section className="py-8 bg-white border-b border-gray-100 sticky top-16 lg:top-20 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-            <div className="flex gap-2 flex-wrap">
+      {/* Filters - Sticky */}
+      <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-sm border-b border-neutral-100">
+        <Container size="xl" className="py-4">
+          <Flex align="center" justify="between" wrap gap="4">
+            <Flex wrap gap="2" className="flex-1">
               {categories.map((cat) => (
-                <button
+                <Button
                   key={cat.id}
+                  variant={activeCategory === cat.id ? "primary" : "outline"}
+                  size="sm"
                   onClick={() => setActiveCategory(cat.id)}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-                    activeCategory === cat.id
-                      ? "bg-blue-700 text-white shadow-sm"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
+                  className="transition-all duration-200"
                 >
                   {cat.label}
-                </button>
+                </Button>
               ))}
-            </div>
-            <div className="relative">
-              <Search
-                size={15}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-              />
-              <input
+            </Flex>
+            <div className="relative w-full sm:w-72">
+              <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+              <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Rechercher par projet, ville ou service..."
-                className="pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-400 w-60 transition"
+                className="pl-10"
+                type="search"
               />
             </div>
-          </div>
-        </div>
-      </section>
+          </Flex>
+        </Container>
+      </div>
 
       {/* Gallery */}
-      <section className="py-16 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="py-16 sm:py-20 lg:py-24 bg-neutral-50">
+        <Container size="xl">
           {loading ? (
-            <div className="text-center py-20">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-700 mx-auto" />
-            </div>
+            <Grid cols={{ base: 1, sm: 2, lg: 3 }} gap="lg">
+              {[1, 2, 3].map((i) => (
+                <Card key={i} variant="default" padding="none" className="overflow-hidden animate-pulse">
+                  <Skeleton variant="rectangular" className="h-52 w-full" />
+                  <CardContent padding="lg">
+                    <Skeleton variant="text" width="3/4" className="mb-3" />
+                    <Skeleton variant="text" width="full" className="mb-2" />
+                    <Skeleton variant="text" width="1/2" />
+                  </CardContent>
+                </Card>
+              ))}
+            </Grid>
           ) : filtered.length === 0 ? (
-            <div className="text-center py-20 text-gray-400">
-              <HardHat size={40} className="mx-auto mb-3 opacity-30" />
-              <p>Aucun projet trouvé</p>
-              <p className="mt-2 text-sm text-gray-500">
-                Essayez une autre ville ou revenez plus tard pour voir nos
-                dernières références.
-              </p>
-            </div>
+            <Flex direction="col" align="center" gap="4" className="py-20 text-center">
+              <IconWrapper size="xl" variant="ghost" shape="circle" className="text-neutral-300">
+                <HardHat size={32} />
+              </IconWrapper>
+              <CardTitle className="text-lg font-semibold text-neutral-900">Aucun projet trouvé</CardTitle>
+              <CardDescription className="max-w-sm text-center">Essayez une autre catégorie ou revenez plus tard pour voir nos dernières références.</CardDescription>
+              <Button variant="outline" size="sm" onClick={() => { setSearch(""); setActiveCategory("all"); }}>
+                Effacer les filtres
+              </Button>
+            </Flex>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filtered.map((r) => {
-                const c = categoryColors[r.category] || categoryColors.btp;
-                const Icon = categoryIcons[r.category] || HardHat;
-                return (
-                  <div
-                    key={r.id}
-                    className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1 group"
-                  >
-                    <div
-                      className={`h-52 bg-gradient-to-br ${c.from} ${c.to} flex items-center justify-center relative overflow-hidden`}
-                    >
-                      <div className="absolute inset-0 bg-black/20" />
-                      <Icon
-                        size={52}
-                        className="text-white/40 relative z-10 group-hover:scale-110 transition-transform duration-300"
-                      />
-                      {r.featured && (
-                        <div className="absolute top-3 left-3 bg-amber-400 text-amber-900 text-xs font-bold px-2.5 py-1 rounded-full z-10">
-                          Projet phare
-                        </div>
-                      )}
-                      <div className={`absolute top-3 right-3 z-10`}>
-                        <span
-                          className={`${c.bg} ${c.text} text-xs font-semibold px-2.5 py-1 rounded-full`}
-                        >
-                          {r.category.toUpperCase()}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="p-5">
-                      <h3 className="font-bold text-gray-900 mb-2 group-hover:text-blue-700 transition-colors">
-                        {r.title}
-                      </h3>
-                      <p className="text-sm text-gray-500 leading-relaxed mb-4 line-clamp-2">
-                        {r.description}
-                      </p>
-                      <div className="flex items-center justify-between text-xs text-gray-400">
-                        <div className="flex items-center gap-1.5">
-                          <MapPin size={12} />
-                          {r.location}
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <Calendar size={12} />
-                          {r.year}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+            <>
+              <Grid cols={{ base: 1, sm: 2, lg: 3 }} gap="lg">
+                {filtered.map((r) => {
+                  const c = getCategoryStyles(r.category);
+                  const Icon = categoryIcons[r.category] || HardHat;
 
-          <div className="text-center mt-10 text-sm text-gray-400">
-            {filtered.length} projet{filtered.length !== 1 ? "s" : ""} affiché
-            {filtered.length !== 1 ? "s" : ""}
-          </div>
-        </div>
+                  return (
+                    <Card
+                      key={r.id}
+                      variant="elevated"
+                      padding="none"
+                      className="overflow-hidden group h-full flex flex-col"
+                    >
+                      <div className="relative h-52 bg-gradient-to-br from-primary-100 to-emerald-100 flex items-center justify-center overflow-hidden">
+                        {r.image_url ? (
+                          <img
+                            src={r.image_url}
+                            alt={r.title}
+                            crossOrigin="anonymous"
+                            className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        ) : (
+                          <Icon size={56} className="text-primary-200 relative z-10 group-hover:scale-110 transition-transform duration-300" />
+                        )}
+                        {r.featured && (
+                          <div className="absolute top-3 left-3 z-10">
+                            <Badge variant="warning" size="sm" className="bg-amber-500/90 text-white">Projet phare</Badge>
+                          </div>
+                        )}
+                        <div className="absolute top-3 right-3 z-10">
+                          <Badge size="sm" variant="primary" className={c.bg + ' ' + c.text}>
+                            {r.category.toUpperCase()}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      <CardContent padding="lg" className="flex-1 flex flex-col">
+                        <Flex align="center" justify="between" className="mb-3">
+                          <CardTitle className="text-lg font-bold text-neutral-900 group-hover:text-primary-600 transition-colors line-clamp-1">{r.title}</CardTitle>
+                        </Flex>
+                        <p className="text-sm text-neutral-500 leading-relaxed mb-4 flex-1 line-clamp-2">{r.description}</p>
+                        <Flex align="center" justify="between" className="text-xs text-neutral-400 pt-2 border-t border-neutral-100">
+                          <Flex align="center" gap="1.5">
+                            <MapPin size={11} />
+                            {r.location}
+                          </Flex>
+                          <Flex align="center" gap="1.5">
+                            <Calendar size={11} />
+                            {r.year}
+                          </Flex>
+                        </Flex>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </Grid>
+
+              <Flex justify="center" className="mt-8">
+                <Badge variant="outline" size="md" className="text-sm">
+                  {filtered.length} projet{filtered.length !== 1 ? "s" : ""} affiché{filtered.length !== 1 ? "s" : ""}
+                </Badge>
+              </Flex>
+            </>
+          )}
+        </Container>
       </section>
     </div>
   );

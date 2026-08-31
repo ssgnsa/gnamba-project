@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { dataService } from "../lib/dbClient.service";
 import type { AuditRecord, AuditQueryRow } from "../components/foncier/FoncierConstants";
 
@@ -6,6 +6,14 @@ import type { AuditRecord, AuditQueryRow } from "../components/foncier/FoncierCo
  * Hook pour la gestion de l'audit foncier
  */
 export function useFoncierAudit() {
+  const [auditModalOpen, setAuditModalOpen] = useState(false);
+  const [auditRecords, setAuditRecords] = useState<any[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditPage, setAuditPage] = useState(1);
+  const [auditTotal, setAuditTotal] = useState(0);
+  const [auditActionFilter, setAuditActionFilter] = useState("");
+  const [auditError, setAuditError] = useState<string | null>(null);
+
   const fetchAudit = useCallback(
     async (
       auditPage: number,
@@ -17,11 +25,11 @@ export function useFoncierAudit() {
         return { data: null, error: "Mode hors-ligne : journal d'audit indisponible.", total: 0 };
       }
 
-      const { data, error, count } = await dataService.getAudit({
-        page: auditPage,
-        pageSize: auditPageSize,
-        actionFilter: auditActionFilter || undefined,
-      }) as { data: any[] | null; error: any; count: number | null };
+      const { data, error, count } = await dataService.getAudit(
+        auditPage,
+        auditPageSize,
+        auditActionFilter || undefined
+      ) as { data: any[] | null; error: any; count: number | null };
 
       if (error) {
         return { data: null, error, total: 0 };
@@ -67,12 +75,29 @@ export function useFoncierAudit() {
         foncier_lots: row.foncier_lots || null,
       }));
 
-      return { data: normalizedRows, error: null, total: count ?? 0 };
+      setAuditRecords(normalizedRows);
+      setAuditTotal(count ?? normalizedRows.length);
+      setAuditError(null);
+      return { data: normalizedRows, error: null, total: count ?? normalizedRows.length };
     },
     [],
   );
 
   return {
+    auditModalOpen,
+    setAuditModalOpen,
+    auditRecords,
+    setAuditRecords,
+    auditLoading,
+    setAuditLoading,
+    auditPage,
+    setAuditPage,
+    auditTotal,
+    setAuditTotal,
+    auditActionFilter,
+    setAuditActionFilter,
+    auditError,
+    setAuditError,
     fetchAudit,
   };
 }

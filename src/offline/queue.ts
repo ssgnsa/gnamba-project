@@ -5,6 +5,8 @@
  * Fiable, ordonné, rejouable.
  */
 
+import { generateUUID } from '../utils/reference';
+
 const QUEUE_KEY = 'egs:offline_queue';
 
 export type QueueActionType =
@@ -48,7 +50,7 @@ export const offlineQueue = {
    */
   enqueue(type: QueueActionType, payload: Record<string, unknown>): QueueItem {
     const item: QueueItem = {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       type,
       payload,
       status: 'pending',

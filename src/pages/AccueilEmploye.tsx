@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useSettings } from "../context/SettingsContext";
-import dbClient from "../data/tableClient";
+import dbClient from '../lib/dbClient.service';
 import { fetchLatestDailyStats } from "../lib/dashboardStats";
 import {
   MessageDirection,
@@ -340,6 +340,12 @@ export default function AccueilEmploye() {
       tone: "secondary",
     },
     {
+      label: "Paramètres",
+      icon: "⚙️",
+      action: () => handleNavigate("parametres"),
+      tone: "secondary",
+    },
+    {
       label: "Finances",
       icon: "💰",
       action: () => handleNavigate("finances"),
@@ -587,6 +593,15 @@ export default function AccueilEmploye() {
                 >
                   <LayoutDashboard size={16} />
                   Tableau de bord
+                </button>
+              )}
+              {isAdmin && (
+                <button
+                  onClick={() => handleNavigate("parametres")}
+                  className="hidden md:flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors text-sm font-medium"
+                >
+                  <Settings size={16} />
+                  Paramètres
                 </button>
               )}
               <div className="hidden md:flex items-center gap-4">

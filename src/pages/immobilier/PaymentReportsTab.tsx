@@ -1,1133 +1,784 @@
 import { useState, useMemo } from "react";
 import {
-  Printer,
-  FileText,
-  Calendar,
+  DollarSign,
+  Percent,
+  Building2,
+  User,
+  Download,
 } from "lucide-react";
-import type { RentPayment, Tenant, Property, LeaseContract } from "../../types";
-import { formatMontant, formatDate } from "../../utils/reference";
-import {
-  getTenantName,
-  getPaymentStatusConfig,
-  getPaymentModeLabel,
-} from "../../lib/immobilier";
+import type { RentPayment, LeaseContract, Property } from "../../types";
+import { useSettings } from "../../context/SettingsContext";
+import { useNotifications } from "../../context/NotificationContext";
+import { formatMontantImmo, getPropertyAddress } from "../../lib/immobilier";
+import Badge from "../../components/ui/Badge";
+
+function getMonthLabel(monthStr: string): string {
+  const [year, month] = monthStr.split("-").map(Number);
+  if (!year || !month) return monthStr;
+  return new Date(year, month - 1).toLocaleDateString("fr-FR", {
+    month: "long",
+    year: "numeric",
+  });
+}
+
+// Get available months from payments
+function getAvailableMonths(payments: RentPayment[]): string[] {
+  const months = new Set<string>();
+  payments.forEach((p) => {
+    if (p.mois_concerne) {
+      months.add(p.mois_concerne);
+    }
+    if (p.mois_concerne_date) {
+      const d = String(p.mois_concerne_date).slice(0, 7);
+      if (d) months.add(d);
+    }
+  });
+  return Array.from(months).sort().reverse();
+}
 
 interface Props {
   payments: RentPayment[];
   contracts: LeaseContract[];
-  tenants: Tenant[];
   properties: Property[];
-  tenantIdColumn: "locataire_id" | "tenant_id";
-  onRefresh: () => void;
-}
-
-type ReportType = "tenant" | "owner" | "property" | "global";
-type DateRange = "month" | "quarter" | "year" | "custom" | "all";
-
-interface ReportConfig {
-  type: ReportType;
-  dateRange: DateRange;
-  startDate?: string;
-  endDate?: string;
-  tenantId?: string;
-  ownerId?: string;
-  propertyId?: string;
 }
 
 export default function PaymentReportsTab({
   payments,
-  tenants,
+  contracts,
   properties,
 }: Props) {
-  const [reportConfig, setReportConfig] = useState<ReportConfig>({
-    type: "tenant",
-    dateRange: "month",
-  });
+  const { settings } = useSettings();
+  const { showToast } = useNotifications();
+  const [selectedMonth, setSelectedMonth] = useState<string>("all");
+  const [viewMode, setViewMode] = useState<"owner" | "company" | "all">("all");
+  const [filterProperty, setFilterProperty] = useState<string>("all");
 
-  const [_showConfigModal, setShowConfigModal] = useState(false);
-  const [generating, setGenerating] = useState(false);
-  const [previewData, setPreviewData] = useState<any>(null);
+  // Get available months
+  const availableMonths = useMemo(() => getAvailableMonths(payments), [payments]);
 
-  // Get unique owners from properties
-  const uniqueOwners = useMemo(() => {
-    const owners = properties
-      .map((p) => p.proprietaire)
-      .filter((v, i, a) => v && v.trim() && a.indexOf(v) === i)
-      .sort();
-    return owners;
-  }, [properties]);
-
-  // Filter payments based on config
-  const getFilteredPayments = (config: ReportConfig) => {
-    let filtered = [...payments];
-
-    // Date filtering
-    if (config.dateRange !== "all") {
-      const now = new Date();
-      let startDate: Date;
-      let endDate: Date;
-
-      switch (config.dateRange) {
-        case "month":
-          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-          endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-          break;
-        case "quarter": {
-          const quarter = Math.floor(now.getMonth() / 3);
-          startDate = new Date(now.getFullYear(), quarter * 3, 1);
-          endDate = new Date(now.getFullYear(), (quarter + 1) * 3, 0);
-          break;
-        }
-        case "year":
-          startDate = new Date(now.getFullYear(), 0, 1);
-          endDate = new Date(now.getFullYear() + 1, 0, 0);
-          break;
-        case "custom":
-          if (config.startDate && config.endDate) {
-            startDate = new Date(config.startDate);
-            endDate = new Date(config.endDate);
-          } else {
-            return filtered;
-          }
-          break;
-        default:
-          return filtered;
+  // Filter payments
+  const filteredPayments = useMemo(() => {
+    return payments.filter((p) => {
+      // Filter by month
+      if (selectedMonth !== "all") {
+        const paymentMonth = p.mois_concerne || String(p.mois_concerne_date || "").slice(0, 7);
+        if (paymentMonth !== selectedMonth) return false;
       }
 
-      filtered = filtered.filter((p) => {
-        const paymentDate = new Date(p.date_paiement || p.date_echeance || "");
-        return paymentDate >= startDate && paymentDate <= endDate;
-      });
-    }
-
-    // Type-specific filtering
-    switch (config.type) {
-      case "tenant":
-        if (config.tenantId) {
-          filtered = filtered.filter((p) => p.locataire_id === config.tenantId);
-        }
-        break;
-      case "owner":
-        if (config.ownerId) {
-          filtered = filtered.filter((p) => {
-            const property = properties.find((prop) => prop.id === p.property_id);
-            return property?.proprietaire === config.ownerId;
-          });
-        }
-        break;
-      case "property":
-        if (config.propertyId) {
-          filtered = filtered.filter((p) => p.property_id === config.propertyId);
-        }
-        break;
-    }
-
-    return filtered.sort((a, b) =>
-      new Date(b.date_paiement || b.date_echeance || "").getTime() -
-      new Date(a.date_paiement || a.date_echeance || "").getTime()
-    );
-  };
-
-  // Generate report data based on type
-  const generateReportData = (config: ReportConfig) => {
-    const filtered = getFilteredPayments(config);
-
-    switch (config.type) {
-      case "tenant":
-        return generateTenantReport(filtered);
-      case "owner":
-        return generateOwnerReport(filtered);
-      case "property":
-        return generatePropertyReport(filtered);
-      case "global":
-        return generateGlobalReport(filtered);
-      default:
-        return [];
-    }
-  };
-
-  // Tenant-specific report
-  const generateTenantReport = (filtered: RentPayment[]) => {
-    const tenantMap = new Map<string, RentPayment[]>();
-    
-    filtered.forEach((payment) => {
-      if (!payment.locataire_id) return;
-      
-      if (!tenantMap.has(payment.locataire_id)) {
-        tenantMap.set(payment.locataire_id, []);
+      // Filter by property (via contract)
+      if (filterProperty !== "all") {
+        const contract = contracts.find((c) => c.id === p.contract_id);
+        if (!contract || contract.property_id !== filterProperty) return false;
       }
-      tenantMap.get(payment.locataire_id)!.push(payment);
+
+      // Only show paid payments for reports
+      return p.statut === "paye";
+    });
+  }, [payments, contracts, selectedMonth, filterProperty]);
+
+  // Group by owner for owner report
+  const ownerReportData = useMemo(() => {
+    const ownerMap = new Map<
+      string,
+      {
+        ownerId: string;
+        ownerName: string;
+        ownerPhone: string;
+        ownerEmail: string;
+        properties: Map<string, { property: Property; payments: RentPayment[]; totalCollected: number; commissionRate: number; enterpriseShare: number; ownerShare: number }>;
+        totalCollected: number;
+        totalEnterpriseShare: number;
+        totalOwnerShare: number;
+      }
+    >();
+
+    filteredPayments.forEach((payment) => {
+      const contract = contracts.find((c) => c.id === payment.contract_id);
+      if (!contract) return;
+
+      const property = properties.find((prop) => prop.id === contract.property_id);
+      if (!property) return;
+
+      const ownerId = property.proprietaire_id || "unknown";
+      const ownerClient = property.proprietaire_client;
+      const ownerName = ownerClient
+        ? `${ownerClient.prenom} ${ownerClient.nom}`
+        : property.proprietaire || "Propriétaire inconnu";
+      const ownerPhone = ownerClient?.telephone || "";
+      const ownerEmail = ownerClient?.email || "";
+
+      const commissionRate = contract.commission_rate || 12;
+      const enterpriseShare = Math.round((payment.montant * commissionRate) / 100);
+      const ownerShare = payment.montant - enterpriseShare;
+
+      if (!ownerMap.has(ownerId)) {
+        ownerMap.set(ownerId, {
+          ownerId,
+          ownerName,
+          ownerPhone,
+          ownerEmail,
+          properties: new Map(),
+          totalCollected: 0,
+          totalEnterpriseShare: 0,
+          totalOwnerShare: 0,
+        });
+      }
+
+      const ownerData = ownerMap.get(ownerId)!;
+      ownerData.totalCollected += payment.montant;
+      ownerData.totalEnterpriseShare += enterpriseShare;
+      ownerData.totalOwnerShare += ownerShare;
+
+      if (!ownerData.properties.has(contract.property_id)) {
+        ownerData.properties.set(contract.property_id, {
+          property,
+          payments: [],
+          totalCollected: 0,
+          commissionRate,
+          enterpriseShare: 0,
+          ownerShare: 0,
+        });
+      }
+
+      const propData = ownerData.properties.get(contract.property_id)!;
+      propData.payments.push(payment);
+      propData.totalCollected += payment.montant;
+      propData.enterpriseShare += enterpriseShare;
+      propData.ownerShare += ownerShare;
     });
 
-    const report = [];
-    
-    for (const [tenantId, tenantPayments] of tenantMap) {
-      const tenant = tenants.find((t) => t.id === tenantId);
-      if (!tenant) continue;
+    // Convert to array and sort by owner name
+    return Array.from(ownerMap.values())
+      .map((owner) => ({
+        ...owner,
+        properties: Array.from(owner.properties.values()).sort(
+          (a, b) => a.property.adresse.localeCompare(b.property.adresse)
+        ),
+      }))
+      .sort((a, b) => a.ownerName.localeCompare(b.ownerName));
+  }, [filteredPayments, contracts, properties]);
 
-      const totalPaid = tenantPayments
-        .filter((p) => p.statut === "paye")
-        .reduce((sum, p) => sum + (p.montant || 0), 0);
-      
-      const totalPending = tenantPayments
-        .filter((p) => p.statut === "en_attente" || p.statut === "retard")
-        .reduce((sum, p) => sum + (p.montant || 0), 0);
+  // Company report data
+  const companyReportData = useMemo(() => {
+    let totalCollected = 0;
+    let totalEnterpriseCommission = 0;
+    let totalOwnerShare = 0;
+    const byProperty = new Map<
+      string,
+      { property: Property; payments: RentPayment[]; totalCollected: number; enterpriseCommission: number; ownerShare: number; commissionRate: number }
+    >();
 
-      report.push({
-        tenant: `${tenant.prenom} ${tenant.nom}`,
-        telephone: tenant.telephone,
-        totalPaid,
-        totalPending,
-        payments: tenantPayments,
-        paymentCount: tenantPayments.length,
-      });
-    }
+    filteredPayments.forEach((payment) => {
+      const contract = contracts.find((c) => c.id === payment.contract_id);
+      if (!contract) return;
 
-    return report.sort((a, b) => a.tenant.localeCompare(b.tenant));
-  };
+      const property = properties.find((prop) => prop.id === contract.property_id);
+      if (!property) return;
 
-  // Owner-specific report
-  const generateOwnerReport = (filtered: RentPayment[]) => {
-    const ownerMap = new Map<string, RentPayment[]>();
-    
-    filtered.forEach((payment) => {
-      const property = properties.find((prop) => prop.id === payment.property_id);
-      const owner = property?.proprietaire || "Non spécifié";
-      
-      if (!ownerMap.has(owner)) {
-        ownerMap.set(owner, []);
+      const commissionRate = contract.commission_rate || 12;
+      const enterpriseShare = Math.round((payment.montant * commissionRate) / 100);
+      const ownerShare = payment.montant - enterpriseShare;
+
+      totalCollected += payment.montant;
+      totalEnterpriseCommission += enterpriseShare;
+      totalOwnerShare += ownerShare;
+
+      if (!byProperty.has(property.id)) {
+        byProperty.set(property.id, {
+          property,
+          payments: [],
+          totalCollected: 0,
+          enterpriseCommission: 0,
+          ownerShare: 0,
+          commissionRate,
+        });
       }
-      ownerMap.get(owner)!.push(payment);
+
+      const propData = byProperty.get(property.id)!;
+      propData.payments.push(payment);
+      propData.totalCollected += payment.montant;
+      propData.enterpriseCommission += enterpriseShare;
+      propData.ownerShare += ownerShare;
     });
-
-    const report = [];
-    
-    for (const [owner, ownerPayments] of ownerMap) {
-      const totalPaid = ownerPayments
-        .filter((p) => p.statut === "paye")
-        .reduce((sum, p) => sum + (p.montant || 0), 0);
-      
-      const totalPending = ownerPayments
-        .filter((p) => p.statut === "en_attente" || p.statut === "retard")
-        .reduce((sum, p) => sum + (p.montant || 0), 0);
-
-      const properties = [...new Set(ownerPayments.map(p => p.property_id))].length;
-
-      report.push({
-        owner,
-        totalPaid,
-        totalPending,
-        properties,
-        payments: ownerPayments,
-        paymentCount: ownerPayments.length,
-      });
-    }
-
-    return report.sort((a, b) => a.owner.localeCompare(b.owner));
-  };
-
-  // Property-specific report
-  const generatePropertyReport = (filtered: RentPayment[]) => {
-    const propertyMap = new Map<string, RentPayment[]>();
-    
-    filtered.forEach((payment) => {
-      if (!payment.property_id) return;
-      
-      if (!propertyMap.has(payment.property_id)) {
-        propertyMap.set(payment.property_id, []);
-      }
-      propertyMap.get(payment.property_id)!.push(payment);
-    });
-
-    const report = [];
-    
-    for (const [propertyId, propertyPayments] of propertyMap) {
-      const property = properties.find((p) => p.id === propertyId);
-      if (!property) continue;
-
-      const totalPaid = propertyPayments
-        .filter((p) => p.statut === "paye")
-        .reduce((sum, p) => sum + (p.montant || 0), 0);
-      
-      const totalPending = propertyPayments
-        .filter((p) => p.statut === "en_attente" || p.statut === "retard")
-        .reduce((sum, p) => sum + (p.montant || 0), 0);
-
-      const tenants = [...new Set(propertyPayments.map(p => p.locataire_id))].length;
-
-      report.push({
-        property: property.adresse,
-        type: property.type_bien,
-        proprietaire: property.proprietaire,
-        totalPaid,
-        totalPending,
-        tenants,
-        payments: propertyPayments,
-        paymentCount: propertyPayments.length,
-      });
-    }
-
-    return report.sort((a, b) => a.property.localeCompare(b.property));
-  };
-
-  // Global summary report
-  const generateGlobalReport = (filtered: RentPayment[]) => {
-    const totalPaid = filtered
-      .filter((p) => p.statut === "paye")
-      .reduce((sum, p) => sum + (p.montant || 0), 0);
-    
-    const totalPending = filtered
-      .filter((p) => p.statut === "en_attente" || p.statut === "retard")
-      .reduce((sum, p) => sum + (p.montant || 0), 0);
-
-    const statusBreakdown = {
-      paye: filtered.filter((p) => p.statut === "paye").length,
-      en_attente: filtered.filter((p) => p.statut === "en_attente").length,
-      retard: filtered.filter((p) => p.statut === "retard").length,
-      partiel: filtered.filter((p) => p.statut === "partiel").length,
-    };
-
-    const modeBreakdown = {
-      virement: filtered.filter((p) => p.mode_paiement === "virement").length,
-      especes: filtered.filter((p) => p.mode_paiement === "especes").length,
-      mobile_money: filtered.filter((p) => p.mode_paiement === "mobile_money").length,
-      cheque: filtered.filter((p) => p.mode_paiement === "cheque").length,
-    };
 
     return {
-      totalPayments: filtered.length,
-      totalPaid,
-      totalPending,
-      statusBreakdown,
-      modeBreakdown,
-      payments: filtered,
+      totalCollected,
+      totalEnterpriseCommission,
+      totalOwnerShare,
+      byProperty: Array.from(byProperty.values()).sort((a, b) =>
+        a.property.adresse.localeCompare(b.property.adresse)
+      ),
     };
-  };
+  }, [filteredPayments, contracts, properties]);
 
-  // Handle report generation
-  const handleGenerateReport = async () => {
-    setGenerating(true);
-    try {
-      const data = generateReportData(reportConfig);
-      setPreviewData(data);
-      setShowConfigModal(false);
-    } catch (error) {
-      console.error("Error generating report:", error);
-    } finally {
-      setGenerating(false);
-    }
-  };
+  const handleExport = (type: "owner" | "company") => {
+    let csvContent = "";
+    const monthLabel = selectedMonth === "all" ? "Tous les mois" : getMonthLabel(selectedMonth);
+    const dateStr = new Date().toLocaleDateString("fr-FR");
 
-  // Print report
-  const handlePrintReport = () => {
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
-
-    const reportHTML = generateReportHTML(previewData, reportConfig.type);
-    printWindow.document.write(reportHTML);
-    printWindow.document.close();
-    printWindow.print();
-  };
-
-  // Generate HTML for printing
-  const generateReportHTML = (data: any[], type: ReportType) => {
-    const dateRangeText = getDateRangeText(reportConfig);
-    
-    let content = "";
-    
-    switch (type) {
-      case "tenant":
-        content = generateTenantHTML(data, dateRangeText);
-        break;
-      case "owner":
-        content = generateOwnerHTML(data, dateRangeText);
-        break;
-      case "property":
-        content = generatePropertyHTML(data, dateRangeText);
-        break;
-      case "global":
-        content = generateGlobalHTML(data, dateRangeText);
-        break;
-    }
-
-    return `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Rapport de Paiements</title>
-          <style>
-            ${getPrintStyles()}
-          </style>
-        </head>
-        <body>
-          ${content}
-        </body>
-      </html>
-    `;
-  };
-
-  // HTML generators for each report type
-  const generateTenantHTML = (data: any[], dateRangeText: string) => {
-    return `
-      <div className="report-header">
-        <h1>Relevé de Paiements par Locataire</h1>
-        <p className="date-range">${dateRangeText}</p>
-        <p className="generated-date">Généré le: ${formatDate(new Date().toISOString())}</p>
-      </div>
+    if (type === "owner") {
+      csvContent = `Rapport Propriétaires - ${monthLabel} - ${dateStr}\n\n`;
+      csvContent += "Propriétaire,Contact,Propriété,Adresse,Type Bien,Commission,Total Encaissé,Part Entreprise,Part Propriétaire\n";
       
-      <div className="summary">
-        <p><strong>Total locataires:</strong> ${data.length}</p>
-        <p><strong>Total encaissé:</strong> ${formatMontant(data.reduce((sum, t) => sum + t.totalPaid, 0))} FCFA</p>
-        <p><strong>Total en attente:</strong> ${formatMontant(data.reduce((sum, t) => sum + t.totalPending, 0))} FCFA</p>
-      </div>
-
-      ${data.map(tenant => `
-        <div className="report-section">
-          <h2>${tenant.tenant}</h2>
-          ${tenant.telephone ? `<p><strong>Téléphone:</strong> ${tenant.telephone}</p>` : ""}
-          
-          <div className="summary-box">
-            <div className="summary-item">
-              <span className="label">Total Payé:</span>
-              <span className="value paid">${formatMontant(tenant.totalPaid)} FCFA</span>
-            </div>
-            <div className="summary-item">
-              <span className="label">En Attente:</span>
-              <span className="value pending">${formatMontant(tenant.totalPending)} FCFA</span>
-            </div>
-            <div className="summary-item">
-              <span className="label">Nb Paiements:</span>
-              <span className="value">${tenant.paymentCount}</span>
-            </div>
-          </div>
-
-          <table className="payment-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Mois</th>
-                <th>Montant</th>
-                <th>Statut</th>
-                <th>Mode</th>
-                <th>Référence</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${tenant.payments.map((payment: RentPayment) => `
-                <tr>
-                  <td>${formatDate(payment.date_paiement)}</td>
-                  <td>${payment.mois_concerne}</td>
-                  <td className="amount">${formatMontant(payment.montant)} FCFA</td>
-                  <td>${getPaymentStatusConfig(payment.statut).label}</td>
-                  <td>${getPaymentModeLabel(payment.mode_paiement)}</td>
-                  <td>${payment.reference}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-      `).join('')}
-    `;
-  };
-
-  const generateOwnerHTML = (data: any[], dateRangeText: string) => {
-    return `
-      <div className="report-header">
-        <h1>Relevé de Paiements par Propriétaire</h1>
-        <p className="date-range">${dateRangeText}</p>
-        <p className="generated-date">Généré le: ${formatDate(new Date().toISOString())}</p>
-      </div>
+      ownerReportData.forEach((owner) => {
+        owner.properties.forEach((prop) => {
+          csvContent += `"${owner.ownerName}","${owner.ownerPhone} ${owner.ownerEmail}","${prop.property.adresse}","${getPropertyAddress(prop.property)}","${prop.property.type_bien}",${prop.commissionRate}%,${formatMontantImmo(prop.totalCollected)},${formatMontantImmo(prop.enterpriseShare)},${formatMontantImmo(prop.ownerShare)}\n`;
+        });
+        csvContent += `TOTAL ${owner.ownerName},,,,,,,${formatMontantImmo(owner.totalCollected)},${formatMontantImmo(owner.totalEnterpriseShare)},${formatMontantImmo(owner.totalOwnerShare)}\n`;
+      });
       
-      <div className="summary">
-        <p><strong>Total propriétaires:</strong> ${data.length}</p>
-        <p><strong>Total encaissé:</strong> ${formatMontant(data.reduce((sum, o) => sum + o.totalPaid, 0))} FCFA</p>
-        <p><strong>Total en attente:</strong> ${formatMontant(data.reduce((sum, o) => sum + o.totalPending, 0))} FCFA</p>
-      </div>
-
-      ${data.map(owner => `
-        <div className="report-section">
-          <h2>${owner.owner}</h2>
-          
-          <div className="summary-box">
-            <div className="summary-item">
-              <span className="label">Total Payé:</span>
-              <span className="value paid">${formatMontant(owner.totalPaid)} FCFA</span>
-            </div>
-            <div className="summary-item">
-              <span className="label">En Attente:</span>
-              <span className="value pending">${formatMontant(owner.totalPending)} FCFA</span>
-            </div>
-            <div className="summary-item">
-              <span className="label">Nb Biens:</span>
-              <span className="value">${owner.properties}</span>
-            </div>
-            <div className="summary-item">
-              <span className="label">Nb Paiements:</span>
-              <span className="value">${owner.paymentCount}</span>
-            </div>
-          </div>
-
-          <table className="payment-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Locataire</th>
-                <th>Bien</th>
-                <th>Montant</th>
-                <th>Statut</th>
-                <th>Mode</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${owner.payments.map((payment: RentPayment) => {
-                const tenant = tenants.find(t => t.id === payment.locataire_id);
-                const property = properties.find(p => p.id === payment.property_id);
-                return `
-                  <tr>
-                    <td>${formatDate(payment.date_paiement)}</td>
-                    <td>${getTenantName(tenant)}</td>
-                    <td>${property?.adresse || "N/A"}</td>
-                    <td className="amount">${formatMontant(payment.montant)} FCFA</td>
-                    <td>${getPaymentStatusConfig(payment.statut).label}</td>
-                    <td>${getPaymentModeLabel(payment.mode_paiement)}</td>
-                  </tr>
-                `;
-              }).join('')}
-            </tbody>
-          </table>
-        </div>
-      `).join('')}
-    `;
-  };
-
-  const generatePropertyHTML = (data: any[], dateRangeText: string) => {
-    return `
-      <div className="report-header">
-        <h1>Relevé de Paiements par Bien Immobilier</h1>
-        <p className="date-range">${dateRangeText}</p>
-        <p className="generated-date">Généré le: ${formatDate(new Date().toISOString())}</p>
-      </div>
+      const gTotalCollected = ownerReportData.reduce((sum, o) => sum + o.totalCollected, 0);
+      const gTotalEnterprise = ownerReportData.reduce((sum, o) => sum + o.totalEnterpriseShare, 0);
+      const gTotalOwner = ownerReportData.reduce((sum, o) => sum + o.totalOwnerShare, 0);
+      csvContent += `TOTAL GÉNÉRAL,,,,,,,,${formatMontantImmo(gTotalCollected)},${formatMontantImmo(gTotalEnterprise)},${formatMontantImmo(gTotalOwner)}\n`;
+    } else {
+      csvContent = `Rapport Entreprise - ${monthLabel} - ${dateStr}\n\n`;
+      csvContent += "Propriété,Adresse,Type Bien,Commission,Total Encaissé,Commission Entreprise (Part),Part Propriétaire\n";
       
-      <div className="summary">
-        <p><strong>Total biens:</strong> ${data.length}</p>
-        <p><strong>Total encaissé:</strong> ${formatMontant(data.reduce((sum, p) => sum + p.totalPaid, 0))} FCFA</p>
-        <p><strong>Total en attente:</strong> ${formatMontant(data.reduce((sum, p) => sum + p.totalPending, 0))} FCFA</p>
-      </div>
-
-      ${data.map(property => `
-        <div className="report-section">
-          <h2>${property.property}</h2>
-          <p><strong>Type:</strong> ${property.type}</p>
-          <p><strong>Propriétaire:</strong> ${property.proprietaire || "N/A"}</p>
-          
-          <div className="summary-box">
-            <div className="summary-item">
-              <span className="label">Total Payé:</span>
-              <span className="value paid">${formatMontant(property.totalPaid)} FCFA</span>
-            </div>
-            <div className="summary-item">
-              <span className="label">En Attente:</span>
-              <span className="value pending">${formatMontant(property.totalPending)} FCFA</span>
-            </div>
-            <div className="summary-item">
-              <span className="label">Nb Locataires:</span>
-              <span className="value">${property.tenants}</span>
-            </div>
-            <div className="summary-item">
-              <span className="label">Nb Paiements:</span>
-              <span className="value">${property.paymentCount}</span>
-            </div>
-          </div>
-
-          <table className="payment-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Locataire</th>
-                <th>Mois</th>
-                <th>Montant</th>
-                <th>Statut</th>
-                <th>Mode</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${property.payments.map((payment: RentPayment) => {
-                const tenant = tenants.find(t => t.id === payment.locataire_id);
-                return `
-                  <tr>
-                    <td>${formatDate(payment.date_paiement)}</td>
-                    <td>${getTenantName(tenant)}</td>
-                    <td>${payment.mois_concerne}</td>
-                    <td className="amount">${formatMontant(payment.montant)} FCFA</td>
-                    <td>${getPaymentStatusConfig(payment.statut).label}</td>
-                    <td>${getPaymentModeLabel(payment.mode_paiement)}</td>
-                  </tr>
-                `;
-              }).join('')}
-            </tbody>
-          </table>
-        </div>
-      `).join('')}
-    `;
-  };
-
-  const generateGlobalHTML = (data: any, dateRangeText: string) => {
-    return `
-      <div className="report-header">
-        <h1>Rapport Global des Paiements</h1>
-        <p className="date-range">${dateRangeText}</p>
-        <p className="generated-date">Généré le: ${formatDate(new Date().toISOString())}</p>
-      </div>
+      companyReportData.byProperty.forEach((prop) => {
+        const contract = contracts.find((c) => c.property_id === prop.property.id);
+        const commissionRate = contract?.commission_rate || 12;
+        csvContent += `"${prop.property.adresse}","${getPropertyAddress(prop.property)}","${prop.property.type_bien}",${commissionRate}%,${formatMontantImmo(prop.totalCollected)},${formatMontantImmo(prop.enterpriseCommission)},${formatMontantImmo(prop.ownerShare)}\n`;
+      });
       
-      <div className="summary">
-        <div className="summary-grid">
-          <div className="summary-item">
-            <span className="label">Total Paiements:</span>
-            <span className="value">${data.totalPayments}</span>
-          </div>
-          <div className="summary-item">
-            <span className="label">Total Encaissé:</span>
-            <span className="value paid">${formatMontant(data.totalPaid)} FCFA</span>
-          </div>
-          <div className="summary-item">
-            <span className="label">Total En Attente:</span>
-            <span className="value pending">${formatMontant(data.totalPending)} FCFA</span>
-          </div>
-        </div>
+      csvContent += `TOTAL GÉNÉRAL,,,,${formatMontantImmo(companyReportData.totalCollected)},${formatMontantImmo(companyReportData.totalEnterpriseCommission)},${formatMontantImmo(companyReportData.totalOwnerShare)}\n`;
+    }
 
-        <div className="breakdown-section">
-          <h3>Répartition par Statut</h3>
-          <div className="breakdown-grid">
-            ${Object.entries(data.statusBreakdown).map(([status, count]) => `
-              <div className="breakdown-item">
-                <span className="status-label">${getPaymentStatusConfig(status as any).label}:</span>
-                <span className="status-count">${count}</span>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-
-        <div className="breakdown-section">
-          <h3>Répartition par Mode de Paiement</h3>
-          <div className="breakdown-grid">
-            ${Object.entries(data.modeBreakdown).map(([mode, count]) => `
-              <div className="breakdown-item">
-                <span className="mode-label">${getPaymentModeLabel(mode as any)}:</span>
-                <span className="mode-count">${count}</span>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-      </div>
-    `;
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const filename = `rapport-${type}-${selectedMonth === "all" ? "all" : selectedMonth}-${dateStr.replace(/\//g, "-")}.csv`;
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    
+    showToast("success", "Export réussi", `Rapport ${type === "owner" ? "propriétaires" : "entreprise"} exporté`);
   };
 
-  // Helper functions
-  const getDateRangeText = (config: ReportConfig) => {
-    const now = new Date();
-    
-    switch (config.dateRange) {
-      case "month":
-        return `Mois de ${now.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}`;
-      case "quarter": {
-        const quarter = Math.floor(now.getMonth() / 3) + 1;
-        return `Trimestre ${quarter} - ${now.getFullYear()}`;
-      }
-      case "year":
-        return `Année ${now.getFullYear()}`;
-      case "custom":
-        if (config.startDate && config.endDate) {
-          return `Du ${formatDate(config.startDate)} au ${formatDate(config.endDate)}`;
-        }
-        return "Période personnalisée";
-      default:
-        return "Toute la période";
-    }
-  };
-
-  const getPrintStyles = () => `
-    @page {
-      margin: 1cm;
-      size: A4;
-    }
-    
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      font-size: 12px;
-      line-height: 1.4;
-      color: #333;
-    }
-    
-    .report-header {
-      text-align: center;
-      margin-bottom: 30px;
-      border-bottom: 2px solid #ddd;
-      padding-bottom: 20px;
-    }
-    
-    .report-header h1 {
-      margin: 0 0 10px 0;
-      font-size: 24px;
-      color: #2c3e50;
-    }
-    
-    .date-range {
-      font-size: 14px;
-      font-weight: bold;
-      color: #666;
-    }
-    
-    .generated-date {
-      font-size: 12px;
-      color: #999;
-      margin-top: 5px;
-    }
-    
-    .summary {
-      background: #f8f9fa;
-      padding: 20px;
-      border-radius: 8px;
-      margin-bottom: 30px;
-    }
-    
-    .summary p {
-      margin: 5px 0;
-    }
-    
-    .summary-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 15px;
-      margin-bottom: 20px;
-    }
-    
-    .summary-box {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 10px;
-      margin: 20px 0;
-      padding: 15px;
-      background: #f1f3f4;
-      border-radius: 6px;
-    }
-    
-    .summary-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    
-    .label {
-      font-weight: 600;
-      color: #555;
-    }
-    
-    .value {
-      font-weight: bold;
-    }
-    
-    .value.paid {
-      color: #27ae60;
-    }
-    
-    .value.pending {
-      color: #f39c12;
-    }
-    
-    .report-section {
-      margin-bottom: 40px;
-      page-break-inside: avoid;
-    }
-    
-    .report-section h2 {
-      color: #2c3e50;
-      border-bottom: 1px solid #ddd;
-      padding-bottom: 8px;
-      margin-bottom: 15px;
-    }
-    
-    .payment-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 15px;
-    }
-    
-    .payment-table th,
-    .payment-table td {
-      border: 1px solid #ddd;
-      padding: 8px;
-      text-align: left;
-    }
-    
-    .payment-table th {
-      background: #f8f9fa;
-      font-weight: 600;
-      color: #2c3e50;
-    }
-    
-    .payment-table tr:nth-child(even) {
-      background: #f9f9f9;
-    }
-    
-    .amount {
-      font-weight: bold;
-      text-align: right;
-    }
-    
-    .breakdown-section {
-      margin: 20px 0;
-    }
-    
-    .breakdown-section h3 {
-      color: #2c3e50;
-      margin-bottom: 10px;
-    }
-    
-    .breakdown-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 10px;
-    }
-    
-    .breakdown-item {
-      display: flex;
-      justify-content: space-between;
-      padding: 8px 12px;
-      background: #f8f9fa;
-      border-radius: 4px;
-      border-left: 4px solid #3498db;
-    }
-    
-    .status-label, .mode-label {
-      font-weight: 500;
-    }
-    
-    .status-count, .mode-count {
-      font-weight: bold;
-      color: #2c3e50;
-    }
-    
-    @media print {
-      .report-section {
-        page-break-inside: avoid;
-      }
-      
-      .payment-table {
-        page-break-inside: avoid;
-      }
-    }
-  `;
+  const monthLabel = selectedMonth === "all" ? "Tous les mois" : getMonthLabel(selectedMonth);
 
   return (
-    <div className="space-y-4">
-      {/* Report Configuration */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <FileText size={20} className="text-blue-600" />
-          <h2 className="text-xl font-semibold text-gray-800">
-            Rapports de Paiements
-          </h2>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Report Type */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Type de Rapport
-            </label>
+    <div className="space-y-6">
+      {/* Filters */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+        <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-sm font-medium text-gray-600">Période :</span>
             <select
-              value={reportConfig.type}
-              onChange={(e) => setReportConfig({
-                ...reportConfig,
-                type: e.target.value as ReportType,
-              })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="w-auto px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
             >
-              <option value="tenant">Par Locataire</option>
-              <option value="owner">Par Propriétaire</option>
-              <option value="property">Par Bien Immobilier</option>
-              <option value="global">Global</option>
+              <option value="all">Tous les mois</option>
+              {availableMonths.map((m) => (
+                <option key={m} value={m}>
+                  {getMonthLabel(m)}
+                </option>
+              ))}
+            </select>
+          </div>
+          
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-sm font-medium text-gray-600">Vue :</span>
+            <div className="flex bg-gray-100 rounded-lg p-1">
+              {(["all", "owner", "company"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                    viewMode === mode
+                      ? "bg-white text-blue-600 shadow-sm"
+                      : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  {mode === "all" ? "Tout" : mode === "owner" ? "Propriétaires" : "Entreprise"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-sm font-medium text-gray-600">Propriété :</span>
+            <select
+              value={filterProperty}
+              onChange={(e) => setFilterProperty(e.target.value)}
+              className="w-auto px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+            >
+              <option value="all">Toutes les propriétés</option>
+              {properties
+                .filter((p) => p.statut === "loue")
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.adresse}
+                  </option>
+                ))}
             </select>
           </div>
 
-          {/* Date Range */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Période
-            </label>
-            <select
-              value={reportConfig.dateRange}
-              onChange={(e) => setReportConfig({
-                ...reportConfig,
-                dateRange: e.target.value as DateRange,
-              })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="month">Ce Mois</option>
-              <option value="quarter">Ce Trimestre</option>
-              <option value="year">Cette Année</option>
-              <option value="custom">Personnalisé</option>
-            </select>
-          </div>
-
-          {/* Custom Date Range */}
-          {reportConfig.dateRange === "custom" && (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Date Début
-                </label>
-                <input
-                  type="date"
-                  value={reportConfig.startDate || ""}
-                  onChange={(e) => setReportConfig({
-                    ...reportConfig,
-                    startDate: e.target.value,
-                  })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Date Fin
-                </label>
-                <input
-                  type="date"
-                  value={reportConfig.endDate || ""}
-                  onChange={(e) => setReportConfig({
-                    ...reportConfig,
-                    endDate: e.target.value,
-                  })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </>
-          )}
-
-          {/* Specific Filters */}
-          {reportConfig.type === "tenant" && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Locataire
-              </label>
-              <select
-                value={reportConfig.tenantId || ""}
-                onChange={(e) => setReportConfig({
-                  ...reportConfig,
-                  tenantId: e.target.value,
-                })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          <div className="flex items-center gap-2 ml-auto">
+            {viewMode === "owner" && (
+              <button
+                onClick={() => handleExport("owner")}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-white text-sm font-medium hover:opacity-90"
+                style={{
+                  backgroundColor: settings.primary_color,
+                  color: "var(--color-on-primary)",
+                }}
               >
-                <option value="">Tous les locataires</option>
-                {tenants.map((tenant) => (
-                  <option key={tenant.id} value={tenant.id}>
-                    {tenant.prenom} {tenant.nom}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {reportConfig.type === "owner" && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Propriétaire
-              </label>
-              <select
-                value={reportConfig.ownerId || ""}
-                onChange={(e) => setReportConfig({
-                  ...reportConfig,
-                  ownerId: e.target.value,
-                })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Tous les propriétaires</option>
-                {uniqueOwners.map((owner) => (
-                  <option key={owner} value={owner || ""}>
-                    {owner || "Non spécifié"}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {reportConfig.type === "property" && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Bien Immobilier
-              </label>
-              <select
-                value={reportConfig.propertyId || ""}
-                onChange={(e) => setReportConfig({
-                  ...reportConfig,
-                  propertyId: e.target.value,
-                })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Tous les biens</option>
-                {properties.map((property) => (
-                  <option key={property.id} value={property.id}>
-                    {property.adresse}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center gap-3 mt-6">
-          <button
-            onClick={handleGenerateReport}
-            disabled={generating}
-            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {generating ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                Génération...
-              </>
-            ) : (
-              <>
-                <FileText size={16} />
-                Générer le Rapport
-              </>
+                <Download size={16} /> Export Propriétaires
+              </button>
             )}
-          </button>
-
-          {previewData.length > 0 && (
-            <button
-              onClick={handlePrintReport}
-              className="flex items-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-            >
-              <Printer size={16} />
-              Imprimer
-            </button>
-          )}
+            {viewMode === "company" && (
+              <button
+                onClick={() => handleExport("company")}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-white text-sm font-medium hover:opacity-90"
+                style={{
+                  backgroundColor: settings.primary_color,
+                  color: "var(--color-on-primary)",
+                }}
+              >
+                <Download size={16} /> Export Entreprise
+              </button>
+            )}
+            {viewMode === "all" && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleExport("owner")}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-white text-sm font-medium hover:opacity-90"
+                  style={{
+                    backgroundColor: settings.primary_color,
+                    color: "var(--color-on-primary)",
+                  }}
+                >
+                  <Download size={16} /> Propriétaires
+                </button>
+                <button
+                  onClick={() => handleExport("company")}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-white text-sm font-medium hover:opacity-90"
+                  style={{
+                    backgroundColor: "#6b7280",
+                    color: "white",
+                  }}
+                >
+                  <Download size={16} /> Entreprise
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Preview */}
-      {previewData.length > 0 && (
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-800">
-              Aperçu du Rapport
-            </h3>
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <Calendar size={14} />
-              {getDateRangeText(reportConfig)}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-500">Total Encaissé ({monthLabel})</p>
+              <p className="text-3xl font-bold text-gray-900 mt-1">
+                {formatMontantImmo(
+                  (viewMode === "owner"
+                    ? ownerReportData.reduce((s, o) => s + o.totalCollected, 0)
+                    : viewMode === "company"
+                    ? companyReportData.totalCollected
+                    : filteredPayments.reduce((s, p) => s + p.montant, 0)
+                ))} FCFA
+              </p>
+            </div>
+            <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
+              <DollarSign size={24} className="text-green-600" />
             </div>
           </div>
+        </div>
 
-          {/* Preview content based on report type */}
-          {reportConfig.type === "tenant" && (
-            <div className="space-y-4">
-              {previewData.slice(0, 3).map((tenant: any, index: number) => (
-                <div key={index} className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-medium text-gray-800">{tenant.tenant}</h4>
-                    <div className="text-right">
-                      <p className="text-sm text-green-600">
-                        Payé: {formatMontant(tenant.totalPaid)} FCFA
-                      </p>
-                      <p className="text-sm text-amber-600">
-                        En attente: {formatMontant(tenant.totalPending)} FCFA
-                      </p>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-500">
+                Part Entreprise (Commission {contracts[0]?.commission_rate || 12}%)
+              </p>
+              <p className="text-3xl font-bold text-blue-600 mt-1">
+                {formatMontantImmo(
+                  viewMode === "owner"
+                    ? ownerReportData.reduce((s, o) => s + o.totalEnterpriseShare, 0)
+                    : viewMode === "company"
+                    ? companyReportData.totalEnterpriseCommission
+                    : filteredPayments.reduce((s, p) => {
+                        const c = contracts.find((con) => con.id === p.contract_id);
+                        const rate = c?.commission_rate || 12;
+                        return s + Math.round((p.montant * rate) / 100);
+                      }, 0)
+                )} FCFA
+              </p>
+            </div>
+            <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
+              <Building2 size={24} className="text-blue-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-500">Part Propriétaires</p>
+              <p className="text-3xl font-bold text-green-600 mt-1">
+                {formatMontantImmo(
+                  viewMode === "owner"
+                    ? ownerReportData.reduce((s, o) => s + o.totalOwnerShare, 0)
+                    : viewMode === "company"
+                    ? companyReportData.totalOwnerShare
+                    : filteredPayments.reduce((s, p) => {
+                        const c = contracts.find((con) => con.id === p.contract_id);
+                        const rate = c?.commission_rate || 12;
+                        return s + p.montant - Math.round((p.montant * rate) / 100);
+                      }, 0)
+                )} FCFA
+              </p>
+            </div>
+            <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center">
+              <User size={24} className="text-amber-600" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Reports Content */}
+      {viewMode === "owner" && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          {ownerReportData.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+              <User size={48} className="mb-3 opacity-30" />
+              <p className="text-lg font-medium">Aucun rapport propriétaire</p>
+              <p className="text-sm">Aucun paiement encaissé pour {monthLabel}</p>
+            </div>
+          ) : (
+            <div className="p-6 space-y-6">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <User size={20} className="text-blue-600" />
+                Rapport par Propriétaire
+              </h3>
+              {ownerReportData.map((owner) => (
+                <div
+                  key={owner.ownerId}
+                  className="border border-gray-200 rounded-xl overflow-hidden"
+                >
+                  {/* Owner Header */}
+                  <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+                          <User size={20} className="text-blue-600" />
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-gray-900 text-lg">
+                            {owner.ownerName}
+                          </h4>
+                          <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
+                            {owner.ownerPhone && (
+                              <span className="flex items-center gap-1">
+                                <span className="w-4 h-4"></span>{owner.ownerPhone}
+                              </span>
+                            )}
+                            {owner.ownerEmail && (
+                              <span className="flex items-center gap-1">
+                                <span className="w-4 h-4"></span>{owner.ownerEmail}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-6 text-sm">
+                        <div className="text-center">
+                          <p className="text-2xl font-bold text-green-600">
+                            {formatMontantImmo(owner.totalCollected)} FCFA
+                          </p>
+                          <p className="text-xs text-gray-500">Total Encaissé</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xl font-bold text-blue-600">
+                            {formatMontantImmo(owner.totalEnterpriseShare)} FCFA
+                          </p>
+                          <p className="text-xs text-gray-500">Part Entreprise</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xl font-bold text-amber-600">
+                            {formatMontantImmo(owner.totalOwnerShare)} FCFA
+                          </p>
+                          <p className="text-xs text-gray-500">Part Propriétaire</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <p className="text-sm text-gray-500">
-                    {tenant.paymentCount} paiement{tenant.paymentCount > 1 ? "s" : ""}
-                  </p>
-                </div>
-              ))}
-              {previewData.length > 3 && (
-                <p className="text-center text-sm text-gray-500">
-                  ... et {previewData.length - 3} autres
-                </p>
-              )}
-            </div>
-          )}
 
-          {reportConfig.type === "owner" && (
-            <div className="space-y-4">
-              {previewData.slice(0, 3).map((owner: any, index: number) => (
-                <div key={index} className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-medium text-gray-800">{owner.owner}</h4>
-                    <div className="text-right">
-                      <p className="text-sm text-green-600">
-                        Payé: {formatMontant(owner.totalPaid)} FCFA
-                      </p>
-                      <p className="text-sm text-amber-600">
-                        En attente: {formatMontant(owner.totalPending)} FCFA
-                      </p>
-                    </div>
+                  {/* Properties for this owner */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-100">
+                          <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
+                            Propriété
+                          </th>
+                          <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase hidden md:table-cell">
+                            Adresse complète
+                          </th>
+                          <th className="text-center px-6 py-3 text-xs font-semibold text-gray-500 uppercase hidden sm:table-cell">
+                            Type
+                          </th>
+                          <th className="text-center px-6 py-3 text-xs font-semibold text-gray-500 uppercase hidden sm:table-cell">
+                            Commission
+                          </th>
+                          <th className="text-right px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
+                            Encaissé
+                          </th>
+                          <th className="text-right px-6 py-3 text-xs font-semibold text-gray-500 uppercase hidden md:table-cell">
+                            Part Entreprise
+                          </th>
+                          <th className="text-right px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
+                            Part Propriétaire
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {owner.properties.map((prop) => (
+                          <tr
+                            key={prop.property.id}
+                            className="hover:bg-gray-50 transition-colors"
+                          >
+                            <td className="px-6 py-4">
+                              <span className="font-medium text-gray-800">
+                                {prop.property.adresse}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 hidden md:table-cell">
+                              <span className="text-gray-500">
+                                {getPropertyAddress(prop.property)}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-center hidden sm:table-cell">
+                              <Badge
+                                label={prop.property.type_bien}
+                                color="blue"
+                              />
+                            </td>
+                            <td className="px-6 py-4 text-center hidden sm:table-cell">
+                              <span className="inline-flex items-center gap-1 text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">
+                                <Percent size={10} /> {prop.commissionRate}%
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-right font-semibold text-green-600">
+                              {formatMontantImmo(prop.totalCollected)} FCFA
+                            </td>
+                            <td className="px-6 py-4 text-right hidden md:table-cell font-medium text-blue-700">
+                              {formatMontantImmo(prop.enterpriseShare)} FCFA
+                            </td>
+                            <td className="px-6 py-4 text-right font-semibold text-amber-600">
+                              {formatMontantImmo(prop.ownerShare)} FCFA
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                  <p className="text-sm text-gray-500">
-                    {owner.properties} bien{owner.properties > 1 ? "s" : ""} • {owner.paymentCount} paiement{owner.paymentCount > 1 ? "s" : ""}
-                  </p>
                 </div>
               ))}
-              {previewData.length > 3 && (
-                <p className="text-center text-sm text-gray-500">
-                  ... et {previewData.length - 3} autres
-                </p>
-              )}
             </div>
           )}
+        </div>
+      )}
 
-          {reportConfig.type === "property" && (
-            <div className="space-y-4">
-              {previewData.slice(0, 3).map((property: any, index: number) => (
-                <div key={index} className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-medium text-gray-800">{property.property}</h4>
-                    <div className="text-right">
-                      <p className="text-sm text-green-600">
-                        Payé: {formatMontant(property.totalPaid)} FCFA
-                      </p>
-                      <p className="text-sm text-amber-600">
-                        En attente: {formatMontant(property.totalPending)} FCFA
-                      </p>
-                    </div>
-                  </div>
-                  <p className="text-sm text-gray-500">
-                    {property.type} • {property.tenants} locataire{property.tenants > 1 ? "s" : ""} • {property.paymentCount} paiement{property.paymentCount > 1 ? "s" : ""}
-                  </p>
-                </div>
-              ))}
-              {previewData.length > 3 && (
-                <p className="text-center text-sm text-gray-500">
-                  ... et {previewData.length - 3} autres
-                </p>
-              )}
+      {viewMode === "company" && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          {companyReportData.byProperty.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+              <Building2 size={48} className="mb-3 opacity-30" />
+              <p className="text-lg font-medium">Aucun rapport entreprise</p>
+              <p className="text-sm">Aucun paiement encaissé pour {monthLabel}</p>
             </div>
-          )}
+          ) : (
+            <div className="p-6 space-y-6">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <Building2 size={20} className="text-green-600" />
+                Rapport Entreprise (Commissions)
+              </h3>
 
-          {reportConfig.type === "global" && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-blue-50 rounded-lg p-4 text-center">
-                <p className="text-sm text-gray-600 mb-1">Total Paiements</p>
-                <p className="text-2xl font-bold text-blue-600">
-                  {previewData.totalPayments}
-                </p>
-              </div>
-              <div className="bg-green-50 rounded-lg p-4 text-center">
-                <p className="text-sm text-gray-600 mb-1">Total Encaissé</p>
-                <p className="text-2xl font-bold text-green-600">
-                  {formatMontant(previewData.totalPaid)} FCFA
-                </p>
-              </div>
-              <div className="bg-amber-50 rounded-lg p-4 text-center">
-                <p className="text-sm text-gray-600 mb-1">Total En Attente</p>
-                <p className="text-2xl font-bold text-amber-600">
-                  {formatMontant(previewData.totalPending)} FCFA
-                </p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-100">
+                      <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
+                        Propriété
+                      </th>
+                      <th className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase hidden md:table-cell">
+                        Adresse
+                      </th>
+                      <th className="text-center px-6 py-3 text-xs font-semibold text-gray-500 uppercase hidden sm:table-cell">
+                        Type
+                      </th>
+                      <th className="text-center px-6 py-3 text-xs font-semibold text-gray-500 uppercase hidden sm:table-cell">
+                        Commission
+                      </th>
+                      <th className="text-right px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
+                        Total Encaissé
+                      </th>
+                      <th className="text-right px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
+                        Commission Entreprise
+                      </th>
+                      <th className="text-right px-6 py-3 text-xs font-semibold text-gray-500 uppercase">
+                        Part Propriétaire
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {companyReportData.byProperty.map((prop) => (
+                      <tr
+                        key={prop.property.id}
+                        className="hover:bg-gray-50 transition-colors"
+                      >
+                        <td className="px-6 py-4">
+                          <span className="font-medium text-gray-800">
+                            {prop.property.adresse}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 hidden md:table-cell">
+                          <span className="text-gray-500">
+                            {getPropertyAddress(prop.property)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-center hidden sm:table-cell">
+                          <Badge
+                            label={prop.property.type_bien}
+                            color="green"
+                          />
+                        </td>
+                        <td className="px-6 py-4 text-center hidden sm:table-cell">
+                          <span className="inline-flex items-center gap-1 text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">
+                            <Percent size={10} /> {prop.commissionRate}%
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right font-semibold text-gray-800">
+                          {formatMontantImmo(prop.totalCollected)} FCFA
+                        </td>
+                        <td className="px-6 py-4 text-right font-bold text-blue-600">
+                          {formatMontantImmo(prop.enterpriseCommission)} FCFA
+                        </td>
+                        <td className="px-6 py-4 text-right font-semibold text-amber-600">
+                          {formatMontantImmo(prop.ownerShare)} FCFA
+                        </td>
+                      </tr>
+                    ))}
+                    <tr className="bg-gray-50 font-bold">
+                      <td className="px-6 py-4" colSpan={3}>TOTAL GÉNÉRAL</td>
+                      <td className="px-6 py-4 text-center hidden sm:table-cell"></td>
+                      <td className="px-6 py-4 text-right text-gray-800">
+                        {formatMontantImmo(companyReportData.totalCollected)} FCFA
+                      </td>
+                      <td className="px-6 py-4 text-right text-blue-600">
+                        {formatMontantImmo(companyReportData.totalEnterpriseCommission)} FCFA
+                      </td>
+                      <td className="px-6 py-4 text-right text-amber-600">
+                        {formatMontantImmo(companyReportData.totalOwnerShare)} FCFA
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
         </div>
+      )}
+
+      {viewMode === "all" && (
+        <>
+          {/* Owner Report */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            {ownerReportData.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-48 text-gray-400 p-6 text-center">
+                <User size={40} className="mb-2 opacity-30" />
+                <p className="text-sm">Aucun rapport propriétaire pour {monthLabel}</p>
+              </div>
+            ) : (
+              <div className="p-6">
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
+                  <User size={20} className="text-blue-600" />
+                  Rapport par Propriétaire
+                </h3>
+                <div className="space-y-4">
+                  {ownerReportData.map((owner) => (
+                    <div
+                      key={owner.ownerId}
+                      className="border border-gray-200 rounded-xl p-4"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                            <User size={18} className="text-blue-600" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-gray-900">
+                              {owner.ownerName}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {owner.properties.length} propriété(s)
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-green-600">
+                            {formatMontantImmo(owner.totalCollected)} FCFA
+                          </p>
+                          <p className="text-xs text-gray-500">Total encaissé</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-4 mt-3 pt-3 border-t border-gray-100 text-sm">
+                        <div className="text-center flex-1">
+                          <p className="font-semibold text-blue-600">
+                            {formatMontantImmo(owner.totalEnterpriseShare)} FCFA
+                          </p>
+                          <p className="text-xs text-gray-500">Part Entreprise</p>
+                        </div>
+                        <div className="text-center flex-1">
+                          <p className="font-semibold text-amber-600">
+                            {formatMontantImmo(owner.totalOwnerShare)} FCFA
+                          </p>
+                          <p className="text-xs text-gray-500">Part Propriétaire</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Company Report Summary */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2 mb-4">
+                <Building2 size={20} className="text-green-600" />
+                Résumé Entreprise
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-gray-50 rounded-xl p-4 text-center">
+                  <p className="text-3xl font-bold text-gray-800">
+                    {formatMontantImmo(companyReportData.totalCollected)} FCFA
+                  </p>
+                  <p className="text-sm text-gray-500 mt-1">Total Encaissé</p>
+                </div>
+                <div className="bg-blue-50 rounded-xl p-4 text-center">
+                  <p className="text-3xl font-bold text-blue-600">
+                    {formatMontantImmo(companyReportData.totalEnterpriseCommission)} FCFA
+                  </p>
+                  <p className="text-sm text-gray-500 mt-1">Commission Entreprise</p>
+                </div>
+                <div className="bg-amber-50 rounded-xl p-4 text-center">
+                  <p className="text-3xl font-bold text-amber-600">
+                    {formatMontantImmo(companyReportData.totalOwnerShare)} FCFA
+                  </p>
+                  <p className="text-sm text-gray-500 mt-1">Part Propriétaires</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

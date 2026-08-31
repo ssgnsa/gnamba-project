@@ -4,8 +4,8 @@ from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
-from backend.app.domain.project import Project
-from backend.app.models.project import ProjectModel
+from app.domain.project import Project
+from app.models.project import ProjectModel
 
 
 class SqlAlchemyProjectRepository:

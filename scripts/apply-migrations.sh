@@ -1,23 +1,22 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/bash
+# apply-migrations.sh — Applique les migrations Alembic
+
+set -e
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-MIGRATION_DIR="${ROOT_DIR}/supabase"
+BACKEND_DIR="${ROOT_DIR}/backend"
 
-if ! command -v supabase >/dev/null 2>&1; then
-  echo "[ERROR] supabase CLI is not installed or not in PATH" >&2
+echo "=== Application des migrations Alembic ==="
+
+cd "${BACKEND_DIR}"
+
+if ! command -v alembic >/dev/null 2>&1; then
+  echo "[ERROR] Alembic n'est pas installé" >&2
+  echo "Installe-le avec: cd backend && pip install alembic" >&2
   exit 1
 fi
 
-cd "${MIGRATION_DIR}"
+echo "[INFO] Application de toutes les migrations..."
+alembic upgrade head
 
-echo "[INFO] Applying Supabase migrations from ${MIGRATION_DIR}"
-
-if ! supabase status >/dev/null 2>&1; then
-  echo "[ERROR] Supabase local is not running. Start it with scripts/start-supabase-local.sh" >&2
-  exit 1
-fi
-
-supabase db push
-
-echo "[INFO] Migration apply completed"
+echo "✅ Migrations appliquées avec succès"

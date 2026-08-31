@@ -15,10 +15,11 @@ import {
   AlertOctagon,
   BarChart3,
 } from "lucide-react";
-import dbClient from "../data/tableClient";
+import { apiClient } from "../api/client";
 import { Task, Employee, Project } from "../types";
 import Modal from "../components/ui/Modal";
 import Badge from "../components/ui/Badge";
+import SelectWithCreate from "../components/ui/SelectWithCreate";
 import KPICard from "../components/dashboard/KPICard";
 import { useSettings } from "../context/SettingsContext";
 import { resolveAccessLevel, useAuth } from "../context/AuthContext";
@@ -91,31 +92,30 @@ export default function Taches() {
   useEffect(() => {
     const findUserEmployee = async () => {
       if (!user?.email) return;
-      const { data } = await dbClient
-        .from("employees")
-        .select("id")
-        .ilike("email", user.email)
-        .maybeSingle();
-      if (data) setUserEmployeeId(data.id);
+      const { data, error } = await apiClient.employees.getAll();
+      if (!error && data) {
+        const emp = data.find((e: Employee) => e.email?.toLowerCase() === user.email!.toLowerCase());
+        if (emp) setUserEmployeeId(emp.id);
+      }
     };
     findUserEmployee();
   }, [user]);
 
   // Shortcuts clavier
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = (event: KeyboardEvent) => {
       // Ctrl+N : Nouvelle tâche
-      if (e.ctrlKey && e.key === "n") {
-        e.preventDefault();
+      if (event.ctrlKey && event.key === "n") {
+        event.preventDefault();
         openAdd();
       }
       // Ctrl+F : Rechercher
-      if (e.ctrlKey && e.key === "f") {
-        e.preventDefault();
+      if (event.ctrlKey && event.key === "f") {
+        event.preventDefault();
         searchInputRef.current?.focus();
       }
       // Échap : Fermer modal
-      if (e.key === "Escape" && modalOpen) {
+      if (event.key === "Escape" && modalOpen) {
         setModalOpen(false);
       }
     };
@@ -127,12 +127,6 @@ export default function Taches() {
   const fetchData = useCallback(async () => {
     setLoading(true);
 
-    // Construire la requête pour filtrer par employé si nécessaire
-    let taskQuery = dbClient
-      .from("tasks")
-      .select("*, employees(nom, prenom), projects(nom)");
-
-    // Si l'utilisateur est un employé et n'a pas activé "voir tout", filtrer ses tâches
     const canViewAll =
       profile?.role === "admin" ||
       profile?.role === "gestionnaire" ||
@@ -141,27 +135,42 @@ export default function Taches() {
       accessLevel === "gestionnaire";
     const shouldFilter = userEmployeeId && !showAllTasks && !canViewAll;
 
+    const [taskRes, empRes, projRes] = await Promise.all([
+      apiClient.tasks.getAll(),
+      apiClient.employees.getAll(),
+      apiClient.projects.getAll(),
+    ]);
+
+    let tasksData = taskRes.data || [];
     if (shouldFilter) {
-      // Filtrer par assignee_id OU afficher les tâches non assignées
-      taskQuery = taskQuery.or(
-        `assignee_id.eq.${userEmployeeId},assignee_id.is.null`,
+      // Filter client-side since API doesn't support complex queries
+      tasksData = tasksData.filter(
+        (task: Task) =>
+          task.assignee_id === userEmployeeId || task.assignee_id === null,
       );
     }
-
-    const [taskRes, empRes, projRes] = await Promise.all([
-      taskQuery.order("created_at", { ascending: false }),
-      dbClient
-        .from("employees")
-        .select("id, nom, prenom")
-        .eq("statut", "actif")
-        .order("nom"),
-      dbClient.from("projects").select("id, nom").order("nom"),
-    ]);
-    setTasks(taskRes.data || []);
-    setEmployees(
-      (empRes.data as Array<Pick<Employee, "id" | "nom" | "prenom">>) || [],
+    // Sort by created_at descending
+    tasksData.sort(
+      (a: Task, b: Task) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
     );
-    setProjects((projRes.data as Array<Pick<Project, "id" | "nom">>) || []);
+
+    let employeesData = empRes.data || [];
+    // Filter active employees client-side
+    employeesData = employeesData
+      .filter((e: Employee) => e.statut === "actif")
+      .sort((a: Employee, b: Employee) =>
+        (a.nom || "").localeCompare(b.nom || ""),
+      );
+
+    let projectsData = projRes.data || [];
+    projectsData = projectsData.sort((a: Project, b: Project) =>
+      (a.nom || "").localeCompare(b.nom || ""),
+    );
+
+    setTasks(tasksData);
+    setEmployees(employeesData);
+    setProjects(projectsData);
     setLoading(false);
   }, [accessLevel, profile?.role, showAllTasks, userEmployeeId]);
 
@@ -239,15 +248,12 @@ export default function Taches() {
       };
 
       if (editingId) {
-        const { error } = await dbClient
-          .from("tasks")
-          .update(payload)
-          .eq("id", editingId);
-        if (error) throw error;
+        const { error } = await apiClient.tasks.update(editingId, payload);
+        if (error) throw new Error(error);
         setPageNotice("✅ Tâche modifiée avec succès");
       } else {
-        const { error } = await dbClient.from("tasks").insert(payload);
-        if (error) throw error;
+        const { error } = await apiClient.tasks.create(payload);
+        if (error) throw new Error(error);
         setPageNotice("✅ Tâche créée avec succès");
       }
 
@@ -269,19 +275,16 @@ export default function Taches() {
       return;
     }
     if (!confirm("Supprimer cette tâche ?")) return;
-    const { error } = await dbClient.from("tasks").delete().eq("id", id);
+    const { error } = await apiClient.tasks.delete(id);
     if (error) {
-      setFormError(error.message);
+      setFormError(error);
       return;
     }
     fetchData();
   };
 
   const handleQuickStatus = async (id: string, statut: Task["statut"]) => {
-    await dbClient
-      .from("tasks")
-      .update({ statut, updated_at: new Date().toISOString() })
-      .eq("id", id);
+    await apiClient.tasks.update(id, { statut, updated_at: new Date().toISOString() });
     fetchData();
   };
 
@@ -734,50 +737,133 @@ export default function Taches() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label
-                htmlFor="task-assignee"
-                className="block text-xs font-medium text-gray-600 mb-1"
-              >
-                Assigné à
-              </label>
-              <select
+              <SelectWithCreate
                 id="task-assignee"
                 value={form.assignee_id}
-                onChange={(e) =>
-                  setForm({ ...form, assignee_id: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
-              >
-                <option value="">Non assigné</option>
-                {employees.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.prenom} {e.nom}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setForm({ ...form, assignee_id: val })}
+                options={employees.map((e) => ({ value: e.id, label: `${e.prenom} ${e.nom}` }))}
+                placeholder="Non assigné"
+                label="Assigné à"
+                createModalTitle="Nouvel Employé"
+                createFields={[
+                  { key: "prenom", label: "Prénom", type: "text", placeholder: "Prénom", required: true },
+                  { key: "nom", label: "Nom", type: "text", placeholder: "Nom", required: true },
+                  { key: "poste", label: "Poste", type: "text", placeholder: "Ex: Développeur", required: true },
+                  { key: "department", label: "Département", type: "text", placeholder: "Ex: IT, RH, BTP...", required: false },
+                  { key: "telephone", label: "Téléphone", type: "tel", placeholder: "+225 07 00 00 00", required: false },
+                  { key: "email", label: "Email", type: "email", placeholder: "email@exemple.com", required: false },
+                  { key: "salaire", label: "Salaire (FCFA)", type: "number", placeholder: "0", required: false },
+                  { key: "date_embauche", label: "Date d'embauche", type: "date", required: false },
+                  { key: "statut", label: "Statut", type: "select", required: true, options: [
+                    { value: "actif", label: "Actif" },
+                    { value: "inactif", label: "Inactif" },
+                    { value: "conge", label: "Congé" },
+                  ]},
+                  { key: "notes", label: "Notes", type: "textarea", placeholder: "Notes...", required: false },
+                ]}
+                validateCreateForm={(data) => {
+                  const errors: Record<string, string> = {};
+                  if (!data.prenom?.trim()) errors.prenom = "Le prénom est obligatoire";
+                  if (!data.nom?.trim()) errors.nom = "Le nom est obligatoire";
+                  if (!data.poste?.trim()) errors.poste = "Le poste est obligatoire";
+                  return Object.keys(errors).length > 0 ? errors : null;
+                }}
+                onCreate={async (data) => {
+                  const now = new Date().toISOString();
+                  const payload = {
+                    nom: data.nom,
+                    prenom: data.prenom,
+                    poste: data.poste,
+                    department: data.department || null,
+                    telephone: data.telephone || null,
+                    email: data.email || null,
+                    salaire: parseFloat(data.salaire) || 0,
+                    date_embauche: data.date_embauche || now.split("T")[0],
+                    statut: data.statut || "actif",
+                    notes: data.notes || null,
+                    updated_at: now,
+                  };
+                  const { data: newEmp, error } = await apiClient.employees.create(payload);
+                  if (error) throw new Error(error);
+                  // Refresh employees list
+                  const { data: empData, error: empError } = await apiClient.employees.getAll();
+                  if (!empError && empData) {
+                    setEmployees(
+                      empData
+                        .filter((e: any) => e.statut === "actif")
+                        .sort((a: any, b: any) =>
+                          (a.nom || "").localeCompare(b.nom || ""),
+                        )
+                        .map((e: any) => ({ id: e.id, nom: e.nom, prenom: e.prenom })),
+                    );
+                  }
+                  return { value: newEmp.id, label: `${data.prenom} ${data.nom}` };
+                }}
+              />
             </div>
             <div>
-              <label
-                htmlFor="task-project"
-                className="block text-xs font-medium text-gray-600 mb-1"
-              >
-                Projet
-              </label>
-              <select
+              <SelectWithCreate
                 id="task-project"
                 value={form.project_id}
-                onChange={(e) =>
-                  setForm({ ...form, project_id: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
-              >
-                <option value="">Sélectionner un projet...</option>
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nom}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setForm({ ...form, project_id: val })}
+                options={projects.map((p) => ({ value: p.id, label: p.nom }))}
+                placeholder="Sélectionner un projet..."
+                label="Projet"
+                createModalTitle="Nouveau Projet"
+                createFields={[
+                  { key: "nom", label: "Nom du Projet", type: "text", placeholder: "Ex: Construction Villa", required: true },
+                  { key: "client_id", label: "Client", type: "select", required: false },
+                  { key: "type_projet", label: "Type de Projet", type: "text", placeholder: "Construction, Rénovation...", required: false },
+                  { key: "localisation", label: "Localisation", type: "text", placeholder: "Ex: Cocody, Abidjan", required: false },
+                  { key: "budget", label: "Budget (FCFA)", type: "number", placeholder: "0", required: false },
+                  { key: "date_debut", label: "Date Début", type: "date", required: false },
+                  { key: "date_fin", label: "Date Fin", type: "date", required: false },
+                  { key: "statut", label: "Statut", type: "select", required: true, options: [
+                    { value: "devis", label: "Devis" },
+                    { value: "valide", label: "Validé" },
+                    { value: "en_cours", label: "En Cours" },
+                    { value: "termine", label: "Terminé" },
+                    { value: "facture", label: "Facturé" },
+                  ]},
+                  { key: "description", label: "Description", type: "textarea", placeholder: "Description...", required: false },
+                  { key: "notes", label: "Notes", type: "textarea", placeholder: "Notes...", required: false },
+                ]}
+                validateCreateForm={(data) => {
+                  const errors: Record<string, string> = {};
+                  if (!data.nom?.trim()) errors.nom = "Le nom du projet est obligatoire";
+                  return Object.keys(errors).length > 0 ? errors : null;
+                }}
+                onCreate={async (data) => {
+                  const now = new Date().toISOString();
+                  const payload = {
+                    nom: data.nom,
+                    client_id: data.client_id || null,
+                    type_projet: data.type_projet || null,
+                    localisation: data.localisation || null,
+                    budget: parseFloat(data.budget) || 0,
+                    date_debut: data.date_debut || null,
+                    date_fin: data.date_fin || null,
+                    statut: data.statut || "devis",
+                    description: data.description || null,
+                    notes: data.notes || null,
+                    updated_at: now,
+                  };
+                  const { data: newProj, error } = await apiClient.projects.create(payload);
+                  if (error) throw new Error(error);
+                  // Refresh projects list
+                  const { data: projData, error: projError } = await apiClient.projects.getAll();
+                  if (!projError && projData) {
+                    setProjects(
+                      projData
+                        .sort((a: any, b: any) =>
+                          (a.nom || "").localeCompare(b.nom || ""),
+                        )
+                        .map((p: any) => ({ id: p.id, nom: p.nom })),
+                    );
+                  }
+                  return { value: newProj.id, label: data.nom };
+                }}
+              />
             </div>
           </div>
 

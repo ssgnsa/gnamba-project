@@ -1,3 +1,4 @@
+import os
 import unittest
 import pytest
 from fastapi.testclient import TestClient
@@ -60,6 +61,34 @@ class LocalAuthApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         body = response.json()
         self.assertEqual(body['user']['email'], 'user@egs.local')
+
+    def test_admin_can_change_password_with_current_password(self) -> None:
+        os.environ['INITIAL_ADMIN_PASSWORD'] = 'EgsAdminInitialPass2026Secure!'
+        self.memory_repo = InMemoryUserRepository()
+        app.dependency_overrides[deps.get_user_repository] = lambda: self.memory_repo
+        app.dependency_overrides[deps.get_auth_service] = lambda: AuthService(self.memory_repo)
+
+        login = self.client.post('/api/v1/auth/login', json={
+            'email': 'admin@egs.local',
+            'password': 'EgsAdminInitialPass2026Secure!'
+        })
+        self.assertEqual(login.status_code, 200)
+        token = login.json()['access_token']
+
+        response = self.client.post('/api/v1/auth/change-password', headers={
+            'Authorization': f'Bearer {token}'
+        }, json={
+            'current_password': 'EgsAdminInitialPass2026Secure!',
+            'new_password': 'NewAdminPass2026!'
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['status'], 'ok')
+
+        next_login = self.client.post('/api/v1/auth/login', json={
+            'email': 'admin@egs.local',
+            'password': 'NewAdminPass2026!'
+        })
+        self.assertEqual(next_login.status_code, 200)
 
 
 if __name__ == '__main__':

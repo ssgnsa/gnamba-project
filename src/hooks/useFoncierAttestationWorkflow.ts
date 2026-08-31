@@ -2,11 +2,24 @@ import { useState, useEffect, useCallback } from 'react';
 import type { FoncierLot } from '@/types';
 
 export const useFoncierAttestationWorkflow = () => {
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState<any>({});
+  const [saving, setSaving] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
   const [attestationModalOpen, setAttestationModalOpen] = useState(false);
   const [attestationLot, setAttestationLot] = useState<FoncierLot | null>(null);
-  const [attestationForm, setAttestationForm] = useState<any>(null);
+  const [attestationForm, setAttestationForm] = useState<any>({});
   const [attestationSaving, setAttestationSaving] = useState(false);
   const [attestationError, setAttestationError] = useState<string | null>(null);
+  const [attestationHasDeletedAt, setAttestationHasDeletedAt] = useState<boolean | null>(null);
+  const [workflowModalOpen, setWorkflowModalOpen] = useState(false);
+  const [workflowSelectedLot, setWorkflowSelectedLot] = useState<string | null>(null);
+  const [attestationHistoryOpen, setAttestationHistoryOpen] = useState(false);
+  const [attestationHistoryLot, setAttestationHistoryLot] = useState<FoncierLot | null>(null);
+  const [attestationHistoryRecords, setAttestationHistoryRecords] = useState<any[]>([]);
+  const [attestationHistoryScans, setAttestationHistoryScans] = useState<Record<string, any>>({});
+  const [activeTab, setActiveTab] = useState<string>("lots");
   const [auditModalOpen, setAuditModalOpen] = useState(false);
   const [auditRecords, setAuditRecords] = useState<any[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
@@ -25,8 +38,8 @@ export const useFoncierAttestationWorkflow = () => {
   const [configError, setConfigError] = useState<string | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
   const [pageNotice, setPageNotice] = useState<string | null>(null);
-  const [attestationHasDeletedAt, setAttestationHasDeletedAt] = useState<boolean | null>(null);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const isOnlineInit = typeof navigator !== "undefined" ? navigator.onLine : true;
+  const [isOnline, setIsOnline] = useState(isOnlineInit);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -55,6 +68,16 @@ export const useFoncierAttestationWorkflow = () => {
   }, []);
 
   return {
+    modalOpen,
+    setModalOpen,
+    editingId,
+    setEditingId,
+    form,
+    setForm,
+    saving,
+    setSaving,
+    modalError,
+    setModalError,
     attestationModalOpen,
     setAttestationModalOpen,
     attestationLot,
@@ -65,6 +88,22 @@ export const useFoncierAttestationWorkflow = () => {
     setAttestationSaving,
     attestationError,
     setAttestationError,
+    attestationHasDeletedAt,
+    setAttestationHasDeletedAt,
+    workflowModalOpen,
+    setWorkflowModalOpen,
+    workflowSelectedLot,
+    setWorkflowSelectedLot,
+    attestationHistoryOpen,
+    setAttestationHistoryOpen,
+    attestationHistoryLot,
+    setAttestationHistoryLot,
+    attestationHistoryRecords,
+    setAttestationHistoryRecords,
+    attestationHistoryScans,
+    setAttestationHistoryScans,
+    activeTab,
+    setActiveTab,
     auditModalOpen,
     setAuditModalOpen,
     auditRecords,
@@ -100,8 +139,6 @@ export const useFoncierAttestationWorkflow = () => {
     setPageError,
     pageNotice,
     setPageNotice,
-    attestationHasDeletedAt,
-    setAttestationHasDeletedAt,
     isOnline,
     setIsOnline,
     openAttestation,

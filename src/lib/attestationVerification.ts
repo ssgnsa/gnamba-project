@@ -1,4 +1,4 @@
-import { getLocalApiBaseUrl, isSelfHostedMode } from "./selfHosted";
+import { getLocalApiBaseUrl } from "./selfHosted";
 import apiClient from "../api/client";
 
 export interface VerificationLookup {
@@ -127,33 +127,6 @@ const buildVerificationSearch = (lookup: VerificationLookup) => {
   if (lookup.control) params.set("control", lookup.control);
   if (lookup.hash) params.set("hash", lookup.hash);
   return params.toString();
-};
-
-const getFunctionEndpoint = (lookup: VerificationLookup) => {
-  if (isSelfHostedMode()) {
-    const baseUrl = getLocalApiBaseUrl();
-    const endpoint = new URL("/api/v1/foncier/attestations/verify", baseUrl);
-    endpoint.search = buildVerificationSearch(lookup);
-    return endpoint.toString();
-  }
-
-  const baseUrl =
-    typeof window !== "undefined" && window.location
-      ? window.location.origin
-      : getLocalApiBaseUrl();
-  const endpoint = new URL("/api/v1/foncier/attestations/verify", baseUrl);
-  endpoint.search = buildVerificationSearch(lookup);
-  return endpoint.toString();
-};
-
-const parseErrorMessage = async (response: Response) => {
-  try {
-    const payload = await response.json();
-    if (payload && typeof payload.error === "string") return payload.error;
-  } catch {
-    // ignore JSON parse errors
-  }
-  return `Vérification impossible (${response.status}).`;
 };
 
 /**

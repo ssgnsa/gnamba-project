@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Star, Upload, Check, RefreshCw, Image } from "lucide-react";
+import { Star, Upload, Check, RefreshCw, Image, AlertTriangle, X } from "lucide-react";
 import { getBrandAsset, setBrandAsset } from "../../lib/mediaUtils";
 import { useAuth } from "../../context/AuthContext";
 import { useSettings } from "../../context/SettingsContext";
@@ -55,6 +55,13 @@ export default function BrandAssetsManager() {
   const [picking, setPicking] = useState<BrandAssetType | null>(null);
   const [saving, setSaving] = useState<BrandAssetType | null>(null);
   const [saved, setSaved] = useState<BrandAssetType | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!error) return;
+    const timer = setTimeout(() => setError(null), 5000);
+    return () => clearTimeout(timer);
+  }, [error]);
 
   const loadAssets = useCallback(async () => {
     if (authLoading || !user) return;
@@ -93,7 +100,7 @@ export default function BrandAssetsManager() {
       setTimeout(() => setSaved(null), 2500);
       await refreshSettings();
     } else {
-      window.alert(`Échec de l'enregistrement de l'actif de marque: ${error}`);
+      setError(`Échec de l'enregistrement : ${error}`);
     }
     setSaving(null);
     setPicking(null);
@@ -143,6 +150,19 @@ export default function BrandAssetsManager() {
           </p>
         </div>
       </div>
+
+      {error && (
+        <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+          <AlertTriangle size={15} className="flex-shrink-0" />
+          <span className="flex-1">{error}</span>
+          <button
+            onClick={() => setError(null)}
+            className="text-red-400 hover:text-red-600 transition-colors"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {BRAND_SLOTS.map((slot) => {

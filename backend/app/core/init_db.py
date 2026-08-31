@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from sqlalchemy import text
 
-from backend.app.core.database import Base, engine
-from backend.app.models.user import User
+from app.core.database import Base, engine
+from app.models.user import User
 
 
 def init_db() -> None:

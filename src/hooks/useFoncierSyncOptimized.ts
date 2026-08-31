@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 
-export const useFoncierSyncOptimized = (deviceId: string, isOnline: boolean) => {
+export const useFoncierSyncOptimized = (_deviceId: string, isOnline: boolean) => {
   const [syncing, setSyncing] = useState(false);
   const [_syncError, _setSyncError] = useState<string | null>(null);
   const [syncProgress, setSyncProgress] = useState<{ current: number; total: number } | null>(null);

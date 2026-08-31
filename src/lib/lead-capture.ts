@@ -11,7 +11,7 @@ const CONFIG = {
   consentCheckboxId: "lead-capture-consent",
 };
 
-const LOCAL_CAPTURE_PATH = "/api/v1/leads/capture";
+const LOCAL_CAPTURE_PATH = "/leads/capture";
 const PHONE_SELECTORS = [
   'input[type="tel"]',
   'input[name*="phone" i]',

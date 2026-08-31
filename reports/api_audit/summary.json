@@ -1,0 +1,749 @@
+{
+  "routers": [
+    "backend/app/api/v1/tasks.py",
+    "backend/app/api/v1/__init__.py",
+    "backend/app/api/v1/leads.py",
+    "backend/app/api/v1/rpc.py",
+    "backend/app/api/v1/tenants.py",
+    "backend/app/api/v1/clients.py",
+    "backend/app/api/v1/tables.py",
+    "backend/app/api/v1/media/__init__.py",
+    "backend/app/api/v1/media/__init__.py",
+    "backend/app/api/v1/projects/__init__.py",
+    "backend/app/api/v1/foncier/routes.py",
+    "backend/app/api/v1/employees/__init__.py",
+    "backend/app/api/v1/suppliers/__init__.py",
+    "backend/app/api/v1/finance/__init__.py",
+    "backend/app/api/v1/auth/__init__.py",
+    "backend/app/api/v1/auth/router.py",
+    "backend/app/api/v1/settings/__init__.py",
+    "backend/app/api/v1/settings/__init__.py",
+    "backend/app/api/v1/settings/__init__.py",
+    "backend/app/api/v1/settings/__init__.py",
+    "backend/app/api/v1/users/__init__.py",
+    "backend/app/api/v1/users/router.py",
+    "backend/app/api/v1/products/__init__.py",
+    "backend/app/api/v1/dashboard/router.py",
+    "backend/app/api/v1/immobilier/__init__.py"
+  ],
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/{task_id}",
+      "file": "backend/app/api/v1/tasks.py"
+    },
+    {
+      "method": "DELETE",
+      "path": "/{task_id}",
+      "file": "backend/app/api/v1/tasks.py"
+    },
+    {
+      "method": "PATCH",
+      "path": "/{task_id}",
+      "file": "backend/app/api/v1/tasks.py"
+    },
+    {
+      "method": "GET",
+      "path": "/campaigns",
+      "file": "backend/app/api/v1/leads.py"
+    },
+    {
+      "method": "GET",
+      "path": "/{lead_id}",
+      "file": "backend/app/api/v1/leads.py"
+    },
+    {
+      "method": "GET",
+      "path": "/campaigns",
+      "file": "backend/app/api/v1/leads.py"
+    },
+    {
+      "method": "POST",
+      "path": "/capture",
+      "file": "backend/app/api/v1/leads.py"
+    },
+    {
+      "method": "POST",
+      "path": "/{name}",
+      "file": "backend/app/api/v1/rpc.py"
+    },
+    {
+      "method": "GET",
+      "path": "/{tenant_id}",
+      "file": "backend/app/api/v1/tenants.py"
+    },
+    {
+      "method": "DELETE",
+      "path": "/{tenant_id}",
+      "file": "backend/app/api/v1/tenants.py"
+    },
+    {
+      "method": "PATCH",
+      "path": "/{tenant_id}",
+      "file": "backend/app/api/v1/tenants.py"
+    },
+    {
+      "method": "GET",
+      "path": "/{client_id}",
+      "file": "backend/app/api/v1/clients.py"
+    },
+    {
+      "method": "DELETE",
+      "path": "/{client_id}",
+      "file": "backend/app/api/v1/clients.py"
+    },
+    {
+      "method": "PATCH",
+      "path": "/{client_id}",
+      "file": "backend/app/api/v1/clients.py"
+    },
+    {
+      "method": "GET",
+      "path": "/{table}",
+      "file": "backend/app/api/v1/tables.py"
+    },
+    {
+      "method": "POST",
+      "path": "/{table}",
+      "file": "backend/app/api/v1/tables.py"
+    },
+    {
+      "method": "DELETE",
+      "path": "/{table}/{row_id}",
+      "file": "backend/app/api/v1/tables.py"
+    },
+    {
+      "method": "PATCH",
+      "path": "/{table}/{row_id}",
+      "file": "backend/app/api/v1/tables.py"
+    },
+    {
+      "method": "GET",
+      "path": "/brand-assets",
+      "file": "backend/app/api/v1/media/__init__.py"
+    },
+    {
+      "method": "GET",
+      "path": "/usage",
+      "file": "backend/app/api/v1/media/__init__.py"
+    },
+    {
+      "method": "GET",
+      "path": "/{media_id}",
+      "file": "backend/app/api/v1/media/__init__.py"
+    },
+    {
+      "method": "GET",
+      "path": "/{media_id}/versions",
+      "file": "backend/app/api/v1/media/__init__.py"
+    },
+    {
+      "method": "GET",
+      "path": "/audit",
+      "file": "backend/app/api/v1/media/__init__.py"
+    },
+    {
+      "method": "POST",
+      "path": "/usage",
+      "file": "backend/app/api/v1/media/__init__.py"
+    },
+    {
+      "method": "POST",
+      "path": "/{media_id}/restore",
+      "file": "backend/app/api/v1/media/__init__.py"
+    },
+    {
+      "method": "POST",
+      "path": "/{media_id}/replace",
+      "file": "backend/app/api/v1/media/__init__.py"
+    },
+    {
+      "method": "DELETE",
+      "path": "/usage/{usage_id}",
+      "file": "backend/app/api/v1/media/__init__.py"
+    },
+    {
+      "method": "DELETE",
+      "path": "/{media_id}",
+      "file": "backend/app/api/v1/media/__init__.py"
+    },
+    {
+      "method": "DELETE",
+      "path": "/{media_id}/purge",
+      "file": "backend/app/api/v1/media/__init__.py"
+    },
+    {
+      "method": "PATCH",
+      "path": "/{media_id}",
+      "file": "backend/app/api/v1/media/__init__.py"
+    },
+    {
+      "method": "DELETE",
+      "path": "/{project_id}",
+      "file": "backend/app/api/v1/projects/__init__.py"
+    },
+    {
+      "method": "PATCH",
+      "path": "/{project_id}",
+      "file": "backend/app/api/v1/projects/__init__.py"
+    },
+    {
+      "method": "GET",
+      "path": "/villages",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "GET",
+      "path": "/villages/with-stats",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "GET",
+      "path": "/villages/{village_id}",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "GET",
+      "path": "/villages/{village_id}/with-stats",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "GET",
+      "path": "/villages/{village_id}/lotissements",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "GET",
+      "path": "/lotissements/{lotissement_id}",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "GET",
+      "path": "/lotissements/{lotissement_id}/ilots",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "GET",
+      "path": "/ilots/{ilot_id}",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "GET",
+      "path": "/ilots/{ilot_id}/lots",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "GET",
+      "path": "/lots",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "GET",
+      "path": "/lots/{lot_id}",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "GET",
+      "path": "/lots/exists",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "GET",
+      "path": "/lots/{lot_id}/attestations",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "GET",
+      "path": "/attestations",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "GET",
+      "path": "/attestations/{attestation_id}",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "GET",
+      "path": "/attestations/{attestation_id}/pdf",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "GET",
+      "path": "/attestations/verify/{reference}",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "GET",
+      "path": "/audit/timeline/{entity_type}/{entity_id}",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "GET",
+      "path": "/audit",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "GET",
+      "path": "/access/me/villages",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "GET",
+      "path": "/villages/{village_id}/users",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "GET",
+      "path": "/sync/status",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "GET",
+      "path": "/sync/queue",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "GET",
+      "path": "/dashboard/stats",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "GET",
+      "path": "/lotissements",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "GET",
+      "path": "/ilots",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "GET",
+      "path": "/assembly",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "GET",
+      "path": "/villages/names",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "POST",
+      "path": "/villages",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "POST",
+      "path": "/villages/{village_id}/lotissements",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "POST",
+      "path": "/lotissements/{lotissement_id}/ilots",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "POST",
+      "path": "/ilots/{ilot_id}/lots",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "POST",
+      "path": "/lots/{lot_id}/archive",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "POST",
+      "path": "/lots/{lot_id}/restore",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "POST",
+      "path": "/lots/check-duplicate",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "POST",
+      "path": "/ilots/{ilot_id}/lots/import",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "POST",
+      "path": "/lots/export",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "POST",
+      "path": "/lots/{lot_id}/attestations",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "POST",
+      "path": "/attestations/{attestation_id}/submit",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "POST",
+      "path": "/attestations/{attestation_id}/validate",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "POST",
+      "path": "/attestations/{attestation_id}/scan",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "POST",
+      "path": "/attestations/{attestation_id}/revoke",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "POST",
+      "path": "/attestations/{attestation_id}/generate-pdf",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "POST",
+      "path": "/audit/export-pdf",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "POST",
+      "path": "/audit/export-csv",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "POST",
+      "path": "/access/{user_id}/villages/{village_id}",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "POST",
+      "path": "/sync/trigger",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "POST",
+      "path": "/sync/queue/{queue_item_id}/resolve",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "POST",
+      "path": "/sync/cleanup",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "POST",
+      "path": "/attestations/{attestation_id}/sign",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "DELETE",
+      "path": "/villages/{village_id}",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "DELETE",
+      "path": "/lotissements/{lotissement_id}",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "DELETE",
+      "path": "/ilots/{ilot_id}",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "DELETE",
+      "path": "/access/{user_id}/villages/{village_id}",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "PATCH",
+      "path": "/villages/{village_id}",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "PATCH",
+      "path": "/lotissements/{lotissement_id}",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "PATCH",
+      "path": "/ilots/{ilot_id}",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "PATCH",
+      "path": "/lots/{lot_id}",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "PATCH",
+      "path": "/attestations/{attestation_id}",
+      "file": "backend/app/api/v1/foncier/routes.py"
+    },
+    {
+      "method": "DELETE",
+      "path": "/{employee_id}",
+      "file": "backend/app/api/v1/employees/__init__.py"
+    },
+    {
+      "method": "PATCH",
+      "path": "/{employee_id}",
+      "file": "backend/app/api/v1/employees/__init__.py"
+    },
+    {
+      "method": "DELETE",
+      "path": "/{supplier_id}",
+      "file": "backend/app/api/v1/suppliers/__init__.py"
+    },
+    {
+      "method": "PATCH",
+      "path": "/{supplier_id}",
+      "file": "backend/app/api/v1/suppliers/__init__.py"
+    },
+    {
+      "method": "DELETE",
+      "path": "/{finance_id}",
+      "file": "backend/app/api/v1/finance/__init__.py"
+    },
+    {
+      "method": "PATCH",
+      "path": "/{finance_id}",
+      "file": "backend/app/api/v1/finance/__init__.py"
+    },
+    {
+      "method": "GET",
+      "path": "/me",
+      "file": "backend/app/api/v1/auth/__init__.py"
+    },
+    {
+      "method": "POST",
+      "path": "/login",
+      "file": "backend/app/api/v1/auth/__init__.py"
+    },
+    {
+      "method": "POST",
+      "path": "/refresh",
+      "file": "backend/app/api/v1/auth/__init__.py"
+    },
+    {
+      "method": "POST",
+      "path": "/logout",
+      "file": "backend/app/api/v1/auth/__init__.py"
+    },
+    {
+      "method": "POST",
+      "path": "/reset-password",
+      "file": "backend/app/api/v1/auth/__init__.py"
+    },
+    {
+      "method": "GET",
+      "path": "/me",
+      "file": "backend/app/api/v1/auth/router.py"
+    },
+    {
+      "method": "POST",
+      "path": "/login",
+      "file": "backend/app/api/v1/auth/router.py"
+    },
+    {
+      "method": "POST",
+      "path": "/refresh",
+      "file": "backend/app/api/v1/auth/router.py"
+    },
+    {
+      "method": "POST",
+      "path": "/logout",
+      "file": "backend/app/api/v1/auth/router.py"
+    },
+    {
+      "method": "POST",
+      "path": "/password/reset",
+      "file": "backend/app/api/v1/auth/router.py"
+    },
+    {
+      "method": "POST",
+      "path": "/reset-password",
+      "file": "backend/app/api/v1/auth/router.py"
+    },
+    {
+      "method": "POST",
+      "path": "/persist-token",
+      "file": "backend/app/api/v1/auth/router.py"
+    },
+    {
+      "method": "POST",
+      "path": "/clear-token",
+      "file": "backend/app/api/v1/auth/router.py"
+    },
+    {
+      "method": "GET",
+      "path": "/{key}",
+      "file": "backend/app/api/v1/settings/__init__.py"
+    },
+    {
+      "method": "DELETE",
+      "path": "/{user_id}",
+      "file": "backend/app/api/v1/users/__init__.py"
+    },
+    {
+      "method": "PATCH",
+      "path": "/{user_id}",
+      "file": "backend/app/api/v1/users/__init__.py"
+    },
+    {
+      "method": "DELETE",
+      "path": "/{user_id}",
+      "file": "backend/app/api/v1/users/router.py"
+    },
+    {
+      "method": "PATCH",
+      "path": "/{user_id}",
+      "file": "backend/app/api/v1/users/router.py"
+    },
+    {
+      "method": "DELETE",
+      "path": "/{product_id}",
+      "file": "backend/app/api/v1/products/__init__.py"
+    },
+    {
+      "method": "PATCH",
+      "path": "/{product_id}",
+      "file": "backend/app/api/v1/products/__init__.py"
+    },
+    {
+      "method": "GET",
+      "path": "/stats",
+      "file": "backend/app/api/v1/dashboard/router.py"
+    },
+    {
+      "method": "GET",
+      "path": "/logs",
+      "file": "backend/app/api/v1/dashboard/router.py"
+    },
+    {
+      "method": "GET",
+      "path": "/report",
+      "file": "backend/app/api/v1/dashboard/router.py"
+    },
+    {
+      "method": "GET",
+      "path": "/properties",
+      "file": "backend/app/api/v1/immobilier/__init__.py"
+    },
+    {
+      "method": "POST",
+      "path": "/properties",
+      "file": "backend/app/api/v1/immobilier/__init__.py"
+    },
+    {
+      "method": "DELETE",
+      "path": "/{item_id}",
+      "file": "backend/app/api/v1/immobilier/__init__.py"
+    },
+    {
+      "method": "PATCH",
+      "path": "/{item_id}",
+      "file": "backend/app/api/v1/immobilier/__init__.py"
+    }
+  ],
+  "prefixes": [
+    {
+      "file": "backend/app/api/v1/tasks.py",
+      "prefix": "/api/v1/tasks"
+    },
+    {
+      "file": "backend/app/api/v1/leads.py",
+      "prefix": "/api/v1/leads"
+    },
+    {
+      "file": "backend/app/api/v1/rpc.py",
+      "prefix": "/api/v1/rpc"
+    },
+    {
+      "file": "backend/app/api/v1/tenants.py",
+      "prefix": "/api/v1/tenants"
+    },
+    {
+      "file": "backend/app/api/v1/clients.py",
+      "prefix": "/api/v1/clients"
+    },
+    {
+      "file": "backend/app/api/v1/tables.py",
+      "prefix": "/api/v1/tables"
+    },
+    {
+      "file": "backend/app/api/v1/media/__init__.py",
+      "prefix": "/api/media"
+    },
+    {
+      "file": "backend/app/api/v1/media/__init__.py",
+      "prefix": "/api/v1/media"
+    },
+    {
+      "file": "backend/app/api/v1/projects/__init__.py",
+      "prefix": "/api/v1/projects"
+    },
+    {
+      "file": "backend/app/api/v1/foncier/routes.py",
+      "prefix": "/api/v1/foncier"
+    },
+    {
+      "file": "backend/app/api/v1/employees/__init__.py",
+      "prefix": "/api/v1/employees"
+    },
+    {
+      "file": "backend/app/api/v1/suppliers/__init__.py",
+      "prefix": "/api/v1/suppliers"
+    },
+    {
+      "file": "backend/app/api/v1/finance/__init__.py",
+      "prefix": "/api/v1/finance"
+    },
+    {
+      "file": "backend/app/api/v1/auth/__init__.py",
+      "prefix": "/api/auth"
+    },
+    {
+      "file": "backend/app/api/v1/auth/router.py",
+      "prefix": "/api/v1/auth"
+    },
+    {
+      "file": "backend/app/api/v1/settings/__init__.py",
+      "prefix": "/api/settings"
+    },
+    {
+      "file": "backend/app/api/v1/settings/__init__.py",
+      "prefix": "/api/v1/settings"
+    },
+    {
+      "file": "backend/app/api/v1/settings/__init__.py",
+      "prefix": "/api/site-content"
+    },
+    {
+      "file": "backend/app/api/v1/settings/__init__.py",
+      "prefix": "/api/v1/site-content"
+    },
+    {
+      "file": "backend/app/api/v1/users/__init__.py",
+      "prefix": "/api/users"
+    },
+    {
+      "file": "backend/app/api/v1/users/router.py",
+      "prefix": "/api/v1/users"
+    },
+    {
+      "file": "backend/app/api/v1/products/__init__.py",
+      "prefix": "/api/v1/products"
+    },
+    {
+      "file": "backend/app/api/v1/dashboard/router.py",
+      "prefix": "/api/v1/dashboard"
+    },
+    {
+      "file": "backend/app/api/v1/immobilier/__init__.py",
+      "prefix": "/api/v1/immobilier"
+    }
+  ]
+}

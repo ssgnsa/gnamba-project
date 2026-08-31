@@ -1,6 +1,21 @@
-import { ArrowRight, BookOpen, CalendarDays, MessageCircle, Tag } from "lucide-react";
+import { ArrowRight, BookOpen, CalendarDays, MessageCircle, Tag, Sparkles, Shield, TrendingUp, Search } from "lucide-react";
 import type { PublicPage } from "../../lib/publicRoutes";
 import { OFFICIAL_CONTACT, buildWhatsAppUrl } from "../../lib/officialContact";
+
+// Premium UI Components
+import {
+  Button,
+  Card,
+  CardHeader,
+  CardContent,
+  CardTitle,
+  CardDescription,
+  Badge,
+  Container,
+  Grid,
+  Flex,
+  IconWrapper,
+} from "../../components/ui";
 
 interface Props {
   onNavigate: (page: PublicPage) => void;
@@ -28,101 +43,173 @@ const articles = [
     summary:
       "Un chantier avance mieux quand les délais, le budget et la communication restent bien suivis.",
   },
+  {
+    title: "Gestion locative : les pièges à éviter",
+    category: "Immobilier",
+    date: "Guide complet",
+    summary:
+      "Les erreurs fréquentes des propriétaires et comment les anticiper pour une gestion sereine.",
+  },
+  {
+    title: "Foncier ivoirien : les réformes 2024 à connaître",
+    category: "Foncier",
+    date: "Actualité",
+    summary:
+      "Ce qui change avec les nouvelles dispositions sur l'ACD, le compulssoire et le cadastre.",
+  },
+  {
+    title: "Vendre son bien rapidement : 5 leviers efficaces",
+    category: "Immobilier",
+    date: "Stratégie vente",
+    summary:
+      "Estimation, présentation, diffusion, négociation, accompagnement - les clés d'une vente réussie.",
+  },
+];
+
+const categories = [
+  { id: "all", label: "Tous", icon: Sparkles },
+  { id: "Foncier", label: "Foncier", icon: Search },
+  { id: "Lotissement", label: "Lotissement", icon: TrendingUp },
+  { id: "Construction", label: "Construction", icon: Shield },
+  { id: "Immobilier", label: "Immobilier", icon: Sparkles },
+  { id: "Guide complet", label: "Guides", icon: BookOpen },
+  { id: "Actualité", label: "Actualité", icon: TrendingUp },
+  { id: "Stratégie vente", label: "Stratégies", icon: Shield },
 ];
 
 export default function PublicBlog({ onNavigate }: Props) {
   const whatsappUrl = buildWhatsAppUrl(OFFICIAL_CONTACT.phone);
 
+  const nav = (page: PublicPage) => {
+    onNavigate(page);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   return (
-    <div className="pt-20">
-      <section className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 py-20 text-white">
-        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_top_right,_rgba(99,102,241,0.45),_transparent_30%),radial-gradient(circle_at_bottom_left,_rgba(16,185,129,0.3),_transparent_35%)]" />
-        <div className="relative z-10 mx-auto max-w-4xl px-4 text-center sm:px-6 lg:px-8">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.24em] text-white/80">
-            Blog
-          </div>
-          <h1 className="mt-5 text-4xl font-bold leading-tight sm:text-5xl">
-            Conseils, bonnes pratiques et actualités
-          </h1>
-          <p className="mx-auto mt-5 max-w-2xl text-base text-white/75 sm:text-lg">
-            Une page éditoriale simple pour publier des contenus utiles autour
-            du foncier, de l'immobilier et du BTP.
-          </p>
-          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <button
-              onClick={() => onNavigate("contact")}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-6 py-3 text-sm font-semibold text-slate-900 shadow-lg hover:bg-slate-100"
-            >
-              Nous écrire
-              <ArrowRight size={16} />
-            </button>
-            <a
-              href={whatsappUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-6 py-3 text-sm font-semibold text-white shadow-lg hover:bg-emerald-600"
-            >
-              <MessageCircle size={16} />
-              WhatsApp
-            </a>
-          </div>
-        </div>
+    <div className="min-h-screen bg-white">
+      {/* Hero */}
+      <section className="relative py-20 sm:py-24 lg:py-28 overflow-hidden" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #4f46e5 100%)' }}>
+        <div
+          className="absolute inset-0 opacity-10"
+          style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+          }}
+        />
+        <Container size="xl" className="relative z-10 py-8">
+          <Flex direction="col" align="center" gap="4" className="text-center max-w-4xl mx-auto">
+            <Flex align="center" justify="center" gap="2" className="mb-2">
+              <IconWrapper size="sm" variant="secondary" shape="circle" className="bg-white/10 text-white border-white/20">
+                <BookOpen size={14} />
+              </IconWrapper>
+              <Badge variant="secondary" size="md" className="text-xs bg-white/10 text-white border-white/20">
+                Blog & Conseils
+              </Badge>
+            </Flex>
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-tight">
+              Conseils, bonnes pratiques <span className="bg-gradient-to-r from-white via-white to-indigo-200 bg-clip-text text-transparent">et actualités</span>
+            </h1>
+            <p className="text-indigo-100 text-lg max-w-2xl mx-auto leading-relaxed">
+              Une page éditoriale pour publier des contenus utiles autour
+              du foncier, de l'immobilier et du BTP.
+            </p>
+            <Flex align="center" justify="center" gap="4" className="pt-4">
+              <Button size="lg" variant="secondary" onClick={() => nav("contact")} iconRight={<ArrowRight size={20} />} className="shadow-lg">
+                Nous écrire
+              </Button>
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-semibold text-base transition-all duration-200 shadow-lg"
+              >
+                <MessageCircle size={18} />
+                WhatsApp
+              </a>
+            </Flex>
+          </Flex>
+        </Container>
       </section>
 
-      <section className="bg-slate-50 py-20">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            {articles.map((article) => (
-              <article
-                key={article.title}
-                className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
-              >
-                <div className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-indigo-700">
-                  <Tag size={12} />
-                  {article.category}
-                </div>
-                <h2 className="mt-4 text-xl font-bold text-slate-900">
-                  {article.title}
-                </h2>
-                <div className="mt-3 flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-slate-400">
-                  <CalendarDays size={13} />
-                  {article.date}
-                </div>
-                <p className="mt-4 text-sm leading-7 text-slate-600">
-                  {article.summary}
-                </p>
-                <div className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-indigo-700">
-                  <BookOpen size={16} />
-                  Article bientôt disponible
-                </div>
-              </article>
-            ))}
-          </div>
+      {/* Category Filters */}
+      <section className="py-8 bg-white border-b border-neutral-100">
+        <Container size="xl">
+          <Flex wrap gap="2" justify="center">
+            {categories.map((cat) => {
+              const Icon = cat.icon;
+              return (
+                <Badge
+                  key={cat.id}
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 transition-all hover:bg-primary-50 hover:border-primary-300 hover:text-primary-700"
+                >
+                  <Icon size={12} />
+                  {cat.label}
+                </Badge>
+              );
+            })}
+          </Flex>
+        </Container>
+      </section>
 
-          <div className="mt-10 rounded-3xl bg-slate-950 p-6 text-white shadow-xl">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-[0.24em] text-white/50">
-                  Publication
-                </div>
-                <h2 className="mt-2 text-2xl font-bold">
-                  Espace éditorial prêt à accueillir vos conseils et actualités
-                </h2>
-                <p className="mt-2 max-w-2xl text-sm text-white/70">
+      {/* Articles Grid */}
+      <section className="py-20 sm:py-24 lg:py-28 bg-neutral-50">
+        <Container size="xl">
+          <Grid cols={{ base: 1, md: 2, lg: 3 }} gap="lg">
+            {articles.map((article) => (
+              <Card
+                key={article.title}
+                variant="elevated"
+                padding="lg"
+                interactive
+                className="h-full flex flex-col group"
+              >
+                <CardHeader className="mb-4">
+                  <Badge variant="outline" size="sm" className="text-xs mb-3" style={{ width: 'fit-content' }}>
+                    <Tag size={10} className="mr-1" />
+                    {article.category}
+                  </Badge>
+                  <CardTitle className="text-lg font-bold text-neutral-900 line-clamp-2 group-hover:text-primary-600 transition-colors">{article.title}</CardTitle>
+                </CardHeader>
+
+                <CardContent className="flex-1 flex flex-col">
+                  <Flex align="center" gap="1.5" className="text-xs text-neutral-400 mb-3">
+                    <CalendarDays size={12} />
+                    {article.date}
+                  </Flex>
+                  <p className="text-sm text-neutral-600 leading-relaxed mb-4 flex-1">{article.summary}</p>
+
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconLeft={<BookOpen size={14} />}
+                    className="text-primary-600 hover:text-primary-700 font-medium"
+                  >
+                    Lire l'article
+                    <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </Grid>
+
+          {/* CTA Card */}
+          <Card variant="default" padding="xl" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%)' }} className="text-white max-w-4xl mx-auto mt-12">
+            <Flex direction="col" align="start" smDirection="row" smAlign="center" smJustify="between" gap="6">
+              <Flex direction="col" gap="3">
+                <Badge variant="secondary" size="sm" className="w-fit bg-white/10 text-white border-white/20">Publication</Badge>
+                <CardTitle className="text-2xl font-extrabold">Espace éditorial prêt à accueillir vos conseils et actualités</CardTitle>
+                <CardDescription className="text-primary-100 max-w-xl">
                   Le blog peut accueillir des conseils, des annonces et des
                   mises en avant de projets selon vos priorités de communication.
-                </p>
-              </div>
-              <button
-                onClick={() => onNavigate("services")}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-900 hover:bg-slate-100"
-              >
+                </CardDescription>
+              </Flex>
+              <Button variant="secondary" size="md" onClick={() => nav("services")} iconRight={<ArrowRight size={16} />} className="bg-white/10 hover:bg-white/20 border-white/20 min-w-[160px]">
                 Nos services
-                <ArrowRight size={16} />
-              </button>
-            </div>
-          </div>
-        </div>
+              </Button>
+            </Flex>
+          </Card>
+        </Container>
       </section>
     </div>
   );

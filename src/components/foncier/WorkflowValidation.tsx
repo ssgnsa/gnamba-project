@@ -117,7 +117,7 @@ export default function WorkflowValidation({
         "id, lot_id, reference, statut, created_at, version, validation_agent_nom, validation_chef_nom, validation_chef_date, foncier_lots:lot_id(reference, numero_lot, village, proprietaire_nom, proprietaire_prenom)",
       )
       .eq("lot_id", lotId)
-      .order("created_at", { ascending: false })
+      .order("created_at")
       .limit(1);
 
     let result = await baseQuery.is("deleted_at", null).maybeSingle();
