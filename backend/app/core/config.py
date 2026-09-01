@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+import logging
 
 from dotenv import load_dotenv
 
@@ -28,3 +29,12 @@ class Settings:
 
 
 settings = Settings()
+
+# Warn at startup if using the insecure default secret. This helps catch
+# cases where the operator forgot to provide a proper secret in production.
+logger = logging.getLogger(__name__)
+if settings.SECRET_KEY == "egs-local-dev-secret-change-me":
+    logger.warning(
+        "LOCAL_AUTH_SECRET is set to the default insecure value. "
+        "Set LOCAL_AUTH_SECRET in .env.server or environment for production."
+    )
