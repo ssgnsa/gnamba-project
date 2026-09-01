@@ -38,6 +38,8 @@ services:
         condition: service_healthy
       egs-redis:
         condition: service_started
+    env_file:
+      - .env.server
     environment:
       APP_NAME: ${APP_NAME:-EGS Local API}
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
