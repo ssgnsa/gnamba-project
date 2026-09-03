@@ -69,6 +69,10 @@ class ApiClient {
         ...options.headers,
       };
 
+      if (options.body instanceof FormData) {
+        delete (headers as Record<string, string>)['Content-Type'];
+      }
+
       return fetch(`${this.baseUrl}${endpoint}`, {
         ...options,
         headers,
@@ -210,24 +214,89 @@ class ApiClient {
       const query = this.buildQueryString(params);
       return this.request(`/media${query}`);
     },
-    upload: async (file: File, metadata?: any) => {
-      const formData = new FormData();
-      formData.append('file', file);
-      if (metadata) {
-        formData.append('metadata', JSON.stringify(metadata));
+    upload: async (file: File | Blob, metadata?: any) => {
+      // Defensive: ensure we always send a browser `File` instance.
+      if (!file) {
+        return { data: null, error: 'No file provided', status: 400 } as ApiResult;
       }
+      let fileToSend: File;
+      try {
+        if (typeof File !== 'undefined' && file instanceof File) {
+          fileToSend = file;
+        } else {
+          const name = (file as any).name || `upload-${Date.now()}`;
+          fileToSend = new File([file as Blob], name, { type: (file as any).type || 'application/octet-stream' });
+        }
+      } catch (e) {
+        const name = (file as any).name || `upload-${Date.now()}`;
+        fileToSend = new File([file as Blob], name, { type: (file as any).type || 'application/octet-stream' });
+      }
+
+      const formData = new FormData();
+      formData.append('file', fileToSend);
+
+      const normalizedMetadata = {
+        ...(metadata ?? {}),
+        category: metadata?.category ?? 'autre',
+        alt_text: metadata?.alt_text ?? metadata?.altText ?? '',
+        description: metadata?.description ?? '',
+        tags: Array.isArray(metadata?.tags) ? metadata.tags : (metadata?.tags ? String(metadata.tags).split(',') : []),
+      };
+
+      const category = normalizedMetadata.category;
+      const altText = normalizedMetadata.alt_text || '';
+      const description = normalizedMetadata.description || '';
+      const tags = normalizedMetadata.tags || [];
+
+      formData.append('category', String(category));
+      formData.append('alt_text', String(altText));
+      formData.append('description', String(description));
+      formData.append('tags', Array.isArray(tags) ? tags.join(',') : String(tags ?? ''));
+
+      formData.append('metadata', JSON.stringify({
+        ...normalizedMetadata,
+        file_name: fileToSend.name,
+      }));
+
       return this.request('/media', {
         method: 'POST',
         body: formData,
         headers: {}, // Let browser set Content-Type with boundary
       });
     },
-    replace: async (id: string, file: File, metadata?: any) => {
+    replace: async (id: string, file: File | Blob, metadata?: any) => {
+      if (!file) {
+        return { data: null, error: 'No file provided', status: 400 } as ApiResult;
+      }
+      let fileToSend: File;
+      try {
+        if (typeof File !== 'undefined' && file instanceof File) {
+          fileToSend = file;
+        } else {
+          const name = (file as any).name || `replace-${Date.now()}`;
+          fileToSend = new File([file as Blob], name, { type: (file as any).type || 'application/octet-stream' });
+        }
+      } catch (e) {
+        const name = (file as any).name || `replace-${Date.now()}`;
+        fileToSend = new File([file as Blob], name, { type: (file as any).type || 'application/octet-stream' });
+      }
+
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', fileToSend);
+
       if (metadata) {
+        const category = metadata?.category ?? 'autre';
+        const altText = metadata?.alt_text ?? metadata?.altText ?? '';
+        const description = metadata?.description ?? '';
+        const tags = metadata?.tags ?? [];
+
+        formData.append('category', String(category));
+        formData.append('alt_text', String(altText));
+        formData.append('description', String(description));
+        formData.append('tags', Array.isArray(tags) ? tags.join(',') : String(tags ?? ''));
         formData.append('metadata', JSON.stringify(metadata));
       }
+
       return this.request(`/media/${id}/replace`, {
         method: 'POST',
         body: formData,
@@ -306,27 +375,39 @@ class ApiClient {
   // Immobilier module
   immobilier = {
     properties: {
-      getAll: async () => this.request('/immobilier/properties'),
+      getAll: async (params?: { limit?: number; offset?: number }) =>
+        this.request(`/immobilier/properties${this.buildQueryString(params)}`),
       get: async (id: string) => this.request(`/immobilier/properties/${id}`),
-      create: async (data: any) => this.request('/immobilier/properties', { method: 'POST', body: JSON.stringify(data) }),
-      update: async (id: string, data: any) => this.request(`/immobilier/properties/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
-      delete: async (id: string) => this.request(`/immobilier/properties/${id}`, { method: 'DELETE' }),
+      create: async (data: any) =>
+        this.request('/immobilier/properties', { method: 'POST', body: JSON.stringify(data) }),
+      update: async (id: string, data: any) =>
+        this.request(`/immobilier/properties/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+      delete: async (id: string) =>
+        this.request(`/immobilier/properties/${id}`, { method: 'DELETE' }),
     },
-    // Tenants are at root level /tenants in backend
-    tenants: {
-      getAll: async () => this.request('/tenants'),
-      get: async (id: string) => this.request(`/tenants/${id}`),
-      create: async (data: any) => this.request('/tenants', { method: 'POST', body: JSON.stringify(data) }),
-      update: async (id: string, data: any) => this.request(`/tenants/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
-      delete: async (id: string) => this.request(`/tenants/${id}`, { method: 'DELETE' }),
-    },
-    // Contracts - not available as nested endpoint, use properties for lease contracts
     contracts: {
-      getAll: async () => this.request('/immobilier/properties'), // Lease contracts are properties with type
-      get: async (id: string) => this.request(`/immobilier/properties/${id}`),
-      create: async (data: any) => this.request('/immobilier/properties', { method: 'POST', body: JSON.stringify(data) }),
-      update: async (id: string, data: any) => this.request(`/immobilier/properties/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
-      delete: async (id: string) => this.request(`/immobilier/properties/${id}`, { method: 'DELETE' }),
+      getAll: async (params?: { limit?: number; offset?: number }) =>
+        this.request(`/immobilier/contracts${this.buildQueryString(params)}`),
+      get: async (id: string) => this.request(`/immobilier/contracts/${id}`),
+      create: async (data: any) =>
+        this.request('/immobilier/contracts', { method: 'POST', body: JSON.stringify(data) }),
+      update: async (id: string, data: any) =>
+        this.request(`/immobilier/contracts/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+      delete: async (id: string) =>
+        this.request(`/immobilier/contracts/${id}`, { method: 'DELETE' }),
+      generatePayments: async (id: string) =>
+        this.request(`/immobilier/contracts/${id}/generate-payments`, { method: 'POST' }),
+    },
+    payments: {
+      getAll: async (params?: { limit?: number; offset?: number }) =>
+        this.request(`/immobilier/payments${this.buildQueryString(params)}`),
+      get: async (id: string) => this.request(`/immobilier/payments/${id}`),
+      create: async (data: any) =>
+        this.request('/immobilier/payments', { method: 'POST', body: JSON.stringify(data) }),
+      update: async (id: string, data: any) =>
+        this.request(`/immobilier/payments/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+      delete: async (id: string) =>
+        this.request(`/immobilier/payments/${id}`, { method: 'DELETE' }),
     },
   };
 
