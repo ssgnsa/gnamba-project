@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import json
+
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
@@ -9,6 +11,31 @@ from app.api.deps import get_media_service, get_optional_current_user
 from app.services.media_service import MediaService
 
 router = APIRouter(prefix="/api/v1/media", tags=["media"])
+
+
+def _normalize_media_metadata(metadata_raw: str | None, category: str, alt_text: str, description: str, tags: str | None) -> tuple[str, str, str, list[str]]:
+    parsed: dict[str, Any] = {}
+    if metadata_raw:
+        try:
+            parsed = json.loads(metadata_raw)
+        except (TypeError, ValueError):
+            parsed = {}
+    if not isinstance(parsed, dict):
+        parsed = {}
+
+    category_value = category if category and category != "autre" else str(parsed.get("category") or category or "autre")
+    alt_text_value = alt_text if alt_text else str(parsed.get("alt_text") or parsed.get("altText") or "")
+    description_value = description if description else str(parsed.get("description") or "")
+
+    raw_tags = tags if tags is not None else parsed.get("tags")
+    if isinstance(raw_tags, str):
+        normalized_tags = [item.strip() for item in raw_tags.split(",") if item.strip()]
+    elif isinstance(raw_tags, list):
+        normalized_tags = [str(item).strip() for item in raw_tags if str(item).strip()]
+    else:
+        normalized_tags = []
+
+    return category_value, alt_text_value, description_value, normalized_tags
 
 
 class BrandAssetResponse(BaseModel):
@@ -39,6 +66,8 @@ class MediaResponse(BaseModel):
     tags: list[str]
     is_brand_asset: bool
     brand_asset_type: str | None = None
+    content_hash: str | None = None
+    taxonomy_id: str | None = None
     created_at: Any | None = None
     updated_at: Any | None = None
     deleted_at: Any | None = None
@@ -76,6 +105,22 @@ class MediaUsageResponse(BaseModel):
     created_at: Any | None = None
 
 
+class MediaAuditLogCreateRequest(BaseModel):
+    media_id: str | None = None
+    action: str
+    actor_id: str | None = None
+    metadata: dict[str, Any] = {}
+
+
+class MediaAuditLogResponse(BaseModel):
+    id: str | None = None
+    media_id: str | None = None
+    action: str
+    actor_id: str | None = None
+    metadata: dict[str, Any] = {}
+    created_at: Any | None = None
+
+
 @router.get("/brand-assets", response_model=list[MediaResponse])
 def list_brand_assets() -> list[MediaResponse]:
     try:
@@ -93,10 +138,11 @@ def upload_media(
     alt_text: str = Form(""),
     description: str = Form(""),
     tags: str | None = Form(None),
+    metadata: str | None = Form(None),
     current_user: dict[str, Any] | None = Depends(get_optional_current_user),
     service: MediaService = Depends(get_media_service),
 ) -> MediaResponse:
-    parsed_tags = [item.strip() for item in (tags or "").split(",") if item.strip()]
+    category, alt_text, description, parsed_tags = _normalize_media_metadata(metadata, category, alt_text, description, tags)
     media = service.upload_media(file, category, current_user.get("id") if current_user else None, alt_text, description, parsed_tags)
     return MediaResponse(**media)
 
@@ -122,6 +168,23 @@ def list_media_usage(
     if entity_type and usage_type:
         return [MediaResponse(**item) for item in service.list_media_for_usage(entity_type=entity_type, entity_id=entity_id, usage_type=usage_type)]
     return []
+
+
+@router.get("/audit", response_model=list[MediaAuditLogResponse])
+def list_media_audit_logs(
+    media_id: str | None = None,
+    service: MediaService = Depends(get_media_service),
+):
+    return [MediaAuditLogResponse(**item) for item in service.list_media_audit_logs(media_id)]
+
+
+@router.post("/audit", response_model=MediaAuditLogResponse)
+def create_media_audit_log(
+    payload: MediaAuditLogCreateRequest,
+    service: MediaService = Depends(get_media_service),
+) -> MediaAuditLogResponse:
+    created = service.create_media_audit_log(payload.model_dump())
+    return MediaAuditLogResponse(**created)
 
 
 @router.post("/usage", response_model=MediaUsageResponse)
@@ -193,12 +256,27 @@ def purge_media(media_id: str, service: MediaService = Depends(get_media_service
 def replace_media(
     media_id: str,
     file: UploadFile = File(...),
+    category: str = Form("autre"),
+    alt_text: str = Form(""),
+    description: str = Form(""),
+    tags: str | None = Form(None),
+    metadata: str | None = Form(None),
     current_user: dict[str, Any] | None = Depends(get_optional_current_user),
     service: MediaService = Depends(get_media_service),
 ) -> MediaResponse:
+    category, alt_text, description, parsed_tags = _normalize_media_metadata(metadata, category, alt_text, description, tags)
     replaced = service.replace(media_id, file, current_user.get("id") if current_user else None)
     if not replaced:
         raise HTTPException(status_code=404, detail="Media introuvable")
+    if category != "autre" or alt_text or description or parsed_tags:
+        updated = service.update_media(media_id, {
+            "category": category,
+            "alt_text": alt_text,
+            "description": description,
+            "tags": parsed_tags,
+        })
+        if updated:
+            replaced = updated
     return MediaResponse(**replaced)
 
 
@@ -208,11 +286,3 @@ def list_media_versions(
     service: MediaService = Depends(get_media_service),
 ):
     return service.list_media_versions(media_id)
-
-
-@router.get("/audit")
-def list_media_audit_logs(
-    media_id: str | None = None,
-    service: MediaService = Depends(get_media_service),
-):
-    return service.list_media_audit_logs(media_id)

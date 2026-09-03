@@ -8,6 +8,40 @@ from app.main import app
 client = TestClient(app)
 
 
+def test_media_audit_route_contract():
+    response = client.get("/api/v1/media/audit")
+    assert response.status_code == 200, response.text
+
+    create_response = client.post(
+        "/api/v1/media/audit",
+        json={
+            "media_id": None,
+            "action": "upload_test",
+            "actor_id": "qa",
+            "metadata": {"source": "pytest"},
+        },
+    )
+    assert create_response.status_code == 200, create_response.text
+    payload = create_response.json()
+    assert payload["action"] == "upload_test"
+    assert payload["metadata"]["source"] == "pytest"
+
+
+def test_media_upload_accepts_legacy_metadata_json_field():
+    response = client.post(
+        "/api/media",
+        files={"file": ("legacy.png", BytesIO(b"fake-image"), "image/png")},
+        data={
+            "metadata": '{"category":"autre","alt_text":"legacy","description":"legacy desc","tags":["legacy","erp"]}'
+        },
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["alt_text"] == "legacy"
+    assert payload["description"] == "legacy desc"
+    assert payload["tags"] == ["legacy", "erp"]
+
+
 def test_media_usage_routes_work():
     response = client.post(
         "/api/media",

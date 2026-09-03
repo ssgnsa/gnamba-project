@@ -41,11 +41,14 @@ class MediaFile(Base):
     deleted_by = Column(String, nullable=True)
     width = Column(Integer, nullable=True)
     height = Column(Integer, nullable=True)
+    content_hash = Column(String, nullable=True, index=True)
+    taxonomy_id = Column(UUID(as_uuid=False), ForeignKey("media_taxonomy.id"), nullable=True)
 
     # Relationships
     versions = relationship("MediaVersion", back_populates="media", cascade="all, delete-orphan")
     usages = relationship("MediaUsage", back_populates="media", cascade="all, delete-orphan")
     audit_logs = relationship("MediaAuditLog", back_populates="media", cascade="all, delete-orphan")
+    taxonomy = relationship("MediaTaxonomy", back_populates="media_files")
 
     __table_args__ = (
         Index("idx_media_category", "category"),
@@ -114,4 +117,19 @@ class MediaAuditLog(Base):
         Index("idx_media_audit_actor", "actor_id"),
         Index("idx_media_audit_action", "action"),
         Index("idx_media_audit_created", "created_at"),
+    )
+
+
+class MediaTaxonomy(Base):
+    __tablename__ = "media_taxonomy"
+
+    id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
+    name = Column(String, nullable=False)
+    slug = Column(String, nullable=False)
+    parent_id = Column(UUID(as_uuid=False), ForeignKey("media_taxonomy.id"), nullable=True)
+
+    media_files = relationship("MediaFile", back_populates="taxonomy")
+
+    __table_args__ = (
+        Index("idx_media_taxonomy_slug", "slug"),
     )
