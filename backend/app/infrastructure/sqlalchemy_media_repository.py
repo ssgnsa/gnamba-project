@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import json
 import uuid
+import hashlib
 from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import UploadFile
 from sqlalchemy import text
 
-from app.core.database import SessionLocal
+from app.core.database import DATABASE_URL, SessionLocal
 from app.domain.media import MediaAsset
 from app.repositories.media_repository import MediaRepositoryPort
 from app.services.storage_provider import StorageProvider
@@ -17,11 +19,85 @@ class SqlAlchemyMediaRepository(MediaRepositoryPort):
     def __init__(self) -> None:
         self.ensure_schema()
 
+    def _is_sqlite(self) -> bool:
+        database_url = DATABASE_URL or ""
+        return str(database_url).startswith("sqlite")
+
     def ensure_schema(self) -> None:
-        with SessionLocal() as session:
-            session.execute(
-                text(
-                    """
+        sqlite_mode = self._is_sqlite()
+
+        if sqlite_mode:
+            ddl = {
+                "media_files": """
+                    CREATE TABLE IF NOT EXISTS media_files (
+                        id TEXT PRIMARY KEY,
+                        filename TEXT NOT NULL,
+                        storage_key TEXT,
+                        original_name TEXT NOT NULL DEFAULT '',
+                        url TEXT NOT NULL DEFAULT '',
+                        thumbnail_url TEXT,
+                        category TEXT NOT NULL DEFAULT 'autre',
+                        uploaded_by TEXT,
+                        upload_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        size INTEGER NOT NULL DEFAULT 0,
+                        type TEXT NOT NULL DEFAULT '',
+                        alt_text TEXT NOT NULL DEFAULT '',
+                        description TEXT NOT NULL DEFAULT '',
+                        tags TEXT NOT NULL DEFAULT '[]',
+                        is_brand_asset BOOLEAN NOT NULL DEFAULT 0,
+                        brand_asset_type TEXT,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        deleted_at DATETIME,
+                        deleted_by TEXT,
+                        width INTEGER,
+                        height INTEGER
+                    )
+                """,
+                "media_usage": """
+                    CREATE TABLE IF NOT EXISTS media_usage (
+                        id TEXT PRIMARY KEY,
+                        media_id TEXT NOT NULL,
+                        entity_type TEXT NOT NULL,
+                        entity_id TEXT,
+                        usage_type TEXT NOT NULL,
+                        label TEXT NOT NULL DEFAULT '',
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    )
+                """,
+                "media_versions": """
+                    CREATE TABLE IF NOT EXISTS media_versions (
+                        id TEXT PRIMARY KEY,
+                        media_id TEXT NOT NULL,
+                        version_number INTEGER NOT NULL DEFAULT 1,
+                        old_url TEXT NOT NULL DEFAULT '',
+                        old_filename TEXT NOT NULL DEFAULT '',
+                        replaced_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        replaced_by TEXT
+                    )
+                """,
+                "media_audit_logs": """
+                    CREATE TABLE IF NOT EXISTS media_audit_logs (
+                        id TEXT PRIMARY KEY,
+                        media_id TEXT,
+                        action TEXT NOT NULL,
+                        actor_id TEXT,
+                        metadata TEXT DEFAULT '{}',
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    )
+                """,
+                "media_taxonomy": """
+                    CREATE TABLE IF NOT EXISTS media_taxonomy (
+                        id TEXT PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        slug TEXT NOT NULL,
+                        parent_id TEXT
+                    )
+                """,
+            }
+        else:
+            ddl = {
+                "media_files": """
                     CREATE TABLE IF NOT EXISTS media_files (
                         id UUID PRIMARY KEY,
                         filename TEXT NOT NULL,
@@ -46,12 +122,8 @@ class SqlAlchemyMediaRepository(MediaRepositoryPort):
                         width INTEGER,
                         height INTEGER
                     )
-                    """
-                )
-            )
-            session.execute(
-                text(
-                    """
+                    """,
+                "media_usage": """
                     CREATE TABLE IF NOT EXISTS media_usage (
                         id UUID PRIMARY KEY,
                         media_id UUID NOT NULL REFERENCES media_files(id) ON DELETE CASCADE,
@@ -61,12 +133,8 @@ class SqlAlchemyMediaRepository(MediaRepositoryPort):
                         label TEXT NOT NULL DEFAULT '',
                         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
                     )
-                    """
-                )
-            )
-            session.execute(
-                text(
-                    """
+                    """,
+                "media_versions": """
                     CREATE TABLE IF NOT EXISTS media_versions (
                         id UUID PRIMARY KEY,
                         media_id UUID NOT NULL REFERENCES media_files(id) ON DELETE CASCADE,
@@ -76,12 +144,8 @@ class SqlAlchemyMediaRepository(MediaRepositoryPort):
                         replaced_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
                         replaced_by UUID
                     )
-                    """
-                )
-            )
-            session.execute(
-                text(
-                    """
+                    """,
+                "media_audit_logs": """
                     CREATE TABLE IF NOT EXISTS media_audit_logs (
                         id UUID PRIMARY KEY,
                         media_id UUID,
@@ -90,52 +154,77 @@ class SqlAlchemyMediaRepository(MediaRepositoryPort):
                         metadata JSONB DEFAULT '{}'::jsonb,
                         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
                     )
-                    """
-                )
-            )
-            session.execute(text("ALTER TABLE media_files ADD COLUMN IF NOT EXISTS storage_key TEXT"))
-
-            column_names_by_table = {
-                "media_files": {"uploaded_by", "deleted_by"},
-                "media_versions": {"replaced_by"},
-                "media_audit_logs": {"actor_id"},
+                    """,
+                "media_taxonomy": """
+                    CREATE TABLE IF NOT EXISTS media_taxonomy (
+                        id UUID PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        slug TEXT NOT NULL,
+                        parent_id UUID
+                    )
+                """,
             }
 
-            for table_name, columns in column_names_by_table.items():
-                existing_columns = session.execute(
-                    text(
-                        """
-                        SELECT column_name
-                        FROM information_schema.columns
-                        WHERE table_schema = current_schema()
-                          AND table_name = :table_name
-                        """
-                    ),
-                    {"table_name": table_name},
-                ).fetchall()
-                existing_names = {row[0] for row in existing_columns}
-                for column_name in sorted(columns):
-                    if column_name not in existing_names:
-                        continue
+        with SessionLocal() as session:
+            for sql in ddl.values():
+                session.execute(text(sql))
 
-                    if table_name == "media_files" and column_name in {"uploaded_by", "deleted_by"}:
-                        session.execute(
-                            text(
-                                f"ALTER TABLE media_files ALTER COLUMN {column_name} TYPE TEXT USING {column_name}::text"
+            if sqlite_mode:
+                media_files_columns = session.execute(text("PRAGMA table_info(media_files)")).fetchall()
+                existing_column_names = {row[1] for row in media_files_columns}
+                if "storage_key" not in existing_column_names:
+                    session.execute(text("ALTER TABLE media_files ADD COLUMN storage_key TEXT"))
+                if "content_hash" not in existing_column_names:
+                    session.execute(text("ALTER TABLE media_files ADD COLUMN content_hash TEXT"))
+                if "taxonomy_id" not in existing_column_names:
+                    session.execute(text("ALTER TABLE media_files ADD COLUMN taxonomy_id TEXT"))
+            else:
+                session.execute(text("ALTER TABLE media_files ADD COLUMN IF NOT EXISTS storage_key TEXT"))
+
+                session.execute(text("ALTER TABLE media_files ADD COLUMN IF NOT EXISTS content_hash TEXT"))
+                session.execute(text("ALTER TABLE media_files ADD COLUMN IF NOT EXISTS taxonomy_id UUID"))
+
+                column_names_by_table = {
+                    "media_files": {"uploaded_by", "deleted_by"},
+                    "media_versions": {"replaced_by"},
+                    "media_audit_logs": {"actor_id"},
+                }
+
+                for table_name, columns in column_names_by_table.items():
+                    existing_columns = session.execute(
+                        text(
+                            """
+                            SELECT column_name
+                            FROM information_schema.columns
+                            WHERE table_schema = current_schema()
+                              AND table_name = :table_name
+                            """
+                        ),
+                        {"table_name": table_name},
+                    ).fetchall()
+                    existing_names = {row[0] for row in existing_columns}
+                    for column_name in sorted(columns):
+                        if column_name not in existing_names:
+                            continue
+
+                        if table_name == "media_files" and column_name in {"uploaded_by", "deleted_by"}:
+                            session.execute(
+                                text(
+                                    f"ALTER TABLE media_files ALTER COLUMN {column_name} TYPE TEXT USING {column_name}::text"
+                                )
                             )
-                        )
-                    elif table_name == "media_versions" and column_name == "replaced_by":
-                        session.execute(
-                            text(
-                                "ALTER TABLE media_versions ALTER COLUMN replaced_by TYPE TEXT USING replaced_by::text"
+                        elif table_name == "media_versions" and column_name == "replaced_by":
+                            session.execute(
+                                text(
+                                    "ALTER TABLE media_versions ALTER COLUMN replaced_by TYPE TEXT USING replaced_by::text"
+                                )
                             )
-                        )
-                    elif table_name == "media_audit_logs" and column_name == "actor_id":
-                        session.execute(
-                            text(
-                                "ALTER TABLE media_audit_logs ALTER COLUMN actor_id TYPE TEXT USING actor_id::text"
+                        elif table_name == "media_audit_logs" and column_name == "actor_id":
+                            session.execute(
+                                text(
+                                    "ALTER TABLE media_audit_logs ALTER COLUMN actor_id TYPE TEXT USING actor_id::text"
+                                )
                             )
-                        )
             session.commit()
 
     def _uuid(self) -> str:
@@ -147,6 +236,14 @@ class SqlAlchemyMediaRepository(MediaRepositoryPort):
     def _row_to_domain(self, row: Any) -> MediaAsset | None:
         if not row:
             return None
+        tags_value = row[12]
+        if isinstance(tags_value, str):
+            try:
+                tags_value = json.loads(tags_value)
+            except (TypeError, ValueError):
+                tags_value = []
+        if not isinstance(tags_value, list):
+            tags_value = []
         return MediaAsset(
             id=str(row[0]) if row[0] is not None else None,
             filename=row[1],
@@ -160,7 +257,7 @@ class SqlAlchemyMediaRepository(MediaRepositoryPort):
             type=row[9] or "",
             alt_text=row[10] or "",
             description=row[11] or "",
-            tags=row[12] or [],
+            tags=tags_value,
             is_brand_asset=bool(row[13]),
             brand_asset_type=row[14],
             created_at=row[15],
@@ -169,6 +266,8 @@ class SqlAlchemyMediaRepository(MediaRepositoryPort):
             deleted_by=str(row[18]) if row[18] is not None else None,
             width=row[19],
             height=row[20],
+            content_hash=row[21] if len(row) > 21 else None,
+            taxonomy_id=str(row[22]) if len(row) > 22 and row[22] is not None else None,
         )
 
     def list_media(self, include_deleted: bool = False) -> list[MediaAsset]:
@@ -177,10 +276,10 @@ class SqlAlchemyMediaRepository(MediaRepositoryPort):
             rows = session.execute(
                 text(
                     f"""
-                    SELECT id, filename, original_name, url, thumbnail_url, category,
-                           uploaded_by, upload_date, size, type, alt_text, description,
-                           tags, is_brand_asset, brand_asset_type, created_at, updated_at,
-                           deleted_at, deleted_by, width, height
+                          SELECT id, filename, original_name, url, thumbnail_url, category,
+                              uploaded_by, upload_date, size, type, alt_text, description,
+                              tags, is_brand_asset, brand_asset_type, created_at, updated_at,
+                              deleted_at, deleted_by, width, height, content_hash, taxonomy_id
                     FROM media_files
                     WHERE 1=1 {clause}
                     ORDER BY upload_date DESC, created_at DESC
@@ -194,10 +293,10 @@ class SqlAlchemyMediaRepository(MediaRepositoryPort):
             row = session.execute(
                 text(
                     """
-                    SELECT id, filename, original_name, url, thumbnail_url, category,
-                           uploaded_by, upload_date, size, type, alt_text, description,
-                           tags, is_brand_asset, brand_asset_type, created_at, updated_at,
-                           deleted_at, deleted_by, width, height
+                          SELECT id, filename, original_name, url, thumbnail_url, category,
+                              uploaded_by, upload_date, size, type, alt_text, description,
+                             tags, is_brand_asset, brand_asset_type, created_at, updated_at,
+                             deleted_at, deleted_by, width, height, content_hash, taxonomy_id
                     FROM media_files
                     WHERE id = :media_id
                     """
@@ -222,27 +321,50 @@ class SqlAlchemyMediaRepository(MediaRepositoryPort):
         filename = f"{category}/{self._now().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:8]}_{upload_file.filename or 'file'}"
         storage_key = filename.replace("//", "/")
         content = upload_file.file.read()
+        # compute content hash for deduplication
+        content_hash = hashlib.sha256(content).hexdigest() if content is not None else None
+
+        # if identical file already exists (not deleted), return existing entry to avoid duplicate storage
+        with SessionLocal() as session:
+            existing_row = session.execute(
+                text(
+                    """
+                    SELECT id, filename, original_name, url, thumbnail_url, category,
+                           uploaded_by, upload_date, size, type, alt_text, description,
+                           tags, is_brand_asset, brand_asset_type, created_at, updated_at,
+                           deleted_at, deleted_by, width, height, content_hash, taxonomy_id
+                    FROM media_files
+                    WHERE content_hash = :content_hash AND deleted_at IS NULL
+                    LIMIT 1
+                    """
+                ),
+                {"content_hash": content_hash},
+            ).fetchone()
+            if existing_row:
+                return self._row_to_domain(existing_row).to_payload()
+
         storage_provider.upload_bytes(storage_key, content, upload_file.content_type or "application/octet-stream", upload_file.filename)
         public_url = storage_provider.public_url(storage_key)
         tags_value = tags or []
+        sqlite_tags_value = json.dumps(tags_value) if self._is_sqlite() else tags_value
         with SessionLocal() as session:
             row = session.execute(
                 text(
                     """
                     INSERT INTO media_files (
                         id, filename, storage_key, original_name, url, category, uploaded_by, size, type,
-                        alt_text, description, tags, upload_date, created_at, updated_at,
-                        deleted_at, width, height
+                        alt_text, description, tags, is_brand_asset, brand_asset_type, upload_date,
+                        created_at, updated_at, deleted_at, width, height, content_hash, taxonomy_id
                     )
                     VALUES (
                         :id, :filename, :storage_key, :original_name, :url, :category, :uploaded_by, :size,
-                        :type, :alt_text, :description, :tags, :upload_date, :created_at, :updated_at,
-                        :deleted_at, :width, :height
+                        :type, :alt_text, :description, :tags, :is_brand_asset, :brand_asset_type,
+                        :upload_date, :created_at, :updated_at, :deleted_at, :width, :height, :content_hash, :taxonomy_id
                     )
                     RETURNING id, filename, original_name, url, thumbnail_url, category,
                               uploaded_by, upload_date, size, type, alt_text, description,
                               tags, is_brand_asset, brand_asset_type, created_at, updated_at,
-                              deleted_at, deleted_by, width, height
+                              deleted_at, deleted_by, width, height, content_hash, taxonomy_id
                     """
                 ),
                 {
@@ -257,13 +379,17 @@ class SqlAlchemyMediaRepository(MediaRepositoryPort):
                     "type": upload_file.content_type or "application/octet-stream",
                     "alt_text": alt_text,
                     "description": description,
-                    "tags": tags_value,
+                    "tags": sqlite_tags_value,
+                    "is_brand_asset": False,
+                    "brand_asset_type": None,
                     "upload_date": self._now(),
                     "created_at": self._now(),
                     "updated_at": self._now(),
                     "deleted_at": None,
                     "width": None,
                     "height": None,
+                    "content_hash": content_hash,
+                    "taxonomy_id": None,
                 },
             ).fetchone()
             session.commit()
@@ -281,7 +407,7 @@ class SqlAlchemyMediaRepository(MediaRepositoryPort):
             if not updates:
                 return self.get_media(media_id)
             updates.append("updated_at = :updated_at")
-            statement = text(f"UPDATE media_files SET {', '.join(updates)} WHERE id = :media_id RETURNING id, filename, original_name, url, thumbnail_url, category, uploaded_by, upload_date, size, type, alt_text, description, tags, is_brand_asset, brand_asset_type, created_at, updated_at, deleted_at, deleted_by, width, height")
+            statement = text(f"UPDATE media_files SET {', '.join(updates)} WHERE id = :media_id RETURNING id, filename, original_name, url, thumbnail_url, category, uploaded_by, upload_date, size, type, alt_text, description, tags, is_brand_asset, brand_asset_type, created_at, updated_at, deleted_at, deleted_by, width, height, content_hash, taxonomy_id")
             row = session.execute(statement, values).fetchone()
             session.commit()
         return self._row_to_domain(row)
@@ -297,7 +423,7 @@ class SqlAlchemyMediaRepository(MediaRepositoryPort):
                     RETURNING id, filename, original_name, url, thumbnail_url, category,
                               uploaded_by, upload_date, size, type, alt_text, description,
                               tags, is_brand_asset, brand_asset_type, created_at, updated_at,
-                              deleted_at, deleted_by, width, height
+                              deleted_at, deleted_by, width, height, content_hash, taxonomy_id
                     """
                 ),
                 {"media_id": media_id, "deleted_at": self._now(), "deleted_by": user_id, "updated_at": self._now()},
@@ -316,7 +442,7 @@ class SqlAlchemyMediaRepository(MediaRepositoryPort):
                     RETURNING id, filename, original_name, url, thumbnail_url, category,
                               uploaded_by, upload_date, size, type, alt_text, description,
                               tags, is_brand_asset, brand_asset_type, created_at, updated_at,
-                              deleted_at, deleted_by, width, height
+                              deleted_at, deleted_by, width, height, content_hash, taxonomy_id
                     """
                 ),
                 {"media_id": media_id, "updated_at": self._now()},
@@ -359,7 +485,7 @@ class SqlAlchemyMediaRepository(MediaRepositoryPort):
                     RETURNING id, filename, original_name, url, thumbnail_url, category,
                               uploaded_by, upload_date, size, type, alt_text, description,
                               tags, is_brand_asset, brand_asset_type, created_at, updated_at,
-                              deleted_at, deleted_by, width, height
+                              deleted_at, deleted_by, width, height, content_hash, taxonomy_id
                     """
                 ),
                 {
@@ -404,10 +530,10 @@ class SqlAlchemyMediaRepository(MediaRepositoryPort):
         with SessionLocal() as session:
             query = text(
                 """
-                SELECT mf.id, mf.filename, mf.original_name, mf.url, mf.thumbnail_url, mf.category,
-                       mf.uploaded_by, mf.upload_date, mf.size, mf.type, mf.alt_text, mf.description,
-                       mf.tags, mf.is_brand_asset, mf.brand_asset_type, mf.created_at, mf.updated_at,
-                       mf.deleted_at, mf.deleted_by, mf.width, mf.height
+                  SELECT mf.id, mf.filename, mf.original_name, mf.url, mf.thumbnail_url, mf.category,
+                      mf.uploaded_by, mf.upload_date, mf.size, mf.type, mf.alt_text, mf.description,
+                      mf.tags, mf.is_brand_asset, mf.brand_asset_type, mf.created_at, mf.updated_at,
+                      mf.deleted_at, mf.deleted_by, mf.width, mf.height, mf.content_hash, mf.taxonomy_id
                 FROM media_usage mu
                 JOIN media_files mf ON mf.id = mu.media_id
                 WHERE mu.entity_type = :entity_type
@@ -419,10 +545,10 @@ class SqlAlchemyMediaRepository(MediaRepositoryPort):
             if entity_id is not None:
                 query = text(
                     """
-                    SELECT mf.id, mf.filename, mf.original_name, mf.url, mf.thumbnail_url, mf.category,
-                           mf.uploaded_by, mf.upload_date, mf.size, mf.type, mf.alt_text, mf.description,
-                           mf.tags, mf.is_brand_asset, mf.brand_asset_type, mf.created_at, mf.updated_at,
-                           mf.deleted_at, mf.deleted_by, mf.width, mf.height
+                          SELECT mf.id, mf.filename, mf.original_name, mf.url, mf.thumbnail_url, mf.category,
+                              mf.uploaded_by, mf.upload_date, mf.size, mf.type, mf.alt_text, mf.description,
+                              mf.tags, mf.is_brand_asset, mf.brand_asset_type, mf.created_at, mf.updated_at,
+                              mf.deleted_at, mf.deleted_by, mf.width, mf.height, mf.content_hash, mf.taxonomy_id
                     FROM media_usage mu
                     JOIN media_files mf ON mf.id = mu.media_id
                     WHERE mu.entity_type = :entity_type
@@ -435,10 +561,10 @@ class SqlAlchemyMediaRepository(MediaRepositoryPort):
             elif entity_id is None:
                 query = text(
                     """
-                    SELECT mf.id, mf.filename, mf.original_name, mf.url, mf.thumbnail_url, mf.category,
-                           mf.uploaded_by, mf.upload_date, mf.size, mf.type, mf.alt_text, mf.description,
-                           mf.tags, mf.is_brand_asset, mf.brand_asset_type, mf.created_at, mf.updated_at,
-                           mf.deleted_at, mf.deleted_by, mf.width, mf.height
+                          SELECT mf.id, mf.filename, mf.original_name, mf.url, mf.thumbnail_url, mf.category,
+                              mf.uploaded_by, mf.upload_date, mf.size, mf.type, mf.alt_text, mf.description,
+                              mf.tags, mf.is_brand_asset, mf.brand_asset_type, mf.created_at, mf.updated_at,
+                              mf.deleted_at, mf.deleted_by, mf.width, mf.height, mf.content_hash, mf.taxonomy_id
                     FROM media_usage mu
                     JOIN media_files mf ON mf.id = mu.media_id
                     WHERE mu.entity_type = :entity_type

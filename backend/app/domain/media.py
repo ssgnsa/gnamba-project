@@ -21,6 +21,8 @@ class MediaAsset:
     tags: list[str] | None = None
     is_brand_asset: bool = False
     brand_asset_type: Optional[str] = None
+    content_hash: Optional[str] = None
+    taxonomy_id: Optional[str] = None
     created_at: Optional[object] = None
     updated_at: Optional[object] = None
     deleted_at: Optional[object] = None
@@ -45,6 +47,8 @@ class MediaAsset:
             "tags": self.tags or [],
             "is_brand_asset": self.is_brand_asset,
             "brand_asset_type": self.brand_asset_type,
+            "content_hash": self.content_hash,
+            "taxonomy_id": self.taxonomy_id,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "deleted_at": self.deleted_at,
