@@ -109,10 +109,7 @@ export default function MediaUploader({
   const { user, loading } = useAuth();
   const [dragging, setDragging] = useState(false);
   const [items, setItems] = useState<UploadItem[]>([]);
-  const [category, setCategory] = useState<MediaCategory>(defaultCategory);
   const [altText, setAltText] = useState("");
-  const [description, setDescription] = useState("");
-  const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [previewUrls, setPreviewUrls] = useState<Map<number, string>>(
@@ -156,14 +153,15 @@ export default function MediaUploader({
     [addFiles],
   );
 
-  const addTag = () => {
-    const t = tagInput.trim().toLowerCase().replace(/\s+/g, "-");
-    if (t && !tags.includes(t)) setTags((prev) => [...prev, t]);
-    setTagInput("");
+  const buildAutoAltText = (fileName: string) =>
+    fileName.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+
+  const addTag = (t: string) => {
+    const tag = t.trim().toLowerCase().replace(/\s+/g, "-");
+    if (tag && !tags.includes(tag)) setTags((prev) => [...prev, tag]);
   };
 
-  const removeTag = (t: string) =>
-    setTags((prev) => prev.filter((x) => x !== t));
+  const removeTag = (t: string) => setTags((prev) => prev.filter((x) => x !== t));
 
   const formatSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
@@ -204,10 +202,28 @@ export default function MediaUploader({
       );
 
       if (isSelfHostedMode()) {
-        const result = await apiClient.media.upload(mainFile, {
-          category,
-          alt_text: altText,
-          description,
+        const effectiveAltText = altText || buildAutoAltText(mainFile.name);
+        // minimal metadata: only alt_text and tags
+        // Ensure we always send a browser `File` instance. Some environments
+        // can supply Blobs or other objects (SSR/tools) — coerce to `File`
+        // to keep the multipart contract stable.
+        let fileToSend: File = mainFile as File;
+        try {
+          if (!(fileToSend instanceof File)) {
+            // coerce: keep original name where possible
+            const name = (mainFile as any).name || `upload-${Date.now()}`;
+            fileToSend = new File([mainFile as Blob], name, { type: mainFile.type });
+          }
+        } catch (e) {
+          // defensive fallback: create File from blob-like
+          const name = (mainFile as any).name || `upload-${Date.now()}`;
+          fileToSend = new File([mainFile as Blob], name, { type: mainFile.type });
+        }
+
+        const result = await apiClient.media.upload(fileToSend, {
+          category: "autre",
+          alt_text: effectiveAltText,
+          description: "",
           tags,
         });
 
@@ -243,7 +259,7 @@ export default function MediaUploader({
       }
 
       const ext = mainFile.name.split(".").pop();
-      const base = `${category}/${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      const base = `autre/${Date.now()}_${Math.random().toString(36).slice(2)}`;
       const filename = `${base}.${ext}`;
 
       const uploadContentType = canCompress
@@ -343,12 +359,12 @@ export default function MediaUploader({
           original_name: item.file.name,
           url: publicUrl,
           thumbnail_url: thumbnailUrl,
-          category,
+          category: "autre",
           uploaded_by: user?.id ?? null,
           size: mainFile.size,
           type: mainFile.type,
-          alt_text: altText,
-          description,
+          alt_text: altText || buildAutoAltText(item.file.name),
+          description: "",
           tags,
           width: imgWidth,
           height: imgHeight,
@@ -400,80 +416,18 @@ export default function MediaUploader({
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">
-            Catégorie
-          </label>
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value as MediaCategory)}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-          >
-            {(Object.keys(CATEGORY_LABELS) as MediaCategory[]).map((cat) => (
-              <option key={cat} value={cat}>
-                {CATEGORY_LABELS[cat]}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">
-            Texte alternatif
-          </label>
-          <input
-            value={altText}
-            onChange={(e) => setAltText(e.target.value)}
-            placeholder="Description pour SEO..."
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          />
-        </div>
-      </div>
-
       <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1">
-          Description
-        </label>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Texte alternatif</label>
         <input
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="Description de l'image..."
+          value={altText}
+          onChange={(e) => setAltText(e.target.value)}
+          placeholder="Optionnel — description pour SEO..."
           className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
         />
-      </div>
-
-      <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1">
-          <Tag size={11} className="inline mr-1" />
-          Tags
-        </label>
-        <div className="flex gap-2">
-          <input
-            value={tagInput}
-            onChange={(e) => setTagInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                addTag();
-              }
-            }}
-            placeholder="Ajouter un tag..."
-            className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          />
-          <button
-            onClick={addTag}
-            className="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs font-medium text-gray-600 transition-colors"
-          >
-            + Ajouter
-          </button>
-        </div>
         {tags.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-2">
             {tags.map((t) => (
-              <span
-                key={t}
-                className="flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 text-xs rounded-full"
-              >
+              <span key={t} className="flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 text-xs rounded-full">
                 #{t}
                 <button onClick={() => removeTag(t)}>
                   <X size={9} />
