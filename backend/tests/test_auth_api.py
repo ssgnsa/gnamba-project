@@ -52,15 +52,32 @@ class LocalAuthApiTests(unittest.TestCase):
         self.assertEqual(me_response.json()['user']['email'], 'admin@egs.local')
 
     def test_create_user(self) -> None:
+        login = self.client.post('/api/v1/auth/login', json={
+            'email': 'admin@egs.local',
+            'password': 'Admin@EGS2025!',
+        })
+        token = login.json()['access_token']
         response = self.client.post('/api/v1/users', json={
             'email': 'user@egs.local',
             'password': 'Test123!',
             'full_name': 'Test User',
-            'access_level': 'employe'
+            'access_level': 'employe',
+        }, headers={
+            'Authorization': f'Bearer {token}',
         })
         self.assertEqual(response.status_code, 200)
         body = response.json()
         self.assertEqual(body['user']['email'], 'user@egs.local')
+
+    def test_create_user_requires_authenticated_admin(self) -> None:
+        response = self.client.post('/api/v1/users', json={
+            'email': 'attacker@egs.local',
+            'password': 'Test123!',
+            'full_name': 'Attacker',
+            'role': 'admin',
+            'access_level': 'admin',
+        })
+        self.assertEqual(response.status_code, 401)
 
     def test_admin_can_change_password_with_current_password(self) -> None:
         os.environ['INITIAL_ADMIN_PASSWORD'] = 'EgsAdminInitialPass2026Secure!'
@@ -93,4 +110,3 @@ class LocalAuthApiTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-

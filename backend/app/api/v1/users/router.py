@@ -13,8 +13,15 @@ router = APIRouter(prefix="/api/v1/users", tags=["users"])
 
 
 @router.post("", response_model=AuthTokenResponse)
-def create_user(payload: CreateUserRequest, auth_service: AuthService = Depends(get_auth_service)) -> AuthTokenResponse:
+def create_user(
+    payload: CreateUserRequest,
+    authorization: str | None = Header(default=None),
+    auth_service: AuthService = Depends(get_auth_service),
+) -> AuthTokenResponse:
     try:
+        current_user = auth_service.get_current_user(authorization)
+        if current_user.get("role") != "admin":
+            raise AuthorizationError("Accès refusé")
         return AuthTokenResponse(**auth_service.create_user(payload.model_dump()))
     except (AuthenticationError, AuthorizationError) as exc:
         raise get_http_exception_for_error(exc) from exc
