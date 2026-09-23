@@ -78,7 +78,7 @@ export default defineConfig({
     allowedHosts: ["gnambaservices.ci"],
     proxy: {
       '/api/v1': {
-        target: 'http://localhost:8000/api/v1',
+        target: 'http://localhost:8000',
         changeOrigin: true,
         secure: false,
       },

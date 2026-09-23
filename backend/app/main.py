@@ -46,9 +46,9 @@ storage_root = Path(os.getenv("LOCAL_STORAGE_ROOT", "backend/storage/uploads")).
 storage_root.mkdir(parents=True, exist_ok=True)
 app.mount("/storage", StaticFiles(directory=storage_root), name="storage")
 
-# CORS middleware - uses CORS_ORIGINS from environment (comma-separated)
-cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:8080,").split(",")
-cors_origins = [origin.strip() for origin in cors_origins if origin.strip()]
+# CORS middleware - uses the shared configuration so local dev ports are allowed
+# without requiring each environment file to be manually updated.
+cors_origins = settings.cors_origins()
 
 app.add_middleware(
     CORSMiddleware,

@@ -14,18 +14,38 @@ class Settings:
     ACCESS_TOKEN_TTL_SECONDS = int(os.getenv("LOCAL_AUTH_ACCESS_TOKEN_TTL_SECONDS", "3600"))
     REFRESH_TOKEN_TTL_SECONDS = int(os.getenv("LOCAL_AUTH_REFRESH_TOKEN_TTL_SECONDS", "2592000"))
 
+    DEFAULT_CORS_ORIGINS = [
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://gnambaservices.ci",
+        "https://www.gnambaservices.ci",
+        "https://api.gnambaservices.ci",
+    ]
+
     def cors_origins(self) -> list[str]:
         """Return a cleaned list of CORS origins from attribute or env var.
 
         Accepts a comma-separated string optionally containing quotes and
-        whitespace (as used in tests).
+        whitespace (as used in tests). Includes the local Vite frontend by
+        default so the dev server can talk to the API without manual env edits.
         """
-        raw = getattr(self, "CORS_ORIGINS", None) or os.getenv("CORS_ORIGINS", "")
+        raw = getattr(self, "CORS_ORIGINS", None)
+        if raw is None or raw == "":
+            raw = os.getenv("CORS_ORIGINS", "")
+
         if not raw:
-            return []
-        parts = [p.strip() for p in raw.split(",") if p.strip()]
-        # remove surrounding quotes if present
-        return [p.strip("'\"") for p in parts]
+            return list(self.DEFAULT_CORS_ORIGINS)
+
+        env_origins = [
+            p.strip().strip("'\"")
+            for p in raw.split(",")
+            if p.strip()
+        ]
+        return env_origins
 
 
 settings = Settings()

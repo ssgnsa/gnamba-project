@@ -19,6 +19,25 @@ interface AuthResult {
   code?: string;
 }
 
+export function resolveApiBaseUrl(
+  configuredBase = '/api/v1',
+  origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173',
+): string {
+  const trimmed = configuredBase.replace(/\/+$/, '');
+  const normalized = trimmed.endsWith('/api/v1')
+    ? trimmed
+    : `${trimmed}/api/v1`;
+
+  const isLocalFrontend = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+  const isLocalApi = /^https?:\/\/localhost:8000\/api\/v1$/.test(normalized) || /^http:\/\/127\.0\.0\.1:8000\/api\/v1$/.test(normalized);
+
+  if (isLocalFrontend && isLocalApi) {
+    return '/api/v1';
+  }
+
+  return normalized;
+}
+
 // Core API client class
 class ApiClient {
   private baseUrl: string;
@@ -43,10 +62,7 @@ class ApiClient {
 
   constructor() {
     const configuredBase = import.meta.env.VITE_API_URL || '/api/v1';
-    const trimmed = configuredBase.replace(/\/+$/, '');
-    this.baseUrl = trimmed.endsWith('/api/v1')
-      ? trimmed
-      : `${trimmed}/api/v1`;
+    this.baseUrl = resolveApiBaseUrl(configuredBase);
     this.defaultHeaders = {
       'Content-Type': 'application/json',
     };
