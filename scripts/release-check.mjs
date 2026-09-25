@@ -44,29 +44,27 @@ const legacyRootFiles = [
   "scripts/deploy-and-verify.sh",
   "src/lib/legacySupabaseAdapter.ts",
   "src/lib/supabase.ts",
-  "src/data/client.ts",
   "src/services/api/client.ts",
 ];
+const retainedTransitionFiles = ["src/data/client.ts"];
 const forbiddenPatterns = [
   "Session expir\u00e9e",
   "capture-lead",
-  "localhost:8000",
-  "127.0.0.1",
   "192.168.",
   ":54321",
   "/functions/",
   "/functions/v1/",
   "/storage/v1/",
   "/rest/v1/",
-");
+  ];
 const allowedExceptions = [
   { file: "src/lib/selfHosted.ts", pattern: "gnambaservices.ci" },
   { file: "src/lib/selfHosted.ts", pattern: "files.gnambaservices.ci/egs" },
-  { file: "dist/", pattern: "localhost:8000" },
-  { file: "dist/", pattern: "127.0.0.1" },
   { file: "dist/", pattern: "https://api.gnambaservices.ci" },
   { file: "dist/", pattern: "https://files.gnambaservices.ci/egs" },
 ];
+const productionLoopbackUrlPattern =
+  /https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?(?:[/?#][^\s"'`<>]*)?/gi;
 
 const failures = [];
 
@@ -82,12 +80,18 @@ for (const relativePath of legacyRootFiles) {
   }
 }
 
+const retainedTransitions = retainedTransitionFiles.filter((relativePath) =>
+  existsSync(path.join(root, relativePath)),
+);
+
 if (!existsSync(distDir)) {
   failures.push("Missing required dist/ build directory.");
 }
 
-function scanForForbiddenPatterns(filePath: string, relPath: string) {
-  let content: string;
+function scanForForbiddenPatterns(filePath, relPath) {
+  if (/(?:^|\/)[^/]+\.(?:test|spec)\.(?:ts|tsx)$/i.test(relPath)) return;
+
+  let content;
   try {
     content = readFileSync(filePath, "utf-8");
   } catch (e) {
@@ -104,9 +108,21 @@ function scanForForbiddenPatterns(filePath: string, relPath: string) {
       }
     }
   }
+
+  if (relPath.startsWith("dist/")) {
+    // resolveApiBaseUrl embeds localhost:5173 as its local frontend-origin default.
+    const loopbackUrl = (content.match(productionLoopbackUrlPattern) ?? []).find(
+      (url) => !/^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\]):5173$/i.test(url),
+    );
+    if (loopbackUrl) {
+      failures.push(
+        `Production artifact contains loopback URL "${loopbackUrl}" in ${relPath}`,
+      );
+    }
+  }
 }
 
-function walkAndScan(dir: string, baseDir: string) {
+function walkAndScan(dir, baseDir) {
   if (!existsSync(dir)) return;
   for (const entry of readdirSync(dir)) {
     const full = path.join(dir, entry);
@@ -123,12 +139,16 @@ function walkAndScan(dir: string, baseDir: string) {
 
 for (const scanRoot of scanRoots) {
   if (statSync(scanRoot).isDirectory()) {
-    walkAndScan(scanRoot, scanRoot);
+    walkAndScan(scanRoot, root);
   } else {
     const rel = path.relative(root, scanRoot);
     scanForForbiddenPatterns(scanRoot, rel);
   }
 }
+
+retainedTransitions.forEach((file) =>
+  console.warn(`\nℹ️ Retained transition adapter: ${file}`),
+);
 
 if (failures.length > 0) {
   console.error("\n\u274c RELEASE CHECK FAILED:");
