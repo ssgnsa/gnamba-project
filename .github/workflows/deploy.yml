@@ -193,6 +193,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    env:
+      DOCKER_LOGIN_CONFIGURED: ${{ secrets.DOCKER_USERNAME != '' }}
 
     steps:
       - name: Checkout code
@@ -203,7 +205,7 @@ jobs:
 
       - name: Login to Docker Hub (optional)
         uses: docker/login-action@v3
-        if: ${{ secrets.DOCKER_USERNAME }}
+        if: ${{ env.DOCKER_LOGIN_CONFIGURED == 'true' }}
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
@@ -297,11 +299,13 @@ jobs:
     runs-on: ubuntu-latest
     needs: [deploy]
     if: always() && github.event_name != 'workflow_dispatch'
+    env:
+      SMTP_SERVER_CONFIGURED: ${{ secrets.SMTP_SERVER != '' }}
 
     steps:
       - name: Send email notification (optional)
         uses: dawidd6/action-send-mail@v3
-        if: ${{ secrets.SMTP_SERVER }}
+        if: ${{ env.SMTP_SERVER_CONFIGURED == 'true' }}
         with:
           server_address: ${{ secrets.SMTP_SERVER }}
           server_port: ${{ secrets.SMTP_PORT || 587 }}
