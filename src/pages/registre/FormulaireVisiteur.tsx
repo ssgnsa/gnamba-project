@@ -1,6 +1,7 @@
 import { memo, useMemo } from "react";
 import { VisiteurFormData } from "../../types";
 import { validateIvoryCoastPhone } from "../../lib/phone/ivoryCoastPhone";
+import StorageImage from "../../components/media/StorageImage";
 import {
   Camera,
   Upload,
@@ -138,7 +139,7 @@ export const FormulaireVisiteur = memo(function FormulaireVisiteur({
               </div>
             ) : visitorForm.photo_url ? (
               <div className="relative">
-                <img
+                <StorageImage
                   src={visitorForm.photo_url}
                   alt="Photo"
                   className="w-24 h-32 object-cover rounded-xl border-2 border-blue-200"

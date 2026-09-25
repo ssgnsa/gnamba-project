@@ -7,6 +7,7 @@ import dbClient from "../../data/tableClient";
 import type { MediaFile, MediaCategory } from "../../types";
 import MediaCard from "./MediaCard";
 import MediaUploader from "./MediaUploader";
+import StorageImage from "./StorageImage";
 
 const CATEGORIES: { value: string; label: string }[] = [
   { value: "all", label: "Toutes les catégories" },
@@ -358,7 +359,7 @@ export default function MediaPicker({
           <div>
             {selected && (
               <div className="flex items-center gap-2">
-                <img
+                <StorageImage
                   src={selected.url}
                   alt=""
                   crossOrigin="anonymous"

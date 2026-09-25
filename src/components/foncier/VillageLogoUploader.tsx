@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Image } from "lucide-react";
 import { assignMedia, getUsageForSlot } from "../../lib/mediaUtils";
 import MediaPicker from "../media/MediaPicker";
+import StorageImage from "../media/StorageImage";
 import type { MediaFile } from "../../types";
 
 interface VillageLogoUploaderProps {
@@ -76,7 +77,7 @@ export function VillageLogoUploader({
         <div className="relative group flex-shrink-0">
           {previewUrl ? (
             <>
-              <img
+              <StorageImage
                 src={previewUrl}
                 alt={`Logo ${villageName}`}
                 className="w-32 h-32 object-contain rounded-full border-4 border-amber-500/30 bg-white p-2"
@@ -172,7 +173,7 @@ export function VillageLogoDisplay({
 
   if (resolvedUrl) {
     return (
-      <img
+      <StorageImage
         src={resolvedUrl}
         alt={`Logo ${villageName}`}
         className={`${sizeClasses[size]} object-contain rounded-full border-2 border-amber-500/30 bg-white p-1 ${className}`}

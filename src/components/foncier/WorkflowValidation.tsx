@@ -14,7 +14,7 @@ import { logFoncierAudit } from "../../lib/foncierAudit";
 import Badge from "../ui/Badge";
 import MediaPicker from "../media/MediaPicker";
 import { assignMedia, getUsageForSlot } from "../../lib/mediaUtils";
-import SafeImage from "../ui/SafeImage";
+import StorageImage, { StorageLink } from "../media/StorageImage";
 import type { MediaFile } from "../../types";
 
 interface AttestationStatus {
@@ -496,11 +496,10 @@ export default function WorkflowValidation({
         ) : scanMedia ? (
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
-              <SafeImage
+              <StorageImage
                 src={scanMedia.url}
                 alt={scanMedia.original_name}
                 className="w-full h-full object-cover"
-                fallbackClassName="w-full h-full"
               />
               <ImageIcon size={20} className="text-gray-300" />
             </div>
@@ -508,14 +507,14 @@ export default function WorkflowValidation({
               <p className="text-sm font-medium text-gray-700">
                 {scanMedia.original_name}
               </p>
-              <a
+              <StorageLink
                 href={scanMedia.url}
                 target="_blank"
                 rel="noreferrer"
                 className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1"
               >
                 Ouvrir <ExternalLink size={12} />
-              </a>
+              </StorageLink>
             </div>
           </div>
         ) : (

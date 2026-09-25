@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from abc import ABC, abstractmethod
 from pathlib import Path
+from pathlib import PurePosixPath, PureWindowsPath
 from typing import Any
 from urllib.parse import quote
 
@@ -44,12 +45,23 @@ class LocalStorageProvider(StorageProvider):
         self.storage_root.mkdir(parents=True, exist_ok=True)
         self.base_url = os.getenv("LOCAL_STORAGE_BASE_URL", "http://localhost:8000/storage").rstrip("/")
 
-    def _resolve_path(self, storage_key: str) -> Path:
+    def resolve_path(self, storage_key: str) -> Path:
         safe_key = storage_key.replace("\\", "/")
-        if safe_key.startswith("/") or safe_key.startswith("../") or "/../" in safe_key:
+        relative_key = PurePosixPath(safe_key)
+        if (
+            not safe_key
+            or "\x00" in safe_key
+            or relative_key.is_absolute()
+            or PureWindowsPath(safe_key).is_absolute()
+            or any(part in {"", ".", ".."} for part in safe_key.split("/"))
+        ):
             raise ValueError("storage_key invalide")
-        candidate = (self.storage_root / safe_key).resolve()
-        if not str(candidate).startswith(str(self.storage_root)):
+        candidate = (self.storage_root / Path(*relative_key.parts)).resolve()
+        try:
+            candidate.relative_to(self.storage_root)
+        except ValueError as exc:
+            raise ValueError("storage_key invalide") from exc
+        if candidate == self.storage_root:
             raise ValueError("storage_key invalide")
         return candidate
 
@@ -60,7 +72,7 @@ class LocalStorageProvider(StorageProvider):
         content_type: str,
         original_name: str | None = None,
     ) -> dict[str, Any]:
-        path = self._resolve_path(storage_key)
+        path = self.resolve_path(storage_key)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(content)
         return {
@@ -72,7 +84,7 @@ class LocalStorageProvider(StorageProvider):
         }
 
     def delete(self, storage_key: str) -> None:
-        path = self._resolve_path(storage_key)
+        path = self.resolve_path(storage_key)
         if path.exists():
             path.unlink()
 

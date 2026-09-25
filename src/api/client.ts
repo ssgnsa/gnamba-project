@@ -126,6 +126,43 @@ class ApiClient {
     }
   }
 
+  async fetchStorageFile(fileUrl: string): Promise<Blob> {
+    if (typeof window === 'undefined') throw new Error('Storage files are browser-only');
+
+    const parsed = new URL(fileUrl, window.location.origin);
+    const prefix = '/storage/';
+    if (!parsed.pathname.startsWith(prefix)) {
+      throw new Error('URL de stockage invalide');
+    }
+
+    const endpoint = `/storage/files/${parsed.pathname.slice(prefix.length)}${parsed.search}`;
+    const fetchFile = () => fetch(`${this.baseUrl}${endpoint}`, {
+      headers: this.getAuthHeaders(),
+    });
+
+    let response = await fetchFile();
+    if (response.status === 401) {
+      const refreshToken = window.localStorage.getItem('egs:local_refresh_token');
+      if (refreshToken) {
+        const refreshResponse = await fetch(`${this.baseUrl}/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        });
+        if (refreshResponse.ok) {
+          const tokens = await refreshResponse.json() as { access_token?: string; refresh_token?: string };
+          if (tokens.access_token) {
+            await this.persistLocalAuthToken(tokens.access_token, tokens.refresh_token || refreshToken);
+            response = await fetchFile();
+          }
+        }
+      }
+    }
+
+    if (!response.ok) throw new Error(`Lecture du fichier refusée (${response.status})`);
+    return response.blob();
+  }
+
   // Auth module
   auth = {
     login: async (email: string, password: string) => this.request<AuthResult>('/auth/login', {

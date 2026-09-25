@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Trash2, Eye, Check, Copy, Star, Tag, FileText } from "lucide-react";
 import type { MediaFile } from "../../types";
+import StorageImage from "./StorageImage";
 
 const CATEGORY_LABELS: Record<string, string> = {
   brand_assets: "Actifs de marque",
@@ -94,7 +95,7 @@ export default function MediaCard({
     >
       <div className="aspect-square bg-gray-100 overflow-hidden relative">
         {isImage && !imgError ? (
-          <img
+          <StorageImage
             src={file.thumbnail_url || resolvedUrl}
             alt={file.alt_text || file.original_name}
             loading="lazy"

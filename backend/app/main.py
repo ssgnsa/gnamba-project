@@ -1,13 +1,13 @@
 from fastapi import FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 import os
 import json
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api import v1_router
+from app.api.storage_files import router as storage_files_router
 from app.core.bootstrap import initialize_system_seed
 from app.core.config import settings
 from app.core.database import SessionLocal
@@ -41,10 +41,8 @@ app = FastAPI(title=settings.APP_NAME, version="0.2.0")
 import mimetypes
 mimetypes.add_type("image/webp", ".webp")
 
-# Serve storage files (media uploads)
-storage_root = Path(os.getenv("LOCAL_STORAGE_ROOT", "backend/storage/uploads")).resolve()
-storage_root.mkdir(parents=True, exist_ok=True)
-app.mount("/storage", StaticFiles(directory=storage_root), name="storage")
+# Serve storage files through an authorization-aware route.
+app.include_router(storage_files_router)
 
 # CORS middleware - uses the shared configuration so local dev ports are allowed
 # without requiring each environment file to be manually updated.

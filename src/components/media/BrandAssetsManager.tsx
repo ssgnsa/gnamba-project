@@ -5,6 +5,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useSettings } from "../../context/SettingsContext";
 import type { MediaFile, BrandAssetType } from "../../types";
 import MediaPicker from "./MediaPicker";
+import StorageImage from "./StorageImage";
 
 interface BrandSlot {
   type: BrandAssetType;
@@ -195,7 +196,7 @@ export default function BrandAssetsManager() {
               <div className="flex items-center gap-4 mb-4">
                 <div className="w-20 h-20 rounded-xl bg-gray-100 border-2 border-dashed border-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0">
                   {current ? (
-                    <img
+                    <StorageImage
                       src={current.url}
                       alt={slot.label}
                       crossOrigin="anonymous"

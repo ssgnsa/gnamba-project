@@ -15,6 +15,7 @@ import Modal from "../components/ui/Modal";
 import Badge from "../components/ui/Badge";
 import { useSettings } from "../context/SettingsContext";
 import MediaPicker from "../components/media/MediaPicker";
+import StorageImage from "../components/media/StorageImage";
 
 const categorieLabels: Record<string, string> = {
   fournitures_bureau: "Fournitures Bureau",
@@ -242,7 +243,7 @@ export default function Fournitures() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           {p.image_url ? (
-                            <img
+                            <StorageImage
                               src={p.image_url}
                               alt={p.nom}
                               crossOrigin="anonymous"
@@ -335,7 +336,7 @@ export default function Fournitures() {
             <div className="flex items-center gap-3">
               {form.image_url ? (
                 <div className="relative">
-                  <img
+                  <StorageImage
                     src={form.image_url}
                     alt="Produit"
                     crossOrigin="anonymous"
