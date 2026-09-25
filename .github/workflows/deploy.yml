@@ -11,6 +11,7 @@ on:
     branches: [main, master]
   pull_request:
     branches: [main, master]
+  workflow_dispatch:
 
 env:
   NODE_VERSION: "18"
@@ -73,6 +74,115 @@ jobs:
         with:
           name: dist
           path: dist/
+          retention-days: 7
+
+  # Manual signature validation only. The Docker build and deploy jobs below
+  # are restricted to push events on main, so this path cannot publish.
+  sign-frontend:
+    name: Sign Frontend Artifact (Manual Validation)
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Download frontend build
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Package, sign, and verify frontend artifact
+        env:
+          EGS_RELEASE_SIGNING_KEY: ${{ secrets.EGS_RELEASE_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          set +x
+          if [[ -z "${EGS_RELEASE_SIGNING_KEY:-}" ]]; then
+            echo "::error::Required secret EGS_RELEASE_SIGNING_KEY is not configured"
+            exit 1
+          fi
+
+          key_file="$RUNNER_TEMP/egs-release-signing-key.pem"
+          release_dir="$RUNNER_TEMP/egs-frontend-release"
+          cleanup() { rm -f -- "$key_file"; }
+          trap cleanup EXIT
+          (umask 077; printf '%s' "$EGS_RELEASE_SIGNING_KEY" > "$key_file")
+          chmod 0600 "$key_file"
+          export EGS_RELEASE_SIGNING_KEY_FILE="$key_file"
+          export EGS_RELEASE_OUTPUT="$release_dir"
+
+          python scripts/package-frontend-release.py
+
+          test -s ops/egs-publisher/ci-ed25519.pub
+          openssl pkey -pubin -in ops/egs-publisher/ci-ed25519.pub -noout
+          mapfile -t manifests < <(find "$release_dir" -maxdepth 1 -type f -name '*.json' -print)
+          if [[ "${#manifests[@]}" -ne 1 ]]; then
+            echo "::error::Expected exactly one signed attestation"
+            exit 1
+          fi
+          manifest="${manifests[0]}"
+          request_id="$(basename "$manifest" .json)"
+          if [[ ! "$request_id" =~ ^[a-f0-9]{32}$ ]]; then
+            echo "::error::Invalid release request identifier"
+            exit 1
+          fi
+          archive="$release_dir/$request_id.tar"
+          signature="$release_dir/$request_id.sig"
+          test -s "$archive"
+          test -s "$signature"
+          openssl pkeyutl -verify -pubin \
+            -inkey ops/egs-publisher/ci-ed25519.pub \
+            -rawin -in "$manifest" -sigfile "$signature" >/dev/null
+          python - "$archive" "$manifest" dist/VERSION.json <<'PY'
+          import hashlib
+          import json
+          import pathlib
+          import sys
+
+          archive, manifest, version_file = map(pathlib.Path, sys.argv[1:])
+          attestation = json.loads(manifest.read_bytes())
+          archive_hash = hashlib.sha256(archive.read_bytes()).hexdigest()
+          version_hash = hashlib.sha256(version_file.read_bytes()).hexdigest()
+          if attestation.get("archive_sha256") != archive_hash:
+              raise SystemExit("attested archive hash does not match the artifact")
+          if attestation.get("version_json_sha256") != version_hash:
+              raise SystemExit("attested VERSION.json hash does not match the build")
+          if attestation.get("release_check") is not True or attestation.get("frontend_validation") is not True:
+              raise SystemExit("required frontend validation gates are not attested")
+          if sorted(path.name for path in archive.parent.iterdir()) != sorted(
+              [archive.name, manifest.name, manifest.with_suffix(".sig").name]
+          ):
+              raise SystemExit("unexpected file found in signed artifact staging")
+          print("Signature and archive/version hashes verified")
+          PY
+
+      - name: Upload signed frontend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: egs-frontend-signed
+          path: ${{ runner.temp }}/egs-frontend-release/*
+          if-no-files-found: error
           retention-days: 7
 
   # ============================================
@@ -186,7 +296,7 @@ jobs:
     name: Send Notification
     runs-on: ubuntu-latest
     needs: [deploy]
-    if: always()
+    if: always() && github.event_name != 'workflow_dispatch'
 
     steps:
       - name: Send email notification (optional)
