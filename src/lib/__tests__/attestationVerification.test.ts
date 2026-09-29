@@ -62,7 +62,7 @@ describe("attestationVerification helpers", () => {
     expect(calledUrl).toContain("/api/v1/foncier/attestations/verify");
     expect(calledUrl).toContain("ref=APV-2026-001");
     expect(calledOpts).toBeDefined();
-    expect(calledOpts.headers).toBeUndefined();
+    expect(calledOpts.headers).toEqual({ "Content-Type": "application/json" });
     expect(result).toEqual(payload);
   });
 

@@ -39,7 +39,7 @@ export function useFoncierAudit() {
       const performerIds = Array.from(
         new Set(
           rows
-            .map((row) => row.performed_by)
+            .map((row) => row.user_id)
             .filter((value): value is string => Boolean(value)),
         ),
       );
@@ -47,32 +47,31 @@ export function useFoncierAudit() {
       let namesById: Record<string, string> = {};
       if (performerIds.length > 0) {
         const { data: profilesData, error: profilesError } = await dataService.getUserProfiles(performerIds) as {
-          data: Array<{ id: string; full_name: string | null }> | null;
+          data: Record<string, { full_name: string | null }> | null;
           error: any;
         };
         if (profilesError) {
           if (import.meta.env.DEV) console.warn("Failed to load user profiles for audit", profilesError);
-        } else {
-          namesById = (profilesData || []).reduce(
-            (acc: Record<string, string>, profile: { id: string; full_name: string | null }) => {
-              acc[profile.id] = profile.full_name || "";
-              return acc;
-            },
-            {} as Record<string, string>,
+        } else if (profilesData) {
+          namesById = Object.fromEntries(
+            Object.entries(profilesData).map(([id, profile]) => [id, profile.full_name || ""]),
           );
         }
       }
 
       const normalizedRows: AuditRecord[] = rows.map((row) => ({
         id: row.id,
-        parcelle_id: row.lot_id,
+        parcelle_id: row.entity_type === "foncier_lot" ? row.entity_id : null,
         action: row.action,
-        utilisateur_nom: row.performed_by
-          ? namesById[row.performed_by] || null
-          : null,
-        date_action: row.performed_at,
+        utilisateur_nom: row.user_id
+          ? namesById[row.user_id] || (
+              row.user_name?.toLowerCase() === row.user_id.toLowerCase()
+                ? null
+                : row.user_name
+            )
+          : row.user_name,
+        date_action: row.created_at,
         details: row.new_values || row.old_values || null,
-        foncier_lots: row.foncier_lots || null,
       }));
 
       setAuditRecords(normalizedRows);

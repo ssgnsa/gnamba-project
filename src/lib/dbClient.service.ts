@@ -407,11 +407,9 @@ export const foncierRepository = {
    * Get audit logs
    */
   async getAudit(page: number, pageSize: number, actionFilter?: string): Promise<RepoResult<any[]>> {
-    const from = (page - 1) * pageSize;
-
     const params = new URLSearchParams();
-    params.append('offset', String(from));
-    params.append('limit', String(pageSize));
+    params.append('page', String(page));
+    params.append('page_size', String(pageSize));
     if (actionFilter) {
       params.append('action', actionFilter);
     }
@@ -421,7 +419,13 @@ export const foncierRepository = {
     if (result.error) {
       return { data: null, error: result.error, count: null };
     }
-    return { data: result.data as any[], error: null, count: result.count || 0 };
+
+    const response = result.data as { items?: any[]; total?: number } | any[] | null;
+    const items = Array.isArray(response) ? response : response?.items ?? [];
+    const count = Array.isArray(response)
+      ? result.count ?? items.length
+      : response?.total ?? result.count ?? items.length;
+    return { data: items, error: null, count };
   },
 
   /**

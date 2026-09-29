@@ -1,32 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 
-// Mock des dépendances
-const mockDataClient = {
-  rpc: vi.fn(),
-  from: vi.fn(() => ({
-    select: vi.fn(() => ({
-      eq: vi.fn(() => ({
-        order: vi.fn(() => ({
-          range: vi.fn(() => ({
-            count: vi.fn(),
-          })),
-        })),
-      })),
-    })),
-  })),
-};
-
-vi.mock("../lib/dbClient", () => ({
-  dbClient: mockDataClient,
+const { mockDataService } = vi.hoisted(() => ({
+  mockDataService: {
+    searchLots: vi.fn(),
+    getVillageStats: vi.fn(),
+    getAudit: vi.fn(),
+    getUserProfiles: vi.fn(),
+  },
 }));
 
-vi.mock("../data/tableClient", () => ({
-  default: mockDataClient,
-}));
-
-vi.mock("../hooks/useFoncierSync", () => ({
-  withBackoff: vi.fn((fn) => fn()),
+vi.mock("../lib/dbClient.service", () => ({
+  dataService: mockDataService,
 }));
 
 describe("Foncier Hooks Tests", () => {
@@ -37,8 +22,6 @@ describe("Foncier Hooks Tests", () => {
   describe("useFoncierData", () => {
     it("should fetch lots successfully", async () => {
       const { useFoncierData } = await import("../hooks/useFoncierData");
-      const dbClient = (await import("../data/tableClient")).default;
-      const { withBackoff } = await import("../hooks/useFoncierSync");
 
       const mockLots = [
         {
@@ -52,12 +35,10 @@ describe("Foncier Hooks Tests", () => {
         },
       ];
 
-      (dbClient.rpc as any).mockResolvedValue({
+      mockDataService.searchLots.mockResolvedValue({
         data: mockLots,
         error: null,
       });
-
-      (withBackoff as any).mockImplementation((fn: any) => fn());
 
       const { result: hookResult } = renderHook(() => useFoncierData());
       const result = await hookResult.current.fetchLots(
@@ -73,24 +54,22 @@ describe("Foncier Hooks Tests", () => {
       expect(result.error).toBeNull();
       expect(result.data).toEqual(mockLots);
       expect(result.total).toBe(1);
-      expect(dbClient.rpc).toHaveBeenCalledWith("search_foncier_lots", {
-        p_search: "",
-        p_village: "",
-        p_quartier: "",
-        p_lotissement: "",
-        p_statut: "",
-        p_sort: "created_at",
-        p_dir: "desc",
-        p_page: 1,
-        p_limit: 20,
-        p_include_archived: false,
+      expect(mockDataService.searchLots).toHaveBeenCalledWith({
+        search: "",
+        village: "",
+        quartier: "",
+        lotissement: "",
+        statut: "",
+        sort: "created_at",
+        dir: "desc",
+        page: 1,
+        limit: 20,
+        include_archived: false,
       });
     });
 
     it("should fetch village stats successfully", async () => {
       const { useFoncierData } = await import("../hooks/useFoncierData");
-      const dbClient = (await import("../data/tableClient")).default;
-      const { withBackoff } = await import("../hooks/useFoncierSync");
 
       const mockStats = [
         {
@@ -100,12 +79,10 @@ describe("Foncier Hooks Tests", () => {
         },
       ];
 
-      (dbClient.rpc as any).mockResolvedValue({
+      mockDataService.getVillageStats.mockResolvedValue({
         data: mockStats,
         error: null,
       });
-
-      (withBackoff as any).mockImplementation((fn: any) => fn());
 
       const { result: hookResult } = renderHook(() => useFoncierData());
       const result = await hookResult.current.fetchVillageStats(false, true);
@@ -118,17 +95,13 @@ describe("Foncier Hooks Tests", () => {
 
     it("should handle fetch errors", async () => {
       const { useFoncierData } = await import("../hooks/useFoncierData");
-      const dbClient = (await import("../data/tableClient")).default;
-      const { withBackoff } = await import("../hooks/useFoncierSync");
 
       const mockError = { message: "Database error" };
 
-      (dbClient.rpc as any).mockResolvedValue({
+      mockDataService.searchLots.mockResolvedValue({
         data: null,
         error: mockError,
       });
-
-      (withBackoff as any).mockImplementation((fn: any) => fn());
 
       const { result: hookResult } = renderHook(() => useFoncierData());
       const result = await hookResult.current.fetchLots(
@@ -141,7 +114,7 @@ describe("Foncier Hooks Tests", () => {
         true,
       );
 
-      expect(result.error).toBe(mockError.message);
+      expect(result.error).toEqual(mockError);
       expect(result.data).toBeNull();
       expect(result.total).toBe(0);
     });
@@ -150,56 +123,39 @@ describe("Foncier Hooks Tests", () => {
   describe("useFoncierAudit", () => {
     it("should fetch audit records successfully", async () => {
       const { useFoncierAudit } = await import("../hooks/useFoncierAudit");
-      const dbClient = (await import("../data/tableClient")).default;
-      const { withBackoff } = await import("../hooks/useFoncierSync");
-
-      const mockAuditData = [
-        {
+      mockDataService.getAudit.mockResolvedValue({
+        data: [{
           id: "1",
-          lot_id: "lot-1",
+          entity_type: "foncier_lot",
+          entity_id: "lot-1",
           action: "create",
-          performed_by: "user-1",
-          performed_at: "2024-01-01T00:00:00Z",
-          foncier_lots: {
-            reference: "TEST-001",
-            numero_lot: "25",
-            village: "Sikensi",
-          },
-        },
-      ];
-
-      const mockProfilesData = [{ id: "user-1", full_name: "Test User" }];
-
-      const mockQuery = {
-        order: vi.fn().mockReturnThis(),
-        range: vi.fn().mockResolvedValue({
-          data: mockAuditData,
-          error: null,
-          count: 1,
-        }),
-        eq: vi.fn().mockResolvedValue({
-          data: mockAuditData,
-          error: null,
-          count: 1,
-        }),
-        in: vi.fn().mockResolvedValue({
-          data: mockProfilesData,
-          error: null,
-        }),
-      };
-
-      (dbClient.from as any).mockReturnValue({
-        select: vi.fn().mockReturnValue(mockQuery),
+          user_id: "user-1",
+          user_name: "user-1",
+          created_at: "2024-01-01T00:00:00Z",
+          old_values: null,
+          new_values: { statut: "actif" },
+        }],
+        error: null,
+        count: 1,
+      });
+      mockDataService.getUserProfiles.mockResolvedValue({
+        data: { "user-1": { id: "user-1", full_name: "Test User" } },
+        error: null,
+        count: 1,
       });
 
-      (withBackoff as any).mockImplementation((fn: any) => fn());
-
       const { result: hookResult } = renderHook(() => useFoncierAudit());
-      const result = await hookResult.current.fetchAudit(1, 20, "", true);
+      let result!: Awaited<ReturnType<typeof hookResult.current.fetchAudit>>;
+      await act(async () => {
+        result = await hookResult.current.fetchAudit(1, 20, "", true);
+      });
 
       expect(result.error).toBeNull();
       expect(result.data).toHaveLength(1);
       expect(result.data?.[0].action).toBe("create");
+      expect(result.data?.[0].utilisateur_nom).toBe("Test User");
+      expect(result.data?.[0].parcelle_id).toBe("lot-1");
+      expect(result.data?.[0].date_action).toBe("2024-01-01T00:00:00Z");
       expect(result.total).toBe(1);
     });
 
