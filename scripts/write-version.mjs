@@ -66,6 +66,13 @@ async function workspaceState() {
     'diff', 'HEAD', '--binary', '--',
     '.', ':(exclude)VERSION.json', ':(exclude)dist/**',
   ], { encoding: 'buffer' });
+  const trackedPaths = git([
+    'diff', '--name-only', '-z', 'HEAD', '--',
+    '.', ':(exclude)VERSION.json', ':(exclude)dist/**',
+  ], { encoding: 'buffer' })
+    .toString('utf8')
+    .split('\0')
+    .filter(Boolean);
   const untrackedPaths = git(['ls-files', '--others', '--exclude-standard', '-z'], { encoding: 'buffer' })
     .toString('utf8')
     .split('\0')
@@ -93,6 +100,7 @@ async function workspaceState() {
   return {
     dirty: trackedDiff.length > 0 || untrackedPaths.length > 0,
     hash: hash.digest('hex'),
+    paths: [...new Set([...trackedPaths, ...untrackedPaths])].sort((a, b) => a.localeCompare(b)),
   };
 }
 
@@ -103,6 +111,9 @@ async function main() {
   const artifactFiles = (await listFiles(dist)).filter((file) => file.relative !== 'VERSION.json');
   const artifactHash = await hashFiles(artifactFiles);
   const workspace = await workspaceState();
+  if (workspace.dirty) {
+    process.stderr.write(`Workspace dirty paths: ${workspace.paths.join(', ')}\n`);
+  }
   const gitCommit = git(['rev-parse', '--verify', 'HEAD']).trim();
   let branch = 'detached';
 
