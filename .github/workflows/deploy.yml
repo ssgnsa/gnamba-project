@@ -58,9 +58,6 @@ jobs:
       - name: Check production dependencies
         run: npm audit --omit=dev --fetch-timeout=120000 --fetch-retries=5
 
-      - name: Check release metadata and architecture
-        run: npm run release:check
-
       - name: Require a clean source checkout
         run: test -z "$(git status --porcelain)"
 
@@ -85,6 +82,9 @@ jobs:
           VITE_API_MODE: local
           VITE_LOCAL_API_URL: https://api.gnambaservices.ci
           # Do not expose Supabase publishable keys in production builds.
+
+      - name: Check release metadata and architecture
+        run: npm run release:check
 
       - name: Validate frontend release artifacts
         run: npm run validate:frontend
