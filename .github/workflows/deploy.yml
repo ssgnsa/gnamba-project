@@ -59,7 +59,12 @@ jobs:
         run: npm audit --omit=dev --fetch-timeout=120000 --fetch-retries=5
 
       - name: Require a clean source checkout
-        run: test -z "$(git status --porcelain)"
+        run: |
+          status="$(git status --porcelain --untracked-files=all)"
+          if [[ -n "$status" ]]; then
+            echo "$status"
+            exit 1
+          fi
 
       - name: Run linter
         run: npm run lint
