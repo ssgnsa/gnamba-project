@@ -87,6 +87,15 @@ services:
       VITE_API_MODE: ${VITE_API_MODE:-local}
       VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
       VITE_LOCAL_API_URL: ${VITE_LOCAL_API_URL:-https://api.gnambaservices.ci}
+    volumes:
+      - type: bind
+        source: /var/www/egs
+        target: /var/www/egs
+        read_only: true
+        bind:
+          create_host_path: false
+    tmpfs:
+      - /run/egs-runtime:rw,noexec,nosuid,size=16m
     ports:
       - "${WEB_PORT:-80}:80"
     networks:

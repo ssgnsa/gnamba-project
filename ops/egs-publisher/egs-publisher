@@ -1,0 +1,567 @@
+#!/usr/bin/python3
+"""Narrow EGS frontend publisher. Install root-owned as /usr/local/sbin/egs-publisher."""
+
+from __future__ import annotations
+
+import fcntl
+import hashlib
+import json
+import os
+import pwd
+import re
+import shutil
+import stat
+import subprocess
+import sys
+import syslog
+import tarfile
+import tempfile
+from datetime import datetime, timezone
+
+
+INCOMING = "/var/lib/egs-publisher/incoming"
+WORK_ROOT = "/var/lib/egs-publisher/work"
+PUBLISH_STAGE = "/var/www/egs/.publisher-staging"
+RELEASES = "/var/www/egs/releases"
+CURRENT = "/var/www/egs/current"
+PUBLIC_KEY = "/etc/egs-publisher/ci-ed25519.pub"
+LOCK = "/var/lib/egs-publisher/work/publisher.lock"
+MAX_ARCHIVE = 100 * 1024 * 1024
+MAX_EXPANDED = 256 * 1024 * 1024
+MAX_MEMBERS = 5000
+MAX_FILE = 64 * 1024 * 1024
+MAX_DEPTH = 16
+MAX_PATH_BYTES = 240
+KEEP_PREVIOUS = 5
+REQUEST_RE = re.compile(r"^[a-f0-9]{32}$")
+NEW_RELEASE_RE = re.compile(r"^frontend-[0-9]{8}T[0-9]{6}Z-[a-f0-9]{64}$")
+ROLLBACK_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$")
+HEX256_RE = re.compile(r"^[a-f0-9]{64}$")
+
+
+class PublishError(Exception):
+    pass
+
+
+def audit(event: str, **fields: object) -> None:
+    record = {"time": datetime.now(timezone.utc).isoformat(), "event": event, **fields}
+    syslog.syslog(syslog.LOG_INFO, json.dumps(record, sort_keys=True, ensure_ascii=True))
+
+
+def require_root() -> None:
+    if os.geteuid() != 0:
+        raise PublishError("publisher must run as root")
+    if os.environ.get("SUDO_USER") != "soma":
+        raise PublishError("publisher may only be called through the soma sudo rule")
+
+
+def request_id_from_name(name: str, suffix: str) -> str:
+    if not name.endswith(suffix):
+        raise PublishError("invalid request filename")
+    request_id = name[: -len(suffix)]
+    if not REQUEST_RE.fullmatch(request_id):
+        raise PublishError("invalid request id")
+    return request_id
+
+
+def list_requests(inbox_fd: int, suffix: str) -> list[str]:
+    return sorted(name for name in os.listdir(inbox_fd) if name.endswith(suffix))
+
+
+def open_regular_at(directory_fd: int, name: str, max_bytes: int) -> int:
+    fd = os.open(name, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW, dir_fd=directory_fd)
+    info = os.fstat(fd)
+    if not stat.S_ISREG(info.st_mode) or info.st_size < 0 or info.st_size > max_bytes:
+        os.close(fd)
+        raise PublishError(f"invalid staged file: {name}")
+    return fd
+
+
+def copy_staged(inbox_fd: int, name: str, destination: str, limit: int) -> str:
+    source_fd = open_regular_at(inbox_fd, name, limit)
+    digest = hashlib.sha256()
+    total = 0
+    try:
+        with os.fdopen(source_fd, "rb", closefd=False) as source, open(destination, "xb") as target:
+            os.chmod(destination, 0o600)
+            while True:
+                block = source.read(1024 * 1024)
+                if not block:
+                    break
+                total += len(block)
+                if total > limit:
+                    raise PublishError(f"staged file exceeds limit: {name}")
+                digest.update(block)
+                target.write(block)
+            target.flush()
+            os.fsync(target.fileno())
+    finally:
+        os.close(source_fd)
+    return digest.hexdigest()
+
+
+def verify_signature(attestation_path: str, signature_path: str) -> dict:
+    try:
+        key_info = os.stat(PUBLIC_KEY, follow_symlinks=False)
+    except OSError as exc:
+        raise PublishError(f"trusted CI public key is missing: {PUBLIC_KEY}") from exc
+    if not stat.S_ISREG(key_info.st_mode) or key_info.st_uid != 0 or key_info.st_mode & 0o022:
+        raise PublishError("trusted CI public key must be a root-owned regular file")
+    result = subprocess.run(
+        ["/usr/bin/openssl", "pkeyutl", "-verify", "-pubin", "-inkey", PUBLIC_KEY,
+         "-rawin", "-in", attestation_path, "-sigfile", signature_path],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env={"PATH": "/usr/bin:/bin", "LANG": "C", "LC_ALL": "C"},
+        check=False,
+    )
+    if result.returncode != 0:
+        raise PublishError("CI attestation signature verification failed")
+    try:
+        with open(attestation_path, "rb") as stream:
+            value = json.load(stream)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise PublishError("invalid CI attestation JSON") from exc
+    if not isinstance(value, dict):
+        raise PublishError("invalid CI attestation object")
+    return value
+
+
+def validate_attestation(attestation: dict, archive_hash: str) -> None:
+    expected_true = ("release_check", "frontend_validation")
+    if attestation.get("schema") != 1 or attestation.get("type") != "egs-frontend-release":
+        raise PublishError("unsupported attestation schema")
+    if attestation.get("archive_sha256") != archive_hash:
+        raise PublishError("attestation does not match the staged archive")
+    if any(attestation.get(field) is not True for field in expected_true):
+        raise PublishError("required CI validations are not attested as successful")
+    if not isinstance(attestation.get("workflow_run"), str) or not attestation["workflow_run"].strip():
+        raise PublishError("missing CI workflow run identifier")
+    if not HEX256_RE.fullmatch(str(attestation.get("version_json_sha256", ""))):
+        raise PublishError("missing attested VERSION.json hash")
+    if not re.fullmatch(r"[0-9a-f]{40,64}", str(attestation.get("git_commit", ""))):
+        raise PublishError("missing attested git commit")
+    if not HEX256_RE.fullmatch(str(attestation.get("artifact_hash", ""))):
+        raise PublishError("missing attested artifact hash")
+    if not HEX256_RE.fullmatch(str(attestation.get("artifact_hash", ""))):
+        raise PublishError("missing attested artifact hash")
+
+
+def safe_member_name(name: str) -> str:
+    if not name or "\x00" in name or "\\" in name or name.startswith("/"):
+        raise PublishError("unsafe archive path")
+    normalized = name[:-1] if name.endswith("/") else name
+    parts = normalized.split("/")
+    if not normalized or any(part in ("", ".", "..") for part in parts):
+        raise PublishError("unsafe archive path component")
+    if len(parts) > MAX_DEPTH or len(normalized.encode("utf-8")) > MAX_PATH_BYTES:
+        raise PublishError("archive path exceeds limit")
+    if any(part in ("llms.txt", "SHA256SUMS") for part in parts):
+        raise PublishError("excluded artifact found in release archive")
+    return normalized
+
+
+def inspect_archive(archive_path: str) -> tuple[list[tuple[tarfile.TarInfo, str]], int]:
+    records: list[tuple[tarfile.TarInfo, str]] = []
+    names: set[str] = set()
+    file_names: set[str] = set()
+    expanded = 0
+    try:
+        with tarfile.open(archive_path, mode="r:") as archive:
+            members = archive.getmembers()
+    except (OSError, tarfile.TarError) as exc:
+        raise PublishError("invalid uncompressed tar archive") from exc
+    if not members or len(members) > MAX_MEMBERS:
+        raise PublishError("archive entry count is invalid")
+    for member in members:
+        name = safe_member_name(member.name)
+        if name in names:
+            raise PublishError("duplicate archive path")
+        names.add(name)
+        if member.isdir():
+            pass
+        elif member.isreg():
+            if getattr(member, "sparse", None):
+                raise PublishError("sparse archive members are not accepted")
+            if member.size < 0 or member.size > MAX_FILE:
+                raise PublishError("archive file exceeds per-file limit")
+            expanded += member.size
+            file_names.add(name)
+        else:
+            raise PublishError("archive contains a link or special file")
+        records.append((member, name))
+        if expanded > MAX_EXPANDED:
+            raise PublishError("archive expanded size exceeds limit")
+    for _, name in records:
+        parts = name.split("/")
+        for index in range(1, len(parts)):
+            if "/".join(parts[:index]) in file_names:
+                raise PublishError("archive path descends from a regular file")
+    if "index.html" not in file_names or "VERSION.json" not in file_names:
+        raise PublishError("index.html and VERSION.json are required at archive root")
+    if not any(name.startswith("assets/") and "/" in name for name in file_names):
+        raise PublishError("assets/ must contain frontend files")
+    return records, expanded
+
+
+def extract_safely(archive_path: str, target: str, records: list[tuple[tarfile.TarInfo, str]]) -> None:
+    os.mkdir(target, 0o700)
+    root = os.path.realpath(target)
+    try:
+        with tarfile.open(archive_path, mode="r:") as archive:
+            members = {safe_member_name(item.name): item for item in archive.getmembers()}
+            for member, name in records:
+                if member.isdir():
+                    os.makedirs(os.path.join(root, name), mode=0o755, exist_ok=True)
+            for member, name in records:
+                if not member.isreg():
+                    continue
+                destination = os.path.join(root, name)
+                os.makedirs(os.path.dirname(destination), mode=0o755, exist_ok=True)
+                source = archive.extractfile(members[name])
+                if source is None:
+                    raise PublishError("archive file could not be read")
+                flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | os.O_NOFOLLOW
+                fd = os.open(destination, flags, 0o600)
+                copied = 0
+                try:
+                    with os.fdopen(fd, "wb", closefd=False) as output:
+                        while True:
+                            block = source.read(1024 * 1024)
+                            if not block:
+                                break
+                            copied += len(block)
+                            if copied > member.size:
+                                raise PublishError("archive member expanded beyond declared size")
+                            output.write(block)
+                        output.flush()
+                        os.fsync(output.fileno())
+                    if copied != member.size:
+                        raise PublishError("archive member size does not match its header")
+                    os.fchmod(fd, 0o644)
+                finally:
+                    os.close(fd)
+                    source.close()
+            for directory, _, _ in os.walk(root, topdown=False, followlinks=False):
+                os.chmod(directory, 0o755)
+    except Exception:
+        shutil.rmtree(root, ignore_errors=True)
+        raise
+
+
+def sha256_file(path: str) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def validate_release_tree(root: str, attestation: dict) -> dict:
+    index_path = os.path.join(root, "index.html")
+    version_path = os.path.join(root, "VERSION.json")
+    if os.path.islink(index_path) or os.path.islink(version_path):
+        raise PublishError("release entry files may not be symlinks")
+    with open(index_path, "rb") as stream:
+        index_bytes = stream.read(MAX_FILE + 1)
+    if len(index_bytes) > MAX_FILE:
+        raise PublishError("index.html exceeds size limit")
+    with open(version_path, "rb") as stream:
+        version_bytes = stream.read(1024 * 1024 + 1)
+    if len(version_bytes) > 1024 * 1024:
+        raise PublishError("VERSION.json exceeds size limit")
+    try:
+        version = json.loads(version_bytes)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise PublishError("VERSION.json is invalid JSON") from exc
+    if not isinstance(version, dict):
+        raise PublishError("VERSION.json must contain an object")
+    if version.get("application") != "EGS ERP" or version.get("environment") != "production":
+        raise PublishError("VERSION.json is not an EGS production build")
+    commit = version.get("git_commit")
+    build_hash = version.get("build_hash")
+    artifact_hash = version.get("artifact_hash")
+    if not isinstance(commit, str) or not re.fullmatch(r"[0-9a-f]{40,64}", commit):
+        raise PublishError("VERSION.json git_commit is invalid")
+    if not isinstance(build_hash, str) or not HEX256_RE.fullmatch(build_hash):
+        raise PublishError("VERSION.json build_hash is invalid")
+    if not isinstance(artifact_hash, str) or not HEX256_RE.fullmatch(artifact_hash):
+        raise PublishError("VERSION.json artifact_hash is invalid")
+    if version.get("workspace_dirty") is not False:
+        raise PublishError("production artifact must be built from a clean workspace")
+    if hashlib.sha256(index_bytes).hexdigest() != build_hash:
+        raise PublishError("VERSION.json build_hash does not match index.html")
+    if hashlib.sha256(version_bytes).hexdigest() != attestation.get("version_json_sha256"):
+        raise PublishError("attested VERSION.json hash does not match the artifact")
+    if commit != attestation.get("git_commit") or artifact_hash != attestation.get("artifact_hash"):
+        raise PublishError("attested build metadata does not match VERSION.json")
+    if not isinstance(attestation.get("artifact_hash"), str) or not HEX256_RE.fullmatch(attestation["artifact_hash"]):
+        raise PublishError("attested artifact_hash is invalid")
+    if os.path.exists(os.path.join(root, "llms.txt")) or os.path.exists(os.path.join(root, "SHA256SUMS")):
+        raise PublishError("excluded artifact found at release root")
+    with open(index_path, "r", encoding="utf-8") as stream:
+        html = stream.read(MAX_FILE + 1)
+    if len(html) > MAX_FILE:
+        raise PublishError("rollback index.html exceeds size limit")
+    if len(html) > MAX_FILE:
+        raise PublishError("index.html exceeds size limit")
+    script_refs = re.findall(r"(?:src|href)=[\"'](/?assets/[^\"']+\.js)[\"']", html)
+    css_refs = re.findall(r"(?:src|href)=[\"'](/?assets/[^\"']+\.css)[\"']", html)
+    if not script_refs or not css_refs:
+        raise PublishError("index.html must reference hashed JS and CSS under assets/")
+    for ref in script_refs + css_refs:
+        relative = ref.lstrip("/")
+        candidate = os.path.join(root, relative)
+        if not os.path.isfile(candidate) or os.path.islink(candidate):
+            raise PublishError(f"referenced frontend asset is missing: {relative}")
+    return version
+
+
+def validate_rollback_tree(root: str) -> dict:
+    if not os.path.isdir(root) or os.path.islink(root):
+        raise PublishError("rollback target must be a direct release directory")
+    for current_root, dirs, files in os.walk(root, followlinks=False):
+        for name in dirs + files:
+            path = os.path.join(current_root, name)
+            info = os.lstat(path)
+            if stat.S_ISLNK(info.st_mode) or not (stat.S_ISDIR(info.st_mode) or stat.S_ISREG(info.st_mode)):
+                raise PublishError("rollback target contains a link or special file")
+    index_path = os.path.join(root, "index.html")
+    version_path = os.path.join(root, "VERSION.json")
+    if not os.path.isfile(index_path) or not os.path.isfile(version_path):
+        raise PublishError("rollback target is missing index.html or VERSION.json")
+    try:
+        with open(version_path, "rb") as stream:
+            version_bytes = stream.read(1024 * 1024 + 1)
+        if len(version_bytes) > 1024 * 1024:
+            raise PublishError("rollback VERSION.json exceeds size limit")
+        version = json.loads(version_bytes)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise PublishError("rollback target has invalid VERSION.json") from exc
+    if not isinstance(version, dict) or version.get("application") != "EGS ERP":
+        raise PublishError("rollback target is not an EGS frontend")
+    if os.stat(index_path, follow_symlinks=False).st_size > MAX_FILE:
+        raise PublishError("rollback index.html exceeds size limit")
+    if not HEX256_RE.fullmatch(str(version.get("build_hash", ""))) or sha256_file(index_path) != version.get("build_hash"):
+        raise PublishError("rollback target index hash does not match VERSION.json")
+    if os.stat(index_path, follow_symlinks=False).st_size > MAX_FILE:
+        raise PublishError("rollback index.html exceeds size limit")
+    with open(index_path, "r", encoding="utf-8") as stream:
+        html = stream.read(MAX_FILE + 1)
+    script_refs = re.findall(r"(?:src|href)=[\"'](/?assets/[^\"']+\.js)[\"']", html)
+    css_refs = re.findall(r"(?:src|href)=[\"'](/?assets/[^\"']+\.css)[\"']", html)
+    if not script_refs or not css_refs:
+        raise PublishError("rollback target has no hashed JS/CSS entry assets")
+    for ref in script_refs + css_refs:
+        path = os.path.join(root, ref.lstrip("/"))
+        if not os.path.isfile(path) or os.path.islink(path):
+            raise PublishError("rollback target references a missing or linked asset")
+    return version
+
+
+def current_target() -> str | None:
+    try:
+        target = os.readlink(CURRENT)
+    except FileNotFoundError:
+        return None
+    if not re.fullmatch(r"releases/[A-Za-z0-9][A-Za-z0-9._-]{0,119}", target):
+        raise PublishError("current is not a recognized relative release symlink")
+    return target.split("/", 1)[1]
+
+
+def switch_current(release_id: str) -> str | None:
+    previous = current_target()
+    if previous is not None and not os.path.isdir(os.path.join(RELEASES, previous)):
+        raise PublishError("current points to a missing release")
+    temp_link = os.path.join("/var/www/egs", f".current-next-{os.getpid()}")
+    try:
+        os.symlink(f"releases/{release_id}", temp_link)
+        os.replace(temp_link, CURRENT)
+    finally:
+        try:
+            os.unlink(temp_link)
+        except FileNotFoundError:
+            pass
+    return previous
+
+
+def retain_releases(active_id: str) -> list[str]:
+    candidates: list[str] = []
+    for name in os.listdir(RELEASES):
+        if not NEW_RELEASE_RE.fullmatch(name) or name == active_id:
+            continue
+        path = os.path.join(RELEASES, name)
+        info = os.lstat(path)
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != 0:
+            continue
+        unsafe = False
+        for root, dirs, files in os.walk(path, followlinks=False):
+            for entry in dirs + files:
+                child = os.path.join(root, entry)
+                child_info = os.lstat(child)
+                if (stat.S_ISLNK(child_info.st_mode) or child_info.st_uid != 0
+                        or child_info.st_mode & 0o022):
+                    unsafe = True
+                    break
+            if unsafe:
+                break
+        if unsafe or info.st_mode & 0o022:
+            continue
+        candidates.append(name)
+    keep = set(sorted(candidates, reverse=True)[:KEEP_PREVIOUS])
+    removed: list[str] = []
+    for name in candidates:
+        if name in keep:
+            continue
+        path = os.path.join(RELEASES, name)
+        info = os.lstat(path)
+        if stat.S_ISDIR(info.st_mode) and info.st_uid == 0 and name != active_id:
+            shutil.rmtree(path)
+            removed.append(name)
+    return removed
+
+
+def open_incoming() -> int:
+    return os.open(INCOMING, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW)
+
+
+def process_publish() -> None:
+    inbox_fd = open_incoming()
+    work = tempfile.mkdtemp(prefix="request-", dir=WORK_ROOT)
+    request_id = "unknown"
+    archive_hash = "unknown"
+    stage = None
+    try:
+        archives = list_requests(inbox_fd, ".tar")
+        if len(archives) != 1:
+            raise PublishError("exactly one pending .tar request is required")
+        request_id = request_id_from_name(archives[0], ".tar")
+        archive_path = os.path.join(work, "artifact.tar")
+        attestation_path = os.path.join(work, "attestation.json")
+        signature_path = os.path.join(work, "attestation.sig")
+        archive_hash = copy_staged(inbox_fd, archives[0], archive_path, MAX_ARCHIVE)
+        copy_staged(inbox_fd, f"{request_id}.json", attestation_path, 65536)
+        copy_staged(inbox_fd, f"{request_id}.sig", signature_path, 1024)
+        attestation = verify_signature(attestation_path, signature_path)
+        validate_attestation(attestation, archive_hash)
+        records, expanded = inspect_archive(archive_path)
+        free_bytes = os.statvfs(PUBLISH_STAGE).f_bavail * os.statvfs(PUBLISH_STAGE).f_frsize
+        if free_bytes < expanded + 100 * 1024 * 1024:
+            raise PublishError("insufficient free space for safe publication")
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        release_id = f"frontend-{stamp}-{archive_hash}"
+        release_path = os.path.join(RELEASES, release_id)
+        if os.path.lexists(release_path):
+            raise PublishError("release id already exists; releases are never overwritten")
+        stage = os.path.join(PUBLISH_STAGE, f".{release_id}.tmp")
+        extract_safely(archive_path, stage, records)
+        version = validate_release_tree(stage, attestation)
+        os.rename(stage, release_path)
+        stage = None
+        previous = switch_current(release_id)
+        try:
+            removed = retain_releases(release_id)
+            retention_result = "ok"
+        except Exception as exc:
+            removed = []
+            retention_result = f"warning: {type(exc).__name__}: {exc}"
+        audit("publish", caller="soma", request_id=request_id, archive_sha256=archive_hash,
+              git_commit=version["git_commit"], release_id=release_id,
+              previous_release=previous, removed_releases=removed,
+              retention=retention_result, result="switched")
+    except Exception as exc:
+        audit("publish", caller="soma", request_id=request_id,
+              archive_sha256=archive_hash, result="failed", error=str(exc))
+        raise
+    finally:
+        if stage and os.path.isdir(stage) and not os.path.islink(stage):
+            shutil.rmtree(stage, ignore_errors=True)
+        if request_id != "unknown":
+            for name in (f"{request_id}.tar", f"{request_id}.json", f"{request_id}.sig"):
+                try:
+                    os.unlink(name, dir_fd=inbox_fd)
+                except FileNotFoundError:
+                    pass
+        os.close(inbox_fd)
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def process_rollback() -> None:
+    inbox_fd = open_incoming()
+    request_id = "unknown"
+    try:
+        requests = list_requests(inbox_fd, ".rollback")
+        if len(requests) != 1:
+            raise PublishError("exactly one pending .rollback request is required")
+        request_id = request_id_from_name(requests[0], ".rollback")
+        fd = open_regular_at(inbox_fd, requests[0], 256)
+        try:
+            with os.fdopen(fd, "r", encoding="ascii", closefd=False) as stream:
+                release_id = stream.read().strip()
+        except UnicodeDecodeError as exc:
+            raise PublishError("rollback request must contain ASCII release id") from exc
+        finally:
+            os.close(fd)
+        if not ROLLBACK_ID_RE.fullmatch(release_id):
+            raise PublishError("rollback request contains an invalid release id")
+        target = os.path.join(RELEASES, release_id)
+        info = os.lstat(target)
+        if not stat.S_ISDIR(info.st_mode):
+            raise PublishError("rollback target must be a direct release directory")
+        for root, dirs, files in os.walk(target, followlinks=False):
+            for name in dirs + files:
+                if stat.S_ISLNK(os.lstat(os.path.join(root, name)).st_mode):
+                    raise PublishError("rollback target contains a symlink")
+        version = validate_rollback_tree(target)
+        previous = switch_current(release_id)
+        audit("rollback", caller="soma", request_id=request_id, release_id=release_id,
+              previous_release=previous, git_commit=version.get("git_commit"), result="switched")
+    except Exception as exc:
+        audit("rollback", caller="soma", request_id=request_id, result="failed", error=str(exc))
+        raise
+    finally:
+        if request_id != "unknown":
+            try:
+                os.unlink(f"{request_id}.rollback", dir_fd=inbox_fd)
+            except FileNotFoundError:
+                pass
+        os.close(inbox_fd)
+
+
+def main() -> int:
+    syslog.openlog("egs-publisher", syslog.LOG_PID, syslog.LOG_AUTHPRIV)
+    try:
+        require_root()
+        if len(sys.argv) != 2 or sys.argv[1] not in ("publish-pending", "rollback-pending"):
+            raise PublishError("usage: egs-publisher {publish-pending|rollback-pending}")
+        os.makedirs(WORK_ROOT, mode=0o700, exist_ok=True)
+        incoming_info = os.stat(INCOMING, follow_symlinks=False)
+        if (not stat.S_ISDIR(incoming_info.st_mode)
+                or incoming_info.st_uid != pwd.getpwnam("soma").pw_uid
+                or incoming_info.st_mode & 0o077):
+            raise PublishError("incoming staging ownership/mode is unsafe")
+        for path in ("/var/lib/egs-publisher", WORK_ROOT, PUBLISH_STAGE, RELEASES, "/var/www/egs"):
+            info = os.stat(path, follow_symlinks=False)
+            if not stat.S_ISDIR(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022:
+                raise PublishError(f"publisher directory ownership/mode is unsafe: {path}")
+        for path in (WORK_ROOT, PUBLISH_STAGE):
+            if os.stat(path, follow_symlinks=False).st_mode & 0o077:
+                raise PublishError(f"publisher private directory must be mode 0700: {path}")
+        lock_fd = os.open(LOCK, os.O_CREAT | os.O_RDWR | os.O_CLOEXEC | os.O_NOFOLLOW, 0o600)
+        try:
+            fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            if sys.argv[1] == "publish-pending":
+                process_publish()
+            else:
+                process_rollback()
+        finally:
+            os.close(lock_fd)
+        return 0
+    except (PublishError, OSError, tarfile.TarError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        sys.stderr.write(f"egs-publisher: {exc}\n")
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

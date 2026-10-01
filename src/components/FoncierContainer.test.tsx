@@ -2,24 +2,21 @@ import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../data/foncier.repository', () => ({
-  foncierRepository: {
-    searchLots: vi.fn(),
-  },
+const { mockSearchLots } = vi.hoisted(() => ({ mockSearchLots: vi.fn() }));
+
+vi.mock('../lib/dbClient.service', () => ({
+  foncierRepository: { searchLots: mockSearchLots },
 }));
+vi.mock('./foncier/FoncierLotForm', () => ({ FoncierLotForm: () => null }));
 
 import { FoncierContainer } from './FoncierContainer';
-import { foncierRepository } from '../lib/dbClient.service';
-
-const mockedRepository = vi.mocked(foncierRepository);
-
 describe('FoncierContainer', () => {
   beforeEach(() => {
-    mockedRepository.searchLots.mockReset();
+    mockSearchLots.mockReset();
   });
 
   it('renders the foncier module with fetched lots', async () => {
-    mockedRepository.searchLots.mockResolvedValue({
+    mockSearchLots.mockResolvedValue({
       data: [
         {
           id: 'lot-1',

@@ -1,276 +1,118 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Mock the client module
-const mockDbClient = {
-  from: vi.fn(),
-  rpc: vi.fn(),
-};
-const mockWithRetry = vi.fn((fn) => fn());
-
-vi.mock("./client.ts", () => ({
-  dbClient: mockDbClient,
-  withRetry: mockWithRetry,
+const { service } = vi.hoisted(() => ({
+  service: {
+    searchLots: vi.fn(),
+    getLotById: vi.fn(),
+    saveLot: vi.fn(),
+    softDeleteLot: vi.fn(),
+    getVillagesList: vi.fn(),
+    restoreLot: vi.fn(),
+    getVillageStats: vi.fn(),
+    checkLotDuplicate: vi.fn(),
+    ensureHierarchy: vi.fn(),
+    getAudit: vi.fn(),
+    createAttestationAtomic: vi.fn(),
+  },
 }));
 
-beforeEach(() => {
-  vi.clearAllMocks();
-});
+vi.mock("../lib/dbClient.service", () => ({ dataService: service }));
 
-describe("foncierRepository", () => {
-  describe("getLotById", () => {
-    it("should return error for invalid UUID", async () => {
-      // We need to mock the validation module
-      vi.doMock("./validation", () => ({
-        isValidUuid: vi.fn().mockReturnValue(false),
-      }));
+import { foncierRepository } from "./foncier.repository";
 
-      // Reset the module cache to get the mocked validation
-      vi.resetModules();
+describe("foncierRepository REST adapter", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
-      const { foncierRepository } = await import("./foncier.repository");
-      const result = await foncierRepository.getLotById("invalid-id");
-      expect(result.error).toBe("ID invalide");
-      expect(result.data).toBeNull();
-    });
+  it("normalizes lot search defaults before delegating", async () => {
+    const response = { data: [], error: null, count: 0 };
+    service.searchLots.mockResolvedValue(response);
 
-    it("should call correct query for valid UUID", async () => {
-      // Mock the validation to return true
-      vi.doMock("./validation", () => ({
-        isValidUuid: vi.fn().mockReturnValue(true),
-      }));
-
-      // Reset the module cache to get the mocked validation
-      vi.resetModules();
-
-      const mockResult = {
-        data: { id: "valid-uuid", reference: "REF123" },
-        error: null,
-      };
-
-      // Set up the mock chain for this test
-      // from().select().eq().is().maybeSingle()
-      const mockMaybeSingle = vi.fn().mockResolvedValue(mockResult);
-      const mockIs = vi.fn().mockReturnValue({ maybeSingle: mockMaybeSingle });
-      const mockEq = vi.fn().mockReturnValue({ is: mockIs });
-      const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
-
-      mockDbClient.from.mockReturnValue({ select: mockSelect });
-
-      // Reset the module cache to get the foncier repository with our mocks
-      vi.resetModules();
-      const { foncierRepository } = await import("./foncier.repository");
-      const result = await foncierRepository.getLotById("valid-uuid");
-
-      expect(mockDbClient.from).toHaveBeenCalledWith("foncier_lots");
-      expect(mockSelect).toHaveBeenCalledWith(
-        "id, reference, numero_lot, numero_ilot, nom_lotissement, quartier, village, commune, departement, region, superficie, code_barre, proprietaire_nom, proprietaire_prenom, proprietaire_naissance_date, proprietaire_naissance_lieu, proprietaire_cni_numero, proprietaire_cni_date, proprietaire_cni_lieu, proprietaire_profession, proprietaire_telephone, chef_village, arrete_prefectoral, arrete_date, statut, publier_sur_vitrine, date_cession, prix_cession, notes, created_at, updated_at, client_updated_at, deleted_at, deleted_by, deleted_reason, row_version, retention_until, last_modified_device_id"
-      );
-      expect(mockEq).toHaveBeenCalledWith("id", "valid-uuid");
-      expect(mockIs).toHaveBeenCalledWith("deleted_at", null);
-      expect(result.data?.id).toBe("valid-uuid");
+    await expect(foncierRepository.searchLots({ search: "test", page: 2 })).resolves.toBe(response);
+    expect(service.searchLots).toHaveBeenCalledWith({
+      search: "test",
+      village: "",
+      quartier: "",
+      lotissement: "",
+      statut: "",
+      sort: "created_at",
+      dir: "desc",
+      page: 2,
+      limit: 20,
+      include_archived: false,
     });
   });
 
-  describe("saveLot", () => {
-    it("should call update when isUpdate is true", async () => {
-      // Mock the validation to return true
-      vi.doMock("./validation", () => ({
-        isValidUuid: vi.fn().mockReturnValue(true),
-      }));
+  it("delegates lot reads and writes to the API service", async () => {
+    service.getLotById.mockResolvedValue({ data: { id: "lot-1" }, error: null });
+    service.saveLot.mockResolvedValue({ data: { id: "lot-1" }, error: null });
+    service.softDeleteLot.mockResolvedValue({ data: null, error: null });
 
-      // Reset the module cache to get the mocked validation
-      vi.resetModules();
+    await foncierRepository.getLotById("lot-1");
+    await foncierRepository.saveLot({ id: "lot-1" }, true);
+    await foncierRepository.softDeleteLot("lot-1", "archivage test");
 
-      const mockData = { id: "test-id", reference: "REF123", row_version: 2 };
-      const mockResult = { data: mockData, error: null };
-
-      // Set up the mock chain: from().update().eq("id",...).eq("row_version",...).select(...).single()
-      const mockSingle = vi.fn().mockResolvedValue(mockResult);
-      const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
-      // First .eq() call returns an object that also has .eq() (for the second .eq())
-      const mockEq = vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({ select: mockSelect }),
-      });
-      const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
-
-      mockDbClient.from.mockReturnValue({ update: mockUpdate });
-
-      // Reset the module cache to get the foncier repository with our mocks
-      vi.resetModules();
-      const { foncierRepository } = await import("./foncier.repository");
-      const result = await foncierRepository.saveLot(mockData, true);
-
-      expect(mockDbClient.from).toHaveBeenCalledWith("foncier_lots");
-      expect(mockUpdate).toHaveBeenCalledWith(mockData);
-      expect(mockEq).toHaveBeenCalledWith("id", "test-id");
-      // Second eq is on the return of first eq; need to get the inner mock
-      const mockEq2 = mockEq.mock.results[0].value.eq;
-      expect(mockEq2).toHaveBeenCalledWith("row_version", 2);
-      expect(mockSelect).toHaveBeenCalledWith(
-        "id, reference, numero_lot, numero_ilot, nom_lotissement, quartier, village, commune, departement, region, superficie, code_barre, proprietaire_nom, proprietaire_prenom, proprietaire_naissance_date, proprietaire_naissance_lieu, proprietaire_cni_numero, proprietaire_cni_date, proprietaire_cni_lieu, proprietaire_profession, proprietaire_telephone, chef_village, arrete_prefectoral, arrete_date, statut, publier_sur_vitrine, date_cession, prix_cession, notes, created_at, updated_at, client_updated_at, deleted_at, deleted_by, deleted_reason, row_version, retention_until, last_modified_device_id"
-      );
-      expect(mockSingle).toHaveBeenCalled();
-      expect(result).toEqual(mockResult);
-    });
-
-    it("should call insert when isUpdate is false", async () => {
-      // Mock the validation to return true
-      vi.doMock("./validation", () => ({
-        isValidUuid: vi.fn().mockReturnValue(true),
-      }));
-
-      // Reset the module cache to get the mocked validation
-      vi.resetModules();
-
-      const mockData = { reference: "REF123" };
-      const mockResult = { data: mockData, error: null };
-
-      // Set up the mock chain for this test
-      // from().insert().select().single()
-      const mockSingle = vi.fn().mockResolvedValue(mockResult);
-      const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
-      const mockInsert = vi.fn().mockReturnValue({ select: mockSelect });
-
-      mockDbClient.from.mockReturnValue({ insert: mockInsert });
-
-      // Reset the module cache to get the foncier repository with our mocks
-      vi.resetModules();
-      const { foncierRepository } = await import("./foncier.repository");
-      const result = await foncierRepository.saveLot(mockData, false);
-
-      expect(mockDbClient.from).toHaveBeenCalledWith("foncier_lots");
-      expect(mockInsert).toHaveBeenCalledWith(mockData);
-      expect(mockSelect).toHaveBeenCalledWith(
-        "id, reference, numero_lot, numero_ilot, nom_lotissement, quartier, village, commune, departement, region, superficie, code_barre, proprietaire_nom, proprietaire_prenom, proprietaire_naissance_date, proprietaire_naissance_lieu, proprietaire_cni_numero, proprietaire_cni_date, proprietaire_cni_lieu, proprietaire_profession, proprietaire_telephone, chef_village, arrete_prefectoral, arrete_date, statut, publier_sur_vitrine, date_cession, prix_cession, notes, created_at, updated_at, client_updated_at, deleted_at, deleted_by, deleted_reason, row_version, retention_until, last_modified_device_id"
-      );
-      expect(mockSingle).toHaveBeenCalled();
-      expect(result).toEqual(mockResult);
-    });
+    expect(service.getLotById).toHaveBeenCalledWith("lot-1");
+    expect(service.saveLot).toHaveBeenCalledWith({ id: "lot-1" }, true);
+    expect(service.softDeleteLot).toHaveBeenCalledWith("lot-1", "archivage test");
   });
 
-  describe("softDeleteLot", () => {
-    it("should call the correct RPC", async () => {
-      const mockResult = { data: null, error: null };
-      mockDbClient.rpc.mockResolvedValue(mockResult);
+  it("loads village options through the authenticated Foncier API service", async () => {
+    const response = { data: [], error: null, count: 0 };
+    service.getVillagesList.mockResolvedValue(response);
 
-      // Reset the module cache to get the foncier repository with our mocks
-      vi.resetModules();
-      const { foncierRepository } = await import("./foncier.repository");
-      const result = await foncierRepository.softDeleteLot("test-id", "test reason");
+    await expect(foncierRepository.getVillagesList()).resolves.toBe(response);
+    expect(service.getVillagesList).toHaveBeenCalledOnce();
+  });
 
-      expect(mockDbClient.rpc).toHaveBeenCalledWith("soft_delete_foncier_lot", {
-        p_lot_id: "test-id",
-        p_reason: "test reason",
-      });
-      expect(result).toEqual(mockResult);
+  it("delegates lot restoration to the API service", async () => {
+    service.restoreLot.mockResolvedValue({ data: { id: "lot-1" }, error: null });
+
+    await expect(foncierRepository.restoreLot("lot-1")).resolves.toEqual({
+      data: { id: "lot-1" },
+      error: null,
     });
+    expect(service.restoreLot).toHaveBeenCalledWith("lot-1");
+  });
+
+  it("passes the archived-lot flag to village statistics", async () => {
+    service.getVillageStats.mockResolvedValue({ data: [], error: null });
+
+    await foncierRepository.getVillageStats(true);
+
+    expect(service.getVillageStats).toHaveBeenCalledWith(true);
+  });
+
+  it("delegates duplicate checks with their exclusion identifier", async () => {
+    const params = {
+      village: "Sikensi",
+      lotissement: "Centre",
+      ilot: "A",
+      lot: "12",
+      exclude_lot_id: "lot-1",
+    };
+    service.checkLotDuplicate.mockResolvedValue({ data: false, error: null });
+
+    await foncierRepository.checkDuplicate(params);
+
+    expect(service.checkLotDuplicate).toHaveBeenCalledWith(params);
+  });
+
+  it("delegates hierarchy creation to the API service", async () => {
+    const hierarchy = { village: "Sikensi", lotissement: "Centre", ilot: "A" };
+    service.ensureHierarchy.mockResolvedValue({ data: hierarchy, error: null });
+
+    await foncierRepository.ensureHierarchy(hierarchy);
+
+    expect(service.ensureHierarchy).toHaveBeenCalledWith(hierarchy);
+  });
+
+  it("passes audit paging and action filters to the API service", async () => {
+    service.getAudit.mockResolvedValue({ data: [], error: null, count: 0 });
+
+    await foncierRepository.getAudit({ page: 2, pageSize: 25, actionFilter: "create" });
+
+    expect(service.getAudit).toHaveBeenCalledWith(2, 25, "create");
   });
 });
-  describe("searchLots", () => {
-    it("should return lots when search is successful", async () => {
-      const mockResult = {
-        data: [
-          { id: "1", reference: "REF1" },
-          { id: "2", reference: "REF2" },
-        ],
-        error: null,
-      };
-
-      mockDbClient.rpc.mockResolvedValue(mockResult);
-
-      // Reset the module cache to get the foncier repository with our mocks
-      vi.resetModules();
-      const { foncierRepository } = await import("./foncier.repository");
-      const result = await foncierRepository.searchLots({
-        search: "test",
-        village: "Village1",
-        page: 1,
-        limit: 10,
-      });
-
-      expect(mockDbClient.rpc).toHaveBeenCalledWith("search_foncier_lots", {
-        p_search: "test",
-        p_village: "Village1",
-        p_quartier: "",
-        p_lotissement: "",
-        p_statut: "",
-        p_sort: "created_at",
-        p_dir: "desc",
-        p_page: 1,
-        p_limit: 10,
-        p_include_archived: false,
-      });
-      expect(result.data).toHaveLength(2);
-      expect(result.data?.[0]?.reference).toBe("REF1");
-      expect(result.error).toBeNull();
-    });
-
-    it("should return error when rpc fails", async () => {
-      const mockResult = {
-        data: null,
-        error: { message: "Database error" },
-      };
-
-      mockDbClient.rpc.mockResolvedValue(mockResult);
-
-      // Reset the module cache to get the foncier repository with our mocks
-      vi.resetModules();
-      const { foncierRepository } = await import("./foncier.repository");
-      const result = await foncierRepository.searchLots();
-
-      expect(mockDbClient.rpc).toHaveBeenCalledWith("search_foncier_lots", {
-        p_search: "",
-        p_village: "",
-        p_quartier: "",
-        p_lotissement: "",
-        p_statut: "",
-        p_sort: "created_at",
-        p_dir: "desc",
-        p_page: 1,
-        p_limit: 20,
-        p_include_archived: false,
-      });
-      expect(result.data).toBeNull();
-      expect(result.error).toBe(mockResult.error);
-    });
-  });
-
-  describe("getLotById", () => {
-    it("should return null when lot not found", async () => {
-      // Mock the validation to return true
-      vi.doMock("./validation", () => ({
-        isValidUuid: vi.fn().mockReturnValue(true),
-      }));
-
-      // Reset the module cache to get the mocked validation
-      vi.resetModules();
-
-      const mockResult = {
-        data: null,
-        error: null,
-      };
-
-      // Set up the mock chain for this test
-      // from().select().eq().is().maybeSingle()
-      const mockMaybeSingle = vi.fn().mockResolvedValue(mockResult);
-      const mockIs = vi.fn().mockReturnValue({ maybeSingle: mockMaybeSingle });
-      const mockEq = vi.fn().mockReturnValue({ is: mockIs });
-      const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
-
-      mockDbClient.from.mockReturnValue({ select: mockSelect });
-
-      // Reset the module cache to get the foncier repository with our mocks
-      vi.resetModules();
-      const { foncierRepository } = await import("./foncier.repository");
-      const result = await foncierRepository.getLotById("valid-uuid");
-
-      expect(mockDbClient.from).toHaveBeenCalledWith("foncier_lots");
-      expect(mockSelect).toHaveBeenCalledWith(
-        "id, reference, numero_lot, numero_ilot, nom_lotissement, quartier, village, commune, departement, region, superficie, code_barre, proprietaire_nom, proprietaire_prenom, proprietaire_naissance_date, proprietaire_naissance_lieu, proprietaire_cni_numero, proprietaire_cni_date, proprietaire_cni_lieu, proprietaire_profession, proprietaire_telephone, chef_village, arrete_prefectoral, arrete_date, statut, publier_sur_vitrine, date_cession, prix_cession, notes, created_at, updated_at, client_updated_at, deleted_at, deleted_by, deleted_reason, row_version, retention_until, last_modified_device_id"
-      );
-      expect(mockEq).toHaveBeenCalledWith("id", "valid-uuid");
-      expect(mockIs).toHaveBeenCalledWith("deleted_at", null);
-      expect(result.data).toBeNull();
-      expect(result.error).toBeNull();
-    });
-  });
