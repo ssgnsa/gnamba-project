@@ -469,10 +469,13 @@ const mergeRollbackPoints = (
 
 export class ContextManager {
   private context: ServerContext | null = null;
+  private contextPath: string;
 
-  private contextPath = ".codex/context/server-context.json";
-
-  constructor(initialContext?: ServerContext) {
+  constructor(
+    initialContext?: ServerContext,
+    contextPath = ".codex/context/server-context.json",
+  ) {
+    this.contextPath = contextPath;
     if (initialContext) {
       this.context = cloneContext(initialContext);
     }

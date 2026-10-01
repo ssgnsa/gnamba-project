@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   ContextManager,
   DiagnosticEngine,
@@ -50,12 +53,17 @@ describe("Codex assistant scaffold", () => {
   });
 
   it("runs the codex status command", async () => {
-    const manager = new ContextManager();
-    const result = await runCodexCommand("codex.status", {
-      contextManager: manager,
-    });
+    const tempDir = await mkdtemp(join(tmpdir(), "egs-codex-context-test-"));
+    try {
+      const manager = new ContextManager(undefined, join(tempDir, "server-context.json"));
+      const result = await runCodexCommand("codex.status", {
+        contextManager: manager,
+      });
 
-    expect(result.ok).toBe(true);
-    expect(result.data).toBeDefined();
+      expect(result.ok).toBe(true);
+      expect(result.data).toBeDefined();
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
   });
 });
