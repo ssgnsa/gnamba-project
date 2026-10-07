@@ -171,6 +171,7 @@ jobs:
           engine = create_engine(os.environ["DATABASE_URL"])
           with engine.begin() as connection:
               connection.execute(text('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"'))
+              connection.execute(text("CREATE ROLE postgres NOLOGIN"))
               connection.execute(text("CREATE ROLE egs_test_user NOLOGIN"))
           engine.dispose()
           PY
