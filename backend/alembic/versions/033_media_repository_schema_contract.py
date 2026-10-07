@@ -182,7 +182,13 @@ def upgrade() -> None:
         WHERE usage_type = 'legacy'
         """
     )
-    op.execute("ALTER TABLE public.media_usage ALTER COLUMN entity_id DROP NOT NULL")
+    op.execute(
+        """
+        ALTER TABLE public.media_usage
+            ALTER COLUMN entity_id TYPE TEXT USING entity_id::TEXT,
+            ALTER COLUMN entity_id DROP NOT NULL
+        """
+    )
 
     op.execute(
         """
@@ -203,6 +209,18 @@ def upgrade() -> None:
         ALTER TABLE public.media_audit_logs
             ALTER COLUMN media_id DROP NOT NULL,
             ALTER COLUMN metadata SET DEFAULT '{}'::JSONB
+        """
+    )
+    op.execute(
+        """
+        ALTER TABLE public.media_files
+            DROP CONSTRAINT IF EXISTS media_files_deleted_by_fkey
+        """
+    )
+    op.execute(
+        """
+        ALTER TABLE public.media_files
+            ALTER COLUMN deleted_by TYPE TEXT USING deleted_by::TEXT
         """
     )
 
