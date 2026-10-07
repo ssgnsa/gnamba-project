@@ -243,12 +243,22 @@ def _normalize(payload: dict[str, Any]) -> dict[str, Any]:
 
 def _response(entry: dict[str, Any]) -> FinanceResponse:
     value = dict(entry)
+    value["id"] = str(value["id"])
     value["type_transaction"] = {
         "ENCAISSEMENT": "recette", "DECAISSEMENT": "depense"
     }.get(value.get("type_operation"))
-    value["date_transaction"] = value.get("date_operation")
-    value["client_id"] = value.get("tiers_id")
-    value["project_id"] = value.get("projet_id")
+    date_operation = value.get("date_operation")
+    value["date_transaction"] = (
+        date_operation.isoformat()
+        if isinstance(date_operation, date)
+        else date_operation
+    )
+    value["client_id"] = (
+        str(value["tiers_id"]) if value.get("tiers_id") is not None else None
+    )
+    value["project_id"] = (
+        str(value["projet_id"]) if value.get("projet_id") is not None else None
+    )
     return FinanceResponse(**value)
 
 

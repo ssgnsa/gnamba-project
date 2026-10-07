@@ -86,6 +86,12 @@ def _repository(db: Session) -> GenericTableRepository:
     )
 
 
+def _response(product: dict[str, Any]) -> ProductResponse:
+    values = dict(product)
+    values["id"] = str(values["id"])
+    return ProductResponse(**values)
+
+
 @router.post("", response_model=ProductResponse)
 def create_product(payload: ProductCreateRequest, db: Session = Depends(get_db)) -> ProductResponse:
     values = payload.model_dump(exclude_unset=True)
@@ -100,13 +106,13 @@ def create_product(payload: ProductCreateRequest, db: Session = Depends(get_db))
         values["reference"] = _local_reference()
     product = _repository(db).create(values)
     product = _with_local_reference(db, product)
-    return ProductResponse(**product)
+    return _response(product)
 
 
 @router.get("", response_model=list[ProductResponse])
 def list_products(db: Session = Depends(get_db)) -> list[ProductResponse]:
     return [
-        ProductResponse(**_with_local_reference(db, item))
+        _response(_with_local_reference(db, item))
         for item in _repository(db).list(order_by="nom", descending=False)
     ]
 
@@ -123,7 +129,7 @@ def update_product(product_id: str, payload: dict[str, Any], db: Session = Depen
     if not updated:
         raise HTTPException(status_code=404, detail="Produit introuvable")
     updated = _with_local_reference(db, updated)
-    return ProductResponse(**updated)
+    return _response(updated)
 
 
 @router.delete("/{product_id}")
