@@ -1,0 +1,182 @@
+{
+  "version": "1.0.0",
+  "lastUpdated": "2026-04-04",
+  "villages": [
+    {
+      "id": "katadji",
+      "nom": "KATADJI",
+      "commune": "Sikensi",
+      "departement": "Sikensi",
+      "region": "Agnéby-Tiassa",
+      "chef": {
+        "titre": "NANAN",
+        "prenom": "FAUSTIN",
+        "nom": "ABOH KOUAME",
+        "nomComplet": "NANAN FAUSTIN ABOH KOUAME"
+      },
+      "logo": {
+        "path": "/logos/katadji.png",
+        "alt": "Sceau du Village de Katadji"
+      },
+      "adresseAdministrative": {
+        "prefixeRef": "KTD",
+        "codePostal": "00000"
+      },
+      "active": true
+    },
+    {
+      "id": "sikensi",
+      "nom": "SIKENSI",
+      "commune": "Sikensi",
+      "departement": "Sikensi",
+      "region": "Agnéby-Tiassa",
+      "chef": {
+        "titre": "NANAN",
+        "prenom": "KOUAME",
+        "nom": "KOUASSI",
+        "nomComplet": "NANAN KOUAME KOUASSI"
+      },
+      "logo": {
+        "path": "/logos/sikensi.png",
+        "alt": "Sceau du Village de Sikensi"
+      },
+      "adresseAdministrative": {
+        "prefixeRef": "SIK",
+        "codePostal": "00000"
+      },
+      "active": true
+    },
+    {
+      "id": "elibou",
+      "nom": "ÉLIBOU",
+      "commune": "Elibou",
+      "departement": "Dabou",
+      "region": "Grands-Ponts",
+      "chef": {
+        "titre": "NANAN",
+        "prenom": "KOFFI",
+        "nom": "YAO",
+        "nomComplet": "NANAN KOFFI YAO"
+      },
+      "logo": {
+        "path": "/logos/elibou.png",
+        "alt": "Sceau du Village d'Élibou"
+      },
+      "adresseAdministrative": {
+        "prefixeRef": "ELI",
+        "codePostal": "00000"
+      },
+      "active": true
+    },
+    {
+      "id": "sahuye",
+      "nom": "SAHUYÉ",
+      "commune": "Sikensi",
+      "departement": "Sikensi",
+      "region": "Agnéby-Tiassa",
+      "chef": {
+        "titre": "NANAN",
+        "prenom": "KOUAKOU",
+        "nom": "KOUAME",
+        "nomComplet": "NANAN KOUAKOU KOUAME"
+      },
+      "logo": {
+        "path": "/logos/sahuye.png",
+        "alt": "Sceau du Village de Sahuyé"
+      },
+      "adresseAdministrative": {
+        "prefixeRef": "SAH",
+        "codePostal": "00000"
+      },
+      "active": true
+    },
+    {
+      "id": "gomon",
+      "nom": "GOMON",
+      "commune": "Grand-Lahou",
+      "departement": "Grand-Lahou",
+      "region": "Grands-Ponts",
+      "chef": {
+        "titre": "NANAN",
+        "prenom": "KOUAME",
+        "nom": "KOUADIO",
+        "nomComplet": "NANAN KOUAME KOUADIO"
+      },
+      "logo": {
+        "path": "/logos/gomon.png",
+        "alt": "Sceau du Village de Gomon"
+      },
+      "adresseAdministrative": {
+        "prefixeRef": "GOM",
+        "codePostal": "00000"
+      },
+      "active": true
+    },
+    {
+      "id": "becedi",
+      "nom": "BÉCÉDI",
+      "commune": "Tiassalé",
+      "departement": "Tiassalé",
+      "region": "Agnéby-Tiassa",
+      "chef": {
+        "titre": "NANAN",
+        "prenom": "KOUASSI",
+        "nom": "KOFFI",
+        "nomComplet": "NANAN KOUASSI KOFFI"
+      },
+      "logo": {
+        "path": "/logos/becedi.png",
+        "alt": "Sceau du Village de Bécedi"
+      },
+      "adresseAdministrative": {
+        "prefixeRef": "BEC",
+        "codePostal": "00000"
+      },
+      "active": true
+    },
+    {
+      "id": "braffoueby",
+      "nom": "BRAFFOUÉBY",
+      "commune": "Adzopé",
+      "departement": "Adzopé",
+      "region": "La Mé",
+      "chef": {
+        "titre": "NANAN",
+        "prenom": "KOUADIO",
+        "nom": "KOUAKOU",
+        "nomComplet": "NANAN KOUADIO KOUAKOU"
+      },
+      "logo": {
+        "path": "/logos/braffoueby.png",
+        "alt": "Sceau du Village de Braffouéby"
+      },
+      "adresseAdministrative": {
+        "prefixeRef": "BRA",
+        "codePostal": "00000"
+      },
+      "active": true
+    },
+    {
+      "id": "badasso",
+      "nom": "BADASSO",
+      "commune": "Sikensi",
+      "departement": "Sikensi",
+      "region": "Agnéby-Tiassa",
+      "chef": {
+        "titre": "NANAN",
+        "prenom": "YAO",
+        "nom": "KOUAME",
+        "nomComplet": "NANAN YAO KOUAME"
+      },
+      "logo": {
+        "path": "/logos/badasso.png",
+        "alt": "Sceau du Village de Badasso"
+      },
+      "adresseAdministrative": {
+        "prefixeRef": "BAD",
+        "codePostal": "00000"
+      },
+      "active": true
+    }
+  ]
+}

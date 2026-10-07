@@ -1,0 +1,63 @@
+*** Begin Patch
+*** Update File: src/api/client.ts
+@@
+-        "/api/auth/login",
++        "/api/v1/auth/login",
+@@
+-      return apiClient.request<Record<string, unknown>>("/api/auth/me");
++      return apiClient.request<Record<string, unknown>>("/api/v1/auth/me");
+@@
+-      return apiClient.request<ApiAuthResponse>("/api/auth/refresh", {
++      return apiClient.request<ApiAuthResponse>("/api/v1/auth/refresh", {
+@@
+-        "/api/auth/logout",
++        "/api/v1/auth/logout",
+@@
+-      return apiClient.request<UserProfile[]>("/api/users");
++      return apiClient.request<UserProfile[]>("/api/v1/users");
+@@
+-      return apiClient.request<ApiAuthResponse>("/api/users", {
++      return apiClient.request<ApiAuthResponse>("/api/v1/users", {
+@@
+-      return apiClient.request<UserProfile>(`/api/users/${id}`, {
++      return apiClient.request<UserProfile>(`/api/v1/users/${id}`, {
+@@
+-        `/api/users/${id}`,
++        `/api/v1/users/${id}`,
+@@
+-        "/api/settings",
++        "/api/v1/settings",
+@@
+-        "/api/settings",
++        "/api/v1/settings",
+@@
+-      >("/api/site-content");
++      >("/api/v1/site-content");
+@@
+-      return apiClient.request<MediaFile[]>(`/api/media${suffix}`);
++      return apiClient.request<MediaFile[]>(`/api/v1/media${suffix}`);
+@@
+-      return apiClient.request<MediaFile>(`/api/media/${id}`);
++      return apiClient.request<MediaFile>(`/api/v1/media/${id}`);
+@@
+-      return apiClient.request<MediaFile>("/api/media", {
++      return apiClient.request<MediaFile>("/api/v1/media", {
+@@
+-      return apiClient.request<MediaFile>(`/api/media/${id}`, {
++      return apiClient.request<MediaFile>(`/api/v1/media/${id}`, {
+@@
+-      }>(`/api/media/${id}`, { method: "DELETE" });
++      }>(`/api/v1/media/${id}`, { method: "DELETE" });
+@@
+-      return apiClient.request<MediaFile>(`/api/media/${id}/restore`, {
++      return apiClient.request<MediaFile>(`/api/v1/media/${id}/restore`, {
+@@
+-        `/api/media/${id}/purge`,
++        `/api/v1/media/${id}/purge`,
+@@
+-      return apiClient.request<MediaFile>(`/api/media/${id}/replace`, {
++      return apiClient.request<MediaFile>(`/api/v1/media/${id}/replace`, {
+@@
+-      >("/api/media/brand-assets");
++      >("/api/v1/media/brand-assets");
+*** End Patch

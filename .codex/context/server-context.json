@@ -1,0 +1,231 @@
+{
+  "server": {
+    "host": "",
+    "sshPort": 2222,
+    "user": "soma",
+    "lastUpdate": "2026-08-31T09:59:55.626Z"
+  },
+  "docker": {
+    "containers": [],
+    "images": [],
+    "volumes": [],
+    "networks": []
+  },
+  "resources": {
+    "ram": {
+      "total": 8192,
+      "used": 0,
+      "available": 8192
+    },
+    "cpu": {
+      "cores": 4,
+      "usage": 0
+    },
+    "disk": {
+      "total": "0",
+      "used": "0",
+      "available": "0",
+      "usePercent": "0%"
+    },
+    "ramMb": {
+      "total": 8192,
+      "used": 0,
+      "available": 8192
+    },
+    "cpuLegacy": {
+      "cores": 4,
+      "usagePercent": 0
+    },
+    "diskGb": {
+      "total": 0,
+      "used": 0,
+      "available": 0
+    }
+  },
+  "services": {
+    "pseudoStack": {
+      "postgres": {
+        "container": "",
+        "port": 0,
+        "status": "unknown",
+        "healthy": false,
+        "lastCheck": ""
+      },
+      "postgrest": {
+        "container": "",
+        "port": 0,
+        "status": "unknown",
+        "healthy": false,
+        "lastCheck": ""
+      },
+      "keycloak": {
+        "container": "",
+        "port": 0,
+        "status": "unknown",
+        "healthy": false,
+        "lastCheck": ""
+      },
+      "studio": {
+        "container": "",
+        "port": 0,
+        "status": "unknown",
+        "healthy": false,
+        "lastCheck": ""
+      },
+      "adminer": {
+        "container": "",
+        "port": 0,
+        "status": "unknown",
+        "healthy": false,
+        "lastCheck": ""
+      }
+    },
+    "coreStack": {
+      "db": {
+        "container": "",
+        "port": 0,
+        "status": "unknown",
+        "healthy": false,
+        "lastCheck": ""
+      },
+      "kong": {
+        "container": "",
+        "port": 0,
+        "status": "unknown",
+        "healthy": false,
+        "lastCheck": ""
+      },
+      "auth": {
+        "container": "",
+        "port": 0,
+        "status": "unknown",
+        "healthy": false,
+        "lastCheck": ""
+      },
+      "storage": {
+        "container": "",
+        "port": 0,
+        "status": "unknown",
+        "healthy": false,
+        "lastCheck": ""
+      },
+      "realtime": {
+        "container": "",
+        "port": 0,
+        "status": "unknown",
+        "healthy": false,
+        "lastCheck": ""
+      },
+      "studio": {
+        "container": "",
+        "port": 0,
+        "status": "unknown",
+        "healthy": false,
+        "lastCheck": ""
+      },
+      "meta": {
+        "container": "",
+        "port": 0,
+        "status": "unknown",
+        "healthy": false,
+        "lastCheck": ""
+      }
+    }
+  },
+  "migration": {
+    "phase": 0,
+    "tasks": [],
+    "completed": [],
+    "rollbackPoints": []
+  },
+  "dbClient": {
+    "pseudoStack": {
+      "postgres": {
+        "container": "",
+        "port": 0,
+        "status": "unknown",
+        "healthy": false,
+        "lastCheck": ""
+      },
+      "postgrest": {
+        "container": "",
+        "port": 0,
+        "status": "unknown",
+        "healthy": false,
+        "lastCheck": ""
+      },
+      "keycloak": {
+        "container": "",
+        "port": 0,
+        "status": "unknown",
+        "healthy": false,
+        "lastCheck": ""
+      },
+      "studio": {
+        "container": "",
+        "port": 0,
+        "status": "unknown",
+        "healthy": false,
+        "lastCheck": ""
+      },
+      "adminer": {
+        "container": "",
+        "port": 0,
+        "status": "unknown",
+        "healthy": false,
+        "lastCheck": ""
+      }
+    },
+    "coreStack": {
+      "db": {
+        "container": "",
+        "port": 0,
+        "status": "unknown",
+        "healthy": false,
+        "lastCheck": ""
+      },
+      "kong": {
+        "container": "",
+        "port": 0,
+        "status": "unknown",
+        "healthy": false,
+        "lastCheck": ""
+      },
+      "auth": {
+        "container": "",
+        "port": 0,
+        "status": "unknown",
+        "healthy": false,
+        "lastCheck": ""
+      },
+      "storage": {
+        "container": "",
+        "port": 0,
+        "status": "unknown",
+        "healthy": false,
+        "lastCheck": ""
+      },
+      "realtime": {
+        "container": "",
+        "port": 0,
+        "status": "unknown",
+        "healthy": false,
+        "lastCheck": ""
+      },
+      "studio": {
+        "container": "",
+        "port": 0,
+        "status": "unknown",
+        "healthy": false,
+        "lastCheck": ""
+      },
+      "meta": {
+        "container": "",
+        "port": 0,
+        "status": "unknown",
+        "healthy": false,
+        "lastCheck": ""
+      }
+    }
+  }
+}

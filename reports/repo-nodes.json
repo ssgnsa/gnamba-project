@@ -1,0 +1,2141 @@
+{
+  "src/App.tsx": {
+    "path": "src/App.tsx",
+    "hash": "d2c7959ee3dbe637e6cb4fe6468bb09a246149b9f0637630fd6f2f9c15ea5bf2",
+    "size": 52127,
+    "imports": [],
+    "external": [
+      "react",
+      "src/context/SettingsContext.tsx",
+      "src/context/AuthContext.tsx",
+      "src/context/NotificationContext.tsx",
+      "src/components/ui/Toast.tsx",
+      "src/lib/useServiceWorker.ts",
+      "lucide-react",
+      "src/components/ErrorBoundary.tsx",
+      "src/offline/ui/offline-indicator.tsx",
+      "src/components/Layout.tsx",
+      "src/components/public/PublicLayout.tsx",
+      "src/components/Sidebar.tsx",
+      "src/lib/publicRoutes.ts",
+      "src/lib/publicRoutes.ts",
+      "src/lib/supabase.ts",
+      "src/components/page-builder/types.ts",
+      "src/components/public/PublicPageLayoutRenderer.tsx",
+      "src/components/public/PublicSocialWall.tsx",
+      "src/lib/officialContact.ts",
+      "react-onesignal"
+    ]
+  },
+  "src/components/AICopilot.tsx": {
+    "path": "src/components/AICopilot.tsx",
+    "hash": "2b30ce782af760d5fdc6cd64a543afa8c6aaf2ac4d3b9b50cba974baf6f8c0b0",
+    "size": 13662,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/lib/ollama.ts"
+    ]
+  },
+  "src/components/BrandLogo.tsx": {
+    "path": "src/components/BrandLogo.tsx",
+    "hash": "a04d644f8c71534f1cc9215af6d06b19ec060140ded62eb2af1df97d547be6af",
+    "size": 2662,
+    "imports": [],
+    "external": [
+      "react",
+      "react",
+      "src/context/SettingsContext.tsx",
+      "src/lib/logoUtils.ts"
+    ]
+  },
+  "src/components/ErrorBoundary.tsx": {
+    "path": "src/components/ErrorBoundary.tsx",
+    "hash": "7f6a2e42485005de4614d441a7bfafbdc4fc541bef21b21fe8a82e0830c88d51",
+    "size": 5211,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/lib/sentry.ts"
+    ]
+  },
+  "src/components/Layout.tsx": {
+    "path": "src/components/Layout.tsx",
+    "hash": "b9a4181a2151043606b45a226092381bf5bccdf30547156ff2a377069a7742c1",
+    "size": 7890,
+    "imports": [],
+    "external": [
+      "react",
+      "src/components/Sidebar.tsx",
+      "src/context/SettingsContext.tsx",
+      "src/context/AuthContext.tsx",
+      "src/hooks/useMobile.ts",
+      "lucide-react",
+      "src/components/BrandLogo.tsx",
+      "src/components/AICopilot.tsx",
+      "src/lib/ollama.ts",
+      "src/lib/lead-capture.ts"
+    ]
+  },
+  "src/components/NetworkStatus.tsx": {
+    "path": "src/components/NetworkStatus.tsx",
+    "hash": "ff42ceee43898dcebb3344570541bcc86691270d411116339579f1722abfad84",
+    "size": 1256,
+    "imports": [],
+    "external": [
+      "src/lib/useServiceWorker.ts",
+      "lucide-react"
+    ]
+  },
+  "src/components/NotificationButton.tsx": {
+    "path": "src/components/NotificationButton.tsx",
+    "hash": "c9d83045310964f6f16ceaa22f9654c244dca37b7e7c6277ba273a7aaea72aac",
+    "size": 3081,
+    "imports": [],
+    "external": [
+      "react",
+      "src/lib/supabase.ts"
+    ]
+  },
+  "src/components/Sidebar.tsx": {
+    "path": "src/components/Sidebar.tsx",
+    "hash": "a2bcf17ce970013d447aa8d5de2c491bd0ff659188573c2568d93e238cf71712",
+    "size": 10703,
+    "imports": [],
+    "external": [
+      "lucide-react",
+      "src/context/SettingsContext.tsx",
+      "src/components/BrandLogo.tsx",
+      "src/context/AuthContext.tsx"
+    ]
+  },
+  "src/components/dashboard/AlertsWidget.tsx": {
+    "path": "src/components/dashboard/AlertsWidget.tsx",
+    "hash": "1fece527c732f26bbec79aea4299b6330f72e62b36337b23cd6e259a5dfbce6e",
+    "size": 1820,
+    "imports": [],
+    "external": [
+      "lucide-react"
+    ]
+  },
+  "src/components/dashboard/CategoryDonutChart.tsx": {
+    "path": "src/components/dashboard/CategoryDonutChart.tsx",
+    "hash": "0b8c5cb9c8d7a79b00935db100380522a2cfbb770aac3c7e5d7bbf8a0ab3d0d5",
+    "size": 3061,
+    "imports": [],
+    "external": []
+  },
+  "src/components/dashboard/KPICard.tsx": {
+    "path": "src/components/dashboard/KPICard.tsx",
+    "hash": "b57bffa1db982018df591299d75ab2281e1e0fa1dcd0cc2f17a5f18ea454712e",
+    "size": 2667,
+    "imports": [],
+    "external": [
+      "lucide-react"
+    ]
+  },
+  "src/components/dashboard/RevenueChart.tsx": {
+    "path": "src/components/dashboard/RevenueChart.tsx",
+    "hash": "a8ee2eac7309f149c5846994f1af47eab312e7a6e09248726c7788f6f3444f6b",
+    "size": 4778,
+    "imports": [],
+    "external": []
+  },
+  "src/components/documents/DocumentForm.tsx": {
+    "path": "src/components/documents/DocumentForm.tsx",
+    "hash": "5f285b857340d52561dc3819814a5d9a0ce8a9cc2da65b2a7d628ef803922cd2",
+    "size": 8393,
+    "imports": [],
+    "external": [
+      "lucide-react",
+      "src/types",
+      "src/components/ui/Modal.tsx"
+    ]
+  },
+  "src/components/filebrowser/FileBrowserIntegration.tsx": {
+    "path": "src/components/filebrowser/FileBrowserIntegration.tsx",
+    "hash": "6f309645ca56d7d9e94527198081304c84727e5de4ed6b61804713b3cf65dce0",
+    "size": 12282,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/lib/filebrowser.ts",
+      "src/context/AuthContext.tsx"
+    ]
+  },
+  "src/components/filebrowser/FilebrowserIframe.tsx": {
+    "path": "src/components/filebrowser/FilebrowserIframe.tsx",
+    "hash": "eb9d6470daee68a536e097045a0f6214e458196c4bcc0c754d7f781fc44b03b5",
+    "size": 6299,
+    "imports": [],
+    "external": [
+      "react",
+      "src/context/AuthContext.tsx",
+      "lucide-react",
+      "src/lib/filebrowserConfig.ts"
+    ]
+  },
+  "src/components/foncier/FoncierConstants.ts": {
+    "path": "src/components/foncier/FoncierConstants.ts",
+    "hash": "9cc700a51d88237c9c5b578d40cab7c21f7008860a77843d2cfc88287cb4c46a",
+    "size": 11259,
+    "imports": [],
+    "external": [
+      "src/types",
+      "src/types/village.ts",
+      "src/lib/villages.json"
+    ]
+  },
+  "src/components/foncier/VillageLogoUploader.tsx": {
+    "path": "src/components/foncier/VillageLogoUploader.tsx",
+    "hash": "2cfec865f853478eb3ba64c5bd1d81cda239abbc1a6412c67cc8e7f975d14174",
+    "size": 6329,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/lib/mediaUtils.ts",
+      "src/components/media/MediaPicker.tsx",
+      "src/types"
+    ]
+  },
+  "src/components/foncier/WorkflowValidation.tsx": {
+    "path": "src/components/foncier/WorkflowValidation.tsx",
+    "hash": "d7e12cc387d09343676e283831edb4ede77fb162b5e346aac9f05454af665d2d",
+    "size": 17581,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/lib/supabase.ts",
+      "src/lib/foncierAudit.ts",
+      "src/components/ui/Badge.tsx",
+      "src/components/media/MediaPicker.tsx",
+      "src/lib/mediaUtils.ts",
+      "src/components/ui/SafeImage.tsx",
+      "src/types"
+    ]
+  },
+  "src/components/media/BrandAssetsManager.tsx": {
+    "path": "src/components/media/BrandAssetsManager.tsx",
+    "hash": "2ca8e97726db53b4c75d7ee56359bcb43f2f3804b03581c567184832a68dc4f0",
+    "size": 8978,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/lib/mediaUtils.ts",
+      "src/context/AuthContext.tsx",
+      "src/context/SettingsContext.tsx",
+      "src/types",
+      "src/components/media/MediaPicker.tsx"
+    ]
+  },
+  "src/components/media/MediaCard.tsx": {
+    "path": "src/components/media/MediaCard.tsx",
+    "hash": "b7945a4345ace1b2657bef1790f65a9d3d8ebcbb4fa2bc0978e23d5f50bd3de7",
+    "size": 7103,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/types"
+    ]
+  },
+  "src/components/media/MediaDetailModal.tsx": {
+    "path": "src/components/media/MediaDetailModal.tsx",
+    "hash": "c70e933800645a5845ae601507213fd3be1f0d9abdc15be41011b89454775112",
+    "size": 21662,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/lib/supabase.ts",
+      "src/context/AuthContext.tsx",
+      "src/lib/mediaUtils.ts",
+      "src/types"
+    ]
+  },
+  "src/components/media/MediaPicker.tsx": {
+    "path": "src/components/media/MediaPicker.tsx",
+    "hash": "78680006428f6fdcfc4eb052d78076e3d5cf6496bf58844daa63a35cd1684e9e",
+    "size": 14760,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/lib/supabase.ts",
+      "src/context/AuthContext.tsx",
+      "src/types",
+      "src/components/media/MediaCard.tsx",
+      "src/components/media/MediaUploader.tsx"
+    ]
+  },
+  "src/components/media/MediaUploader.tsx": {
+    "path": "src/components/media/MediaUploader.tsx",
+    "hash": "6e0907a892a6f7278ce0645dab121d1c93a21e7ea081fc5b65af8d7d66d2f8e3",
+    "size": 17597,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/lib/supabase.ts",
+      "src/lib/mediaUtils.ts",
+      "src/context/AuthContext.tsx",
+      "src/types"
+    ]
+  },
+  "src/components/media/SiteMediaAssignments.tsx": {
+    "path": "src/components/media/SiteMediaAssignments.tsx",
+    "hash": "969c8eebe64ba0c855c315e33d75cf57847adc07f1f8d71289bb344c4247a8da",
+    "size": 8393,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/lib/mediaUtils.ts",
+      "src/context/AuthContext.tsx",
+      "src/types",
+      "src/components/media/MediaPicker.tsx"
+    ]
+  },
+  "src/components/page-builder/PageBuilder.tsx": {
+    "path": "src/components/page-builder/PageBuilder.tsx",
+    "hash": "b12d0986d15a8745136fc50fee56babc3c3cb06cebaf5c1f20b95fe55fa9702c",
+    "size": 15398,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/lib/supabase.ts",
+      "src/components/page-builder/types.ts",
+      "src/components/page-builder/SectionPreview.tsx",
+      "src/components/page-builder/PropertiesPanel.tsx"
+    ]
+  },
+  "src/components/page-builder/PropertiesPanel.tsx": {
+    "path": "src/components/page-builder/PropertiesPanel.tsx",
+    "hash": "74b7effc9580e658511a05904c6cbdefdac423004ad2fba42fd57024dcc5420a",
+    "size": 24657,
+    "imports": [],
+    "external": [
+      "lucide-react",
+      "src/components/page-builder/types.ts",
+      "src/components/media/MediaPicker.tsx",
+      "react"
+    ]
+  },
+  "src/components/page-builder/SectionPreview.tsx": {
+    "path": "src/components/page-builder/SectionPreview.tsx",
+    "hash": "200e46f2b54eb39d5b2986771bfdb1af30222fe70f123cdef414b9e1443f6eef",
+    "size": 10036,
+    "imports": [],
+    "external": [
+      "src/components/page-builder/types.ts"
+    ]
+  },
+  "src/components/page-builder/types.ts": {
+    "path": "src/components/page-builder/types.ts",
+    "hash": "a31de5057213dd4e991376ef5bc16668ef5a1312184544fded270fcd43c2c7d8",
+    "size": 6727,
+    "imports": [],
+    "external": []
+  },
+  "src/components/public/PublicFooter.tsx": {
+    "path": "src/components/public/PublicFooter.tsx",
+    "hash": "9e46ded421ce2c1e8aeb9236a696081e76916d0ab69d35a045011c693b5d57e9",
+    "size": 14066,
+    "imports": [],
+    "external": [
+      "lucide-react",
+      "react",
+      "src/lib/publicRoutes.ts",
+      "src/lib/publicRoutes.ts",
+      "src/context/SiteContentContext.tsx",
+      "src/context/SettingsContext.tsx",
+      "src/components/BrandLogo.tsx",
+      "src/lib/officialContact.ts"
+    ]
+  },
+  "src/components/public/PublicLayout.tsx": {
+    "path": "src/components/public/PublicLayout.tsx",
+    "hash": "5aa79bc184724bd7180afdb4a69cbad347eae7f99e3d294d066611957ac97156",
+    "size": 1748,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/components/public/PublicNavbar.tsx",
+      "src/lib/publicRoutes.ts",
+      "src/components/public/PublicFooter.tsx",
+      "src/context/SiteContentContext.tsx",
+      "src/lib/officialContact.ts"
+    ]
+  },
+  "src/components/public/PublicNavbar.tsx": {
+    "path": "src/components/public/PublicNavbar.tsx",
+    "hash": "0529bef083910089a96e61932d77acd24bf33aca02f624281f193bac3e0c347b",
+    "size": 9773,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/context/SettingsContext.tsx",
+      "src/components/BrandLogo.tsx",
+      "src/lib/publicRoutes.ts",
+      "src/lib/officialContact.ts"
+    ]
+  },
+  "src/components/public/PublicPageLayoutRenderer.tsx": {
+    "path": "src/components/public/PublicPageLayoutRenderer.tsx",
+    "hash": "e512d98669af02aa2063633cb42a4a0ffb23cc4947092a4d5ca6c70fdb5fdb98",
+    "size": 21449,
+    "imports": [],
+    "external": [
+      "react",
+      "react",
+      "lucide-react",
+      "src/components/page-builder/types.ts",
+      "src/context/SettingsContext.tsx",
+      "src/lib/supabase.ts",
+      "src/components/BrandLogo.tsx",
+      "src/lib/publicRoutes.ts",
+      "src/lib/publicRoutes.ts",
+      "src/lib/officialContact.ts"
+    ]
+  },
+  "src/components/public/PublicSocialWall.tsx": {
+    "path": "src/components/public/PublicSocialWall.tsx",
+    "hash": "771f9a45e2145d9ea32b64751f2667b367649a06e2ab294b95c8433a70cc130d",
+    "size": 18927,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/context/SettingsContext.tsx",
+      "src/lib/supabase.ts"
+    ]
+  },
+  "src/components/ui/Badge.tsx": {
+    "path": "src/components/ui/Badge.tsx",
+    "hash": "5736f6fd88536566c85162d140e1a618fee8303284cf3aa7e756267826d6cbea",
+    "size": 746,
+    "imports": [],
+    "external": []
+  },
+  "src/components/ui/Breadcrumb.tsx": {
+    "path": "src/components/ui/Breadcrumb.tsx",
+    "hash": "657efe781b03ae81ae430204e09007e080260557e6b4fb799db62ea2b75d8254",
+    "size": 2095,
+    "imports": [],
+    "external": [
+      "lucide-react"
+    ]
+  },
+  "src/components/ui/Input.tsx": {
+    "path": "src/components/ui/Input.tsx",
+    "hash": "46c4f4f188a589d9a87999cfed52a24b20f744da5a4fca83eb624fee527d2986",
+    "size": 943,
+    "imports": [],
+    "external": [
+      "react"
+    ]
+  },
+  "src/components/ui/LazyImage.tsx": {
+    "path": "src/components/ui/LazyImage.tsx",
+    "hash": "70794d3a59b405da5617594dea51ecfa70bebce0a3b440ef7e64a1c82149c228",
+    "size": 2633,
+    "imports": [],
+    "external": [
+      "react"
+    ]
+  },
+  "src/components/ui/MobileCard.tsx": {
+    "path": "src/components/ui/MobileCard.tsx",
+    "hash": "5db4006fe1fbe0953668647a0e73357586dd902539a4a1b01e3d9c62b285a22b",
+    "size": 2100,
+    "imports": [],
+    "external": [
+      "react",
+      "src/hooks/useMobile.ts"
+    ]
+  },
+  "src/components/ui/Modal.tsx": {
+    "path": "src/components/ui/Modal.tsx",
+    "hash": "0ec459ba838dda8bbf626225ddf32fc12a5b8f6e66c525c5fc7e61425d90673a",
+    "size": 5384,
+    "imports": [],
+    "external": [
+      "react",
+      "react-dom",
+      "lucide-react"
+    ]
+  },
+  "src/components/ui/SafeImage.tsx": {
+    "path": "src/components/ui/SafeImage.tsx",
+    "hash": "fa2eba1cb4109789a502c21b47c728007d6e86bdd38f73c823598f4ac1375da9",
+    "size": 1094,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react"
+    ]
+  },
+  "src/components/ui/SyncRemoteButton.tsx": {
+    "path": "src/components/ui/SyncRemoteButton.tsx",
+    "hash": "2ec6a9a9fe870d4c65fe0926146cba8b9010efe7ba0c250f40232be0a2a532f9",
+    "size": 1182,
+    "imports": [],
+    "external": [
+      "lucide-react"
+    ]
+  },
+  "src/components/ui/Toast.tsx": {
+    "path": "src/components/ui/Toast.tsx",
+    "hash": "b2b148cae452bce796f5ce5ad426a2296d5cc147fddea321fd146c25919a3527",
+    "size": 2641,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react"
+    ]
+  },
+  "src/context/AuthContext.tsx": {
+    "path": "src/context/AuthContext.tsx",
+    "hash": "fb2291ba52e85d724e859d209394840c5d98af816a5245b405b44e67c66d6772",
+    "size": 9041,
+    "imports": [],
+    "external": [
+      "react",
+      "@supabase/supabase-js",
+      "src/lib/supabase.ts",
+      "src/types"
+    ]
+  },
+  "src/context/NotificationContext.tsx": {
+    "path": "src/context/NotificationContext.tsx",
+    "hash": "810f9ae8ec34403b9f507df795403c8ce25443af16f666f02a7d12f3ee56d7b3",
+    "size": 2068,
+    "imports": [],
+    "external": [
+      "react",
+      "src/components/ui/Toast.tsx"
+    ]
+  },
+  "src/context/SettingsContext.tsx": {
+    "path": "src/context/SettingsContext.tsx",
+    "hash": "b297252f660b8c389662b43251c877360a454b5396b2c038f86ba017d065ffc2",
+    "size": 10025,
+    "imports": [],
+    "external": [
+      "react",
+      "src/lib/supabase.ts",
+      "src/types",
+      "src/lib/officialContact.ts"
+    ]
+  },
+  "src/context/SiteContentContext.tsx": {
+    "path": "src/context/SiteContentContext.tsx",
+    "hash": "af72d3b38b10ce225b99943fa84b78fc9a36449cda9f65f45c17724917b4a384",
+    "size": 1647,
+    "imports": [],
+    "external": [
+      "react",
+      "src/lib/supabase.ts"
+    ]
+  },
+  "src/contexts/VillageContext.tsx": {
+    "path": "src/contexts/VillageContext.tsx",
+    "hash": "dfda5e349997f947038b0b7c119fd08cc9626e227bf9d3fe08739111be2f0da9",
+    "size": 2831,
+    "imports": [],
+    "external": [
+      "react",
+      "src/types/village.ts",
+      "src/types/village.ts"
+    ]
+  },
+  "src/data/client.ts": {
+    "path": "src/data/client.ts",
+    "hash": "423100834880688c7ca509fcf235da425e5b2bcd5f8a152712da0250585745ed",
+    "size": 1545,
+    "imports": [],
+    "external": [
+      "src/lib/supabase.ts"
+    ]
+  },
+  "src/data/clients.repository.test.ts": {
+    "path": "src/data/clients.repository.test.ts",
+    "hash": "a6b52101a36ef9c4673a3567c50829a0737d1a0ea563d5959f81039d388cfc09",
+    "size": 1680,
+    "imports": [],
+    "external": [
+      "vitest",
+      "src/data/clients.repository.ts"
+    ]
+  },
+  "src/data/clients.repository.ts": {
+    "path": "src/data/clients.repository.ts",
+    "hash": "b7cb8b8204644e5386dc96e4d7ffc1df8fed6c3075f9fec5f5ce1a91478b9e73",
+    "size": 5963,
+    "imports": [],
+    "external": [
+      "src/data/client.ts",
+      "src/types"
+    ]
+  },
+  "src/data/foncier.repository.ts": {
+    "path": "src/data/foncier.repository.ts",
+    "hash": "bcf1f35edd6780563cc2d4493835f5bbaf2ab5fff2e6e767c29c7b8787cbd044",
+    "size": 2703,
+    "imports": [],
+    "external": [
+      "src/lib/supabase.service.ts",
+      "src/data/client.ts"
+    ]
+  },
+  "src/data/leads.repository.test.ts": {
+    "path": "src/data/leads.repository.test.ts",
+    "hash": "8dad585b4e7c57b61c39d1dc7eaee86808f905eb18984a82846bcf80c38e3d8a",
+    "size": 1410,
+    "imports": [],
+    "external": [
+      "vitest",
+      "src/data/leads.repository.ts"
+    ]
+  },
+  "src/data/leads.repository.ts": {
+    "path": "src/data/leads.repository.ts",
+    "hash": "318ce3e5f8777746ba07d0316946cc22712769826da3c30ae61c6bcb29b8bcad",
+    "size": 7507,
+    "imports": [],
+    "external": [
+      "src/data/client.ts"
+    ]
+  },
+  "src/data/tenants.repository.test.ts": {
+    "path": "src/data/tenants.repository.test.ts",
+    "hash": "5660ffd7e8395a8d1ab47baf99f93255bec9df15955e25e9827d92c385492b58",
+    "size": 1731,
+    "imports": [],
+    "external": [
+      "vitest",
+      "src/data/tenants.repository.ts"
+    ]
+  },
+  "src/data/tenants.repository.ts": {
+    "path": "src/data/tenants.repository.ts",
+    "hash": "9597233aeebf176d7003b34461e2de9bef322244afd5d4833f598c8ff0c3880e",
+    "size": 7138,
+    "imports": [],
+    "external": [
+      "src/data/client.ts",
+      "src/types"
+    ]
+  },
+  "src/data/users.repository.ts": {
+    "path": "src/data/users.repository.ts",
+    "hash": "f10a33c1d355b068baa617ee871aacdb96833206cfbdbc74474878492849b9ce",
+    "size": 1373,
+    "imports": [],
+    "external": [
+      "src/data/client.ts"
+    ]
+  },
+  "src/domain/foncier/foncier.rules.ts": {
+    "path": "src/domain/foncier/foncier.rules.ts",
+    "hash": "18947ffcdd6b0196a97ad928b86e653ee0d8f925610d2f7b350f41c2f9e71b64",
+    "size": 2737,
+    "imports": [],
+    "external": []
+  },
+  "src/domain/foncier/foncier.validator.ts": {
+    "path": "src/domain/foncier/foncier.validator.ts",
+    "hash": "9c5517b16fc6c9f725fb1616c3c77940511fc42576f4307c19996bbbd4bf3fcf",
+    "size": 3562,
+    "imports": [],
+    "external": [
+      "zod"
+    ]
+  },
+  "src/domain/leads/leads.rules.ts": {
+    "path": "src/domain/leads/leads.rules.ts",
+    "hash": "d02f85049985fa5637d6f515d26b3dd9d1894b8555710d718b6d1e24268fa32c",
+    "size": 3409,
+    "imports": [],
+    "external": []
+  },
+  "src/domain/leads/leads.validator.ts": {
+    "path": "src/domain/leads/leads.validator.ts",
+    "hash": "906df084a764b7ca9c425aef0fb1c86dd302d92a3a09557b89dedda19659bd4d",
+    "size": 2351,
+    "imports": [],
+    "external": [
+      "zod"
+    ]
+  },
+  "src/hooks/useBranding.ts": {
+    "path": "src/hooks/useBranding.ts",
+    "hash": "9fa691764558a7fba4a2adc999d16824ee07bf1499e756bbfddfd57d875fd9d5",
+    "size": 5796,
+    "imports": [],
+    "external": [
+      "react",
+      "src/context/SettingsContext.tsx"
+    ]
+  },
+  "src/hooks/useFoncierAudit.ts": {
+    "path": "src/hooks/useFoncierAudit.ts",
+    "hash": "18c6c9d826ce80d94dfd1d9a5e1e423bf9d74a0d807869ccbfa32511ff378a36",
+    "size": 2555,
+    "imports": [],
+    "external": [
+      "react",
+      "src/lib/supabase.service.ts",
+      "src/components/foncier/FoncierConstants.ts"
+    ]
+  },
+  "src/hooks/useFoncierData.ts": {
+    "path": "src/hooks/useFoncierData.ts",
+    "hash": "8493e20226bceaade80dec17d1f16354e1e0ed1e6f502fac62c82d368f62146e",
+    "size": 2408,
+    "imports": [],
+    "external": [
+      "react",
+      "src/lib/supabase.service.ts",
+      "src/types"
+    ]
+  },
+  "src/hooks/useFoncierLogic.ts": {
+    "path": "src/hooks/useFoncierLogic.ts",
+    "hash": "35aaf86e58423182f2ffba11c3cfdc78830065d3ba8e5288e9f4f32ace1128e2",
+    "size": 11737,
+    "imports": [],
+    "external": [
+      "react",
+      "dompurify",
+      "src/lib/supabase.service.ts",
+      "src/types",
+      "src/utils/reference.ts",
+      "src/lib/foncierOffline.ts",
+      "src/components/foncier/FoncierConstants.ts",
+      "src/lib/foncierValidation.ts"
+    ]
+  },
+  "src/hooks/useFoncierState.ts": {
+    "path": "src/hooks/useFoncierState.ts",
+    "hash": "067de01892a2fc044f15bc47222cdfa8ffb06e4209c10666f1b1b4772e86afe7",
+    "size": 7775,
+    "imports": [],
+    "external": [
+      "react",
+      "src/types",
+      "src/components/foncier/FoncierConstants.ts",
+      "src/components/foncier/FoncierConstants.ts"
+    ]
+  },
+  "src/hooks/useFoncierSync.ts": {
+    "path": "src/hooks/useFoncierSync.ts",
+    "hash": "d1744a0ee093fb4777a3bf66300627e9183e06ae7bf20063ded5c25c69c7fea7",
+    "size": 6562,
+    "imports": [],
+    "external": [
+      "react",
+      "src/lib/supabase.service.ts",
+      "src/types",
+      "src/lib/foncierOffline.ts",
+      "src/utils/reference.ts"
+    ]
+  },
+  "src/hooks/useMobile.ts": {
+    "path": "src/hooks/useMobile.ts",
+    "hash": "03424ead88c51f23b597c786dcb0b0d97ba977e8b876293315d2fc64e407b93b",
+    "size": 5214,
+    "imports": [],
+    "external": [
+      "react"
+    ]
+  },
+  "src/hooks/useRealtimePayments.ts": {
+    "path": "src/hooks/useRealtimePayments.ts",
+    "hash": "c33c41e3b5e6cd8454563f11fbbed791a34d532fdffa57d1db3a477c5f87becc",
+    "size": 4289,
+    "imports": [],
+    "external": [
+      "react",
+      "src/lib/supabase.ts",
+      "src/context/NotificationContext.tsx",
+      "@supabase/supabase-js"
+    ]
+  },
+  "src/lib/__tests__/adminUserCreation.test.ts": {
+    "path": "src/lib/__tests__/adminUserCreation.test.ts",
+    "hash": "d180250ceb4ef1a615d5e264cb72ce44d6c44145bde97b2f2b625e65da4f3a55",
+    "size": 773,
+    "imports": [],
+    "external": [
+      "vitest",
+      "src/lib/adminUserCreation.ts"
+    ]
+  },
+  "src/lib/__tests__/attestationVerification.test.ts": {
+    "path": "src/lib/__tests__/attestationVerification.test.ts",
+    "hash": "6b3f994d1e8c80795873e2eb8fbfc88ae34f1e7a39978c22b7316b7f4bd2c15d",
+    "size": 2322,
+    "imports": [],
+    "external": [
+      "vitest",
+      "src/lib/attestationVerification.ts"
+    ]
+  },
+  "src/lib/__tests__/dashboardStats.test.ts": {
+    "path": "src/lib/__tests__/dashboardStats.test.ts",
+    "hash": "7ad1786ee82cbf41c4e092b334d6772f3dd12000ac11e0972176f8c82702ac98",
+    "size": 1677,
+    "imports": [],
+    "external": [
+      "vitest",
+      "src/lib/dashboardStats.ts"
+    ]
+  },
+  "src/lib/__tests__/foncierAttestation.test.ts": {
+    "path": "src/lib/__tests__/foncierAttestation.test.ts",
+    "hash": "0268fe1ee20d20778b593ea3ff9cb6d897cd0532f65f9c9861d9e24a8bd580cb",
+    "size": 2726,
+    "imports": [],
+    "external": [
+      "vitest",
+      "src/lib/foncierAttestation.ts"
+    ]
+  },
+  "src/lib/__tests__/mediaUtils.test.ts": {
+    "path": "src/lib/__tests__/mediaUtils.test.ts",
+    "hash": "bdd713092244092f08726776e90b659d1738951b043f1d3956415237a75ff2a3",
+    "size": 3462,
+    "imports": [],
+    "external": [
+      "vitest",
+      "src/lib/supabase.ts",
+      "src/lib/mediaUtils.ts"
+    ]
+  },
+  "src/lib/__tests__/supabase.service.test.ts": {
+    "path": "src/lib/__tests__/supabase.service.test.ts",
+    "hash": "63b4d3ecdeb101d1ef74b113b4ae57616d1bfc2a21088c81393b7ae5288e5e3c",
+    "size": 8012,
+    "imports": [],
+    "external": [
+      "vitest",
+      "src/lib/supabase.service.ts"
+    ]
+  },
+  "src/lib/adminUserCreation.ts": {
+    "path": "src/lib/adminUserCreation.ts",
+    "hash": "8800daf1dd25be05eaf3af69cb2a4f9b2ee5511f578efc8bf36beefec4b5a489",
+    "size": 353,
+    "imports": [],
+    "external": []
+  },
+  "src/lib/attestationPdfLogger.ts": {
+    "path": "src/lib/attestationPdfLogger.ts",
+    "hash": "b2826e5faf41ff171b30dee49e32a5df27bc6c98c3062ce87ce3f081476f96f3",
+    "size": 588,
+    "imports": [],
+    "external": [
+      "src/lib/supabase.service.ts"
+    ]
+  },
+  "src/lib/attestationVerification.ts": {
+    "path": "src/lib/attestationVerification.ts",
+    "hash": "14c19bd187143cd098b75c60ed6697c371965e16c86c8f9c3c34b9dce7a28c2d",
+    "size": 5978,
+    "imports": [],
+    "external": [
+      "src/lib/supabaseConfig.ts"
+    ]
+  },
+  "src/lib/bot-engine.ts": {
+    "path": "src/lib/bot-engine.ts",
+    "hash": "4298a760fe97dd42a1cd8063380d2380f11f46d819d6db4f1e3c9009551c1484",
+    "size": 15996,
+    "imports": [],
+    "external": [
+      "src/lib/supabase.ts",
+      "src/data/leads.repository.ts"
+    ]
+  },
+  "src/lib/codex-assistant/__tests__/codex-assistant.test.ts": {
+    "path": "src/lib/codex-assistant/__tests__/codex-assistant.test.ts",
+    "hash": "205a5acdfbac035d0f96979e3bab0ae60d781c42371640be677494be7ea9cedd",
+    "size": 1839,
+    "imports": [],
+    "external": [
+      "vitest",
+      "src/lib/codex-assistant/index.ts"
+    ]
+  },
+  "src/lib/codex-assistant/cli.ts": {
+    "path": "src/lib/codex-assistant/cli.ts",
+    "hash": "9042ffd248ba450d3b1390c739a03998e4edce9e0175e3376f987de5d1b4fe09",
+    "size": 2967,
+    "imports": [],
+    "external": [
+      "src/lib/codex-assistant/index.ts",
+      "src/lib/codex-assistant/types.ts"
+    ]
+  },
+  "src/lib/codex-assistant/command-registry.ts": {
+    "path": "src/lib/codex-assistant/command-registry.ts",
+    "hash": "91920ebf752f84677eb27f0404d89672b59b70c7e24f431f49babe5546d1f99f",
+    "size": 10456,
+    "imports": [],
+    "external": [
+      "src/lib/codex-assistant/context-manager.ts",
+      "src/lib/codex-assistant/diagnostic-engine.ts",
+      "src/lib/codex-assistant/migration-assistant.ts",
+      "src/lib/codex-assistant/types.ts"
+    ]
+  },
+  "src/lib/codex-assistant/context-manager.ts": {
+    "path": "src/lib/codex-assistant/context-manager.ts",
+    "hash": "efdf95e7489f529c80d65db9864e299e2a601c93a28dceceadfb6009a4620d6a",
+    "size": 24404,
+    "imports": [],
+    "external": [
+      "dockerode",
+      "node:child_process",
+      "node:fs",
+      "node:os",
+      "src/lib/codex-assistant/types.ts"
+    ]
+  },
+  "src/lib/codex-assistant/diagnostic-engine.ts": {
+    "path": "src/lib/codex-assistant/diagnostic-engine.ts",
+    "hash": "d0f300c1d1967e46baba50965d49ea2ef3e930e604e646bd1a14a1ea9d6f7186",
+    "size": 16424,
+    "imports": [],
+    "external": [
+      "src/lib/codex-assistant/context-manager.ts",
+      "src/lib/codex-assistant/types.ts"
+    ]
+  },
+  "src/lib/codex-assistant/index.ts": {
+    "path": "src/lib/codex-assistant/index.ts",
+    "hash": "5a27e7e54b430e2995a02994cbcb1fbfbf58209eddb33fb3ec439f8a63cb6456",
+    "size": 2101,
+    "imports": [],
+    "external": [
+      "src/lib/codex-assistant/context-manager.ts",
+      "src/lib/codex-assistant/diagnostic-engine.ts",
+      "src/lib/codex-assistant/migration-assistant.ts",
+      "src/lib/codex-assistant/command-registry.ts",
+      "src/lib/codex-assistant/types.ts"
+    ]
+  },
+  "src/lib/codex-assistant/migration-assistant.ts": {
+    "path": "src/lib/codex-assistant/migration-assistant.ts",
+    "hash": "41472810d41197d6d481985623c160b714e6837eabab488a3d7dba5190ccf5db",
+    "size": 9057,
+    "imports": [],
+    "external": [
+      "src/lib/codex-assistant/context-manager.ts",
+      "src/lib/codex-assistant/types.ts"
+    ]
+  },
+  "src/lib/codex-assistant/types.ts": {
+    "path": "src/lib/codex-assistant/types.ts",
+    "hash": "21b88d0bea3603364366c8ce5d2e2c4c4e056d057e1a8498dc4c16608e4cf47a",
+    "size": 4460,
+    "imports": [],
+    "external": []
+  },
+  "src/lib/dashboardStats.ts": {
+    "path": "src/lib/dashboardStats.ts",
+    "hash": "21a93a39e8e50f2f0a47057c0639163ed3f40563bf3e3a629be9b4a16eeacd80",
+    "size": 1291,
+    "imports": [],
+    "external": []
+  },
+  "src/lib/demoMode.ts": {
+    "path": "src/lib/demoMode.ts",
+    "hash": "5a98d913f58baade6b34d633750bebe27dec33c27579aab6724e5cbb446ef789",
+    "size": 905,
+    "imports": [],
+    "external": [
+      "@supabase/supabase-js",
+      "src/types"
+    ]
+  },
+  "src/lib/filebrowser.ts": {
+    "path": "src/lib/filebrowser.ts",
+    "hash": "00aa3b7c4185e90751e967a135b41a8150ffcfecf3426407d18625784f9f7de5",
+    "size": 9472,
+    "imports": [],
+    "external": [
+      "src/lib/filebrowserConfig.ts"
+    ]
+  },
+  "src/lib/filebrowserConfig.ts": {
+    "path": "src/lib/filebrowserConfig.ts",
+    "hash": "380cb92756ecc4c736ccf03e213616eb7ffb4664ea01a422a1c1edf0095614bd",
+    "size": 1064,
+    "imports": [],
+    "external": []
+  },
+  "src/lib/foncierAttestation.ts": {
+    "path": "src/lib/foncierAttestation.ts",
+    "hash": "07688ad2aae6a3dff330b2a5b5e56bb2798e7511e051d9667377a4593608b76e",
+    "size": 6836,
+    "imports": [],
+    "external": [
+      "dompurify",
+      "src/components/foncier/FoncierConstants.ts",
+      "src/types",
+      "src/utils/reference.ts"
+    ]
+  },
+  "src/lib/foncierAudit.ts": {
+    "path": "src/lib/foncierAudit.ts",
+    "hash": "0e6f8d976197f3c5b9d2db6753cbfdf24bc298e445e3024ff509258519d296e2",
+    "size": 4322,
+    "imports": [],
+    "external": []
+  },
+  "src/lib/foncierOffline.ts": {
+    "path": "src/lib/foncierOffline.ts",
+    "hash": "497e0d73ac5d95c1719e69ea24163fc6d472e7ec93d75c337aa131f4653db0e0",
+    "size": 8986,
+    "imports": [],
+    "external": [
+      "src/types"
+    ]
+  },
+  "src/lib/foncierValidation.ts": {
+    "path": "src/lib/foncierValidation.ts",
+    "hash": "06af067694b2c2052c8007496a9cda77eb656ac5254d7dc60ac2e765d07de417",
+    "size": 9723,
+    "imports": [],
+    "external": [
+      "zod"
+    ]
+  },
+  "src/lib/hash.ts": {
+    "path": "src/lib/hash.ts",
+    "hash": "eea6c336aa1f90bef5507d1f8c5dec434b4fcd2af96d08f08e938e081bc7ea5a",
+    "size": 2368,
+    "imports": [],
+    "external": [
+      "crypto"
+    ]
+  },
+  "src/lib/immobilier.ts": {
+    "path": "src/lib/immobilier.ts",
+    "hash": "59ee48303d4d6f3950798c54c00ce9a74a866388df2813b18b14d88da304eea6",
+    "size": 8013,
+    "imports": [],
+    "external": [
+      "src/types"
+    ]
+  },
+  "src/lib/lead-api.ts": {
+    "path": "src/lib/lead-api.ts",
+    "hash": "c2580ce7c1ee4cb1966d8ffc47320c726caa69630ef4d5d066af023f72887f1b",
+    "size": 1825,
+    "imports": [],
+    "external": [
+      "src/data/leads.repository.ts"
+    ]
+  },
+  "src/lib/lead-capture.ts": {
+    "path": "src/lib/lead-capture.ts",
+    "hash": "61f8b3ec9df0f2cd50bee704bfeb53ef78ac47004ff7326d0644cdf4c5f150b4",
+    "size": 6248,
+    "imports": [],
+    "external": [
+      "src/lib/supabaseConfig.ts"
+    ]
+  },
+  "src/lib/logger.ts": {
+    "path": "src/lib/logger.ts",
+    "hash": "f212b75245c0fa78bd5827c87793748f6f4bab37bbb2fd5b51efb4c6ba4b20cd",
+    "size": 743,
+    "imports": [],
+    "external": []
+  },
+  "src/lib/logoUtils.ts": {
+    "path": "src/lib/logoUtils.ts",
+    "hash": "2595599fc8143d3094d268259edc673517193ed88440b78a50769d2992d2caa2",
+    "size": 5372,
+    "imports": [],
+    "external": [
+      "src/lib/supabase.ts"
+    ]
+  },
+  "src/lib/manualSyncStore.ts": {
+    "path": "src/lib/manualSyncStore.ts",
+    "hash": "af1e34ce5e52f0c6937b90d9ea1fc44671791edb284044b3d91bef9bad470a33",
+    "size": 1250,
+    "imports": [],
+    "external": []
+  },
+  "src/lib/mediaUtils.ts": {
+    "path": "src/lib/mediaUtils.ts",
+    "hash": "c0aff2030c972f048e664419ef801ff08ae71bab489a296a935219eef8bc596c",
+    "size": 12015,
+    "imports": [],
+    "external": [
+      "src/lib/supabase.ts",
+      "src/types"
+    ]
+  },
+  "src/lib/officialContact.ts": {
+    "path": "src/lib/officialContact.ts",
+    "hash": "06920b4f0cc560987b3e2fcb7e495d5e33d1b4b224622199a9b4fca18710c0e4",
+    "size": 2095,
+    "imports": [],
+    "external": []
+  },
+  "src/lib/ollama.ts": {
+    "path": "src/lib/ollama.ts",
+    "hash": "117d8eb7acea01567ce1ec89e1810c52145b9943a8e1b5a9727c4b3b436b3021",
+    "size": 11593,
+    "imports": [],
+    "external": []
+  },
+  "src/lib/publicRoutes.ts": {
+    "path": "src/lib/publicRoutes.ts",
+    "hash": "f8166875009a064ed79a42175a6b2081711ab2efc956e3b0d3f0c11e8fc06c00",
+    "size": 2402,
+    "imports": [],
+    "external": []
+  },
+  "src/lib/reports.ts": {
+    "path": "src/lib/reports.ts",
+    "hash": "47226a885292223a57aee91f5453382df4b666c47b9a02e25a908465faad1d1f",
+    "size": 8806,
+    "imports": [],
+    "external": [
+      "src/types"
+    ]
+  },
+  "src/lib/sentry.ts": {
+    "path": "src/lib/sentry.ts",
+    "hash": "c0f57dd15a8bd4fd3a06d25b24ead7ca781267bf5991727d2c9fd7025e6fca91",
+    "size": 6710,
+    "imports": [],
+    "external": []
+  },
+  "src/lib/sms-reminder-service.ts": {
+    "path": "src/lib/sms-reminder-service.ts",
+    "hash": "0d48fea2080b3195ff8a1963d42ba04e0dcdb0ed34cb8f297aaebf102708cef7",
+    "size": 6573,
+    "imports": [],
+    "external": [
+      "src/lib/supabase.ts"
+    ]
+  },
+  "src/lib/social-publish.ts": {
+    "path": "src/lib/social-publish.ts",
+    "hash": "c36562d9cd3cd132eb0ed11e7d77474f00c734a0397d10e1291c314e59da87d6",
+    "size": 14780,
+    "imports": [],
+    "external": [
+      "src/lib/supabase.ts"
+    ]
+  },
+  "src/lib/supabase.service.ts": {
+    "path": "src/lib/supabase.service.ts",
+    "hash": "33ca21d8057cb50d65973437c18e14c0ccfc59b2046234ea3e134a4bda31b28d",
+    "size": 17064,
+    "imports": [],
+    "external": [
+      "src/lib/supabase.ts",
+      "@supabase/supabase-js",
+      "src/types",
+      "src/lib/foncierAudit.ts",
+      "src/lib/foncierAttestation.ts"
+    ]
+  },
+  "src/lib/supabase.ts": {
+    "path": "src/lib/supabase.ts",
+    "hash": "b8020bfdbabc9bf39e1a36f2b1eef1633dfa81a7da0ce900acae6e24dc995214",
+    "size": 7273,
+    "imports": [],
+    "external": [
+      "@supabase/supabase-js",
+      "src/lib/supabaseConfig.ts"
+    ]
+  },
+  "src/lib/supabaseConfig.ts": {
+    "path": "src/lib/supabaseConfig.ts",
+    "hash": "223788b3c607254265e44f31fbbbf1b3fb50d424d4905cf6e091566dad42acc3",
+    "size": 981,
+    "imports": [],
+    "external": []
+  },
+  "src/lib/useServiceWorker.ts": {
+    "path": "src/lib/useServiceWorker.ts",
+    "hash": "8f6a29ad30886b1c69dacf7adc4521d28704d1e332f6b998401c075fd9a6889a",
+    "size": 4550,
+    "imports": [],
+    "external": [
+      "react"
+    ]
+  },
+  "src/lib/villages.json": {
+    "path": "src/lib/villages.json",
+    "hash": "babde9b282675ec5bf903909d10fb14773abc686b924d7db2fb0dd1336f41c18",
+    "size": 4318,
+    "imports": [],
+    "external": []
+  },
+  "src/lib/whatsappService.ts": {
+    "path": "src/lib/whatsappService.ts",
+    "hash": "043a56eb777e47eb2c1790c7dda33136448971c8c5405e89c0c487404b2bc9b1",
+    "size": 7508,
+    "imports": [],
+    "external": []
+  },
+  "src/main.tsx": {
+    "path": "src/main.tsx",
+    "hash": "c4706104b88b0e2c94eb22c4268704d5345bdd1f9829e3a6d474d1b86ad46957",
+    "size": 815,
+    "imports": [],
+    "external": [
+      "react",
+      "react-dom/client",
+      "src/App.tsx",
+      "src/offline/sync/sync.engine.v2.ts",
+      "src/offline/network/connectivity.ts"
+    ]
+  },
+  "src/offline/conflict.resolver.ts": {
+    "path": "src/offline/conflict.resolver.ts",
+    "hash": "72392e37bef1fc88b123d298feb9a7770356a11380f6f5547600f9122004c591",
+    "size": 2378,
+    "imports": [],
+    "external": []
+  },
+  "src/offline/db/indexeddb.ts": {
+    "path": "src/offline/db/indexeddb.ts",
+    "hash": "b92d60660f99931e5d1538d7ff86f10d1f124ac7f5e7a7418edfa03a5aaf684e",
+    "size": 11284,
+    "imports": [],
+    "external": []
+  },
+  "src/offline/network/connectivity.ts": {
+    "path": "src/offline/network/connectivity.ts",
+    "hash": "587c01f9238983a56ec3b0f6f27c6c1cab05b1f32784d5cae31a4f1c2959c670",
+    "size": 9133,
+    "imports": [],
+    "external": []
+  },
+  "src/offline/queue.ts": {
+    "path": "src/offline/queue.ts",
+    "hash": "c202243d87895477f7f3363d321bc6a37300cd0fe925b17e05ec4a679e942c52",
+    "size": 2470,
+    "imports": [],
+    "external": []
+  },
+  "src/offline/sync/sync.engine.v2.ts": {
+    "path": "src/offline/sync/sync.engine.v2.ts",
+    "hash": "a5eab42082130ec3b29cab382e6ba444ec5505dbbc7573b036a98ed0ec328f3f",
+    "size": 13284,
+    "imports": [],
+    "external": [
+      "src/offline/db/indexeddb.ts",
+      "src/data/foncier.repository.ts",
+      "src/data/leads.repository.ts",
+      "src/data/users.repository.ts",
+      "src/offline/conflict.resolver.ts"
+    ]
+  },
+  "src/offline/sync.engine.ts": {
+    "path": "src/offline/sync.engine.ts",
+    "hash": "bd298f658e86414ce61afa10a91530a3f26b261e3e684462f59dff1b8746a9a8",
+    "size": 2460,
+    "imports": [],
+    "external": [
+      "src/offline/queue.ts",
+      "src/data/foncier.repository.ts",
+      "src/data/leads.repository.ts"
+    ]
+  },
+  "src/offline/ui/offline-indicator.tsx": {
+    "path": "src/offline/ui/offline-indicator.tsx",
+    "hash": "2ee2e3d7274bf974bb135842b9f74215cde6c0723cf2393ae86b90d81da718c9",
+    "size": 6257,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/offline/sync/sync.engine.v2.ts",
+      "src/offline/network/connectivity.ts",
+      "src/offline/network/connectivity.ts"
+    ]
+  },
+  "src/offline/versioning.ts": {
+    "path": "src/offline/versioning.ts",
+    "hash": "22ec90be463c28c7066cce6988333b35445d072a0e6bb061d50532f609ec82aa",
+    "size": 2501,
+    "imports": [],
+    "external": []
+  },
+  "src/pages/AccueilEmploye.tsx": {
+    "path": "src/pages/AccueilEmploye.tsx",
+    "hash": "117d89bf0c1f059540b5f9b93c1ad1887917a640ab754e16734a04127cd885a6",
+    "size": 53327,
+    "imports": [],
+    "external": [
+      "react",
+      "src/context/AuthContext.tsx",
+      "src/context/SettingsContext.tsx",
+      "src/lib/supabase.ts",
+      "src/lib/dashboardStats.ts",
+      "src/types",
+      "lucide-react",
+      "src/components/BrandLogo.tsx",
+      "src/context/AuthContext.tsx"
+    ]
+  },
+  "src/pages/CatalogueLots.tsx": {
+    "path": "src/pages/CatalogueLots.tsx",
+    "hash": "e73d168c8fd32e6a40927642ac8e9eda435b0097d99fe906d01fe723f6a8d07c",
+    "size": 43065,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/lib/supabase.ts",
+      "src/context/AuthContext.tsx",
+      "src/context/NotificationContext.tsx",
+      "src/lib/officialContact.ts",
+      "src/utils/reference.ts",
+      "src/types",
+      "src/components/media/MediaPicker.tsx"
+    ]
+  },
+  "src/pages/Clients.tsx": {
+    "path": "src/pages/Clients.tsx",
+    "hash": "7157ab3b2bc0c8b0388cac1bea52cd97cc54e8095afab4ba0dabe4feb2fee394",
+    "size": 30493,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/data/clients.repository.ts",
+      "src/types",
+      "src/components/ui/Modal.tsx",
+      "src/components/ui/Badge.tsx",
+      "src/components/ui/SyncRemoteButton.tsx",
+      "src/context/SettingsContext.tsx",
+      "src/components/ui/MobileCard.tsx",
+      "src/context/NotificationContext.tsx",
+      "src/context/AuthContext.tsx",
+      "src/lib/demoMode.ts",
+      "src/lib/manualSyncStore.ts"
+    ]
+  },
+  "src/pages/CodexAssistant.tsx": {
+    "path": "src/pages/CodexAssistant.tsx",
+    "hash": "8c1b3d09e7ca57460dfa8d11d3009a14d9352e4d7f0dc8314697d3677044709c",
+    "size": 10858,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react"
+    ]
+  },
+  "src/pages/Dashboard.tsx": {
+    "path": "src/pages/Dashboard.tsx",
+    "hash": "d8601f62adb5df4a628f55ed2cb2055b7d60eaf78356e371a2b99766e441d39d",
+    "size": 35373,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/lib/supabase.ts",
+      "src/data/clients.repository.ts",
+      "src/context/AuthContext.tsx",
+      "src/lib/ollama.ts",
+      "src/components/dashboard/KPICard.tsx",
+      "src/components/dashboard/RevenueChart.tsx",
+      "src/components/dashboard/CategoryDonutChart.tsx",
+      "src/components/dashboard/AlertsWidget.tsx"
+    ]
+  },
+  "src/pages/Diagnostic.tsx": {
+    "path": "src/pages/Diagnostic.tsx",
+    "hash": "3e6df985b9464e8edb4b54ef6621e57208236b01349593cedc912870802d7286",
+    "size": 6444,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/lib/supabase.ts"
+    ]
+  },
+  "src/pages/Documents.tsx": {
+    "path": "src/pages/Documents.tsx",
+    "hash": "1202d17d299faf2b04858bb38f433a99025a3487a52b1fab1eee6bc7fcf8ba73",
+    "size": 44331,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/lib/supabase.ts",
+      "src/data/clients.repository.ts",
+      "src/types",
+      "src/components/ui/Modal.tsx",
+      "src/components/ui/Badge.tsx",
+      "src/context/SettingsContext.tsx",
+      "src/context/AuthContext.tsx",
+      "src/components/filebrowser/FileBrowserIntegration.tsx",
+      "src/components/documents/DocumentForm.tsx",
+      "src/lib/filebrowserConfig.ts"
+    ]
+  },
+  "src/pages/Employes.tsx": {
+    "path": "src/pages/Employes.tsx",
+    "hash": "52666f0c647577549edc69e8778b45a8470c808a984388de8352d3c3d0d47f5a",
+    "size": 27227,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/lib/supabase.ts",
+      "src/types",
+      "src/components/ui/Modal.tsx",
+      "src/components/ui/Badge.tsx",
+      "src/context/SettingsContext.tsx",
+      "src/components/media/MediaPicker.tsx",
+      "src/components/ui/MobileCard.tsx",
+      "src/context/AuthContext.tsx",
+      "src/lib/demoMode.ts"
+    ]
+  },
+  "src/pages/Finances.tsx": {
+    "path": "src/pages/Finances.tsx",
+    "hash": "110f377a3f61d23c5b18c018c5dfa76dacdda5cede95213e0463c325ca3f6201",
+    "size": 29011,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/lib/supabase.ts",
+      "src/data/clients.repository.ts",
+      "src/types",
+      "src/components/ui/Modal.tsx",
+      "src/components/ui/Badge.tsx",
+      "src/context/SettingsContext.tsx",
+      "src/context/AuthContext.tsx",
+      "src/lib/demoMode.ts",
+      "src/utils/reference.ts",
+      "src/utils/print.ts",
+      "src/components/ui/MobileCard.tsx"
+    ]
+  },
+  "src/pages/Foncier.tsx": {
+    "path": "src/pages/Foncier.tsx",
+    "hash": "1018d227c0c66f006a8be9aa7f0770af6e65c6caa25eb27bbb3834274fc2cbbd",
+    "size": 175787,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/lib/supabase.ts",
+      "src/types",
+      "src/components/ui/Modal.tsx",
+      "src/components/ui/Badge.tsx",
+      "src/components/foncier/VillageLogoUploader.tsx",
+      "src/components/foncier/WorkflowValidation.tsx",
+      "src/components/foncier/FoncierConstants.ts",
+      "src/context/SettingsContext.tsx",
+      "src/context/AuthContext.tsx",
+      "src/lib/supabase.service.ts",
+      "src/hooks/useFoncierState.ts",
+      "src/hooks/useFoncierSync.ts",
+      "src/hooks/useFoncierLogic.ts",
+      "src/hooks/useFoncierAudit.ts",
+      "src/utils/reference.ts",
+      "src/utils/print.ts",
+      "src/lib/foncierAudit.ts",
+      "src/lib/foncierValidation.ts",
+      "src/lib/foncierAttestation.ts",
+      "src/lib/mediaUtils.ts",
+      "src/lib/foncierOffline.ts"
+    ]
+  },
+  "src/pages/Fournisseurs.tsx": {
+    "path": "src/pages/Fournisseurs.tsx",
+    "hash": "1e2dc9b4c73cfa7d07f8360a26c7d8667d5cd554efe14b9a4535e002989efda3",
+    "size": 15575,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/lib/supabase.ts",
+      "src/types",
+      "src/components/ui/Modal.tsx",
+      "src/components/ui/Badge.tsx",
+      "src/context/SettingsContext.tsx",
+      "src/components/ui/MobileCard.tsx",
+      "src/context/AuthContext.tsx",
+      "src/lib/demoMode.ts"
+    ]
+  },
+  "src/pages/Fournitures.tsx": {
+    "path": "src/pages/Fournitures.tsx",
+    "hash": "48645b82fc7cd5457722335c6e67527c2a5e03a0c9a2626f4286360a1ae0cc74",
+    "size": 17961,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/lib/supabase.ts",
+      "src/types",
+      "src/components/ui/Modal.tsx",
+      "src/components/ui/Badge.tsx",
+      "src/context/SettingsContext.tsx",
+      "src/components/media/MediaPicker.tsx"
+    ]
+  },
+  "src/pages/Immobilier.tsx": {
+    "path": "src/pages/Immobilier.tsx",
+    "hash": "261bf2f23788cd7368b0bfd7feb843fa2dd387840575af82d81871ea1ce5bf70",
+    "size": 18457,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/lib/supabase.ts",
+      "src/data/tenants.repository.ts",
+      "src/types",
+      "src/context/SettingsContext.tsx",
+      "src/hooks/useRealtimePayments.ts",
+      "src/pages/immobilier/PropertiesTab.tsx",
+      "src/pages/immobilier/TenantsTab.tsx",
+      "src/pages/immobilier/ContractsTab.tsx",
+      "src/pages/immobilier/PaymentsTab.tsx",
+      "src/pages/immobilier/PaymentReportsTab.tsx",
+      "src/components/ui/SyncRemoteButton.tsx",
+      "src/lib/manualSyncStore.ts"
+    ]
+  },
+  "src/pages/Leads.tsx": {
+    "path": "src/pages/Leads.tsx",
+    "hash": "e3872d768df64dd58458b1422c8e81c76cc928803bd03048ce809b53134423db",
+    "size": 31593,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/lib/supabase.ts",
+      "src/context/SettingsContext.tsx",
+      "src/data/leads.repository.ts",
+      "src/components/ui/Badge.tsx"
+    ]
+  },
+  "src/pages/Media.tsx": {
+    "path": "src/pages/Media.tsx",
+    "hash": "57cfd72c11949ba561693ad0d09ba498069b966d5db57e1d3647c5d041159f87",
+    "size": 31959,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/lib/supabase.ts",
+      "src/lib/mediaUtils.ts",
+      "src/context/AuthContext.tsx",
+      "src/types",
+      "src/hooks/useBranding.ts",
+      "src/components/media/MediaCard.tsx",
+      "src/components/media/MediaUploader.tsx",
+      "src/components/media/MediaDetailModal.tsx",
+      "src/components/media/BrandAssetsManager.tsx",
+      "src/components/media/SiteMediaAssignments.tsx"
+    ]
+  },
+  "src/pages/Parametres.tsx": {
+    "path": "src/pages/Parametres.tsx",
+    "hash": "325f0ba26d86878b8ea217e7bee7bdf32e83bc35a90c4be156185fe1050e0ba8",
+    "size": 57024,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/lib/supabase.ts",
+      "src/context/SettingsContext.tsx",
+      "src/context/AuthContext.tsx",
+      "src/components/media/BrandAssetsManager.tsx",
+      "src/components/media/SiteMediaAssignments.tsx",
+      "src/components/BrandLogo.tsx",
+      "src/types",
+      "src/components/Sidebar.tsx",
+      "src/utils/validation.ts",
+      "src/lib/demoMode.ts"
+    ]
+  },
+  "src/pages/Projets.tsx": {
+    "path": "src/pages/Projets.tsx",
+    "hash": "5406c3cf513a467a832fdd5fde1f9f6fc32610f74e2bfdd748e794c5af348a9b",
+    "size": 26336,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/lib/supabase.ts",
+      "src/types",
+      "src/data/clients.repository.ts",
+      "src/components/ui/Modal.tsx",
+      "src/components/ui/Badge.tsx",
+      "src/context/SettingsContext.tsx",
+      "src/components/media/MediaPicker.tsx",
+      "src/components/ui/MobileCard.tsx",
+      "src/context/AuthContext.tsx",
+      "src/lib/demoMode.ts"
+    ]
+  },
+  "src/pages/RegistreVisiteur.tsx": {
+    "path": "src/pages/RegistreVisiteur.tsx",
+    "hash": "237f3c99914f489d27b3930519194b375c5da5ab61ce3d166e037ed9af5387ab",
+    "size": 67772,
+    "imports": [],
+    "external": [
+      "react",
+      "src/context/AuthContext.tsx",
+      "src/context/SettingsContext.tsx",
+      "src/components/BrandLogo.tsx",
+      "src/lib/supabase.ts",
+      "src/types",
+      "src/lib/manualSyncStore.ts",
+      "lucide-react",
+      "src/pages/registre/FormulaireVisiteur.tsx",
+      "src/components/ui/SyncRemoteButton.tsx"
+    ]
+  },
+  "src/pages/Statistiques.tsx": {
+    "path": "src/pages/Statistiques.tsx",
+    "hash": "f8e4b77ba582ef121edcd8ec4d4c42161731d51965a33fc4d83bd706b22735da",
+    "size": 11877,
+    "imports": [],
+    "external": [
+      "react",
+      "src/lib/supabase.ts",
+      "src/data/clients.repository.ts",
+      "src/context/SettingsContext.tsx",
+      "lucide-react"
+    ]
+  },
+  "src/pages/Taches.tsx": {
+    "path": "src/pages/Taches.tsx",
+    "hash": "2d0547653fc27f3ee1c8523158815e81555c7b170f396119f499125e62389ac0",
+    "size": 32225,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/lib/supabase.ts",
+      "src/types",
+      "src/components/ui/Modal.tsx",
+      "src/components/ui/Badge.tsx",
+      "src/components/dashboard/KPICard.tsx",
+      "src/context/SettingsContext.tsx",
+      "src/context/AuthContext.tsx",
+      "src/lib/demoMode.ts"
+    ]
+  },
+  "src/pages/Utilisateurs.tsx": {
+    "path": "src/pages/Utilisateurs.tsx",
+    "hash": "6cd49e204dc92d4937c8c66eb1b73f3139625e7bfa764d7b362d9436095b7dda",
+    "size": 38553,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/lib/supabase.ts",
+      "src/components/ui/Modal.tsx",
+      "src/components/ui/Badge.tsx",
+      "src/context/SettingsContext.tsx",
+      "src/context/AuthContext.tsx",
+      "src/types",
+      "src/components/media/MediaPicker.tsx",
+      "src/lib/adminUserCreation.ts"
+    ]
+  },
+  "src/pages/VerificationAttestation.tsx": {
+    "path": "src/pages/VerificationAttestation.tsx",
+    "hash": "545ab107d9e7c33335606eba3d5df35c8f4d7ffb2a6cc0799688e83dc03dc25f",
+    "size": 55,
+    "imports": [],
+    "external": []
+  },
+  "src/pages/admin/SiteEditor.tsx": {
+    "path": "src/pages/admin/SiteEditor.tsx",
+    "hash": "ce05e6cc033295bb3c93fa67e8187db011612ed65db99bfac7f5005c13f9b6e1",
+    "size": 30587,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/lib/supabase.ts",
+      "src/components/media/MediaPicker.tsx",
+      "src/components/page-builder/PageBuilder.tsx"
+    ]
+  },
+  "src/pages/immobilier/ContractsTab.tsx": {
+    "path": "src/pages/immobilier/ContractsTab.tsx",
+    "hash": "113570a0692a724f825ef94ba7ccc42c20d2b81483e8c26df60f4cce6d843639",
+    "size": 30011,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/types",
+      "src/components/ui/Modal.tsx",
+      "src/context/SettingsContext.tsx",
+      "src/context/AuthContext.tsx",
+      "src/lib/demoMode.ts",
+      "src/utils/reference.ts",
+      "src/lib/manualSyncStore.ts",
+      "src/lib/immobilier.ts"
+    ]
+  },
+  "src/pages/immobilier/PaymentReportsTab.tsx": {
+    "path": "src/pages/immobilier/PaymentReportsTab.tsx",
+    "hash": "8947966d76a0197063292ac3ad74cc0ed6f71484a3e31039caa7e3042cd4933c",
+    "size": 38093,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/types",
+      "src/utils/reference.ts",
+      "src/lib/immobilier.ts"
+    ]
+  },
+  "src/pages/immobilier/PaymentsTab.tsx": {
+    "path": "src/pages/immobilier/PaymentsTab.tsx",
+    "hash": "582fd4c4ee3dc34435b1c9eb561e3fe81053cccd8a7344bfdfb1a4319c9608f3",
+    "size": 43019,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/types",
+      "src/components/ui/Modal.tsx",
+      "src/components/ui/Badge.tsx",
+      "src/context/SettingsContext.tsx",
+      "src/context/AuthContext.tsx",
+      "src/lib/demoMode.ts",
+      "src/utils/reference.ts",
+      "src/utils/print.ts",
+      "src/lib/immobilier.ts",
+      "src/utils/reference.ts",
+      "src/lib/manualSyncStore.ts"
+    ]
+  },
+  "src/pages/immobilier/PropertiesTab.tsx": {
+    "path": "src/pages/immobilier/PropertiesTab.tsx",
+    "hash": "1b7a2a0e9b5ae1c28b6c57092827da4c57eb9bc60776cfa10b6abcf23411f252",
+    "size": 18665,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/types",
+      "src/components/ui/Modal.tsx",
+      "src/components/ui/Badge.tsx",
+      "src/context/SettingsContext.tsx",
+      "src/context/AuthContext.tsx",
+      "src/lib/demoMode.ts",
+      "src/lib/manualSyncStore.ts",
+      "src/lib/immobilier.ts"
+    ]
+  },
+  "src/pages/immobilier/TenantsTab.tsx": {
+    "path": "src/pages/immobilier/TenantsTab.tsx",
+    "hash": "b735cdce0a1793f819a68eef7c5dd5b1f68ad658281f6a7ff2e3e0edab45289d",
+    "size": 16720,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/types",
+      "src/components/ui/Modal.tsx",
+      "src/components/ui/Badge.tsx",
+      "src/context/SettingsContext.tsx",
+      "src/context/AuthContext.tsx",
+      "src/lib/demoMode.ts",
+      "src/lib/immobilier.ts",
+      "src/lib/manualSyncStore.ts"
+    ]
+  },
+  "src/pages/public/ForgotPasswordPage.tsx": {
+    "path": "src/pages/public/ForgotPasswordPage.tsx",
+    "hash": "880ffe6e522a834d66293848a2bef5610ec868c41c6a3e6a42e0b656ec1e4217",
+    "size": 6233,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/context/AuthContext.tsx",
+      "src/context/SettingsContext.tsx",
+      "src/components/BrandLogo.tsx",
+      "src/lib/officialContact.ts"
+    ]
+  },
+  "src/pages/public/LoginPage.tsx": {
+    "path": "src/pages/public/LoginPage.tsx",
+    "hash": "ac44557898bf0d41c1446f0092e48c70e78bded6bab295d92ffb6a5b1e3ecf5a",
+    "size": 18380,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/context/AuthContext.tsx",
+      "src/context/SettingsContext.tsx",
+      "src/components/BrandLogo.tsx",
+      "src/lib/supabase.ts",
+      "react-turnstile",
+      "src/lib/officialContact.ts"
+    ]
+  },
+  "src/pages/public/PublicAbout.tsx": {
+    "path": "src/pages/public/PublicAbout.tsx",
+    "hash": "0482abf8e0739bf725cd0420c274d02374ee0951945e553cf9fc5c9a37a44fd5",
+    "size": 14300,
+    "imports": [],
+    "external": [
+      "lucide-react",
+      "src/context/SiteContentContext.tsx"
+    ]
+  },
+  "src/pages/public/PublicBlog.tsx": {
+    "path": "src/pages/public/PublicBlog.tsx",
+    "hash": "e701e623f51cbf92c37d20e99c8017627cef33f34df33e76e88e8e5cab5509a4",
+    "size": 5695,
+    "imports": [],
+    "external": [
+      "lucide-react",
+      "src/lib/publicRoutes.ts",
+      "src/lib/officialContact.ts"
+    ]
+  },
+  "src/pages/public/PublicBtpConstruction.tsx": {
+    "path": "src/pages/public/PublicBtpConstruction.tsx",
+    "hash": "3d782040e27e746c4ac7ab740e89f5317b4ae382e98d0a40cc838e8688442215",
+    "size": 5328,
+    "imports": [],
+    "external": [
+      "lucide-react",
+      "src/lib/publicRoutes.ts",
+      "src/lib/officialContact.ts"
+    ]
+  },
+  "src/pages/public/PublicContact.tsx": {
+    "path": "src/pages/public/PublicContact.tsx",
+    "hash": "df570c7681aa3e0b6a398747c1947840be59419c0eac9a7c1340538d8b0b3a39",
+    "size": 22338,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/lib/supabase.ts",
+      "src/context/SiteContentContext.tsx",
+      "dompurify",
+      "src/lib/officialContact.ts"
+    ]
+  },
+  "src/pages/public/PublicFAQ.tsx": {
+    "path": "src/pages/public/PublicFAQ.tsx",
+    "hash": "0cc8d1f0184d14b7e4e9f36f4b457f691b6e364827bf9fb5f7c2cb340355e221",
+    "size": 6176,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/lib/publicRoutes.ts",
+      "src/lib/officialContact.ts"
+    ]
+  },
+  "src/pages/public/PublicFoncier.tsx": {
+    "path": "src/pages/public/PublicFoncier.tsx",
+    "hash": "0823a1f03ad9472931c85c7ad3256321a1f27bca528138d8c35fabf2a50b66d6",
+    "size": 5815,
+    "imports": [],
+    "external": [
+      "lucide-react",
+      "src/lib/publicRoutes.ts",
+      "src/lib/officialContact.ts"
+    ]
+  },
+  "src/pages/public/PublicHome.tsx": {
+    "path": "src/pages/public/PublicHome.tsx",
+    "hash": "99903ab757f57ef7345c68e642c43f2fce24b46c9afb2736476da83655c0a336",
+    "size": 42363,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/lib/supabase.ts",
+      "src/context/SiteContentContext.tsx",
+      "src/context/SettingsContext.tsx",
+      "src/lib/publicRoutes.ts",
+      "src/types",
+      "src/utils/reference.ts",
+      "src/components/public/PublicSocialWall.tsx",
+      "src/lib/officialContact.ts"
+    ]
+  },
+  "src/pages/public/PublicImmobilier.tsx": {
+    "path": "src/pages/public/PublicImmobilier.tsx",
+    "hash": "06ec971917b4d7a59f3bb959a92d36590ecd938c98fbcffa49fd87679f82f6b6",
+    "size": 5767,
+    "imports": [],
+    "external": [
+      "lucide-react",
+      "src/lib/publicRoutes.ts",
+      "src/lib/officialContact.ts"
+    ]
+  },
+  "src/pages/public/PublicLegal.tsx": {
+    "path": "src/pages/public/PublicLegal.tsx",
+    "hash": "2e79de28e30168d23cd12e74414b9cdcbe68c45bf43a72a25d60dc39679bfc29",
+    "size": 7460,
+    "imports": [],
+    "external": [
+      "lucide-react",
+      "src/lib/officialContact.ts"
+    ]
+  },
+  "src/pages/public/PublicLotissement.tsx": {
+    "path": "src/pages/public/PublicLotissement.tsx",
+    "hash": "26841d4769fe8ea9b715492be1b1cbbdc13582f064ae16edfd24a4e9940d3a20",
+    "size": 5721,
+    "imports": [],
+    "external": [
+      "lucide-react",
+      "src/lib/publicRoutes.ts",
+      "src/lib/officialContact.ts"
+    ]
+  },
+  "src/pages/public/PublicLots.tsx": {
+    "path": "src/pages/public/PublicLots.tsx",
+    "hash": "4121481beba4e8c8a2ad7205ab51e8f4d19fc31b4315f32b95031ee89ba6a469",
+    "size": 28272,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/lib/supabase.ts",
+      "src/types",
+      "src/utils/reference.ts",
+      "src/lib/lead-capture.ts",
+      "src/data/clients.repository.ts",
+      "src/lib/officialContact.ts"
+    ]
+  },
+  "src/pages/public/PublicRealisations.tsx": {
+    "path": "src/pages/public/PublicRealisations.tsx",
+    "hash": "a420a0d41e222dfcc55da2187ef2f26caad56e06961dbdafaff7c29c5bfee53b",
+    "size": 8841,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/lib/supabase.ts"
+    ]
+  },
+  "src/pages/public/PublicServices.tsx": {
+    "path": "src/pages/public/PublicServices.tsx",
+    "hash": "9b0ae86ea38d079e4fa8c6f22494700d01df787cd4fc2c550360e5d5aab78712",
+    "size": 11039,
+    "imports": [],
+    "external": [
+      "lucide-react",
+      "src/context/SiteContentContext.tsx",
+      "src/lib/publicRoutes.ts"
+    ]
+  },
+  "src/pages/public/PublicTestimonials.tsx": {
+    "path": "src/pages/public/PublicTestimonials.tsx",
+    "hash": "8cf12d9047630d0d7529d1f1d18193e0cfc0dbd941a7dcd310c5675e191ed78d",
+    "size": 5539,
+    "imports": [],
+    "external": [
+      "lucide-react",
+      "src/lib/publicRoutes.ts",
+      "src/lib/officialContact.ts"
+    ]
+  },
+  "src/pages/public/PublicVerification.tsx": {
+    "path": "src/pages/public/PublicVerification.tsx",
+    "hash": "d84c7bde8c148a10b25cdda4e5307c1a89bb30b683174d193edbb1ef6e89d248",
+    "size": 22765,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/context/SettingsContext.tsx",
+      "src/components/BrandLogo.tsx",
+      "src/lib/publicRoutes.ts",
+      "src/lib/attestationVerification.ts"
+    ]
+  },
+  "src/pages/public/ResetPasswordPage.tsx": {
+    "path": "src/pages/public/ResetPasswordPage.tsx",
+    "hash": "511f7c02ea985bc31195e95342bec9c65cb39a6d57be56b6b8331715ccc927d6",
+    "size": 8635,
+    "imports": [],
+    "external": [
+      "react",
+      "lucide-react",
+      "src/lib/supabase.ts",
+      "src/context/SettingsContext.tsx",
+      "src/components/BrandLogo.tsx",
+      "src/lib/officialContact.ts"
+    ]
+  },
+  "src/pages/registre/FormulaireVisiteur.tsx": {
+    "path": "src/pages/registre/FormulaireVisiteur.tsx",
+    "hash": "d90dfe1dedfb7d7bb1fd4dc01be177f75508a251c13c75b779c660241c083adb",
+    "size": 10093,
+    "imports": [],
+    "external": [
+      "react",
+      "src/types",
+      "lucide-react"
+    ]
+  },
+  "src/repositories/README.md": {
+    "path": "src/repositories/README.md",
+    "hash": "d402ac2ff01288119e08a58f1564deef977d7b247b2465d77cfde2211c03e60c",
+    "size": 165,
+    "imports": [],
+    "external": []
+  },
+  "src/test/FoncierAttestation.test.ts": {
+    "path": "src/test/FoncierAttestation.test.ts",
+    "hash": "771ef6c2b14911b818981a27f4957c20f1de08e36767f7b45d5393998e76100b",
+    "size": 8985,
+    "imports": [],
+    "external": [
+      "vitest"
+    ]
+  },
+  "src/test/FoncierHooks.test.ts": {
+    "path": "src/test/FoncierHooks.test.ts",
+    "hash": "e92fd18ee2d45da7d142d08574b62bb7cc3478009d59f87d08d55bc8ae13c698",
+    "size": 5895,
+    "imports": [],
+    "external": [
+      "vitest",
+      "@testing-library/react"
+    ]
+  },
+  "src/test/PublicVerification.test.tsx": {
+    "path": "src/test/PublicVerification.test.tsx",
+    "hash": "c8d0c832ae4612d08978631a22f3871bf88c9157d6100a37ab630cfaeb9a7f01",
+    "size": 2374,
+    "imports": [],
+    "external": [
+      "vitest",
+      "@testing-library/react",
+      "src/pages/public/PublicVerification.tsx"
+    ]
+  },
+  "src/test/setup.ts": {
+    "path": "src/test/setup.ts",
+    "hash": "01a74d9daaad4c66a8ac419a6be4e0bfc6feea069b9d740bde2d62a97dbc29b2",
+    "size": 313,
+    "imports": [],
+    "external": [
+      "vitest",
+      "@testing-library/react",
+      "@testing-library/jest-dom/matchers"
+    ]
+  },
+  "src/types/database.ts": {
+    "path": "src/types/database.ts",
+    "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "size": 0,
+    "imports": [],
+    "external": []
+  },
+  "src/types/index.ts": {
+    "path": "src/types/index.ts",
+    "hash": "f8fc82f9b22e9c07127c0ffa9732ed4fc6ef40ec4be6f0cc49d6fb193e21aea7",
+    "size": 18620,
+    "imports": [],
+    "external": []
+  },
+  "src/types/react-turnstile.d.ts": {
+    "path": "src/types/react-turnstile.d.ts",
+    "hash": "38cdf1d51cc9afee7baa20d8cc4ec0c0c3ccfe5502880713729722422169bf85",
+    "size": 332,
+    "imports": [],
+    "external": [
+      "react"
+    ]
+  },
+  "src/types/village.ts": {
+    "path": "src/types/village.ts",
+    "hash": "b2e35828e0e5d8eaf4241bc1719383eefd8938e88e5ae43094827e86ed572bae",
+    "size": 1872,
+    "imports": [],
+    "external": []
+  },
+  "src/utils/__tests__/reference.test.ts": {
+    "path": "src/utils/__tests__/reference.test.ts",
+    "hash": "b4b90a736defaece5d27224ed3fb1750b60b4974c91c6fdaf15935c8bfc954d4",
+    "size": 2019,
+    "imports": [],
+    "external": [
+      "vitest",
+      "src/utils/reference.ts"
+    ]
+  },
+  "src/utils/print.ts": {
+    "path": "src/utils/print.ts",
+    "hash": "51c75a4ee7912812a263ede15cfec87faa63aaac876196af3ceb25b300c3ebec",
+    "size": 54991,
+    "imports": [],
+    "external": [
+      "dompurify"
+    ]
+  },
+  "src/utils/privacy.ts": {
+    "path": "src/utils/privacy.ts",
+    "hash": "8cb6fa62db568011a394b1a3a17e3e03568bd87153ec46d2a11de4f936e53d01",
+    "size": 1384,
+    "imports": [],
+    "external": []
+  },
+  "src/utils/reference.ts": {
+    "path": "src/utils/reference.ts",
+    "hash": "a253ae73858c35dff88c6e4a3512138e203e2bf587c29395b93a110363fd54a2",
+    "size": 5813,
+    "imports": [],
+    "external": []
+  },
+  "src/utils/validation.ts": {
+    "path": "src/utils/validation.ts",
+    "hash": "7828007ab0f3f896965bb58d8ada9c3bff5dede98786a84e0b0a688604ccf0f5",
+    "size": 8129,
+    "imports": [],
+    "external": [
+      "src/types"
+    ]
+  },
+  "src/vite-env.d.ts": {
+    "path": "src/vite-env.d.ts",
+    "hash": "21c34411a9c4230fd8fa1ad3108b3b1ee822ee34005101b45d8048ef023c43c8",
+    "size": 77,
+    "imports": [],
+    "external": []
+  }
+}

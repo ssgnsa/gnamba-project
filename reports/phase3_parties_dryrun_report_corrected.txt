@@ -1,0 +1,4 @@
+BEGIN
+ERROR:  column "phone" does not exist
+LINE 6:        trim(lower(coalesce(coalesce(telephone, phone), '')))...
+                                                       ^

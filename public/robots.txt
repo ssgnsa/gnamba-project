@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://gnambaservices.ci/sitemap.xml

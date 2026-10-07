@@ -1,0 +1,96 @@
+# Filebrowser
+filebrowser/config/
+filebrowser/database/
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Node
+node_modules/
+
+# Docker volumes
+**/volumes/
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Secrets
+.env
+.env.*
+!.env.example
+.aider*
+
+# --- Custom ignores for EGS ERP ---
+# Backup files
+*.bak
+*.backup
+*~
+# Temporary files
+*.tmp
+*.temp
+# Log files
+*.log
+lint_output.txt
+# Directories
+_archive/
+audit_report/
+backups/
+coverage/
+dist/
+node_modules/
+.venv/
+.amplitude/
+.claude/
+.continue/
+.cursor/
+.grok/
+.secrets/
+# Specific files
+.gitignore.*
+.*-*
+.sylius*
+.microchip
+Dockerfile.*
+docker-compose.yml.*
+AUDIT_FONCTIONNEL_COMPLET.md
+AUDIT_REPORT.md
+CLAUDE.md
+IMPLEMENTATION_PLAN.md
+INVENTORY.md
+RISK_REGISTER.md
+SECURITY_AUDIT.md
+SERVICE_CRITICALITY_MATRIX.md
+VULNERABILITY_REGISTER.md
+
+# Backup and temporary files
+*~
+*.bak*
+*.backup*
+*.orig
+*.rej
+.*.swp
+.swo
+.*.swo
+# Logs
+*.log
+lint_output.txt
+# Misc
+.DS_Store
+Thumbs.db
+.ma_cle_api
+# Uploads (user-generated content)
+backend/storage/uploads/
+
+# Additional ignores
+logs/
+log*.md
+*.tar.gz
+*.zip
+*.7z
+*.rar
+*log*.md

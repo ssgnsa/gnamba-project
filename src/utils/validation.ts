@@ -1,0 +1,326 @@
+/**
+ * Utilitaires de validation pour les paramètres de l'application
+ */
+import type { BrandSettings } from "../types";
+import { validateIvoryCoastPhone } from "../lib/phone/ivoryCoastPhone";
+
+// ============================================
+// EXPRESSIONS RÉGULIÈRES
+// ============================================
+
+const EMAIL_REGEX = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+// Suppression de la duplication - on utilise maintenant l'utilitaire centralisé
+const URL_REGEX = /^https?:\/\/.+/i;
+const RELAXED_URL_REGEX = /^(https?:\/\/)?[\w-]+(\.[\w-]+)+([\w-.,@?^=%&/~+#]*[\w-@?^=%&/~+#])?$/i;
+const HEX_COLOR_REGEX = /^#[0-9A-Fa-f]{6}$/;
+
+function normalizeUrl(value: string): string {
+  if (/^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//.test(value)) {
+    return value;
+  }
+  return `https://${value}`;
+}
+
+function isUrlNormalized(value: string, allowWithoutProtocol = false): boolean {
+  try {
+    const normalized = allowWithoutProtocol ? normalizeUrl(value) : value;
+    new URL(normalized);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ============================================
+// TYPES
+// ============================================
+
+export interface ValidationError {
+  field: string;
+  message: string;
+  type: "format" | "required" | "length" | "contrast";
+}
+
+export interface ValidationResult {
+  valid: boolean;
+  errors: ValidationError[];
+}
+
+// ============================================
+// FONCTIONS DE VALIDATION
+// ============================================
+
+/**
+ * Valide une adresse email
+ */
+export function validateEmail(
+  email: string,
+  fieldName: string = "email",
+): ValidationError | null {
+  if (!email) return null; // Champ vide, pas une erreur si optionnel
+  if (!EMAIL_REGEX.test(email)) {
+    return {
+      field: fieldName,
+      message: "Format d'email invalide (ex: contact@exemple.com)",
+      type: "format",
+    };
+  }
+  return null;
+}
+
+/**
+ * Valide un numéro de téléphone (format Côte d'Ivoire)
+ * DÉPRÉCÉE : Utiliser validateIvoryCoastPhone de ../lib/phone/ivoryCoastPhone à la place
+ * Gardée pour compatibilité ascendante
+ */
+export function validatePhone(
+  phone: string,
+  fieldName: string = "phone",
+): ValidationError | null {
+  // Delegation à la fonction centralisée
+  const error = validateIvoryCoastPhone(phone);
+  if (error) {
+    return {
+      field: fieldName,
+      message: error,
+      type: "format",
+    };
+  }
+  return null;
+}
+
+/**
+ * Valide une URL
+ */
+export function validateUrl(
+  url: string,
+  fieldName: string = "URL",
+  allowWithoutProtocol = false,
+): ValidationError | null {
+  if (!url) return null;
+  const value = url.trim();
+  const isValid = allowWithoutProtocol
+    ? RELAXED_URL_REGEX.test(value) && isUrlNormalized(value, true)
+    : URL_REGEX.test(value);
+
+  if (!isValid) {
+    return {
+      field: fieldName,
+      message: `URL invalide. Doit être une adresse valide${
+        allowWithoutProtocol ? " (http(s) ou domaine)" : " (http:// ou https://)"
+      }`,
+      type: "format",
+    };
+  }
+  return null;
+}
+
+/**
+ * Valide une couleur hexadécimale
+ */
+export function validateColor(color: string): ValidationError | null {
+  if (!color) return null;
+  if (!HEX_COLOR_REGEX.test(color)) {
+    return {
+      field: "color",
+      message: "Format de couleur invalide. Utilisez: #RRVVBB",
+      type: "format",
+    };
+  }
+  return null;
+}
+
+/**
+ * Calcule le contraste entre deux couleurs
+ * Retourne le ratio de contraste (4.45:1 minimum pour AA)
+ */
+export function calculateContrastRatio(color1: string, color2: string): number {
+  const getLuminance = (hex: string): number => {
+    const rgb = parseInt(hex.slice(1), 16);
+    const r = (rgb >> 16) & 0xff;
+    const g = (rgb >> 8) & 0xff;
+    const b = (rgb >> 0) & 0xff;
+
+    const [rs, gs, bs] = [r, g, b].map((c) => {
+      const sRGB = c / 255;
+      return sRGB <= 0.03928
+        ? sRGB / 12.92
+        : Math.pow((sRGB + 0.055) / 1.055, 2.4);
+    });
+
+    return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
+  };
+
+  const l1 = getLuminance(color1);
+  const l2 = getLuminance(color2);
+
+  const lighter = Math.max(l1, l2);
+  const darker = Math.min(l1, l2);
+
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+/**
+ * Valide le contraste entre une couleur de texte et de fond
+ */
+export function validateContrast(
+  textColor: string,
+  backgroundColor: string,
+  minRatio: number = 4.5,
+): ValidationError | null {
+  const ratio = calculateContrastRatio(textColor, backgroundColor);
+
+  if (ratio < minRatio) {
+    return {
+      field: "contrast",
+      message: `Contraste insuffisant (${ratio.toFixed(2)}:1, minimum ${minRatio}:1 recommandé)`,
+      type: "contrast",
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Valide la longueur d'une chaîne
+ */
+export function validateLength(
+  value: string,
+  min: number,
+  max: number,
+  fieldName: string,
+): ValidationError | null {
+  if (value.length < min) {
+    return {
+      field: fieldName,
+      message: `Minimum ${min} caractères requis`,
+      type: "length",
+    };
+  }
+
+  if (value.length > max) {
+    return {
+      field: fieldName,
+      message: `Maximum ${max} caractères autorisés`,
+      type: "length",
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Valide tous les paramètres
+ */
+export function validateSettings(form: BrandSettings): ValidationResult {
+  const errors: ValidationError[] = [];
+
+  // Champs requis
+  if (!form.app_title || form.app_title.trim() === "") {
+    errors.push({
+      field: "app_title",
+      message: "Le titre est requis",
+      type: "required",
+    });
+  }
+
+  if (!form.app_company || form.app_company.trim() === "") {
+    errors.push({
+      field: "app_company",
+      message: "Le nom de l'entreprise est requis",
+      type: "required",
+    });
+  }
+
+  // Couleurs
+  const colorError = validateColor(form.primary_color);
+  if (colorError) errors.push({ ...colorError, field: "primary_color" });
+
+  const secondaryColorError = validateColor(form.secondary_color);
+  if (secondaryColorError)
+    errors.push({ ...secondaryColorError, field: "secondary_color" });
+
+  // Email
+  const emailError = validateEmail(form.contact_email, "contact_email");
+  if (emailError) errors.push(emailError);
+
+  // Téléphone - Utilisation de la fonction centralisée via validatePhone (pour compatibilité)
+  const phoneError = validatePhone(form.contact_phone, "contact_phone");
+  if (phoneError) errors.push(phoneError);
+
+  // URLs des réseaux sociaux
+  const socialFields: Array<keyof BrandSettings> = [
+    "social_facebook",
+    "social_youtube",
+    "social_linkedin",
+    "social_twitter",
+    "social_instagram",
+    "social_tiktok",
+  ];
+  for (const field of socialFields) {
+    const val = form[field] as string | undefined;
+    if (val) {
+      const urlError = validateUrl(val, field, true);
+      if (urlError) errors.push(urlError);
+    }
+  }
+
+  // URLs des logos
+  const logoFields: Array<keyof BrandSettings> = [
+    "logo_url",
+    "brand_logo_dark",
+    "brand_favicon_url",
+    "brand_watermark_url",
+    "hero_background_url",
+  ];
+  for (const field of logoFields) {
+    const val = form[field] as string | undefined;
+    if (val) {
+      // Les URLs des logos peuvent venir de media_files, donc on ne valide pas strictement
+      // Mais on peut vérifier si c'est une URL valide
+      const urlError = validateUrl(val, field);
+      if (urlError) {
+        // Ce n'est pas bloquant, on ne l'ajoute pas aux erreurs
+        if (import.meta.env.DEV)
+          console.warn(`Avertissement: ${field} n'est pas une URL valide`);
+      }
+    }
+  }
+
+  // SEO Description length
+  if (form.seo_description) {
+    if (form.seo_description.length > 160) {
+      errors.push({
+        field: "seo_description",
+        message: `La description SEO est trop longue (${form.seo_description.length} caractères, maximum 160 recommandé)`,
+        type: "length",
+      });
+    }
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+  };
+}
+
+/**
+ * Obtient le texte d'erreur pour un champ spécifique
+ */
+export function getFieldError(
+  errors: ValidationError[],
+  field: string,
+): string | null {
+  const error = errors.find((e) => e.field === field);
+  return error ? error.message : null;
+}
+
+/**
+ * Vérifie si un champ a une erreur
+ */
+export function hasFieldError(
+  errors: ValidationError[],
+  field: string,
+): boolean {
+  return errors.some((e) => e.field === field);
+}

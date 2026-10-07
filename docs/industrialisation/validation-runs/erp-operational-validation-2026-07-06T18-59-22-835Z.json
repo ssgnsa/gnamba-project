@@ -1,0 +1,298 @@
+{
+  "runId": "2026-07-06T18-59-22-835Z",
+  "startedAt": "2026-07-06T18:59:22.836Z",
+  "options": {
+    "apiBaseUrl": "http://127.0.0.1:8000",
+    "webBaseUrl": "http://127.0.0.1:5173",
+    "email": "admin@egs.local",
+    "logicalMinutes": 30,
+    "browser": true
+  },
+  "steps": [
+    {
+      "name": "health",
+      "status": "passed",
+      "details": {
+        "body": {
+          "status": "ok",
+          "service": "egs-local-api"
+        },
+        "durationMs": 30
+      },
+      "at": "2026-07-06T18:59:22.898Z"
+    },
+    {
+      "name": "auth.login",
+      "status": "passed",
+      "details": {
+        "user": "admin@egs.local",
+        "accessType": "access",
+        "refreshType": "refresh",
+        "accessExpiresAt": "2026-07-06T19:59:22.000Z"
+      },
+      "at": "2026-07-06T18:59:22.918Z"
+    },
+    {
+      "name": "auth.me",
+      "status": "passed",
+      "details": {
+        "user": "admin@egs.local"
+      },
+      "at": "2026-07-06T18:59:22.929Z"
+    },
+    {
+      "name": "auth.refresh",
+      "status": "passed",
+      "details": {
+        "refreshedUser": "admin@egs.local"
+      },
+      "at": "2026-07-06T18:59:22.940Z"
+    },
+    {
+      "name": "auth.multi-session",
+      "status": "passed",
+      "details": {
+        "firstUser": "admin@egs.local",
+        "secondUser": "admin@egs.local"
+      },
+      "at": "2026-07-06T18:59:22.971Z"
+    },
+    {
+      "name": "navigation.users-api",
+      "status": "passed",
+      "details": {
+        "endpoint": "/api/v1/users"
+      },
+      "at": "2026-07-06T18:59:22.983Z"
+    },
+    {
+      "name": "crud.projects",
+      "status": "passed",
+      "details": {
+        "id": "9b49c8bd-7d15-4c12-9d66-6c2d2ab823a5",
+        "created": "OPS-VALIDATION-2026-07-06T18-59-22-835Z Chantier pilote",
+        "patched": "OPS-VALIDATION-2026-07-06T18-59-22-835Z Chantier pilote",
+        "listCount": 4
+      },
+      "at": "2026-07-06T18:59:23.111Z"
+    },
+    {
+      "name": "crud.employees",
+      "status": "passed",
+      "details": {
+        "id": "cd816743-6879-4836-8f2f-a5221d7bd894",
+        "created": "OPS-VALIDATION-2026-07-06T18-59-22-835Z Employe",
+        "patched": "OPS-VALIDATION-2026-07-06T18-59-22-835Z Employe",
+        "listCount": 3
+      },
+      "at": "2026-07-06T18:59:23.222Z"
+    },
+    {
+      "name": "crud.suppliers",
+      "status": "passed",
+      "details": {
+        "id": "2990ce46-f4f5-4e33-bd29-45ada6ab4116",
+        "created": "OPS-VALIDATION-2026-07-06T18-59-22-835Z Fournisseur",
+        "patched": "OPS-VALIDATION-2026-07-06T18-59-22-835Z Fournisseur",
+        "listCount": 3
+      },
+      "at": "2026-07-06T18:59:23.332Z"
+    },
+    {
+      "name": "crud.products",
+      "status": "passed",
+      "details": {
+        "id": "62cc4821-f9c1-4c4e-8ee2-b039c4502c0c",
+        "created": "OPS-VALIDATION-2026-07-06T18-59-22-835Z Materiau",
+        "patched": "OPS-VALIDATION-2026-07-06T18-59-22-835Z Materiau",
+        "listCount": 3
+      },
+      "at": "2026-07-06T18:59:23.442Z"
+    },
+    {
+      "name": "crud.finance",
+      "status": "passed",
+      "details": {
+        "id": "b542b7bd-0273-4b97-94a2-c13fc28d0ef7",
+        "created": "OPS-VALIDATION-2026-07-06T18-59-22-835Z-FIN",
+        "patched": "OPS-VALIDATION-2026-07-06T18-59-22-835Z-FIN",
+        "listCount": 3
+      },
+      "at": "2026-07-06T18:59:23.553Z"
+    },
+    {
+      "name": "navigation.media-api",
+      "status": "passed",
+      "details": {
+        "mediaCount": 15,
+        "brandAssetCount": 0
+      },
+      "at": "2026-07-06T18:59:23.602Z"
+    },
+    {
+      "name": "resilience.expired-or-invalid-access-refresh",
+      "status": "passed",
+      "details": {
+        "recoveredUser": "admin@egs.local"
+      },
+      "at": "2026-07-06T18:59:23.632Z"
+    },
+    {
+      "name": "resilience.api-error-controlled",
+      "status": "passed",
+      "details": {
+        "status": 404,
+        "detail": "Projet introuvable"
+      },
+      "at": "2026-07-06T18:59:23.655Z"
+    },
+    {
+      "name": "resilience.temporary-network-loss",
+      "status": "passed",
+      "details": {
+        "error": "fetch failed"
+      },
+      "at": "2026-07-06T18:59:23.657Z"
+    },
+    {
+      "name": "resilience.network-recovery",
+      "status": "passed",
+      "details": {
+        "endpoint": "/api/v1/auth/me"
+      },
+      "at": "2026-07-06T18:59:23.666Z"
+    },
+    {
+      "name": "usage.continuous-logical-session",
+      "status": "passed",
+      "details": {
+        "logicalMinutes": 30,
+        "requestCount": 30,
+        "maxDurationMs": 88
+      },
+      "at": "2026-07-06T18:59:24.496Z"
+    },
+    {
+      "name": "supabase.source-guard",
+      "status": "passed",
+      "details": {
+        "path": "src"
+      },
+      "at": "2026-07-06T18:59:24.510Z"
+    },
+    {
+      "name": "supabase.build-scan",
+      "status": "passed",
+      "details": {
+        "path": "dist-local",
+        "scannedFiles": 63
+      },
+      "at": "2026-07-06T18:59:24.528Z"
+    },
+    {
+      "name": "supabase.stale-dist-scan",
+      "status": "warning",
+      "details": {
+        "path": "dist",
+        "forbiddenFileCount": 6
+      },
+      "at": "2026-07-06T18:59:24.537Z"
+    },
+    {
+      "name": "browser.ui-journey",
+      "status": "skipped",
+      "details": {
+        "reason": "Browser validation could not run in this environment.",
+        "error": "Failed to launch the browser process!\n/home/soma/.cache/puppeteer/chrome/linux-131.0.6778.204/chrome-linux64/chrome: error while loading shared libraries: libatk-bridge-2.0.so.0: cannot open shared object file: No such file or directory\n\n\nTROUBLESHOOTING: https://pptr.dev/troubleshooting\n"
+      },
+      "at": "2026-07-06T18:59:24.838Z"
+    },
+    {
+      "name": "auth.logout",
+      "status": "passed",
+      "details": {
+        "logoutApiStatus": 200,
+        "tokenStillValidUntilExpiry": true,
+        "note": "Logout endpoint is stateless in current FastAPI implementation; frontend clears local tokens."
+      },
+      "at": "2026-07-06T18:59:24.859Z"
+    },
+    {
+      "name": "auth.relogin",
+      "status": "passed",
+      "details": {
+        "user": "admin@egs.local"
+      },
+      "at": "2026-07-06T18:59:24.881Z"
+    },
+    {
+      "name": "cleanup.validation-data",
+      "status": "passed",
+      "details": {
+        "deleted": 5
+      },
+      "at": "2026-07-06T18:59:25.048Z"
+    }
+  ],
+  "risks": [
+    {
+      "level": "moyen",
+      "item": "Stale root-owned dist/ contains legacy Supabase artifacts and must not be deployed: dist/assets/Documents-xhSHHoiM.js, dist/assets/PublicVerification-D346U_wt.js, dist/assets/index-C1BCILuq.js, dist/assets/supabase-BzJSEYoh.js, dist/assets/supabase-vendor-CMSNY3NE.js, dist/index.html"
+    },
+    {
+      "level": "moyen",
+      "item": "Browser UI journey not validated in this run."
+    }
+  ],
+  "cleanup": [
+    {
+      "collection": "finance",
+      "id": "b542b7bd-0273-4b97-94a2-c13fc28d0ef7",
+      "status": 200
+    },
+    {
+      "collection": "products",
+      "id": "62cc4821-f9c1-4c4e-8ee2-b039c4502c0c",
+      "status": 200
+    },
+    {
+      "collection": "suppliers",
+      "id": "2990ce46-f4f5-4e33-bd29-45ada6ab4116",
+      "status": 200
+    },
+    {
+      "collection": "employees",
+      "id": "cd816743-6879-4836-8f2f-a5221d7bd894",
+      "status": 200
+    },
+    {
+      "collection": "projects",
+      "id": "9b49c8bd-7d15-4c12-9d66-6c2d2ab823a5",
+      "status": 200
+    }
+  ],
+  "forbiddenNetworkRequests": [],
+  "created": {
+    "projects": [
+      "9b49c8bd-7d15-4c12-9d66-6c2d2ab823a5"
+    ],
+    "employees": [
+      "cd816743-6879-4836-8f2f-a5221d7bd894"
+    ],
+    "suppliers": [
+      "2990ce46-f4f5-4e33-bd29-45ada6ab4116"
+    ],
+    "products": [
+      "62cc4821-f9c1-4c4e-8ee2-b039c4502c0c"
+    ],
+    "finance": [
+      "b542b7bd-0273-4b97-94a2-c13fc28d0ef7"
+    ],
+    "media": []
+  },
+  "finishedAt": "2026-07-06T18:59:25.048Z",
+  "verdict": {
+    "stableForInternalUse": true,
+    "status": "OUI"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "application": "EGS ERP",
+  "git_commit": "d6875613efd2010bf554ddb251add008ebf27099",
+  "branch": "feat/selfhosted-adapter",
+  "build_date": "2026-07-07T18:15:08Z",
+  "build_hash": "aa73f3d26424bbe1115cffb49a903eb092159cf5d30e4a164a76b43fedf6acda",
+  "environment": "production"
+}

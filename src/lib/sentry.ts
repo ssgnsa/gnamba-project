@@ -1,0 +1,259 @@
+import { generateUUID } from "../utils/reference";
+
+// ============================================
+// Sentry — Minimal Error Monitoring for EGS
+// ============================================
+// Purpose: Capture and report frontend errors in production.
+// Free tier: 5,000 errors/month — sufficient for EGS.
+//
+// Setup:
+//   1. Create a Sentry project at https://sentry.io
+//   2. Get the DSN from Settings > Client Keys (DSN)
+//   3. Add VITE_SENTRY_DSN to your .env file
+//
+// Without VITE_SENTRY_DSN set, this module is a no-op (graceful degradation).
+// ============================================
+
+type SentryEvent = {
+  module: string;
+  error: string;
+  stack?: string;
+  componentStack?: string;
+  url: string;
+  timestamp: string;
+  userRole?: string;
+  severity: "error" | "warning" | "fatal";
+  tags?: Record<string, any>;
+};
+
+let sentryEnabled = false;
+let sentryDsn = "";
+let sentryEnvelopeUrl = "";
+
+const parseSentryDsn = (dsn: string) => {
+  try {
+    const url = new URL(dsn);
+    const publicKey = url.username;
+    const projectId = url.pathname
+      .replace(/^\/+/, "")
+      .split("/")
+      .filter(Boolean)
+      .pop();
+
+    if (!publicKey || !projectId) return "";
+
+    return `${url.origin}/api/v1/${projectId}/envelope/?sentry_key=${publicKey}`;
+  } catch {
+    return "";
+  }
+};
+
+const getStoredSentryUser = () => {
+  if (typeof window === "undefined") return undefined;
+
+  try {
+    const userId = sessionStorage.getItem("sentry:user_id");
+    if (!userId) return undefined;
+
+    const userRole = sessionStorage.getItem("sentry:user_role") || undefined;
+    return {
+      id: userId,
+      role: userRole,
+    };
+  } catch {
+    return undefined;
+  }
+};
+
+// Lazy init — only when first error occurs
+const initSentry = () => {
+  if (sentryDsn) return; // Already initialized
+
+  const selfHostedEnabled = import.meta.env.VITE_SELFHOSTED_MODE === "true";
+  sentryDsn = import.meta.env.VITE_SENTRY_DSN || "";
+  sentryEnvelopeUrl = parseSentryDsn(sentryDsn);
+  sentryEnabled =
+    !!sentryEnvelopeUrl &&
+    import.meta.env.PROD &&
+    !selfHostedEnabled &&
+    import.meta.env.VITE_ENABLE_SENTRY !== "false";
+
+  if (!sentryEnabled && import.meta.env.DEV) {
+    console.info("[Sentry] Error monitoring disabled or not configured");
+  }
+};
+
+// Send error to Sentry via HTTP (no SDK needed — lightweight)
+const sendToSentry = async (event: SentryEvent) => {
+  if (!sentryEnabled) return;
+
+  if (typeof window === "undefined" || typeof navigator === "undefined") return;
+
+  const isBlockedByClient =
+    typeof navigator !== "undefined" &&
+    /block|adblock|privacy/i.test(navigator.userAgent || "");
+
+  if (isBlockedByClient) return;
+
+  try {
+    // Sentry envelope protocol (no SDK required)
+    const envelope = {
+      event_id: generateUUID(),
+      sent_at: new Date().toISOString(),
+      sdk: { name: "egs-minimal", version: "1.0.0" },
+    };
+
+    const itemHeader = {
+      type: "event",
+      content_type: "application/json",
+    };
+
+    const payload = {
+      ...event,
+      environment: import.meta.env.MODE,
+      release: import.meta.env.VITE_APP_VERSION || "unknown",
+      tags: {
+        ...(event.tags ?? {}),
+        module: event.module,
+        severity: event.severity,
+        api_mode: import.meta.env.VITE_API_MODE || "unknown",
+      },
+      user: getStoredSentryUser(),
+      contexts: {
+        react: {
+          component_stack: event.componentStack,
+        },
+      },
+      exception: {
+        values: [
+          {
+            type: "Error",
+            value: event.error,
+            stacktrace: { frames: [{ filename: event.url }] },
+          },
+        ],
+      },
+    };
+
+    const envelopeStr = [
+      JSON.stringify(envelope),
+      JSON.stringify(itemHeader),
+      JSON.stringify(payload),
+      "",
+    ].join("\n");
+
+    // Use beacon API for non-blocking send (better than fetch for error reporting)
+    if ("sendBeacon" in navigator) {
+      const queued = navigator.sendBeacon(
+        sentryEnvelopeUrl,
+        new Blob([envelopeStr], { type: "text/plain;charset=UTF-8" }),
+      );
+      if (queued) return;
+    }
+
+    // Fallback to fetch. text/plain avoids CORS preflight noise in browsers.
+    const response = await fetch(sentryEnvelopeUrl, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=UTF-8" },
+      body: envelopeStr,
+      keepalive: true,
+      credentials: "omit",
+      mode: "cors",
+    });
+
+    if (!response.ok) {
+      if (import.meta.env.DEV)
+        console.warn("[Sentry] Failed to send error event:", response.status);
+    }
+  } catch (err) {
+    // Never let error reporting break the app
+    if (import.meta.env.DEV) console.warn("[Sentry] sendBeacon failed:", err);
+  }
+};
+
+// Capture a React Error Boundary error
+export const captureErrorBoundary = (
+  moduleName: string,
+  error: Error,
+  componentStack?: string,
+) => {
+  initSentry();
+
+  const event: SentryEvent = {
+    module: moduleName,
+    error: error.message,
+    stack: error.stack,
+    componentStack,
+    url: window.location.href,
+    timestamp: new Date().toISOString(),
+    severity: "fatal",
+  };
+
+  sendToSentry(event);
+};
+
+// Capture a API locale error
+export const captureApiError = (
+  operation: string,
+  table: string,
+  error: { message?: string; code?: string; details?: string } | null,
+) => {
+  initSentry();
+
+  const event: SentryEvent = {
+    module: `API locale/${operation}`,
+    error: error?.message || "Unknown API locale error",
+    url: window.location.href,
+    timestamp: new Date().toISOString(),
+    severity: "error",
+  };
+
+  // Tag with RLS-specific info if available
+  if (error?.code === "42501") {
+    event.tags = { rls_failed: true, table };
+    event.severity = "warning";
+  }
+
+  sendToSentry(event);
+};
+
+// Capture a generic error
+export const captureError = (
+  moduleName: string,
+  error: Error | string,
+  _context?: Record<string, unknown>,
+) => {
+  initSentry();
+
+  const errorMessage = error instanceof Error ? error.message : error;
+  const stack = error instanceof Error ? error.stack : undefined;
+
+  const event: SentryEvent = {
+    module: moduleName,
+    error: errorMessage,
+    stack,
+    url: window.location.href,
+    timestamp: new Date().toISOString(),
+    severity: "error",
+  };
+
+  sendToSentry(event);
+};
+
+// Set user context (called after auth login)
+export const setSentryUser = (userId: string, role?: string) => {
+  // With the beacon API, user context is sent with the next error event
+  // For now, we store it in sessionStorage for inclusion in events
+  if (typeof window !== "undefined") {
+    sessionStorage.setItem("sentry:user_id", userId);
+    if (role) sessionStorage.setItem("sentry:user_role", role);
+  }
+};
+
+// Clear user context (called on logout)
+export const clearSentryUser = () => {
+  if (typeof window !== "undefined") {
+    sessionStorage.removeItem("sentry:user_id");
+    sessionStorage.removeItem("sentry:user_role");
+  }
+};

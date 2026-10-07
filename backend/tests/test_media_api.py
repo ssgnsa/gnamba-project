@@ -1,0 +1,154 @@
+from io import BytesIO
+
+from fastapi.testclient import TestClient
+import pytest
+
+from app.main import app
+from app.api.deps import get_current_user
+from app.core.database import SessionLocal
+from sqlalchemy import text
+
+
+client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def authenticated_admin():
+    app.dependency_overrides[get_current_user] = lambda: {
+        "id": "media-admin",
+        "role": "admin",
+        "mfa_verified": True,
+    }
+    yield
+    app.dependency_overrides.clear()
+
+
+def test_media_management_requires_authentication():
+    app.dependency_overrides.clear()
+    response = client.get("/api/v1/media")
+    assert response.status_code == 401, response.text
+    app.dependency_overrides[get_current_user] = lambda: {"id": "media-user", "role": "gestionnaire"}
+    purge = client.delete("/api/v1/media/not-a-real-id/purge")
+    assert purge.status_code == 403, purge.text
+
+
+def test_media_audit_route_contract():
+    response = client.get("/api/v1/media/audit")
+    assert response.status_code == 200, response.text
+
+    create_response = client.post(
+        "/api/v1/media/audit",
+        json={
+            "media_id": None,
+            "action": "upload_test",
+            "actor_id": "client-supplied-actor-is-ignored",
+            "metadata": {"source": "pytest"},
+        },
+    )
+    assert create_response.status_code == 200, create_response.text
+    payload = create_response.json()
+    try:
+        assert payload["action"] == "upload_test"
+        assert payload["metadata"]["source"] == "pytest"
+        assert payload["actor_id"] == "media-admin"
+
+        read_response = client.get("/api/v1/media/audit")
+        assert read_response.status_code == 200, read_response.text
+        persisted = next(item for item in read_response.json() if item["id"] == payload["id"])
+        assert persisted["metadata"]["source"] == "pytest"
+    finally:
+        with SessionLocal() as session:
+            session.execute(text("DELETE FROM media_audit_logs WHERE id = :id"), {"id": payload["id"]})
+            session.commit()
+
+
+def test_media_upload_accepts_legacy_metadata_json_field():
+    response = client.post(
+        "/api/media",
+        files={"file": ("legacy.png", BytesIO(b"fake-image"), "image/png")},
+        data={
+            "metadata": '{"category":"autre","alt_text":"legacy","description":"legacy desc","tags":["legacy","erp"]}'
+        },
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["alt_text"] == "legacy"
+    assert payload["description"] == "legacy desc"
+    assert payload["tags"] == ["legacy", "erp"]
+
+
+def test_media_usage_routes_work():
+    response = client.post(
+        "/api/media",
+        files={"file": ("demo.png", BytesIO(b"fake-image"), "image/png")},
+        data={"category": "autre", "alt_text": "demo", "description": "demo desc", "tags": "one,two"},
+    )
+    assert response.status_code == 200, response.text
+    media_id = response.json()["id"]
+
+    create_usage = client.post(
+        "/api/media/usage",
+        json={
+            "media_id": media_id,
+            "entity_type": "site_section",
+            "entity_id": "hero",
+            "usage_type": "hero_image",
+            "label": "Hero",
+        },
+    )
+    assert create_usage.status_code == 200, create_usage.text
+
+    list_usage = client.get(f"/api/media/usage?media_id={media_id}")
+    assert list_usage.status_code == 200
+    assert list_usage.json()[0]["media_id"] == media_id
+
+    slot_usage = client.get(
+        "/api/media/usage?entity_type=site_section&usage_type=hero_image&entity_id=hero"
+    )
+    assert slot_usage.status_code == 200
+    assert slot_usage.json()[0]["id"] == media_id
+
+    delete_usage = client.delete(f"/api/media/usage/{list_usage.json()[0]['id']}")
+    assert delete_usage.status_code == 200
+
+
+def test_media_upload_list_get_update_delete_restore_purge_flow():
+    response = client.post(
+        "/api/media",
+        files={"file": ("demo.png", BytesIO(b"fake-image"), "image/png")},
+        data={"category": "autre", "alt_text": "demo", "description": "demo desc", "tags": "one,two"},
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    media_id = payload["id"]
+    assert payload["filename"].startswith("autre/")
+
+    list_response = client.get("/api/media")
+    assert list_response.status_code == 200
+    assert any(item["id"] == media_id for item in list_response.json())
+
+    get_response = client.get(f"/api/media/{media_id}")
+    assert get_response.status_code == 200
+    assert get_response.json()["id"] == media_id
+
+    update_response = client.patch(
+        f"/api/media/{media_id}",
+        json={"alt_text": "updated", "description": "updated desc"},
+    )
+    assert update_response.status_code == 200
+    assert update_response.json()["alt_text"] == "updated"
+
+    delete_response = client.delete(f"/api/media/{media_id}")
+    assert delete_response.status_code == 200
+    assert delete_response.json()["deleted_at"] is not None
+
+    restore_response = client.post(f"/api/media/{media_id}/restore")
+    assert restore_response.status_code == 200
+    assert restore_response.json()["deleted_at"] is None
+
+    purge_response = client.delete(f"/api/media/{media_id}/purge")
+    assert purge_response.status_code == 200
+    assert purge_response.json()["status"] == "purged"
+
+    after_purge = client.get(f"/api/media/{media_id}")
+    assert after_purge.status_code == 404

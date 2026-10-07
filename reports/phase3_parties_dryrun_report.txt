@@ -1,0 +1,52 @@
+BEGIN
+SELECT 4
+SELECT 4
+SELECT 4
+SELECT 0
+         note          
+-----------------------
+ *** SOURCE COUNTS ***
+(1 row)
+
+          metric          | value 
+--------------------------+-------
+ clients_source           |     2
+ leads_source             |     2
+ locataires_source        |     0
+ source_rows_with_contact |     4
+(4 rows)
+
+               note                
+-----------------------------------
+ *** PARTY CREATION CANDIDATES ***
+(1 row)
+
+ party_creation_candidates 
+---------------------------
+                         4
+(1 row)
+
+              note              
+--------------------------------
+ *** PARTY MERGE CANDIDATES ***
+(1 row)
+
+ party_merge_candidates 
+------------------------
+                      0
+(1 row)
+
+                note                
+------------------------------------
+ *** CREATION CANDIDATES SAMPLE ***
+(1 row)
+
+ source_table |              source_id               |     normalized_email      | normalized_phone |           email           |   telephone    
+--------------+--------------------------------------+---------------------------+------------------+---------------------------+----------------
+ clients      | 11111111-1111-4111-8111-111111111111 | jean-marc.koffi@sgbci.ci  | +2250709123456   | jean-marc.koffi@sgbci.ci  | +2250709123456
+ clients      | 22222222-2222-4222-8222-222222222222 | aminata.aka@entreprise.ci | +2250788776655   | aminata.aka@entreprise.ci | +2250788776655
+ leads        | 0eb2a6d3-9aaf-4fd5-bac3-d8ecd2c0df79 |                           | +2250700000001   |                           | +2250700000001
+ leads        | 8f1a2c59-8b8b-49ad-8786-9c07009a2058 |                           | +2250700000000   |                           | +2250700000000
+(4 rows)
+
+ROLLBACK

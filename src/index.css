@@ -1,0 +1,313 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  :root {
+    --color-primary: #1e40af;
+    --color-secondary: #16a34a;
+    
+    /* GNAMBA Design System - Palette complète */
+    /* Bleu nuit : Confiance, rigueur, structure */
+    --color-navy: #0F2742;
+    --color-navy-50: #f1f6fb;
+    --color-navy-100: #d9e8f7;
+    --color-navy-200: #b3d1f0;
+    --color-navy-300: #7fa8e0;
+    --color-navy-600: #1e40af;
+    
+    /* Orange terre cuite : Action, construction, chaleur locale */
+    --color-orange: #E76F24;
+    --color-orange-50: #fef5f0;
+    --color-orange-100: #fce4d6;
+    --color-orange-200: #f8c9ad;
+    --color-orange-600: #e76f24;
+    
+    /* Sable très clair : Fonds de section */
+    --color-sand: #F8F5F0;
+    --color-sand-50: #fffbf8;
+    --color-sand-100: #f8f5f0;
+    
+    /* Vert profond : Accent foncier & terrain */
+    --color-green: #1F5A43;
+    --color-green-50: #f0f7f3;
+    --color-green-100: #d9ebe1;
+    --color-green-600: #1f5a43;
+    
+    /* Legacy primaries (kept for compatibility) */
+    --color-primary-50: #eff6ff;
+    --color-primary-100: #dbeafe;
+    --color-primary-200: #bfdbfe;
+    --color-primary-300: #93c5fd;
+    --color-primary-400: #60a5fa;
+    --color-primary-500: var(--color-primary);
+    --color-primary-600: #2563eb;
+    --color-primary-700: #1d4ed8;
+    --color-primary-800: #1e40af;
+    --color-primary-900: #1e3a8a;
+    --color-on-primary: #ffffff;
+
+    --color-neutral-50: #f9fafb;
+    --color-neutral-100: #f3f4f6;
+    --color-neutral-600: #4b5563;
+    --color-neutral-900: #111827;
+    --surface-canvas: #f4f6f9;
+    --surface-card: #ffffff;
+    --surface-soft: #f8fafc;
+    --border-subtle: #e2e8f0;
+    --shadow-soft:
+      0 1px 2px rgba(15, 23, 42, 0.06), 0 10px 24px rgba(15, 23, 42, 0.06);
+
+    --text-xs: 0.75rem;
+    --text-sm: 0.875rem;
+    --text-base: 1rem; /* 16px - Base typography size */
+    --text-lg: 1.125rem;
+    --text-xl: 1.25rem;
+    --text-2xl: 1.5rem;
+    --text-4xl: 2.25rem;
+    
+    /* GNAMBA Spacing System */
+    --space-xs: 0.25rem;
+    --space-sm: 0.5rem;
+    --space-md: 1rem;
+    --space-lg: 1.5rem;
+    --space-xl: 2rem;
+    --space-2xl: 3rem;
+    
+    /* Section Vertical Spacing */
+    --section-gap-desktop: 7rem; /* 112px */
+    --section-gap-tablet: 4rem; /* 64px */
+    --section-gap-mobile: 3rem; /* 48px */
+    
+    /* Line length for optimal readability (max ~65 chars) */
+    --max-text-width: 42rem;
+    
+    /* Touch target minimum size (WCAG) */
+    --touch-target: 44px;
+
+    --font-normal: 400;
+    --font-medium: 500;
+    --font-semibold: 600;
+    --font-bold: 700;
+
+    --font-sans: "Manrope", "Segoe UI", system-ui, sans-serif;
+    --font-display: "Fraunces", "Georgia", serif;
+    --font-mono: "JetBrains Mono", "Fira Code", monospace;
+
+    /* Safe area insets for notched devices */
+    --sat: env(safe-area-inset-top, 0px);
+    --sar: env(safe-area-inset-right, 0px);
+    --sab: env(safe-area-inset-bottom, 0px);
+    --sal: env(safe-area-inset-left, 0px);
+  }
+
+  /* Large screen content centering — prevents awkward stretching on 1440px+ */
+  @media (min-width: 1440px) {
+    .max-w-7xl {
+      max-width: 1400px !important;
+    }
+  }
+
+  @media (min-width: 1920px) {
+    .max-w-7xl {
+      max-width: 1520px !important;
+    }
+  }
+
+  body {
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: 1.5;
+    color: var(--color-neutral-900);
+    background-color: var(--surface-canvas);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Prevent pull-to-refresh on mobile */
+    overscroll-behavior-y: contain;
+    /* Improve touch scrolling */
+    -webkit-overflow-scrolling: touch;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+
+  ::selection {
+    background: var(--color-primary-200);
+    color: var(--color-primary-900);
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    border-color: var(--border-subtle);
+    background-color: var(--surface-card);
+    transition:
+      border-color 160ms ease,
+      box-shadow 160ms ease,
+      background-color 160ms ease;
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]):not(
+      [type="range"]
+    )::placeholder,
+  textarea::placeholder {
+    color: #94a3b8;
+  }
+
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    transition:
+      background-color 160ms ease,
+      border-color 160ms ease,
+      color 160ms ease,
+      box-shadow 160ms ease,
+      opacity 160ms ease;
+  }
+
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--color-primary-100);
+    border-color: var(--color-primary-400);
+  }
+
+  /* Improve touch target sizes */
+  @media (max-width: 768px) {
+    button,
+    a,
+    input[type="button"],
+    input[type="submit"] {
+      min-height: 44px;
+      min-width: 44px;
+    }
+
+    /* Prevent zoom on input focus */
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="number"],
+    input[type="search"],
+    textarea,
+    select {
+      font-size: 16px !important;
+    }
+  }
+
+  /* Safe area padding for notched devices */
+  @supports (padding: max(0px)) {
+    body {
+      padding-left: max(0px, var(--sal));
+      padding-right: max(0px, var(--sar));
+    }
+  }
+
+  ::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 9999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+  }
+}
+
+@layer components {
+  .egs-panel {
+    @apply rounded-2xl border bg-white shadow-sm;
+    border-color: var(--border-subtle);
+  }
+
+  .egs-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .egs-table thead th {
+    @apply text-xs font-semibold uppercase tracking-wider text-slate-500;
+  }
+
+  .egs-table tbody {
+    @apply text-slate-700;
+  }
+
+  .egs-table tbody td {
+    @apply text-sm;
+  }
+
+  .egs-table .table-key {
+    @apply font-mono font-semibold text-slate-800;
+  }
+
+  .egs-table .table-money {
+    @apply font-semibold text-slate-900;
+  }
+
+  .egs-table .table-muted {
+    @apply text-xs text-slate-500;
+  }
+}
+
+@layer utilities {
+  .transition-shadow {
+    transition-property: box-shadow;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+  }
+
+  .animate-slide-in {
+    animation: slideIn 0.3s ease-out;
+  }
+
+  .animate-slide-out {
+    animation: slideOut 0.3s ease-in forwards;
+  }
+
+  @keyframes slideIn {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideOut {
+    from {
+      transform: translateX(0);
+      opacity: 1;
+    }
+    to {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+  }
+}
