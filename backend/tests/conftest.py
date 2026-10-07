@@ -9,9 +9,40 @@ import secrets
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import inspect, text
+from sqlalchemy.engine import make_url
+from sqlalchemy.exc import ArgumentError
 
-# Force a local sqlite DB for tests to run isolated from Postgres
-os.environ.setdefault("DATABASE_URL", "sqlite:///./_test_sqlite.db")
+
+def _test_database_url() -> str:
+    """Use SQLite by default; permit only explicit loopback PostgreSQL test DBs."""
+    configured_url = os.environ.get("EGS_TEST_DATABASE_URL")
+    if not configured_url:
+        return "sqlite:///./_test_sqlite.db"
+
+    try:
+        url = make_url(configured_url)
+    except ArgumentError as exc:
+        raise RuntimeError("EGS_TEST_DATABASE_URL is not a valid SQLAlchemy URL") from exc
+
+    if url.get_backend_name() == "sqlite":
+        return configured_url
+
+    if (
+        url.get_backend_name() == "postgresql"
+        and url.host in {"localhost", "127.0.0.1", "::1"}
+        and url.database
+        and url.database.endswith("_test")
+    ):
+        return configured_url
+
+    raise RuntimeError(
+        "EGS_TEST_DATABASE_URL must target SQLite or a loopback PostgreSQL "
+        "database whose name ends in _test"
+    )
+
+
+# Never inherit an arbitrary DATABASE_URL (which may point at a live database).
+os.environ["DATABASE_URL"] = _test_database_url()
 os.environ.setdefault(
     "LOCAL_AUTH_SECRET",
     "test-only-local-auth-secret-012345678901234567890123456789",
@@ -47,14 +78,17 @@ def _compile_array_sqlite(type_, compiler, **kw):
 
 
 def _ensure_test_schema() -> None:
-    """Create any model table that is missing from the target test database.
+    """Provision SQLite locally; PostgreSQL tests must use the migrated schema."""
+    if engine.dialect.name == "sqlite":
+        Base.metadata.create_all(bind=engine, checkfirst=True)
+        return
 
-    CI provisions an empty PostgreSQL database and runs pytest before Alembic,
-    so the suite must be able to start from no schema at all. `checkfirst=True`
-    only creates absent tables: it never alters or drops existing ones, which
-    keeps a pre-migrated or pre-seeded fixture database untouched.
-    """
-    Base.metadata.create_all(bind=engine, checkfirst=True)
+    if engine.dialect.name == "postgresql" and inspect(engine).has_table("alembic_version"):
+        return
+
+    raise RuntimeError(
+        "PostgreSQL backend tests require an Alembic-migrated EGS_TEST_DATABASE_URL"
+    )
 
 
 _ensure_test_schema()

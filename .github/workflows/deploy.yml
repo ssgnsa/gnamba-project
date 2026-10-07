@@ -124,7 +124,7 @@ jobs:
     name: Validate FastAPI backend and Alembic
     runs-on: ubuntu-latest
     env:
-      DATABASE_URL: postgresql://egs_ci:egs_ci_nonprod@localhost:5432/egs_test
+      EGS_TEST_DATABASE_URL: postgresql://egs_ci:egs_ci_nonprod@localhost:5432/egs_test
     services:
       postgres:
         image: postgres:16
@@ -160,14 +160,11 @@ jobs:
       - name: Compile backend and migration sources
         run: python -m compileall -q backend/app backend/alembic backend/tests
 
-      - name: Run backend tests
-        run: pytest -c backend/pytest.ini -q --tb=line backend/tests
-
-      - name: Verify Alembic migration chain
+      - name: Prepare isolated PostgreSQL test schema
         working-directory: backend
         run: |
-          python -m alembic heads
-          python -m alembic history -r=-8:head
+          set -euo pipefail
+          export DATABASE_URL="$EGS_TEST_DATABASE_URL"
           python - <<'PY'
           import os
           from sqlalchemy import create_engine, text
@@ -177,6 +174,18 @@ jobs:
               connection.execute(text("CREATE ROLE egs_test_user NOLOGIN"))
           engine.dispose()
           PY
+          python -m alembic upgrade head
+
+      - name: Run backend tests
+        run: pytest -c backend/pytest.ini -q --tb=line backend/tests
+
+      - name: Verify Alembic migration chain
+        working-directory: backend
+        run: |
+          set -euo pipefail
+          export DATABASE_URL="$EGS_TEST_DATABASE_URL"
+          python -m alembic heads
+          python -m alembic history -r=-8:head
           python -m app.core.alembic_version_capacity --apply
           python -m alembic upgrade head
           python -m alembic check
