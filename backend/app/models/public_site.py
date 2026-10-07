@@ -111,6 +111,9 @@ class VitrineLot(Base):
     updated_at = Column(TIMESTAMP(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
 
     __table_args__ = (
+        Index("idx_vitrine_lot", "lot_id"),
+        Index("idx_vitrine_property", "property_id"),
+        Index("idx_vitrine_publier", "publier"),
         Index("idx_vitrine_lot_reference", "reference"),
         Index("idx_vitrine_lot_statut", "statut"),
         Index("idx_vitrine_lot_publie", "publier_sur_vitrine"),

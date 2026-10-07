@@ -25,6 +25,7 @@ class Visiteur(Base):
     telephone = Column(String, nullable=True)
     email = Column(String, nullable=True)
     societe = Column(String, nullable=True)
+    entreprise = Column(String(255), nullable=True)
     motif = Column(String, nullable=True)
     date_arrivee = Column(TIMESTAMP(timezone=True), nullable=True)
     heure_arrivee = Column(String, nullable=True)
