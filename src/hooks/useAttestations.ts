@@ -1,7 +1,8 @@
 import { useState, useCallback } from "react";
+import { attestationsApi } from "../api/foncier";
 import { foncierRepository } from "../data/foncier.repository";
 import dbClient from "../lib/dbClient.service";
-import { buildAttestationRpcParams, FONCIER_ATTESTATION_WITH_TEMOINS_SELECT } from "../lib/foncierAttestation";
+import { buildAttestationRpcParams } from "../lib/foncierAttestation";
 import { logFoncierAudit } from "../lib/foncierAudit";
 import { generateFoncierReference, generateUUID } from "../utils/reference";
 import type { FoncierLot } from "../types";
@@ -34,7 +35,7 @@ interface UseAttestationsReturn {
   scanError: string | null;
   
   // Actions
-  getLatestAttestation: (lotId: string) => Promise<void>;
+  getLatestAttestation: (lotId: string) => Promise<any | null>;
   fetchAttestationHistory: (lotId: string) => Promise<void>;
   fetchScan: (attestationId: string) => Promise<void>;
   
@@ -47,8 +48,8 @@ interface UseAttestationsReturn {
   }) => Promise<any>;
   
   // Workflow
-  submitAttestation: (attestationId: string, lotId: string, reference: string) => Promise<void>;
-  validateAttestation: (attestationId: string, lotId: string, reference: string, chefName: string, userId: string | null) => Promise<void>;
+  submitAttestation: (attestationId: string) => Promise<void>;
+  validateAttestation: (attestationId: string, chefName: string) => Promise<void>;
   uploadScan: (attestationId: string, lotId: string, reference: string, mediaId: string) => Promise<void>;
   revokeAttestation: (attestationId: string, lotId: string, reference: string, reason: string) => Promise<void>;
   reissueAttestation: (attestationId: string, lotId: string) => Promise<void>;
@@ -75,10 +76,13 @@ export function useAttestations({ deviceId, profile }: UseAttestationsOptions): 
     try {
       const result = await foncierRepository.getLatestAttestation(lotId, false);
       if (result.error) throw result.error;
-      setLatestAttestation(result.data || null);
+      const attestation = result.data || null;
+      setLatestAttestation(attestation);
+      return attestation;
     } catch (err) {
       console.error("Error fetching latest attestation:", err);
       setLatestAttestation(null);
+      return null;
     }
   }, []);
 
@@ -88,21 +92,12 @@ export function useAttestations({ deviceId, profile }: UseAttestationsOptions): 
     setScans({});
     
     try {
-      const baseQuery = dbClient
-        .from("foncier_attestations")
-        .select(FONCIER_ATTESTATION_WITH_TEMOINS_SELECT)
-        .eq("lot_id", lotId)
-        .order("created_at", { ascending: false });
-
-      let result = await baseQuery.is("deleted_at", null);
-      
-      if (result.error && result.error.code === "42703") {
-        result = await baseQuery;
-      }
-
-      if (result.error) throw result.error;
-      
-      const data = result.data || [];
+      const result = await attestationsApi.listByLot(lotId);
+      if (result.error) throw new Error(result.error);
+      const data = (result.data || []).map((attestation) => ({
+        ...attestation,
+        foncier_attestation_temoins: (attestation as any).temoins || [],
+      }));
       setAttestationHistory(data);
       
       // Fetch scans
@@ -204,24 +199,13 @@ export function useAttestations({ deviceId, profile }: UseAttestationsOptions): 
     }
   }, [deviceId]);
 
-  const submitAttestation = useCallback(async (attestationId: string, lotId: string, reference: string) => {
+  const submitAttestation = useCallback(async (attestationId: string) => {
     setSubmitting(true);
     setSubmitError(null);
     
     try {
-      const now = new Date().toISOString();
-      const { error } = await dbClient
-        .from("foncier_attestations")
-        .update({ statut: "soumis", updated_at: now, client_updated_at: now })
-        .eq("id", attestationId);
-
-      if (error) throw error;
-
-      await logFoncierAudit(dbClient, {
-        lotId,
-        action: "ATTESTATION_SUBMIT",
-        details: { attestation_id: attestationId, reference },
-      });
+      const result = await attestationsApi.submit(attestationId, profile?.full_name ?? "");
+      if (result.error) throw new Error(result.error);
 
       setSubmitting(false);
     } catch (err: any) {
@@ -229,33 +213,15 @@ export function useAttestations({ deviceId, profile }: UseAttestationsOptions): 
       setSubmitError(err.message || "Erreur lors de la soumission");
       setSubmitting(false);
     }
-  }, []);
+  }, [profile?.full_name]);
 
-  const validateAttestation = useCallback(async (attestationId: string, lotId: string, reference: string, chefName: string, userId: string | null) => {
+  const validateAttestation = useCallback(async (attestationId: string, chefName: string) => {
     setValidating(true);
     setValidateError(null);
     
     try {
-      const now = new Date().toISOString();
-      const { error } = await dbClient
-        .from("foncier_attestations")
-        .update({
-          statut: "valide",
-          validation_chef_nom: chefName,
-          validation_chef_id: userId,
-          validation_chef_date: now,
-          updated_at: now,
-          client_updated_at: now,
-        })
-        .eq("id", attestationId);
-
-      if (error) throw error;
-
-      await logFoncierAudit(dbClient, {
-        lotId,
-        action: "ATTESTATION_VALIDATE",
-        details: { attestation_id: attestationId, reference },
-      });
+      const result = await attestationsApi.validate(attestationId, { chef_nom: chefName });
+      if (result.error) throw new Error(result.error);
 
       setValidating(false);
     } catch (err: any) {
@@ -299,30 +265,14 @@ export function useAttestations({ deviceId, profile }: UseAttestationsOptions): 
   }, [fetchScan]);
 
   const revokeAttestation = useCallback(async (attestationId: string, lotId: string, reference: string, reason: string) => {
+    void lotId;
+    void reference;
     setSubmitting(true);
     setSubmitError(null);
     
     try {
-      const now = new Date().toISOString();
-      const { error } = await dbClient
-        .from("foncier_attestations")
-        .update({ 
-          statut: "revoque", 
-          revoke_reason: reason,
-          revoked_at: now,
-          revoked_by: profile?.id || null,
-          updated_at: now,
-          client_updated_at: now,
-        })
-        .eq("id", attestationId);
-
-      if (error) throw error;
-
-      await logFoncierAudit(dbClient, {
-        lotId,
-        action: "ATTESTATION_REVOKE",
-        details: { attestation_id: attestationId, reference, reason },
-      });
+      const result = await attestationsApi.revoke(attestationId, reason);
+      if (result.error) throw new Error(result.error);
 
       setSubmitting(false);
     } catch (err: any) {
@@ -330,30 +280,12 @@ export function useAttestations({ deviceId, profile }: UseAttestationsOptions): 
       setSubmitError(err.message || "Erreur lors de la révocation");
       setSubmitting(false);
     }
-  }, [profile]);
+  }, []);
 
   const reissueAttestation = useCallback(async (attestationId: string, lotId: string) => {
-    setCreating(true);
-    setCreateError(null);
-    
-    try {
-      const { error } = await dbClient
-        .rpc("reissue_attestation", { p_attestation_id: attestationId });
-      
-      if (error) throw error;
-
-      await logFoncierAudit(dbClient, {
-        lotId,
-        action: "ATTESTATION_REISSUE",
-        details: { original_attestation_id: attestationId },
-      });
-
-      setCreating(false);
-    } catch (err: any) {
-      console.error("Error reissuing attestation:", err);
-      setCreateError(err.message || "Erreur lors de la réémission");
-      setCreating(false);
-    }
+    void attestationId;
+    void lotId;
+    setCreateError("La réémission n'est pas encore exposée par l'API Foncier.");
   }, []);
 
   return {

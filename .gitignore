@@ -18,6 +18,7 @@ node_modules/
 *.db
 *.sqlite
 *.sqlite3
+*.sqlite3-*
 
 # Secrets
 .env
@@ -45,7 +46,6 @@ dist/
 node_modules/
 .venv/
 .amplitude/
-.claude/
 .continue/
 .cursor/
 .grok/
@@ -59,7 +59,6 @@ Dockerfile.*
 docker-compose.yml.*
 AUDIT_FONCTIONNEL_COMPLET.md
 AUDIT_REPORT.md
-CLAUDE.md
 IMPLEMENTATION_PLAN.md
 INVENTORY.md
 RISK_REGISTER.md
@@ -94,3 +93,28 @@ log*.md
 *.7z
 *.rar
 *log*.md
+
+# Local deployment credentials and machine-generated audit snapshots
+/egs_publish
+/egs_publish.pub
+/reports/claude-governance-backups/
+/audit-global-readonly-*/
+/quarantine/
+backend/PHASE3.3-ACCESS-*.txt
+backend/PHASE3.3-RBAC-LIVE-TESTS.txt
+backend/PHASE3.3.1-MEDIA-LIVE-TESTS.txt
+*BASELINE*.txt
+TYPECHECK-RESULT-PHASE3.3.txt
+
+# ============================================================
+# Claude Code — gouvernance projet
+# La gouvernance partageable est versionnée.
+# Les états locaux et secrets restent hors Git.
+# ============================================================
+.claude/settings.local.json
+.claude/.credentials*
+.claude/**/.credentials*
+.claude/cache/
+.claude/backups/
+.claude/sessions/
+.claude/history/

@@ -1,19 +1,33 @@
 from __future__ import annotations
 import json
+from datetime import datetime, timezone
+from uuid import UUID
 
 from typing import Any
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel, Field
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
-from app.core.database import SessionLocal
+from app.api.deps import require_permission
+from app.core.antispam import public_form_limiter
+from app.core.database import SessionLocal, get_db
 from app.core.security import AuthorizationError, get_http_exception_for_error
 from app.content import bumpContentVersion
+from app.models.entity import Entity
+from app.schemas.entity import EntityCreate
+from app.services.entity_service import get_entity_service
 
 router = APIRouter(prefix="/api/v1/site", tags=["site"])
+
+
+def _datetime_iso_utc(value: datetime) -> str:
+    """Serialize timestamps as UTC ISO-8601, treating legacy naive DB values as UTC."""
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc).isoformat()
 
 
 def convert_realisation_row(row) -> SiteRealisationRow:
@@ -50,13 +64,13 @@ def convert_vitrine_lot_row(row) -> VitrineLotRow:
     data = dict(row._mapping)
     # Convert datetime to ISO string
     if data.get("created_at"):
-        data["created_at"] = data["created_at"].isoformat()
+        data["created_at"] = _datetime_iso_utc(data["created_at"])
     if data.get("updated_at"):
-        data["updated_at"] = data["updated_at"].isoformat()
+        data["updated_at"] = _datetime_iso_utc(data["updated_at"])
     # Convert Decimal to float
     decimal_fields = ["prix", "surface", "superficie", "prix_vente"]
     for field in decimal_fields:
-        if data.get(field):
+        if data.get(field) is not None:
             data[field] = float(data[field])
     # Convert UUID to string
     if data.get("id"):
@@ -108,10 +122,10 @@ class SiteRealisationRow(BaseModel):
 
 
 class VitrineLotRow(BaseModel):
-    id: str | None = None
-    lot_id: str | None = None
-    property_id: str | None = None
-    titre: str | None = None
+    id: UUID | None = None
+    lot_id: UUID | None = None
+    property_id: UUID | None = None
+    titre: str | None = Field(default=None, max_length=255)
     description: str | None = None
     prix: float | None = None
     surface: float | None = None
@@ -129,7 +143,7 @@ class VitrineLotRow(BaseModel):
     region: str | None = None
     superficie: float | None = None
     prix_vente: float | None = None
-    statut: str | None = None
+    statut: str | None = Field(default=None, max_length=50)
     documents: str | None = None
     caracteristiques: list[str] | None = None
     image_url: str | None = None
@@ -145,18 +159,61 @@ class VitrineLotRow(BaseModel):
     updated_at: str | None = None
 
 
+class PublicLotInquiry(BaseModel):
+    lot_id: UUID | None = None
+    is_example: bool = False
+    reference: str = Field(min_length=1, max_length=80)
+    village: str = Field(default="", max_length=120)
+    nom: str = Field(min_length=1, max_length=120)
+    prenom: str = Field(min_length=1, max_length=120)
+    email: str = Field(min_length=3, max_length=255)
+    telephone: str = Field(min_length=5, max_length=50)
+    message: str = Field(min_length=1, max_length=5000)
+    website: str = Field(default="", max_length=200)
+    form_started_at: float
+    consent: bool
+
+
+class PublicLeadCapture(BaseModel):
+    """Minimal public lead payload used by generic site forms."""
+
+    phone: str = Field(min_length=5, max_length=50)
+    first_name: str | None = Field(default=None, max_length=255)
+    last_name: str | None = Field(default=None, max_length=255)
+    email: str | None = Field(default=None, max_length=255)
+    source: str = Field(default="web_form", min_length=1, max_length=100)
+    source_page: str | None = Field(default=None, max_length=500)
+    source_form: str | None = Field(default=None, max_length=255)
+    consent_text: str = Field(min_length=1, max_length=1000)
+    channels_optin: dict[str, bool] | list[str] | None = None
+    website: str = Field(default="", max_length=200)
+
+
+class PublicPropertyRow(BaseModel):
+    id: UUID
+    reference: str
+    titre: str
+    description: str | None = None
+    type_bien: str
+    commune: str | None = None
+    ville: str | None = None
+    loyer_mensuel: float | None = None
+    valeur: float | None = None
+    cover_image_url: str | None = None
+    updated_at: datetime | None = None
+
+
 @router.get("/realisations", response_model=list[SiteRealisationRow])
 def list_realisations() -> list[SiteRealisationRow]:
     try:
         with SessionLocal() as session:
             rows = session.execute(
                 text("""
-                    SELECT id, reference, titre, description, description_courte, type_realisation, statut,
-                           localisation, ville, surface, budget_previsionnel, budget_reel,
-                           date_debut, date_fin_prevue, date_fin_reelle, chef_projet_id,
-                           equipe, photos, documents, publier_vitrine, ordre_affichage, tags,
-                           metadata_json, created_at, updated_at
+                    SELECT id, reference, titre, description, description_courte, type_realisation,
+                           localisation, ville, photos, publier_vitrine, ordre_affichage,
+                           created_at, updated_at
                     FROM site_realisations
+                    WHERE publier_vitrine IS TRUE
                     ORDER BY ordre_affichage, created_at DESC
                 """)
             ).fetchall()
@@ -167,8 +224,42 @@ def list_realisations() -> list[SiteRealisationRow]:
         return []
 
 
+@router.get("/properties", response_model=list[PublicPropertyRow])
+def list_public_properties() -> list[PublicPropertyRow]:
+    """Expose only the allowlisted fields of currently published properties."""
+    try:
+        with SessionLocal() as session:
+            rows = session.execute(
+                text("""
+                    SELECT id, reference, titre, description, type_bien,
+                           commune, ville, loyer_mensuel, valeur,
+                           cover_image_url, updated_at
+                    FROM public.properties
+                    WHERE publier_vitrine IS TRUE
+                      AND deleted_at IS NULL
+                      AND statut IN ('disponible', 'en_vente')
+                    ORDER BY created_at DESC, id
+                """)
+            ).fetchall()
+        result = []
+        for row in rows:
+            data = dict(row._mapping)
+            data["id"] = str(data["id"])
+            for field in ("loyer_mensuel", "valeur"):
+                if data[field] is not None:
+                    data[field] = float(data[field])
+            result.append(PublicPropertyRow(**data))
+        return result
+    except Exception:
+        logging.exception("site.list_public_properties failed")
+        return []
+
+
 @router.get("/realisations/{item_id}", response_model=SiteRealisationRow)
-def get_realisation(item_id: str) -> SiteRealisationRow:
+def get_realisation(
+    item_id: str,
+    _admin: dict[str, Any] = Depends(require_permission("site_vitrine", "read_private")),
+) -> SiteRealisationRow:
     try:
         with SessionLocal() as session:
             row = session.execute(
@@ -194,12 +285,9 @@ def get_realisation(item_id: str) -> SiteRealisationRow:
 @router.post("/realisations", response_model=SiteRealisationRow)
 def create_realisation(
     payload: SiteRealisationRow,
-    current_user: dict[str, Any] = Depends(get_current_user),
+    current_user: dict[str, Any] = Depends(require_permission("site_vitrine", "create")),
 ) -> SiteRealisationRow:
     try:
-        if current_user.get("role") != "admin":
-            raise AuthorizationError("Accès refusé")
-
         from uuid import uuid4
         from datetime import datetime
 
@@ -281,12 +369,9 @@ def create_realisation(
 def update_realisation(
     item_id: str,
     payload: SiteRealisationRow,
-    current_user: dict[str, Any] = Depends(get_current_user),
+    current_user: dict[str, Any] = Depends(require_permission("site_vitrine", "update")),
 ) -> SiteRealisationRow:
     try:
-        if current_user.get("role") != "admin":
-            raise AuthorizationError("Accès refusé")
-
         from datetime import datetime
 
         with SessionLocal() as session:
@@ -329,12 +414,9 @@ def update_realisation(
 @router.delete("/realisations/{item_id}")
 def delete_realisation(
     item_id: str,
-    current_user: dict[str, Any] = Depends(get_current_user),
+    current_user: dict[str, Any] = Depends(require_permission("site_vitrine", "delete")),
 ) -> dict[str, str]:
     try:
-        if current_user.get("role") != "admin":
-            raise AuthorizationError("Accès refusé")
-
         with SessionLocal() as session:
             result = session.execute(
                 text("DELETE FROM site_realisations WHERE id = :item_id"),
@@ -361,10 +443,12 @@ def list_vitrine_lots() -> list[VitrineLotRow]:
                     SELECT id, lot_id, property_id, titre, description, prix, surface, localisation,
                            photos, publier, ordre, tags, reference, village, quartier, commune,
                            departement, region, superficie, prix_vente, statut, documents,
-                           caracteristiques, image_url, image_alt, contact_phone, contact_email,
-                           publier_sur_vitrine, ordre_affichage, notes, created_by, updated_by,
+                           caracteristiques, image_url, image_alt,
+                           NULL::VARCHAR(50) AS contact_phone, NULL::VARCHAR(255) AS contact_email,
+                           publier_sur_vitrine, ordre_affichage,
                            created_at, updated_at
                     FROM vitrine_lots
+                    WHERE publier_sur_vitrine IS TRUE
                     ORDER BY ordre_affichage, created_at DESC
                 """)
             ).fetchall()
@@ -376,7 +460,10 @@ def list_vitrine_lots() -> list[VitrineLotRow]:
 
 
 @router.get("/vitrine-lots/{item_id}", response_model=VitrineLotRow)
-def get_vitrine_lot(item_id: str) -> VitrineLotRow:
+def get_vitrine_lot(
+    item_id: UUID,
+    _admin: dict[str, Any] = Depends(require_permission("site_vitrine", "read_private")),
+) -> VitrineLotRow:
     try:
         with SessionLocal() as session:
             row = session.execute(
@@ -389,7 +476,7 @@ def get_vitrine_lot(item_id: str) -> VitrineLotRow:
                            created_at, updated_at
                     FROM vitrine_lots WHERE id = :item_id
                 """),
-                {"item_id": item_id},
+                {"item_id": str(item_id)},
             ).fetchone()
         if row:
             return convert_vitrine_lot_row(row)
@@ -400,20 +487,136 @@ def get_vitrine_lot(item_id: str) -> VitrineLotRow:
         raise HTTPException(status_code=404, detail="Lot non trouvé")
 
 
+@router.post("/vitrine-lot-inquiries", status_code=201)
+def create_vitrine_lot_inquiry(
+    payload: PublicLotInquiry,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Accept a constrained public inquiry and create the existing CRM follow-up."""
+    if payload.website.strip():
+        return {"success": True}
+    elapsed = datetime.now(timezone.utc).timestamp() - payload.form_started_at
+    if elapsed < 2.5 or elapsed > 60 * 60 or not payload.consent:
+        raise HTTPException(status_code=422, detail="Formulaire invalide")
+    if not request.client or not request.client.host or not public_form_limiter.allow(
+        request.client.host,
+        maximum=5,
+        window_seconds=60 * 60,
+    ):
+        raise HTTPException(status_code=429, detail="Soumission temporairement indisponible")
+    if not payload.telephone.strip():
+        raise HTTPException(status_code=422, detail="Téléphone requis")
+
+    lot: dict[str, Any] | None = None
+    if not payload.is_example:
+        if not payload.lot_id:
+            raise HTTPException(status_code=422, detail="Lot requis")
+        row = db.execute(
+            text("""
+                SELECT id, reference, titre, village, prix_vente
+                FROM vitrine_lots
+                WHERE id = :lot_id AND publier_sur_vitrine IS TRUE
+            """),
+            {"lot_id": str(payload.lot_id)},
+        ).mappings().first()
+        if not row:
+            return {"success": True}
+        lot = dict(row)
+
+    service = get_entity_service(db)
+    service.create(EntityCreate(
+        type="lead",
+        subtype="particulier",
+        status="pending",
+        display_name=f"{payload.prenom.strip()} {payload.nom.strip()}".strip(),
+        first_name=payload.prenom.strip(),
+        last_name=payload.nom.strip(),
+        phone=payload.telephone.strip(),
+        email=payload.email.strip().lower(),
+        entity_metadata={
+            "source": "vitrine_lots",
+            "source_form": "public_lots",
+            "consent_text": "Consentement explicite au formulaire public",
+            "lot_reference": str((lot or {}).get("reference") or payload.reference).strip(),
+            "lot_id": str(payload.lot_id) if payload.lot_id else None,
+            "message": payload.message.strip(),
+        },
+    ))
+    db.commit()
+    return {"success": True}
+
+
+@router.post("/lead-capture")
+def create_public_lead_capture(
+    payload: PublicLeadCapture,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Capture a generic public lead without exposing the admin leads API."""
+    if payload.website.strip():
+        return {"success": True}
+    if not payload.phone.strip():
+        raise HTTPException(status_code=422, detail="Téléphone requis")
+    if not payload.consent_text.strip():
+        raise HTTPException(status_code=422, detail="Consentement requis")
+    if not request.client or not request.client.host or not public_form_limiter.allow(
+        request.client.host,
+        maximum=5,
+        window_seconds=60 * 60,
+    ):
+        raise HTTPException(status_code=429, detail="Soumission temporairement indisponible")
+
+    service = get_entity_service(db)
+    phone = payload.phone.strip()
+    existing = service.get_by_phone(phone)
+    if existing and existing.type == "lead":
+        return {
+            "success": True,
+            "data": {"id": str(existing.id), "phone": phone},
+            "existing": True,
+        }
+
+    channels_optin = payload.channels_optin
+    if isinstance(channels_optin, list):
+        channels_optin = {channel: True for channel in channels_optin}
+    entity = service.create(
+        EntityCreate(
+            type="lead",
+            subtype="particulier",
+            status="pending",
+            display_name=f"{payload.first_name or ''} {payload.last_name or ''}".strip()
+            or f"Lead {phone}",
+            first_name=payload.first_name or "",
+            last_name=payload.last_name or "",
+            phone=phone,
+            email=payload.email.lower() if payload.email else None,
+            entity_metadata={
+                "source": payload.source,
+                "source_page": payload.source_page,
+                "source_form": payload.source_form,
+                "consent_text": payload.consent_text,
+                "channels_optin": channels_optin,
+                "statut": "nouveau",
+            },
+        )
+    )
+    return {
+        "success": True,
+        "data": {"id": str(entity.id), "phone": phone},
+        "existing": False,
+    }
+
+
 @router.post("/vitrine-lots", response_model=VitrineLotRow)
 def create_vitrine_lot(
     payload: VitrineLotRow,
-    current_user: dict[str, Any] = Depends(get_current_user),
+    current_user: dict[str, Any] = Depends(require_permission("site_vitrine", "create")),
 ) -> VitrineLotRow:
     try:
-        if current_user.get("role") != "admin":
-            raise AuthorizationError("Accès refusé")
-
         from uuid import uuid4
-        from datetime import datetime
-
         lot_id = str(uuid4())
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
 
         with SessionLocal() as session:
             session.execute(
@@ -436,8 +639,8 @@ def create_vitrine_lot(
                 """),
                 {
                     "id": lot_id,
-                    "lot_id": payload.lot_id,
-                    "property_id": payload.property_id,
+                    "lot_id": str(payload.lot_id) if payload.lot_id is not None else None,
+                    "property_id": str(payload.property_id) if payload.property_id is not None else None,
                     "titre": payload.titre,
                     "description": payload.description,
                     "prix": payload.prix,
@@ -498,15 +701,11 @@ def create_vitrine_lot(
 
 @router.patch("/vitrine-lots/{item_id}", response_model=VitrineLotRow)
 def update_vitrine_lot(
-    item_id: str,
+    item_id: UUID,
     payload: VitrineLotRow,
-    current_user: dict[str, Any] = Depends(get_current_user),
+    current_user: dict[str, Any] = Depends(require_permission("site_vitrine", "update")),
 ) -> VitrineLotRow:
     try:
-        if not current_user or current_user.get("role") != "admin":
-            raise HTTPException(status_code=403, detail="Accès refusé : droits admin requis")
-
-        from datetime import datetime
         from decimal import Decimal
         import uuid
 
@@ -516,14 +715,18 @@ def update_vitrine_lot(
             if not fields:
                 raise HTTPException(status_code=400, detail="Aucun champ à mettre à jour")
 
-            fields["updated_at"] = datetime.now()
+            for field in ("lot_id", "property_id"):
+                if fields.get(field) is not None:
+                    fields[field] = str(fields[field])
+
+            fields["updated_at"] = datetime.now(timezone.utc)
             fields["updated_by"] = current_user.get("id")
 
             # 2. Exécuter la mise à jour
             set_clause = ", ".join(f"{key} = :{key}" for key in fields.keys())
             session.execute(
                 text(f"UPDATE vitrine_lots SET {set_clause} WHERE id = :item_id"),
-                {**fields, "item_id": item_id},
+                {**fields, "item_id": str(item_id)},
             )
             session.commit()
 
@@ -545,7 +748,7 @@ def update_vitrine_lot(
                            created_at, updated_at
                     FROM vitrine_lots WHERE id = :item_id
                 """),
-                {"item_id": item_id}
+                {"item_id": str(item_id)}
             ).mappings().first()
             
             if not row:
@@ -559,7 +762,7 @@ def update_vitrine_lot(
                 elif isinstance(value, Decimal):
                     safe_row[key] = float(value)
                 elif isinstance(value, datetime):
-                    safe_row[key] = value.isoformat()
+                    safe_row[key] = _datetime_iso_utc(value)
                 else:
                     safe_row[key] = value
 
@@ -575,17 +778,14 @@ def update_vitrine_lot(
 
 @router.delete("/vitrine-lots/{item_id}")
 def delete_vitrine_lot(
-    item_id: str,
-    current_user: dict[str, Any] = Depends(get_current_user),
+    item_id: UUID,
+    current_user: dict[str, Any] = Depends(require_permission("site_vitrine", "delete")),
 ) -> dict[str, str]:
     try:
-        if current_user.get("role") != "admin":
-            raise AuthorizationError("Accès refusé")
-
         with SessionLocal() as session:
             result = session.execute(
                 text("DELETE FROM vitrine_lots WHERE id = :item_id"),
-                {"item_id": item_id},
+                {"item_id": str(item_id)},
             )
             session.commit()
             bumpContentVersion()  # Invalidate caches across all clients

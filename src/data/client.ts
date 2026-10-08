@@ -184,7 +184,19 @@ const tableEndpoints: Record<string, string> = {
   visites_du_jour: "/visites/jour",
   visiteurs: "/visiteurs",
   employees_presence: "/employees/presence",
+  tasks: "/tasks",
+  taches: "/tasks",
+  properties: "/immobilier/properties",
+  lease_contracts: "/immobilier/contracts",
+  rent_payments: "/immobilier/payments",
 };
+
+const resourceEndpointsById = new Set([
+  "tasks",
+  "properties",
+  "lease_contracts",
+  "rent_payments",
+]);
 
 const resolveTableEndpoint = (tableName: string): string =>
   tableEndpoints[tableName] ??
@@ -492,8 +504,13 @@ class ApiTableQuery {
   }
 
   private async fetchRows(tableName: string): Promise<Row[]> {
+    const idFilter = tableName === this.table ? this.idFilter() : null;
+    const endpoint = resolveTableEndpoint(tableName);
+    const resourceEndpoint = idFilter && resourceEndpointsById.has(tableName)
+      ? `${endpoint}/${encodeURIComponent(idFilter)}`
+      : endpoint;
     const result = await apiClient.request<Row[]>(
-      `${resolveTableEndpoint(tableName)}${tableName === this.table ? this.queryString() : ""}`,
+      `${resourceEndpoint}${idFilter && resourceEndpointsById.has(tableName) ? "" : tableName === this.table ? this.queryString() : ""}`,
     );
     if (result.error) {
       if (result.status === 404 && OPTIONAL_EMPTY_TABLES.has(tableName)) {
@@ -501,7 +518,14 @@ class ApiTableQuery {
       }
       throw new Error(result.error);
     }
-    return Array.isArray(result.data) ? result.data : [];
+    if (Array.isArray(result.data)) return result.data;
+    if (result.data && Array.isArray((result.data as { items?: unknown[] }).items)) {
+      return (result.data as { items: Row[] }).items;
+    }
+    if (idFilter && result.data && typeof result.data === "object") {
+      return [result.data as Row];
+    }
+    return [];
   }
 
   private async fetchPartyJoinedRows() {

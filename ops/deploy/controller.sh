@@ -19,12 +19,27 @@ EOF
   exit 2
 }
 
+help() {
+  cat <<'EOF'
+Usage:
+  controller.sh --environment production --ref <40-char-sha> --artifact-dir <dir> --dry-run
+  controller.sh --environment production --ref <40-char-sha> --artifact-dir <dir> --authorize-publish
+
+Only the signed frontend publisher is enabled. No controller mode performs a
+database migration, changes the current symlink, or directly publishes files.
+EOF
+  exit 0
+}
+
 environment=
 expected_ref=
 artifact_dir=
 mode=
 while (($#)); do
   case "$1" in
+    --help|-h)
+      help
+      ;;
     --environment|--ref|--artifact-dir)
       (($# >= 2)) || usage
       case "$1" in

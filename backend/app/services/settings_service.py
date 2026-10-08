@@ -283,7 +283,7 @@ class SettingsService:
 
     def get_all_settings(self) -> List[SettingsResponse]:
         """Récupère tous les paramètres formatés pour l'API"""
-        settings = self.repo.get_all()
+        settings = self.repo.get_public_settings()
         return [
             SettingsResponse(
                 key=s.key,

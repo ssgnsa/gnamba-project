@@ -44,7 +44,9 @@ class InMemoryUserRepository(UserRepositoryPort):
     def _seed_default_admin(self) -> None:
         if self._users_by_email:
             return
-        admin_password = os.getenv("INITIAL_ADMIN_PASSWORD", "Admin@EGS2025!")
+        admin_password = os.getenv("INITIAL_ADMIN_PASSWORD")
+        if not admin_password:
+            return
         admin = User(
             id="local-admin",
             entity_id="local-admin-entity",

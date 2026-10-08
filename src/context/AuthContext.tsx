@@ -96,6 +96,7 @@ interface AuthContextType {
     email: string,
     password: string,
   ) => Promise<{ error: string | null; code: string | null }>;
+  verifyMfa: (code: string) => Promise<{ error: string | null; code: string | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: string | null }>;
@@ -111,80 +112,18 @@ const AuthContext = createContext<AuthContextType>({
   profile: null,
   loading: true,
   signIn: async () => ({ error: null, code: null }),
+  verifyMfa: async () => ({ error: null, code: null }),
   signOut: async () => {},
   refreshProfile: async () => {},
   resetPassword: async () => ({ error: null }),
   changePassword: async () => ({ error: null, code: null }),
 });
 
-export async function hydrateE2EAdminSession(): Promise<boolean> {
-  // This helper is exclusively for local automated tests. A query parameter
-  // must never turn a production visitor into an administrator.
-  if (!import.meta.env.DEV || typeof window === "undefined") return false;
-
-  const hasE2EFlag = window.location.search.includes("e2e=true");
-  if (!hasE2EFlag) return false;
-
-  const adminEmail = "admin@egs.local";
-  const adminPassword =
-    import.meta.env.VITE_INITIAL_ADMIN_PASSWORD ||
-    "EgsAdminInitialPass2026Secure!";
-
-  const loginResult = await apiClient.auth.login(adminEmail, adminPassword);
-  if (loginResult.error || !loginResult.data?.access_token || !loginResult.data?.refresh_token) {
-    return false;
-  }
-
-  persistLocalAuthToken(
-    loginResult.data.access_token,
-    loginResult.data.refresh_token,
-  );
-
-  const user = loginResult.data.user as UserProfile | undefined;
-  if (user) {
-    const mappedUser = {
-      id: user.id ?? "e2e-admin",
-      email: user.email ?? adminEmail,
-      full_name: user.full_name ?? "E2E Tester",
-      role: user.role ?? "admin",
-      access_level: user.access_level ?? "admin",
-      poste: user.poste ?? null,
-      department: user.department ?? null,
-      phone: user.phone ?? null,
-      avatar_url: user.avatar_url ?? null,
-    } as UserProfile;
-
-    const previousProfile = window.localStorage.getItem("egs:local_auth_token");
-    if (!previousProfile) {
-      window.localStorage.setItem("egs:local_auth_token", loginResult.data.access_token);
-      window.localStorage.setItem("egs:local_refresh_token", loginResult.data.refresh_token);
-    }
-
-    return !!mappedUser.email;
-  }
-
-  return true;
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const e2eInitialUser = import.meta.env.DEV && typeof window !== 'undefined' && window.location.search.includes('e2e=true')
-    ? ({
-        id: 'e2e',
-        email: 'e2e@local',
-        full_name: 'E2E Tester',
-        role: 'admin',
-        access_level: 'admin',
-        poste: null,
-        department: null,
-        phone: null,
-        avatar_url: null,
-      } as unknown as UserProfile)
-    : null;
-
-  const [user, setUser] = useState<UserProfile | null>(e2eInitialUser);
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [session, setSession] = useState<null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(e2eInitialUser);
-  const [loading, setLoading] = useState(!e2eInitialUser);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
   const IDLE_TIMEOUT_MINUTES = Number(
     import.meta.env.VITE_IDLE_TIMEOUT_MINUTES ?? 0,
   );
@@ -195,7 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const getAccessTokenExpiryMs = (): number | null => {
     if (typeof window === "undefined") return null;
-    const token = window.localStorage.getItem("egs:local_auth_token");
+    const token = apiClient.getStoredLocalAuthToken();
     if (!token) return null;
     try {
       const [, payload] = token.split(".");
@@ -214,20 +153,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshLocalSession = useCallback(async () => {
     if (typeof window === "undefined") return false;
 
-    const refreshToken = window.localStorage.getItem("egs:local_refresh_token");
-    if (!refreshToken) return false;
-
     try {
-      const result = await apiClient.auth.refresh(refreshToken);
+      const result = await apiClient.auth.refresh();
       if (result.error || !result.data?.access_token) {
         clearStoredLocalAuthToken();
         return false;
       }
 
-      persistLocalAuthToken(
-        result.data.access_token,
-        result.data.refresh_token,
-      );
+      persistLocalAuthToken(result.data.access_token);
       return true;
     } catch {
       clearStoredLocalAuthToken();
@@ -249,7 +182,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchProfile = async (_userId: string) => {
     if (isSelfHostedMode()) {
-      const token = window.localStorage.getItem("egs:local_auth_token");
+      const token = apiClient.getStoredLocalAuthToken();
       if (!token) {
         setProfile(null);
         return;
@@ -275,58 +208,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     const init = async () => {
-      // E2E/dev shortcut: log into the real local API and keep the JWT in localStorage
-      try {
-        if (import.meta.env.DEV && typeof window !== 'undefined' && window.location.search.includes('e2e=true')) {
-          const authenticated = await hydrateE2EAdminSession();
-          const dummy = {
-            id: 'e2e',
-            email: 'e2e@local',
-            full_name: 'E2E Tester',
-            role: 'admin',
-            access_level: 'admin',
-            poste: null,
-            department: null,
-            phone: null,
-            avatar_url: null,
-          } as any;
-          setUser(dummy);
-          setProfile(dummy);
-
-          if (authenticated) {
-            const storedUser = window.localStorage.getItem('egs:local_auth_token');
-            if (storedUser) {
-              const meResult = await apiClient.auth.me();
-              if (!meResult.error && meResult.data?.user) {
-                const authenticatedUser = meResult.data.user as UserProfile;
-                setUser(authenticatedUser);
-                setProfile(authenticatedUser);
-              }
-            }
-          }
-
-          setLoading(false);
-          return;
-        }
-      } catch {
-        // ignore
-      }
       try {
         if (isSelfHostedMode()) {
-          const token = window.localStorage.getItem("egs:local_auth_token");
-          if (!token) {
+          const refreshed = await refreshLocalSession();
+          if (!refreshed) {
             if (!cancelled) setLoading(false);
             return;
           }
 
-          let result = await apiClient.auth.me();
-
-          if (result.status === 401) {
-            const refreshed = await refreshLocalSession();
-            if (refreshed) {
-              result = await apiClient.auth.me();
-            }
-          }
+          const result = await apiClient.auth.me();
 
           if (result.error || !result.data?.user) {
             clearStoredLocalAuthToken();
@@ -367,15 +257,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const result = await apiClient.auth.login(email, password);
         if (result.error || !result.data?.access_token) {
           return {
-            code: result.data?.code ?? null,
+            code: result.code ?? result.data?.code ?? null,
             error: result.error || "Identifiants invalides",
           };
         }
 
         const access_token = result.data!.access_token!;
-        const refresh_token = result.data!.refresh_token!;
         const user = result.data!.user;
-        persistLocalAuthToken(access_token, refresh_token);
+        persistLocalAuthToken(access_token);
+        if (result.data?.mfa_challenge_required) {
+          return { error: null, code: "mfa_required" };
+        }
         setUser(mapLocalUser(user as Record<string, any>));
         setSession(null);
         setProfile(user as UserProfile);
@@ -389,6 +281,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     [],
   );
+
+  const verifyMfa = useCallback(async (code: string) => {
+    const result = await apiClient.auth.verifyMfa(code);
+    if (result.error || !result.data?.access_token) {
+      return { error: result.error || "Code MFA invalide", code: "mfa_invalid" };
+    }
+    persistLocalAuthToken(result.data.access_token);
+    const mapped = mapLocalUser(result.data.user as Record<string, any>);
+    setUser(mapped);
+    setSession(null);
+    setProfile(result.data.user as UserProfile);
+    return { error: null, code: null };
+  }, []);
 
   const signOut = useCallback(async () => {
     if (isSelfHostedMode()) {
@@ -407,16 +312,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const resetPassword = useCallback(
-    async (_email: string): Promise<{ error: string | null }> => {
-      if (isSelfHostedMode()) {
-        return {
-          error: "La réinitialisation locale n'est pas encore implémentée.",
-        };
-      }
-
-      return {
-        error: "La réinitialisation locale n'est pas encore implémentée.",
-      };
+    async (email: string): Promise<{ error: string | null }> => {
+      const result = await apiClient.auth.requestPasswordReset(email);
+      return { error: result.error };
     },
     [],
   );
@@ -448,6 +346,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
       }
 
+      clearStoredLocalAuthToken();
+      setUser(null);
+      setSession(null);
+      setProfile(null);
       return { error: null, code: null };
     },
     [],
@@ -460,7 +362,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const refreshIfNeeded = async () => {
       const expiryMs = getAccessTokenExpiryMs();
       if (!expiryMs) return;
-      if (expiryMs - Date.now() > 10 * 60 * 1000) return;
+      if (expiryMs - Date.now() > 90 * 1000) return;
 
       const refreshed = await refreshLocalSession();
       if (!refreshed) {
@@ -528,6 +430,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profile,
         loading,
         signIn,
+        verifyMfa,
         signOut,
         refreshProfile,
         resetPassword,

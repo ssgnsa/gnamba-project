@@ -16,34 +16,11 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Add missing columns to parties table
-    op.add_column('parties', sa.Column('type', sa.Text(), nullable=True, server_default='particulier'))
-    op.add_column('parties', sa.Column('nom_entreprise', sa.Text(), nullable=True))
-    op.add_column('parties', sa.Column('cni_numero', sa.Text(), nullable=True))
-    op.add_column('parties', sa.Column('cni_date', sa.Text(), nullable=True))
-    op.add_column('parties', sa.Column('cni_lieu', sa.Text(), nullable=True))
-    op.add_column('parties', sa.Column('profession', sa.Text(), nullable=True))
-    op.add_column('parties', sa.Column('employeur', sa.Text(), nullable=True))
-    op.add_column('parties', sa.Column('naissance_date', sa.Text(), nullable=True))
-    op.add_column('parties', sa.Column('naissance_lieu', sa.Text(), nullable=True))
-    op.add_column('parties', sa.Column('nationalite', sa.Text(), nullable=True))
-    op.add_column('parties', sa.Column('actif', sa.Boolean(), nullable=True, server_default='true'))
-    op.add_column('parties', sa.Column('created_by', sa.Text(), nullable=True))
-    op.add_column('parties', sa.Column('updated_by', sa.Text(), nullable=True))
+    # Revision 005 already defines these columns. Keep this revision in the
+    # chain as a no-op so a fresh database does not add the same columns twice.
+    pass
 
 
 def downgrade() -> None:
-    # Remove the added columns
-    op.drop_column('parties', 'type')
-    op.drop_column('parties', 'nom_entreprise')
-    op.drop_column('parties', 'cni_numero')
-    op.drop_column('parties', 'cni_date')
-    op.drop_column('parties', 'cni_lieu')
-    op.drop_column('parties', 'profession')
-    op.drop_column('parties', 'employeur')
-    op.drop_column('parties', 'naissance_date')
-    op.drop_column('parties', 'naissance_lieu')
-    op.drop_column('parties', 'nationalite')
-    op.drop_column('parties', 'actif')
-    op.drop_column('parties', 'created_by')
-    op.drop_column('parties', 'updated_by')
+    # The columns belong to revision 005 and must not be removed here.
+    pass

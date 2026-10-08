@@ -10,7 +10,6 @@ interface WhatsAppConfig {
   accountSid?: string;
   authToken?: string;
   phoneNumber?: string;
-  apiKey?: string;
   whatsappBusinessNumber?: string;
   accessToken?: string;
 }
@@ -71,7 +70,6 @@ export function getWhatsAppConfig(): WhatsAppConfig | null {
   if (provider === "callmebot") {
     return {
       provider,
-      apiKey: import.meta.env.VITE_CALLMEBOT_API_KEY || undefined,
       phoneNumber: import.meta.env.VITE_WHATSAPP_DEFAULT_RECIPIENT || undefined,
     };
   }

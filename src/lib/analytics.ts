@@ -1,6 +1,4 @@
-const amplitudeApiKey = import.meta.env.VITE_AMPLITUDE_API_KEY as string | undefined;
-
-const isEnabled = Boolean(amplitudeApiKey);
+const isEnabled = false;
 
 export const analytics = {
   isEnabled,

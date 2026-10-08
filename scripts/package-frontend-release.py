@@ -141,6 +141,8 @@ def main() -> int:
             "archive_sha256": sha256_file(archive_path),
             "version_json_sha256": hashlib.sha256(version_bytes).hexdigest(),
             "git_commit": commit,
+            "branch": version.get("branch"),
+            "git_ref": version.get("git_ref"),
             "artifact_hash": artifact_hash,
             "release_check": True,
             "frontend_validation": True,

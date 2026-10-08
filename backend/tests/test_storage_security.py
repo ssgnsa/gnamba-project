@@ -73,7 +73,7 @@ def test_private_storage_requires_media_read_permission(storage_client) -> None:
 
 def test_authorized_media_user_can_read_private_file(storage_client) -> None:
     client, state, _root = storage_client
-    state["user"] = {"id": "manager-1", "role": "gestionnaire"}
+    state["user"] = {"id": "admin-1", "role": "admin", "mfa_verified": True}
 
     response = client.get("/storage/private/record.pdf")
 
@@ -95,7 +95,7 @@ def test_publicly_referenced_asset_remains_anonymous(storage_client) -> None:
 
 def test_missing_private_file_is_not_found_for_authorized_user(storage_client) -> None:
     client, state, _root = storage_client
-    state["user"] = {"id": "admin-1", "role": "admin"}
+    state["user"] = {"id": "admin-1", "role": "admin", "mfa_verified": True}
 
     response = client.get("/storage/private/missing.pdf")
 
@@ -121,7 +121,7 @@ def test_private_file_api_requires_media_read_permission(storage_client) -> None
 
 def test_private_file_api_serves_file_to_authorized_media_user(storage_client) -> None:
     client, state, _root = storage_client
-    state["user"] = {"id": "manager-1", "role": "gestionnaire"}
+    state["user"] = {"id": "admin-1", "role": "admin", "mfa_verified": True}
 
     response = client.get("/api/v1/storage/files/private/record.pdf")
 

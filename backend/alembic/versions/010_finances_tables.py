@@ -39,7 +39,7 @@ def upgrade() -> None:
         sa.Column('tiers_id', postgresql.UUID(as_uuid=False), nullable=True),
         sa.Column('tiers_type', sa.String(50), nullable=True),
         sa.Column('tiers_nom', sa.String(255), nullable=True),
-        sa.Column('projet_id', postgresql.UUID(as_uuid=False), nullable=True),
+        sa.Column('projet_id', sa.String(), nullable=True),
         sa.Column('lot_id', postgresql.UUID(as_uuid=False), nullable=True),
         sa.Column('property_id', postgresql.UUID(as_uuid=False), nullable=True),
         sa.Column('contract_id', postgresql.UUID(as_uuid=False), nullable=True),
@@ -108,8 +108,7 @@ def upgrade() -> None:
         sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
         sa.PrimaryKeyConstraint('id'),
         sa.UniqueConstraint('reference'),
-        sa.UniqueConstraint('sku'),
-        sa.ForeignKeyConstraint(['fournisseur_principal_id'], ['suppliers.id'], ondelete='SET NULL')
+        sa.UniqueConstraint('sku')
     )
     op.create_index('idx_product_reference', 'products', ['reference'])
     op.create_index('idx_product_sku', 'products', ['sku'])
@@ -155,9 +154,18 @@ def upgrade() -> None:
     op.create_index('idx_supplier_type', 'suppliers', ['type_fournisseur'])
     op.create_index('idx_supplier_actif', 'suppliers', ['actif'])
     op.create_index('idx_supplier_ville', 'suppliers', ['ville'])
+    op.create_foreign_key(
+        'fk_products_fournisseur_principal_id_suppliers',
+        'products',
+        'suppliers',
+        ['fournisseur_principal_id'],
+        ['id'],
+        ondelete='SET NULL',
+    )
 
 
 def downgrade() -> None:
+    op.drop_constraint('fk_products_fournisseur_principal_id_suppliers', 'products', type_='foreignkey')
     op.drop_index('idx_supplier_ville', table_name='suppliers')
     op.drop_index('idx_supplier_actif', table_name='suppliers')
     op.drop_index('idx_supplier_type', table_name='suppliers')

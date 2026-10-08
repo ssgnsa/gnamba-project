@@ -406,7 +406,7 @@ export const attestationsApi = {
 export const auditApi = {
   // Liste paginée avec filtres
   list: (params: {
-    entity_type?: string;
+    entity_type?: string | string[];
     entity_id?: string;
     action?: string;
     user_id?: string;
@@ -424,7 +424,11 @@ export const auditApi = {
     const query = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
-        query.append(key, String(value));
+        if (Array.isArray(value)) {
+          value.forEach((item) => query.append(key, String(item)));
+        } else {
+          query.append(key, String(value));
+        }
       }
     });
     return apiClient.request(`/foncier/audit?${query.toString()}`, {

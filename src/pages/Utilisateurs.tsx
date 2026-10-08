@@ -379,7 +379,7 @@ export default function Utilisateurs() {
 
   const handleCreateAccount = async () => {
     const email = createForm.email.trim().toLowerCase();
-    const password = createForm.password.trim();
+    const password = createForm.password;
     const fullName = createForm.full_name.trim();
 
     if (!email || !email.includes("@")) {
@@ -387,8 +387,8 @@ export default function Utilisateurs() {
       return;
     }
 
-    if (password.length < 8) {
-      setError("Mot de passe trop court (minimum 8 caractères).");
+    if (password.length < 12) {
+      setError("Mot de passe trop court (minimum 12 caractères).");
       return;
     }
 
@@ -721,7 +721,10 @@ export default function Utilisateurs() {
                 onChange={(e) =>
                   setCreateForm({ ...createForm, password: e.target.value })
                 }
-                placeholder="Minimum 8 caractères"
+                placeholder="Minimum 12 caractères"
+                autoComplete="new-password"
+                minLength={12}
+                maxLength={128}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
               />
             </div>

@@ -2,7 +2,11 @@
 
 ## Statut
 
-Ce document constitue la cartographie et l’audit de phase 0/1 du protocole de refactor. Aucune suppression n’a été effectuée : la priorité actuelle est la compréhension, la traçabilité et la validation avant toute consolidation destructive.
+Ce document constitue la cartographie et l’audit de la consolidation. La cible
+retenue pour le redeploiement contrôlé est l’architecture actuellement
+implémentée : React/Vite → FastAPI `/api/v1` → PostgreSQL/Alembic. Une
+migration Flask/Jinja n’est pas engagée par cette consolidation et reste hors
+périmètre tant qu’une décision d’architecture distincte n’est pas approuvée.
 
 ## 1. Cartographie complète
 
@@ -13,8 +17,8 @@ Ce document constitue la cartographie et l’audit de phase 0/1 du protocole de 
 - Navigation : état local dans l’application, sans routeur dédié.
 - Contexte applicatif : [src/context/AuthContext.tsx](src/context/AuthContext.tsx), [src/context/SettingsContext.tsx](src/context/SettingsContext.tsx), [src/context/SiteContentContext.tsx](src/context/SiteContentContext.tsx).
 - Pages métier : [src/pages](src/pages)
-- Services API unifiés : [src/services/api/client.ts](src/services/api/client.ts)
-- Intégration legacy Supabase : [src/lib/supabase.ts](src/lib/supabase.ts)
+- Service API unifié : [src/api/client.ts](src/api/client.ts)
+- Adaptateur de transition table : [src/data/tableClient.ts](src/data/tableClient.ts)
 
 ### 1.2 Backend
 
@@ -36,7 +40,7 @@ Ce document constitue la cartographie et l’audit de phase 0/1 du protocole de 
 ### 1.4 Docker et infrastructure
 
 - Compose principal : [docker-compose.yml](docker-compose.yml)
-- Compose backend : [backend/docker-compose.yml](backend/docker-compose.yml)
+- Compose backend de développement : [backend/docker-compose.yml](backend/docker-compose.yml)
 - Conteneurs/services observés : frontend web, production web, filebrowser.
 - Déploiement CI/CD : [.github/workflows/deploy.yml](.github/workflows/deploy.yml)
 
@@ -58,17 +62,20 @@ graph TD
   E --> F[Service layer / repositories]
   F --> G[PostgreSQL]
   E --> H[Auth / JWT / RBAC]
-  A -.legacy.-> I[Client Supabase direct]
-  I -.legacy.-> J[Supabase services]
+  C -.transition.-> I[Table adapter]
+  I --> D
 ```
 
 ## 3. Architecture actuelle
 
 ### 3.1 État observé
 
-- Le projet est encore hybride : le frontend utilise encore massivement le client Supabase direct dans de nombreuses pages et utilitaires, tandis que le backend expose déjà une couche FastAPI versionnée.
-- L’authentification a commencé à migrer vers l’API locale via [src/services/api/client.ts](src/services/api/client.ts) et [src/context/AuthContext.tsx](src/context/AuthContext.tsx).
-- Les modules métier sont en cours de couverture côté backend sous /api/v1, mais beaucoup de pages frontend restent dépendantes du modèle Supabase historique.
+- Le frontend consomme l’API locale via `src/api/client.ts`; quelques écrans
+  passent encore par `src/data/tableClient.ts`, adaptateur de transition.
+- L’authentification et les contextes applicatifs utilisent l’API locale
+  versionnée.
+- Les modules métier sont exposés sous `/api/v1` et leur schéma de référence
+  est gouverné par Alembic.
 
 ### 3.2 Architecture cible retenue
 
@@ -81,15 +88,19 @@ graph TD
 
 - Backend FastAPI déjà présent et fonctionnel.
 - Documentation architecturale déjà existante et relativement détaillée.
-- Service API front unifié déjà en place.
+- Service API front unifié déjà en place, avec `src/data/tableClient.ts`
+  conservé uniquement comme adaptateur de transition.
 - Tests backend en place et stables.
 - Base de migrations Alembic présente.
 
 ## 5. Faiblesses et risques
 
-- Frontend encore fortement couplé à Supabase direct dans de nombreuses pages.
-- Présence de routes et d’API parallèles : /api/auth et /api/v1/auth ; /api/users et /api/v1/users.
-- Dépendance mixte entre architecture locale et logique legacy Supabase.
+- Frontend encore couplé à des adaptateurs nommés legacy dans quelques pages,
+  mais aucun SDK Supabase n’est présent dans les dépendances runtime.
+- Une compatibilité entrante réécrit encore les anciens préfixes vers `/api/v1`;
+  les routeurs actifs sont versionnés sous `/api/v1`.
+- Dépendance mixte entre `src/api/client.ts`, repositories métier et adaptateur
+  table; elle doit être réduite progressivement.
 - Risque de divergence entre l’API backend et les écrans frontend tant que la migration n’est pas complète.
 - Plusieurs fichiers de configuration et de déploiement coexistent, ce qui augmente la complexité opérationnelle.
 
@@ -99,11 +110,13 @@ graph TD
 - Doublons de documents et scripts de déploiement.
 - Coexistence de plusieurs chemins de configuration environnementale.
 - Modules partiellement migrés côté frontend et backend.
-- Dépendance à un client Supabase historique alors que le backend local est déjà disponible.
+- Dépendance à l’adaptateur table historique alors que le client API local est
+  déjà disponible.
 
 ## 7. Duplications identifiées
 
-- API redondantes : routes legacy et routes /api/v1.
+- Compatibilité de préfixe legacy à retirer après validation des consommateurs;
+  les routes de référence restent sous `/api/v1`.
 - Documentation multiple sur l’architecture, la migration et le déploiement.
 - Scripts de maintenance et d’ops redondants dans la racine.
 - Plusieurs fichiers Docker Compose et variantes de déploiement.
@@ -139,13 +152,11 @@ graph TD
 ### Backend existants
 
 - /health
-- /api/auth/\*
 - /api/v1/auth/\*
-- /api/users/\*
 - /api/v1/users/\*
-- /api/settings/\*
-- /api/site-content/\*
-- /api/media/\*
+- /api/v1/settings/\*
+- /api/v1/site-content/\*
+- /api/v1/media/\*
 - /api/v1/projects/\*
 - /api/v1/employees/\*
 - /api/v1/suppliers/\*
@@ -164,7 +175,9 @@ Fichiers et zones à surveiller :
 - [/.env.server.example](.env.server.example)
 - [backend/.env.example](backend/.env.example)
 
-Les principales variables concernées sont liées à l’API locale, à Supabase, à PostgreSQL et à la sécurité JWT.
+Les principales variables concernées sont liées à l’API locale, à PostgreSQL et
+à la sécurité JWT. Les anciennes variables Supabase ne font plus partie du
+contrat de déploiement self-hosted.
 
 ## 11. Validation actuelle
 
@@ -178,9 +191,9 @@ Validations déjà exécutées dans ce workspace :
 
 La phase suivante ne doit pas supprimer ni réécrire arbitrairement. Elle doit :
 
-1. consolider les routes autour de /api/v1 uniquement ;
-2. réduire la dépendance directe au client Supabase côté frontend ;
-3. aligner les modules métier sur une seule source de vérité ;
+1. consolider les routes autour de `/api/v1` uniquement ;
+2. réduire la dépendance aux adaptateurs table côté frontend ;
+3. aligner les modules métier sur PostgreSQL/Alembic comme source de vérité ;
 4. valider chaque migration par tests avant toute suppression.
 
 ## 13. Recommandation de gouvernance

@@ -3,7 +3,6 @@ import {
   Plus,
   Search,
   CreditCard as Edit,
-  Trash2,
   DollarSign,
   TrendingUp,
   TrendingDown,
@@ -16,17 +15,12 @@ import {
   RotateCcw,
 } from "lucide-react";
 import dbClient from '../lib/dbClient.service';
-import { clientsRepository } from '../lib/dbClient.service';
+import { clientsRepository, financeRepository } from '../lib/dbClient.service';
 import { Finance, Client, Project } from "../types";
 import Modal from "../components/ui/Modal";
 import Badge from "../components/ui/Badge";
 import SelectWithCreate from "../components/ui/SelectWithCreate";
 import { useSettings } from "../context/SettingsContext";
-import { useAuth } from "../context/AuthContext";
-import {
-  getDemoBlockMessage,
-  shouldBlockDestructiveAction,
-} from "../lib/demoMode";
 import { generateReference } from "../utils/reference";
 import { printRecu } from "../utils/print";
 import MobileCard from "../components/ui/MobileCard";
@@ -69,7 +63,6 @@ const emptyForm = {
 
 export default function Finances() {
   const { settings } = useSettings();
-  const { user, profile } = useAuth();
   const [transactions, setTransactions] = useState<Finance[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [clients, setClients] = useState<Client[]>([]);
@@ -85,22 +78,11 @@ export default function Finances() {
   const [formError, setFormError] = useState<string | null>(null);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const destructiveActionsDisabled = shouldBlockDestructiveAction(
-    user,
-    profile,
-  );
-
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const from = page * PAGE_SIZE;
-      const to = from + PAGE_SIZE - 1;
       const [finRes, cliRes, projRes] = await Promise.all([
-        dbClient
-          .from("finances")
-          .select("*", { count: "exact" })
-          .range(from, to)
-          .order("date_transaction", { ascending: false }),
+        financeRepository.list({ limit: PAGE_SIZE, offset: page * PAGE_SIZE }),
         clientsRepository.getAll(),
         dbClient.from("projects").select("id, nom").order("nom"),
       ]);
@@ -125,11 +107,12 @@ export default function Finances() {
   };
 
   const openEdit = (t: Finance) => {
+    if (t.type_transaction === null) return;
     setForm({
       type_transaction: t.type_transaction,
       categorie: t.categorie,
       montant: String(t.montant),
-      date_transaction: t.date_transaction,
+      date_transaction: t.date_transaction || "",
       mode_paiement: t.mode_paiement,
       reference: t.reference,
       description: t.description,
@@ -156,28 +139,25 @@ export default function Finances() {
     setSaving(true);
     const ref = form.reference || generateReference("FIN");
     const payload = {
-      type_transaction: form.type_transaction,
+      type_operation:
+        form.type_transaction === "recette" ? "ENCAISSEMENT" : "DECAISSEMENT",
       categorie: form.categorie,
       montant: parsedMontant,
-      date_transaction: form.date_transaction,
+      date_operation: form.date_transaction,
+      devise: "XOF",
       mode_paiement: form.mode_paiement,
-      reference: ref,
       description: form.description,
       client_id: form.client_id || null,
       project_id: form.project_id || null,
       statut: "valide",
-      updated_at: new Date().toISOString(),
     };
 
     try {
       if (editingId) {
-        const { error } = await dbClient
-          .from("finances")
-          .update(payload)
-          .eq("id", editingId);
+        const { error } = await financeRepository.update(editingId, payload);
         if (error) throw error;
       } else {
-        const { error } = await dbClient.from("finances").insert(payload);
+        const { error } = await financeRepository.create({ ...payload, reference: ref });
         if (error) throw error;
       }
 
@@ -192,43 +172,25 @@ export default function Finances() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (destructiveActionsDisabled) {
-      window.alert(getDemoBlockMessage());
-      return;
-    }
-    if (!confirm("Supprimer cette transaction ?")) return;
-    const { error } = await dbClient.from("finances").delete().eq("id", id);
-    if (error) {
-      setFormError(error.message);
-      return;
-    }
-    fetchData();
-  };
-
   const handleRestore = async (id: string) => {
     if (!confirm("Restaurer cette transaction annulée ?")) return;
-    const { error } = await dbClient
-      .from("finances")
-      .update({ statut: "valide" })
-      .eq("id", id);
+    const { error } = await financeRepository.update(id, { statut: "valide" });
     if (error) {
-      setFormError(error.message);
+      setFormError(error);
       return;
     }
     fetchData();
   };
 
   const handlePrintRecu = (t: Finance) => {
+    if (t.type_transaction !== "recette" || !t.date_transaction) return;
     const client = clients.find((c) => c.id === t.client_id);
     printRecu({
       reference: t.reference || generateReference("FIN"),
       client_nom: client ? `${client.prenom} ${client.nom}` : "—",
       description: t.description,
       montant: t.montant,
-      date_transaction: new Date(t.date_transaction).toLocaleDateString(
-        "fr-FR",
-      ),
+      date_transaction: t.date_transaction ? new Date(t.date_transaction).toLocaleDateString("fr-FR") : "Date inconnue",
       mode_paiement: t.mode_paiement,
       categorie: t.categorie,
       appName: settings.app_title,
@@ -237,24 +199,24 @@ export default function Finances() {
     });
   };
 
-  // Filtre côté client (sur les données paginées) + exclut les annulées
+  // Conserver l’historique annulé visible; les agrégats les excluent plus bas.
   const filtered = transactions
-    .filter((t) => t.statut !== "annule")
     .filter((t) => {
       const matchSearch = `${t.categorie} ${t.description} ${t.reference}`
         .toLowerCase()
         .includes(search.toLowerCase());
       const matchType = !filterType || t.type_transaction === filterType;
-      const matchDateFrom = ! dateFrom || t.date_transaction >= dateFrom;
-      const matchDateTo = !dateTo || t.date_transaction <= dateTo;
+      const matchDateFrom = !dateFrom || (!!t.date_transaction && t.date_transaction >= dateFrom);
+      const matchDateTo = !dateTo || (!!t.date_transaction && t.date_transaction <= dateTo);
       return matchSearch && matchType && matchDateFrom && matchDateTo;
     });
 
-  // Toutes les transactions (inclure les annulées pour les totaux)
+  // Les flux réalisés excluent les opérations annulées et les types HOLD.
   const allForCalc = transactions.filter((t) => {
+    if (t.statut === "annule") return false;
     const matchType = !filterType || t.type_transaction === filterType;
-    const matchDateFrom = !dateFrom || t.date_transaction >= dateFrom;
-    const matchDateTo = !dateTo || t.date_transaction <= dateTo;
+    const matchDateFrom = !dateFrom || (!!t.date_transaction && t.date_transaction >= dateFrom);
+    const matchDateTo = !dateTo || (!!t.date_transaction && t.date_transaction <= dateTo);
     return matchType && matchDateFrom && matchDateTo;
   });
 
@@ -280,8 +242,8 @@ export default function Finances() {
       "Projet",
     ];
     const rows = filtered.map((t) => [
-      new Date(t.date_transaction).toLocaleDateString("fr-FR"),
-      t.type_transaction === "recette" ? "Recette" : "Dépense",
+      t.date_transaction ? new Date(t.date_transaction).toLocaleDateString("fr-FR") : "Date inconnue",
+      t.type_transaction === "recette" ? "Recette" : t.type_transaction === "depense" ? "Dépense" : "INCONNU · HOLD",
       t.categorie,
       t.description || "",
       t.montant.toFixed(2),
@@ -449,12 +411,10 @@ export default function Finances() {
                 <MobileCard
                   key={t.id}
                   title={t.categorie}
-                  subtitle={new Date(t.date_transaction).toLocaleDateString(
-                    "fr-FR",
-                  )}
+                  subtitle={t.date_transaction ? new Date(t.date_transaction).toLocaleDateString("fr-FR") : "Date inconnue"}
                   icon={
                     <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center ${t.type_transaction === "recette" ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"}`}
+                      className={`w-10 h-10 rounded-full flex items-center justify-center ${t.type_transaction === "recette" ? "bg-green-100 text-green-600" : t.type_transaction === "depense" ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-700"}`}
                     >
                       <DollarSign size={18} />
                     </div>
@@ -467,10 +427,12 @@ export default function Finances() {
                           label={
                             t.type_transaction === "recette"
                               ? "Recette"
-                              : "Dépense"
+                              : t.type_transaction === "depense"
+                                ? "Dépense"
+                                : "INCONNU · HOLD"
                           }
                           color={
-                            t.type_transaction === "recette" ? "green" : "red"
+                            t.type_transaction === "recette" ? "green" : t.type_transaction === "depense" ? "red" : "orange"
                           }
                         />
                       ),
@@ -487,37 +449,40 @@ export default function Finances() {
                           className={
                             t.type_transaction === "recette"
                               ? "text-green-600 font-semibold"
-                              : "text-red-600 font-semibold"
+                              : t.type_transaction === "depense"
+                                ? "text-red-600 font-semibold"
+                                : "text-amber-700 font-semibold"
                           }
                         >
-                          {t.type_transaction === "recette" ? "+" : "-"}
+                          {t.type_transaction === "recette" ? "+" : t.type_transaction === "depense" ? "-" : ""}
                           {t.montant.toLocaleString("fr-FR")} FCFA
                         </span>
                       ),
                     },
                     { label: "Description", value: t.description || "—" },
+                    ...(t.statut === "annule"
+                      ? [{ label: "Statut", value: <Badge label="Annulé · historique" color="gray" /> }]
+                      : []),
                   ]}
                   actions={
                     <>
-                      <button
-                        onClick={() => handlePrintRecu(t)}
-                        title="Imprimer Reçu"
-                        className="p-2 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors"
-                      >
-                        <Printer size={16} />
-                      </button>
-                      <button
-                        onClick={() => openEdit(t)}
-                        className="p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                      >
-                        <Edit size={16} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(t.id)}
-                        className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      {t.type_transaction === "recette" && (
+                        <button
+                          onClick={() => handlePrintRecu(t)}
+                          title="Imprimer Reçu"
+                          className="p-2 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors"
+                        >
+                          <Printer size={16} />
+                        </button>
+                      )}
+                      {t.type_transaction !== null && t.statut !== "annule" && (
+                        <button
+                          onClick={() => openEdit(t)}
+                          className="p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                        >
+                          <Edit size={16} />
+                        </button>
+                      )}
                     </>
                   }
                 />
@@ -558,9 +523,7 @@ export default function Finances() {
                         {t.reference || "—"}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">
-                        {new Date(t.date_transaction).toLocaleDateString(
-                          "fr-FR",
-                        )}
+                        {t.date_transaction ? new Date(t.date_transaction).toLocaleDateString("fr-FR") : "Date inconnue"}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
@@ -568,10 +531,12 @@ export default function Finances() {
                             label={
                               t.type_transaction === "recette"
                                 ? "Recette"
-                                : "Dépense"
+                                : t.type_transaction === "depense"
+                                  ? "Dépense"
+                                  : "INCONNU · HOLD"
                             }
                             color={
-                              t.type_transaction === "recette" ? "green" : "red"
+                              t.type_transaction === "recette" ? "green" : t.type_transaction === "depense" ? "red" : "orange"
                             }
                           />
                           {t.statut === "annule" && (
@@ -586,21 +551,23 @@ export default function Finances() {
                         {modeLabels[t.mode_paiement]}
                       </td>
                       <td
-                        className={`px-4 py-3 text-sm font-semibold text-right ${t.type_transaction === "recette" ? "text-green-600" : "text-red-600"}`}
+                        className={`px-4 py-3 text-sm font-semibold text-right ${t.type_transaction === "recette" ? "text-green-600" : t.type_transaction === "depense" ? "text-red-600" : "text-amber-700"}`}
                       >
-                        {t.type_transaction === "recette" ? "+" : "-"}
+                        {t.type_transaction === "recette" ? "+" : t.type_transaction === "depense" ? "-" : ""}
                         {t.montant.toLocaleString("fr-FR")} FCFA
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1 justify-end">
-                          <button
-                            onClick={() => handlePrintRecu(t)}
-                            title="Imprimer Reçu"
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors"
-                          >
-                            <Printer size={15} />
-                          </button>
-                          {t.statut !== "annule" ? (
+                          {t.type_transaction === "recette" && (
+                            <button
+                              onClick={() => handlePrintRecu(t)}
+                              title="Imprimer Reçu"
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors"
+                            >
+                              <Printer size={15} />
+                            </button>
+                          )}
+                      {t.statut !== "annule" && t.type_transaction !== null ? (
                             <>
                               <button
                                 onClick={() => openEdit(t)}
@@ -608,14 +575,8 @@ export default function Finances() {
                               >
                                 <Edit size={15} />
                               </button>
-                              <button
-                                onClick={() => handleDelete(t.id)}
-                                className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                              >
-                                <Trash2 size={15} />
-                              </button>
                             </>
-                          ) : (
+                          ) : t.type_transaction !== null ? (
                             <button
                               onClick={() => handleRestore(t.id)}
                               title="Restaurer"
@@ -623,7 +584,7 @@ export default function Finances() {
                             >
                               <RotateCcw size={15} />
                             </button>
-                          )}
+                          ) : <Badge label="HOLD historique" color="gray" />}
                         </div>
                       </td>
                     </tr>

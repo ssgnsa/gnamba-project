@@ -1,5 +1,6 @@
 import type { FoncierLot } from "../types";
 import { generateUUID } from "../utils/reference";
+import { logFoncierAudit } from "./foncierAudit";
 
 export type OfflineQueueItem = {
   id: string;
@@ -282,7 +283,6 @@ const processQueueItemWithConflictResolution = async (
       await dbClient.rpc("restore_foncier_lot", { p_lot_id: item.payload.id });
       break;
     case "audit_log": {
-      const { logFoncierAudit } = await import("../lib/foncierAudit");
       await logFoncierAudit(dbClient, item.payload);
       break;
     }

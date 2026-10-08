@@ -36,43 +36,13 @@ export function useFoncierAudit() {
       }
 
       const rows = (data || []) as unknown as AuditQueryRow[];
-      const performerIds = Array.from(
-        new Set(
-          rows
-            .map((row) => row.performed_by)
-            .filter((value): value is string => Boolean(value)),
-        ),
-      );
-
-      let namesById: Record<string, string> = {};
-      if (performerIds.length > 0) {
-        const { data: profilesData, error: profilesError } = await dataService.getUserProfiles(performerIds) as {
-          data: Array<{ id: string; full_name: string | null }> | null;
-          error: any;
-        };
-        if (profilesError) {
-          if (import.meta.env.DEV) console.warn("Failed to load user profiles for audit", profilesError);
-        } else {
-          namesById = (profilesData || []).reduce(
-            (acc: Record<string, string>, profile: { id: string; full_name: string | null }) => {
-              acc[profile.id] = profile.full_name || "";
-              return acc;
-            },
-            {} as Record<string, string>,
-          );
-        }
-      }
-
       const normalizedRows: AuditRecord[] = rows.map((row) => ({
         id: row.id,
-        parcelle_id: row.lot_id,
+        parcelle_id: row.entity_id,
         action: row.action,
-        utilisateur_nom: row.performed_by
-          ? namesById[row.performed_by] || null
-          : null,
-        date_action: row.performed_at,
+        utilisateur_nom: row.user_name,
+        date_action: row.created_at,
         details: row.new_values || row.old_values || null,
-        foncier_lots: row.foncier_lots || null,
       }));
 
       setAuditRecords(normalizedRows);

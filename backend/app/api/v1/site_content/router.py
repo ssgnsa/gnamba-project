@@ -3,15 +3,18 @@ from __future__ import annotations
 from typing import Any
 # import json  # Not needed - value is stored as plain text
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
 
-from app.api.deps import get_current_user
+from app.api.deps import require_admin_user
 from app.core.database import SessionLocal
 from app.core.security import AuthorizationError, get_http_exception_for_error
 
-router = APIRouter(prefix="/api/v1/site-content", tags=["site-content"])
+router = APIRouter(
+    prefix="/api/v1/site-content",
+    tags=["site-content"],
+)
 
 
 class SiteContentRow(BaseModel):
@@ -61,18 +64,20 @@ def get_site_content(section: str, key: str) -> SiteContentRow:
 
 
 @router.post("", response_model=dict[str, str])
-def upsert_site_content(payload: SiteContentRow) -> dict[str, str]:
+def upsert_site_content(
+    payload: SiteContentRow,
+    _admin: dict[str, Any] = Depends(require_admin_user),
+) -> dict[str, str]:
     try:
-        # For backwards compatibility in tests, allow upsert without authentication.
         with SessionLocal() as session:
             session.execute(
                 text(
                     """
                     INSERT INTO site_content (section, key, value, updated_at)
-                    VALUES (:section, :key, :value, NOW())
+                    VALUES (:section, :key, :value, CURRENT_TIMESTAMP)
                     ON CONFLICT (section, key) DO UPDATE
                     SET value = EXCLUDED.value,
-                        updated_at = NOW()
+                        updated_at = CURRENT_TIMESTAMP
                     """
                 ),
                 {"section": payload.section, "key": payload.key, "value": payload.value or ""},
@@ -85,12 +90,16 @@ def upsert_site_content(payload: SiteContentRow) -> dict[str, str]:
 
 
 @router.patch("/{content_id}", response_model=dict[str, str])
-def patch_site_content(content_id: str, payload: SiteContentRow) -> dict[str, str]:
+def patch_site_content(
+    content_id: str,
+    payload: SiteContentRow,
+    _admin: dict[str, Any] = Depends(require_admin_user),
+) -> dict[str, str]:
     try:
         with SessionLocal() as session:
             session.execute(
                 text(
-                    "UPDATE site_content SET section = :section, key = :key, value = :value, updated_at = NOW() WHERE id = :id"
+                    "UPDATE site_content SET section = :section, key = :key, value = :value, updated_at = CURRENT_TIMESTAMP WHERE id = :id"
                 ),
                 {"section": payload.section, "key": payload.key, "value": payload.value or "", "id": content_id},
             )
@@ -102,7 +111,10 @@ def patch_site_content(content_id: str, payload: SiteContentRow) -> dict[str, st
 
 
 @router.delete("/{content_id}", response_model=dict[str, str])
-def delete_site_content(content_id: str) -> dict[str, str]:
+def delete_site_content(
+    content_id: str,
+    _admin: dict[str, Any] = Depends(require_admin_user),
+) -> dict[str, str]:
     try:
         with SessionLocal() as session:
             session.execute(text("DELETE FROM site_content WHERE id = :id"), {"id": content_id})

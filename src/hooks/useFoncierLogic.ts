@@ -5,9 +5,6 @@ import type { FoncierLot } from "../types";
 import { useFoncierAttestationWorkflow } from "./useFoncierAttestationWorkflow";
 import { cleanText, generateFoncierReference, generateUUID } from "../utils/reference";
 import {
-  addQueueItem,
-  getCachedLots,
-  OFFLINE_STORAGE_FULL,
   upsertCachedLot,
 } from "../lib/foncierOffline";
 import { createEmptyForm as buildEmptyFoncierForm } from "../components/foncier/FoncierConstants";
@@ -82,7 +79,15 @@ export function useFoncierLogic(
         };
       }
 
-      const sourceLots = isOnline ? lots : await getCachedLots();
+      if (!isOnline) {
+        return {
+          success: false,
+          error:
+            "Connexion indisponible : les modifications Foncier hors ligne ne sont pas synchronisées et n’ont pas été enregistrées.",
+        };
+      }
+
+      const sourceLots = lots;
       const editableLots = sourceLots.filter(
         (lot) => !lot.deleted_at && lot.statut !== "annule",
       );
@@ -219,34 +224,6 @@ export function useFoncierLogic(
         retention_until: existingLot?.retention_until ?? null,
       } as FoncierLot;
 
-      if (!isOnline) {
-        try {
-          await upsertCachedLot(payload);
-          await addQueueItem({
-            id: generateUUID(),
-            op: "upsert_lot",
-            payload,
-            client_updated_at: nowIso,
-          });
-          return {
-            success: true,
-            offline: true,
-            message: "Lot enregistré hors-ligne.",
-          };
-        } catch (error: any) {
-          if (error?.code === OFFLINE_STORAGE_FULL) {
-            return {
-              success: false,
-              error: "Stockage local plein. Libérez de l'espace puis réessayez.",
-            };
-          }
-          return {
-            success: false,
-            error: "Impossible de sauvegarder hors-ligne.",
-          };
-        }
-      }
-
       const { data, error: dbError } = await dataService.saveLot(
         payload,
         Boolean(editingId),
@@ -282,34 +259,12 @@ export function useFoncierLogic(
 
   const archiveLot = useCallback(
     async (lot: FoncierLot, isOnline: boolean) => {
-      const nowIso = new Date().toISOString();
-
       if (!isOnline) {
-        try {
-          const payload = {
-            ...lot,
-            deleted_at: nowIso,
-            deleted_reason: "archivage",
-            client_updated_at: nowIso,
-          };
-          await upsertCachedLot(payload as FoncierLot);
-          await addQueueItem({
-            id: generateUUID(),
-            op: "soft_delete_lot",
-            payload: { id: lot.id, deleted_reason: "archivage" },
-            client_updated_at: nowIso,
-          });
-          return {
-            success: true,
-            message: "Lot archivé hors-ligne.",
-            offline: true,
-          };
-        } catch {
-          return {
-            success: false,
-            error: "Archivage hors-ligne impossible.",
-          };
-        }
+        return {
+          success: false,
+          error:
+            "Connexion indisponible : l’archivage hors ligne n’est pas synchronisé et n’a pas été enregistré.",
+        };
       }
 
       const { error } = await dataService.softDeleteLot(lot.id);
@@ -328,34 +283,12 @@ export function useFoncierLogic(
 
   const restoreLot = useCallback(
     async (lot: FoncierLot, isOnline: boolean) => {
-      const nowIso = new Date().toISOString();
-
       if (!isOnline) {
-        try {
-          const payload = {
-            ...lot,
-            deleted_at: null,
-            deleted_reason: null,
-            client_updated_at: nowIso,
-          };
-          await upsertCachedLot(payload as FoncierLot);
-          await addQueueItem({
-            id: generateUUID(),
-            op: "restore_lot",
-            payload: { id: lot.id },
-            client_updated_at: nowIso,
-          });
-          return {
-            success: true,
-            message: "Lot restauré hors-ligne.",
-            offline: true,
-          };
-        } catch {
-          return {
-            success: false,
-            error: "Restauration hors-ligne impossible.",
-          };
-        }
+        return {
+          success: false,
+          error:
+            "Connexion indisponible : la restauration hors ligne n’est pas synchronisée et n’a pas été enregistrée.",
+        };
       }
 
       const { error } = await dataService.restoreLot(lot.id);

@@ -1,6 +1,6 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { foncierRepository } from "../data/foncier.repository";
-import { loadVillageConfig, saveVillageConfig } from "../lib/foncierVillageConfig";
+import { loadVillageConfig } from "../lib/foncierVillageConfig";
 import type { FoncierConfigMap } from "../components/foncier/FoncierConstants";
 import type { MediaFile } from "../types";
 
@@ -36,7 +36,32 @@ interface UseVillagesReturn {
   removeLogo: () => void;
 }
 
+const emptyVillageConfig = (village: string): FoncierConfigMap => ({
+  region: "",
+  departement: "",
+  commune: "",
+  village,
+  chef_village: "",
+  arrete_prefectoral: "",
+  nom_chef_signe: "",
+  lieu_signature: "",
+  logo_url: "",
+  village_logo_url: "",
+  primary_color: "",
+  secondary_color: "",
+  layout_preference: "",
+  registre_volume: "",
+  registre_next_numero: "",
+  arrete_lotissement: "",
+  arrete_date: "",
+  limites_nord: "",
+  limites_sud: "",
+  limites_est: "",
+  limites_ouest: "",
+} as FoncierConfigMap);
+
 export function useVillages({ accessLevel: _accessLevel, profile: _profile }: UseVillagesOptions = {}): UseVillagesReturn {
+  const validConfigByVillage = useRef(new Map<string, FoncierConfigMap>());
   const [selectedVillage, setSelectedVillage] = useState("");
   const [villageOptions, setVillageOptions] = useState<string[]>([]);
   const [villageOptionsLoading, setVillageOptionsLoading] = useState(false);
@@ -104,47 +129,33 @@ export function useVillages({ accessLevel: _accessLevel, profile: _profile }: Us
     setConfigError(null);
     
     try {
-      // Try localStorage first (fast)
-      const localConfig = (await loadVillageConfig(village)) ?? ({
-        region: "",
-        departement: "",
-        commune: "",
-        village,
-        chef_village: "",
-        arrete_prefectoral: "",
-        nom_chef_signe: "",
-        lieu_signature: "",
-        logo_url: "",
-        village_logo_url: "",
-        primary_color: "",
-        secondary_color: "",
-        layout_preference: "",
-        registre_volume: "",
-        registre_next_numero: "",
-        arrete_lotissement: "",
-        arrete_date: "",
-        limites_nord: "",
-        limites_sud: "",
-        limites_est: "",
-        limites_ouest: "",
-      } as FoncierConfigMap);
+      // Legacy app settings are only a fallback; config_jsonb is authoritative.
+      const localConfig = await loadVillageConfig(village);
 
       // Also try to fetch from DB for latest
       let dbConfig: Partial<FoncierConfigMap> = {};
       try {
-        const villageResult = (await foncierRepository.getVillagesList()) as {
+        const villageResult = (await foncierRepository.getVillages()) as {
           data?: Array<{ nom?: string; config_jsonb?: Partial<FoncierConfigMap> | null }> | null;
+          error?: unknown;
         };
+        if (villageResult.error) throw villageResult.error;
         const villageData = villageResult.data?.find((v) => v.nom === village);
         if (villageData?.config_jsonb) {
           dbConfig = villageData.config_jsonb as Partial<FoncierConfigMap>;
         }
-        const mergedConfig = { ...dbConfig, ...localConfig } as FoncierConfigMap;
+        // config_jsonb is authoritative; app settings are retained as a legacy fallback.
+        const mergedConfig = { ...emptyVillageConfig(village), ...(localConfig ?? {}), ...dbConfig } as FoncierConfigMap;
+        validConfigByVillage.current.set(village, mergedConfig);
         setConfig(mergedConfig);
-        setLogoUrl((mergedConfig as any).logo_url || (localConfig as any).logo_url || undefined);
+        setLogoUrl(mergedConfig.logo_url || undefined);
       } catch {
-        setConfig(localConfig);
-        setLogoUrl((localConfig as any).logo_url || undefined);
+        const fallbackConfig = validConfigByVillage.current.get(village)
+          ?? (localConfig ? { ...emptyVillageConfig(village), ...localConfig } as FoncierConfigMap : null);
+        if (!fallbackConfig) throw new Error("Configuration du village indisponible");
+        validConfigByVillage.current.set(village, fallbackConfig);
+        setConfig(fallbackConfig);
+        setLogoUrl(fallbackConfig.logo_url || undefined);
       }
       
       setConfigLoaded(true);
@@ -183,31 +194,27 @@ export function useVillages({ accessLevel: _accessLevel, profile: _profile }: Us
     setConfigError(null);
 
     try {
-      // Save to localStorage
-      const saved = await saveVillageConfig(selectedVillage, config);
-      if (!saved) throw new Error("Échec sauvegarde locale");
+      const villageResult = (await foncierRepository.getVillages()) as {
+        data?: Array<{ id?: string; nom?: string }> | null;
+        error?: unknown;
+      };
+      if (villageResult.error) throw villageResult.error;
+      const villageData = villageResult.data?.find((v) => v.nom === selectedVillage);
+      if (!villageData?.id) throw new Error("Village introuvable pour enregistrer sa configuration");
 
-      // Try to persist to DB
-      try {
-        const villageResult = (await foncierRepository.getVillagesList()) as { data?: Array<{ id?: string; nom?: string }> | null };
-        const villageData = villageResult.data?.find((v) => v.nom === selectedVillage);
-        
-        if (villageData?.id) {
-          await foncierRepository.updateVillage(villageData.id, {
-            config_jsonb: config,
-            primary_color: config.primary_color || null,
-            secondary_color: config.secondary_color || null,
-            logo_url: config.logo_url || null,
-            region: config.region || null,
-            departement: config.departement || null,
-            commune: config.commune || null,
-            chef_village: config.chef_village || null,
-            updated_at: new Date().toISOString(),
-          } as any);
-        }
-      } catch (dbErr) {
-        console.warn("DB save failed, using localStorage only:", dbErr);
-      }
+      const result = await foncierRepository.updateVillage(villageData.id, {
+        config_jsonb: config,
+        primary_color: config.primary_color || null,
+        secondary_color: config.secondary_color || null,
+        logo_url: config.logo_url || null,
+        region: config.region || null,
+        departement: config.departement || null,
+        commune: config.commune || null,
+        chef_village: config.chef_village || null,
+        updated_at: new Date().toISOString(),
+      } as any);
+      if (result.error) throw result.error;
+      validConfigByVillage.current.set(selectedVillage, config);
 
       return true;
     } catch (err: any) {

@@ -229,7 +229,7 @@ export default function Parametres() {
     updateSettings,
     error: settingsError,
   } = useSettings();
-  const { user, profile } = useAuth();
+  const { user, profile, changePassword, signOut } = useAuth();
   const destructiveActionsDisabled = shouldBlockDestructiveAction(
     user,
     profile,
@@ -438,8 +438,8 @@ export default function Parametres() {
       setPasswordError("Veuillez remplir le mot de passe actuel et le nouveau mot de passe.");
       return;
     }
-    if (passwordForm.new_password.length < 6) {
-      setPasswordError("Le nouveau mot de passe doit contenir au moins 6 caractères.");
+    if (passwordForm.new_password.length < 12) {
+      setPasswordError("Le nouveau mot de passe doit contenir au moins 12 caractères.");
       return;
     }
     if (passwordForm.new_password !== passwordForm.confirm_password) {
@@ -451,7 +451,7 @@ export default function Parametres() {
     setPasswordError(null);
     setPasswordSuccess(null);
 
-    const result = await apiClient.auth.updatePassword(
+    const result = await changePassword(
       passwordForm.current_password,
       passwordForm.new_password,
     );
@@ -459,11 +459,7 @@ export default function Parametres() {
     setPasswordSaving(false);
 
     if (result.error) {
-      setPasswordError(
-        result.status === 401
-          ? "Le mot de passe actuel est incorrect."
-          : result.error,
-      );
+      setPasswordError(result.error || "Impossible de modifier le mot de passe.");
       return;
     }
 
@@ -473,6 +469,7 @@ export default function Parametres() {
       confirm_password: "",
     });
     setPasswordSuccess("Votre mot de passe a été mis à jour avec succès.");
+    window.setTimeout(() => void signOut(), 1200);
   };
 
   const handleReload = async () => {

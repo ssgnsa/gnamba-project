@@ -10,6 +10,7 @@ import {
   Image as ImageIcon,
 } from "lucide-react";
 import dbClient from "../../data/tableClient";
+import { attestationsApi, lotsApi } from "../../api/foncier";
 import { logFoncierAudit } from "../../lib/foncierAudit";
 import Badge from "../ui/Badge";
 import MediaPicker from "../media/MediaPicker";
@@ -19,7 +20,7 @@ import type { MediaFile } from "../../types";
 
 interface AttestationStatus {
   id: string;
-  lot_id: string;
+  lot_id: string | null;
   reference: string;
   statut: string | null;
   created_at: string;
@@ -38,7 +39,6 @@ interface AttestationStatus {
 
 interface WorkflowValidationProps {
   lotId: string;
-  userId?: string | null;
   userName?: string | null;
   isAdmin?: boolean;
   isOnline?: boolean;
@@ -68,17 +68,8 @@ const statutColors: Record<
   annule: "red",
 };
 
-const isMissingColumnError = (error: any, column: string) => {
-  const message = typeof error?.message === "string" ? error.message : "";
-  const code = typeof error?.code === "string" ? error.code : "";
-  return (
-    code === "42703" || message.includes(`column "${column}" does not exist`)
-  );
-};
-
 export default function WorkflowValidation({
   lotId,
-  userId,
   userName,
   isAdmin = false,
   isOnline = navigator.onLine,
@@ -93,57 +84,41 @@ export default function WorkflowValidation({
   const [scanLoading, setScanLoading] = useState(false);
   const [scanMedia, setScanMedia] = useState<MediaFile | null>(null);
   const [showMediaPicker, setShowMediaPicker] = useState(false);
-  const [userRole, setUserRole] = useState<string>("lecteur");
   const [error, setError] = useState<string | null>(null);
-
-  const fetchUserRole = useCallback(async () => {
-    if (!userId) return;
-    const { data } = await dbClient
-      .from("user_profiles")
-      .select("foncier_role")
-      .eq("id", userId)
-      .maybeSingle();
-    if (data?.foncier_role) {
-      setUserRole(data.foncier_role);
-    }
-  }, [userId]);
 
   const fetchAttestation = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const baseQuery = dbClient
-      .from("foncier_attestations")
-      .select(
-        "id, lot_id, reference, statut, created_at, version, validation_agent_nom, validation_chef_nom, validation_chef_date, foncier_lots:lot_id(reference, numero_lot, village, proprietaire_nom, proprietaire_prenom)",
-      )
-      .eq("lot_id", lotId)
-      .order("created_at")
-      .limit(1);
+    const [attestationsResult, lotResult] = await Promise.all([
+      attestationsApi.listByLot(lotId),
+      lotsApi.get(lotId),
+    ]);
 
-    let result = await baseQuery.is("deleted_at", null).maybeSingle();
-
-    if (result.error && isMissingColumnError(result.error, "deleted_at")) {
-      result = await baseQuery.maybeSingle();
-    }
-
-    if (result.error) {
+    if (attestationsResult.error || lotResult.error) {
       setError("Impossible de charger l’attestation.");
       setLoading(false);
       return;
     }
-    if (!result.data) {
+    const raw = [...(attestationsResult.data ?? [])].sort((left, right) =>
+      String(right.created_at ?? "").localeCompare(String(left.created_at ?? "")),
+    )[0];
+    if (!raw) {
       setAttestation(null);
       setLoading(false);
       return;
     }
 
-    const raw = result.data as any;
-    const lot = Array.isArray(raw.foncier_lots)
-      ? (raw.foncier_lots[0] ?? null)
-      : (raw.foncier_lots ?? null);
     const normalized: AttestationStatus = {
       ...raw,
-      foncier_lots: lot,
+      foncier_lots: lotResult.data
+        ? {
+            reference: lotResult.data.reference,
+            numero_lot: lotResult.data.numero_lot,
+            village: lotResult.data.hierarchy?.village?.nom ?? "",
+            proprietaire_nom: lotResult.data.proprietaire_nom,
+            proprietaire_prenom: lotResult.data.proprietaire_prenom,
+          }
+        : null,
     };
     setAttestation(normalized);
     setLoading(false);
@@ -167,8 +142,7 @@ export default function WorkflowValidation({
 
   useEffect(() => {
     void fetchAttestation();
-    void fetchUserRole();
-  }, [fetchAttestation, fetchUserRole]);
+  }, [fetchAttestation]);
 
   useEffect(() => {
     if (!attestation?.id) {
@@ -178,9 +152,8 @@ export default function WorkflowValidation({
     void fetchScan(attestation.id);
   }, [attestation?.id, fetchScan]);
 
-  const canSubmit =
-    ["agent", "validateur_village", "admin"].includes(userRole) || isAdmin;
-  const canValidateChef = userRole === "validateur_village" || isAdmin;
+  const canSubmit = isAdmin;
+  const canValidateChef = isAdmin;
 
   const handleSubmit = async () => {
     if (!attestation) return;
@@ -191,23 +164,10 @@ export default function WorkflowValidation({
     if (!confirm("Soumettre l’attestation au Chef du village ?")) return;
 
     setSubmitting(true);
-    const now = new Date().toISOString();
-    const { error: updateError } = await dbClient
-      .from("foncier_attestations")
-      .update({ statut: "soumis", updated_at: now, client_updated_at: now })
-      .eq("id", attestation.id);
-
-    if (updateError) {
-      alert("Erreur : " + updateError.message);
+    const result = await attestationsApi.submit(attestation.id, userName || "");
+    if (result.error) {
+      alert("Erreur : " + result.error);
     } else {
-      await logFoncierAudit(dbClient, {
-        lotId: attestation.lot_id,
-        action: "SOUMISSION_CHEF",
-        details: {
-          attestation_id: attestation.id,
-          reference: attestation.reference,
-        },
-      });
       await fetchAttestation();
       onWorkflowComplete?.();
     }
@@ -224,32 +184,14 @@ export default function WorkflowValidation({
       return;
 
     setValidatingChef(true);
-    const now = new Date().toISOString();
     const chefName = attestation.validation_chef_nom || userName || null;
+    const result = await attestationsApi.validate(attestation.id, {
+      chef_nom: chefName || "",
+    });
 
-    const { error: updateError } = await dbClient
-      .from("foncier_attestations")
-      .update({
-        statut: "valide",
-        validation_chef_nom: chefName,
-        validation_chef_id: userId || null,
-        validation_chef_date: now,
-        updated_at: now,
-        client_updated_at: now,
-      })
-      .eq("id", attestation.id);
-
-    if (updateError) {
-      alert("Erreur : " + updateError.message);
+    if (result.error) {
+      alert("Erreur : " + result.error);
     } else {
-      await logFoncierAudit(dbClient, {
-        lotId: attestation.lot_id,
-        action: "VALIDATION_CHEF",
-        details: {
-          attestation_id: attestation.id,
-          reference: attestation.reference,
-        },
-      });
       await fetchAttestation();
       onWorkflowComplete?.();
     }
@@ -270,15 +212,17 @@ export default function WorkflowValidation({
       alert(`Erreur : ${error}`);
     } else {
       setScanMedia(file);
-      await logFoncierAudit(dbClient, {
-        lotId: attestation.lot_id,
-        action: "SCAN_ORIGINAL",
-        details: {
-          attestation_id: attestation.id,
-          reference: attestation.reference,
-          media_id: file.id,
-        },
-      });
+      if (attestation.lot_id) {
+        await logFoncierAudit(dbClient, {
+          lotId: attestation.lot_id,
+          action: "SCAN_ORIGINAL",
+          details: {
+            attestation_id: attestation.id,
+            reference: attestation.reference,
+            media_id: file.id,
+          },
+        });
+      }
     }
     setShowMediaPicker(false);
     setScanLoading(false);

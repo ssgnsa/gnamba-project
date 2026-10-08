@@ -1,9 +1,7 @@
 import { FC, useState, useEffect, useCallback } from "react";
 import { Save, Loader2, Image as ImageIcon, Globe, MapPin, Building2, Shield, Settings as SettingsIcon, Palette, RefreshCw } from "lucide-react";
 import { VillageLogoUploader } from "../VillageLogoUploader";
-import { saveVillageConfig } from "@/lib/foncierVillageConfig";
 import { foncierRepository } from "@/data/foncier.repository";
-import dbClient, { withBackoff } from "@/lib/dbClient.service";
 import type { MediaFile } from "@/types";
 import MediaPicker from "@/components/media/MediaPicker";
 import { assignMedia } from "@/lib/mediaUtils";
@@ -111,38 +109,26 @@ export const ConfigModal: FC<ConfigModalProps> = ({
     setError(null);
 
     try {
-      // Save to localStorage fallback
-      try {
-        await saveVillageConfig(selectedVillage, config);
-      } catch {
-        throw new Error("Échec sauvegarde locale");
-      }
+      const villageResult = await foncierRepository.getVillages() as {
+        data?: Array<{ id?: string; nom?: string }> | null;
+        error?: unknown;
+      };
+      if (villageResult.error) throw villageResult.error;
+      const village = villageResult.data?.find((item) => item.nom === selectedVillage);
+      if (!village?.id) throw new Error("Village introuvable pour enregistrer sa configuration");
 
-      // Also try to persist to DB
-      try {
-        const villageResult = await withBackoff<{ data: { id: string; nom: string } | null; error: any }>(() => 
-          dbClient.from("foncier_villages").select("id, nom").eq("nom", selectedVillage).maybeSingle()
-        );
-        
-        const villageId = villageResult.data?.id;
-        if (villageId) {
-          await withBackoff(() =>
-            dbClient.from("foncier_villages").update({
-              config_jsonb: config,
-              primary_color: config.primary_color || null,
-              secondary_color: config.secondary_color || null,
-              logo_url: config.logo_url || null,
-              region: config.region || null,
-              departement: config.departement || null,
-              commune: config.commune || null,
-              chef_village: config.chef_village || null,
-              updated_at: new Date().toISOString(),
-            }).eq("id", villageId)
-          );
-        }
-      } catch (_dbErr) {
-        console.warn("DB save failed, using localStorage only:", _dbErr);
-      }
+      const result = await foncierRepository.updateVillage(village.id, {
+        config_jsonb: config,
+        primary_color: config.primary_color || null,
+        secondary_color: config.secondary_color || null,
+        logo_url: config.logo_url || null,
+        region: config.region || null,
+        departement: config.departement || null,
+        commune: config.commune || null,
+        chef_village: config.chef_village || null,
+        updated_at: new Date().toISOString(),
+      } as any);
+      if (result.error) throw result.error;
 
       onSuccess();
       onClose();

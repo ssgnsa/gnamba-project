@@ -4,16 +4,17 @@ import os
 import time
 from typing import Any
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.core.security import hash_password, verify_password
+from app.core.security import hash_password, validate_password, verify_password
 from app.domain.user import User as DomainUser
 from app.models.entity import Entity
 from app.models.user import AccessLevelEnum, RoleEnum, User as SqlAlchemyUser
 from app.repositories.user_repository import UserRepositoryPort
 
 ADMIN_USER_ID = "00000000-0000-0000-0000-000000000001"
-ADMIN_EMAIL = "admin@egs.local"
+ADMIN_EMAIL = os.getenv("EGS_ADMIN_EMAIL", "admin@egs.local").strip().lower()
 
 
 def _entity_identity(entity: Entity | None, fallback_user: SqlAlchemyUser | None = None) -> dict[str, Any]:
@@ -80,7 +81,7 @@ class SqlAlchemyUserRepository(UserRepositoryPort):
 
     def _seed_default_admin(self) -> None:
         """Ensure the admin exists and only repairs known stale bootstrap hashes."""
-        entity = self.db.query(Entity).filter(Entity.email == ADMIN_EMAIL).first()
+        entity = self.db.query(Entity).filter(func.lower(Entity.email) == ADMIN_EMAIL).first()
         if entity is None:
             entity = Entity(
                 type="user",
@@ -95,11 +96,18 @@ class SqlAlchemyUserRepository(UserRepositoryPort):
             self.db.refresh(entity)
 
         existing = self.db.query(SqlAlchemyUser).filter(SqlAlchemyUser.id == ADMIN_USER_ID).first()
-        admin_password = os.getenv("INITIAL_ADMIN_PASSWORD", "Admin@EGS2025!")
-        desired_hash = hash_password(admin_password)
+        admin_password = os.getenv("INITIAL_ADMIN_PASSWORD")
         repair_flag = os.getenv("AUTO_RESET_DEFAULT_ADMIN_PASSWORD", "false").strip().lower() == "true"
+        if existing is None and not admin_password:
+            raise RuntimeError("INITIAL_ADMIN_PASSWORD is required to create the initial administrator")
+        if repair_flag and not admin_password:
+            raise RuntimeError("INITIAL_ADMIN_PASSWORD is required when administrator password reset is enabled")
+        if admin_password and (existing is None or repair_flag):
+            validate_password(admin_password)
+        desired_hash = hash_password(admin_password) if admin_password else None
 
         if existing is None:
+            assert desired_hash is not None
             existing = SqlAlchemyUser(
                 id=ADMIN_USER_ID,
                 password_hash=desired_hash,
@@ -126,12 +134,13 @@ class SqlAlchemyUserRepository(UserRepositoryPort):
         self.db.refresh(existing)
 
     def get_by_email(self, email: str) -> DomainUser | None:
-        if email.strip().lower() == ADMIN_EMAIL:
+        normalized_email = email.strip().lower()
+        if normalized_email == ADMIN_EMAIL:
             self._seed_default_admin()
         user = (
             self.db.query(SqlAlchemyUser)
             .join(Entity, Entity.id == SqlAlchemyUser.entity_id)
-            .filter(Entity.email == email)
+            .filter(func.lower(Entity.email) == normalized_email)
             .first()
         )
         return _to_domain(user) if user else None
@@ -200,7 +209,7 @@ class SqlAlchemyUserRepository(UserRepositoryPort):
 
     def create(self, payload: dict[str, Any]) -> DomainUser:
         email = (payload.get("email") or "").strip().lower() or None
-        entity = self.db.query(Entity).filter(Entity.email == email).first() if email else None
+        entity = self.db.query(Entity).filter(func.lower(Entity.email) == email).first() if email else None
         if not entity and email:
             full_name = payload.get("full_name", "") or ""
             parts = full_name.strip().split(" ", 1)
@@ -212,7 +221,7 @@ class SqlAlchemyUserRepository(UserRepositoryPort):
                 last_name=parts[1].strip() if len(parts) > 1 else None,
                 phone=payload.get("phone"),
                 entity_metadata={
-                    "role": payload.get("role", "employe"),
+                    "role": payload.get("role") or "guest",
                     "department": payload.get("department"),
                     "poste": payload.get("poste"),
                 },
@@ -223,8 +232,8 @@ class SqlAlchemyUserRepository(UserRepositoryPort):
 
         email_value = (payload.get("email") or "").strip().lower()
         full_name_value = (payload.get("full_name") or "").strip() or email_value
-        role_value = self._coerce_enum(RoleEnum, payload.get("role"), RoleEnum.EMPLOYE).value
-        access_value = self._coerce_enum(AccessLevelEnum, payload.get("access_level", "employe"), AccessLevelEnum.EMPLOYE).value
+        role_value = self._coerce_enum(RoleEnum, payload.get("role"), RoleEnum.GUEST).value
+        access_value = self._coerce_enum(AccessLevelEnum, payload.get("access_level") or "guest", AccessLevelEnum.GUEST).value
 
         user = SqlAlchemyUser(
             id=f"local-user-{int(time.time() * 1000)}",

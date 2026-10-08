@@ -3,6 +3,7 @@
  */
 
 import { dbClient, withRetry } from "./client";
+import apiClient from "../api/client";
 import type { QueryResult } from "./client";
 
 export const dashboardRepository = {
@@ -27,8 +28,11 @@ export const dashboardRepository = {
     id: string,
     payload: Record<string, unknown>,
   ): Promise<QueryResult<null>> {
-    return (await withRetry(() =>
-      dbClient.from("properties").update(payload).eq("id", id),
-    )) as QueryResult<null>;
+    const result = await apiClient.immobilier.properties.update(id, payload);
+    return {
+      data: result.data ? null : null,
+      error: result.error,
+      count: result.count,
+    } as QueryResult<null>;
   },
 };

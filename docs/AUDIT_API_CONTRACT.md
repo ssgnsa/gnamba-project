@@ -99,7 +99,7 @@ Date : 2026-07-30 12:45:31.275693
 | `/api/v1/foncier/villages/{village_id}/with-stats` | `backend/app/api/v1/foncier/routes.py` |
 | `/api/v1/immobilier/{item_id}` | `backend/app/api/v1/immobilier/__init__.py` |
 | `/api/v1/immobilier/{item_id}` | `backend/app/api/v1/immobilier/__init__.py` |
-| `/api/v1/leads/capture` | `backend/app/api/v1/leads.py` |
+| `/api/v1/site/lead-capture` | `backend/app/api/v1/site/router.py` (public); `/api/v1/leads/capture` reste admin-only |
 | `/api/v1/products/{product_id}` | `backend/app/api/v1/products/__init__.py` |
 | `/api/v1/products/{product_id}` | `backend/app/api/v1/products/__init__.py` |
 | `/api/v1/projects/{project_id}` | `backend/app/api/v1/projects/__init__.py` |

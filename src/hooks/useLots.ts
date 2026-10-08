@@ -1,5 +1,9 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { foncierRepository } from "../data/foncier.repository";
+import {
+  countQueueItems,
+  getCachedLots,
+} from "../lib/foncierOffline";
 import type { FoncierLot } from "../types";
 
 interface UseLotsOptions {
@@ -129,7 +133,6 @@ export function useLots(options: UseLotsOptions = {}): UseLotsReturn {
   // Offline cache
   const loadCachedLots = useCallback(async () => {
     try {
-      const { getCachedLots } = await import("../lib/foncierOffline");
       const cached = await getCachedLots();
       const { paged, total } = applyLocalFilters(cached);
       setLots(paged);
@@ -223,7 +226,6 @@ export function useLots(options: UseLotsOptions = {}): UseLotsReturn {
 
   const refreshQueueCount = useCallback(async (): Promise<number> => {
     try {
-      const { countQueueItems } = await import("../lib/foncierOffline");
       const count = await countQueueItems();
       return count;
     } catch (err) {

@@ -127,7 +127,9 @@ class VillageService:
         village = self.repo.get(village_id)
         if not village:
             return False
-        village.deleted_at = datetime.utcnow()
+        # Le schéma Foncier utilise `actif` pour l'archivage des villages.
+        # `deleted_at` n'existe pas sur ce modèle ni dans la table déployée.
+        village.actif = False
         village.updated_by = user_id
         self.db.commit()
         return True

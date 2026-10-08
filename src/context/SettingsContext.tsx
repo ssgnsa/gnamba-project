@@ -161,7 +161,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     try {
       setError(null);
 
-      const settingsResult = await apiClient.settings.getAll();
+      const settingsResult = await apiClient.settings.getPublic();
       if (settingsResult.error) {
         if (import.meta.env.DEV)
           console.error(

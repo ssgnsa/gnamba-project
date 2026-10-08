@@ -9,6 +9,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.api.deps import require_admin_user
 from app.models.entity import Entity
 from app.schemas.entity import EntityCreate, EntityUpdate, EntitySearchParams
 from app.services.entity_service import get_entity_service
@@ -239,6 +240,7 @@ def list_leads(
     assigned_to: Optional[str] = Query(None, description="Filtrer par assigné"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    _admin: dict[str, Any] = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ) -> list[LeadResponse]:
     """Liste les leads (entités de type lead)"""
@@ -263,7 +265,11 @@ def list_leads(
 
 
 @router.get("/{lead_id}", response_model=LeadResponse)
-def get_lead(lead_id: str, db: Session = Depends(get_db)) -> LeadResponse:
+def get_lead(
+    lead_id: str,
+    _admin: dict[str, Any] = Depends(require_admin_user),
+    db: Session = Depends(get_db),
+) -> LeadResponse:
     """Retrieve a lead by ID"""
     svc = get_entity_service(db)
     entity = svc.get(UUID(lead_id))
@@ -273,8 +279,12 @@ def get_lead(lead_id: str, db: Session = Depends(get_db)) -> LeadResponse:
 
 
 @router.post("/capture")
-def capture_lead(payload: LeadCaptureRequest, db: Session = Depends(get_db)) -> dict[str, Any]:
-    """Capture a lead (from web form)"""
+def capture_lead(
+    payload: LeadCaptureRequest,
+    _admin: dict[str, Any] = Depends(require_admin_user),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Administrative capture compatibility route; public forms use site inquiry."""
     svc = get_entity_service(db)
 
     if not payload.phone.strip():
@@ -333,7 +343,11 @@ def capture_lead(payload: LeadCaptureRequest, db: Session = Depends(get_db)) -> 
 
 
 @router.post("", response_model=LeadResponse, status_code=201)
-def create_lead(payload: LeadCreateRequest, db: Session = Depends(get_db)) -> LeadResponse:
+def create_lead(
+    payload: LeadCreateRequest,
+    _admin: dict[str, Any] = Depends(require_admin_user),
+    db: Session = Depends(get_db),
+) -> LeadResponse:
     """Create a new lead"""
     svc = get_entity_service(db)
 
@@ -360,7 +374,12 @@ def create_lead(payload: LeadCreateRequest, db: Session = Depends(get_db)) -> Le
 
 
 @router.patch("/{lead_id}", response_model=LeadResponse)
-def update_lead(lead_id: str, payload: LeadUpdateRequest, db: Session = Depends(get_db)) -> LeadResponse:
+def update_lead(
+    lead_id: str,
+    payload: LeadUpdateRequest,
+    _admin: dict[str, Any] = Depends(require_admin_user),
+    db: Session = Depends(get_db),
+) -> LeadResponse:
     """Update a lead"""
     svc = get_entity_service(db)
     entity = svc.get(UUID(lead_id))
@@ -428,7 +447,7 @@ def update_lead(lead_id: str, payload: LeadUpdateRequest, db: Session = Depends(
 
 
 @router.delete("/{lead_id}")
-def delete_lead(lead_id: str, db: Session = Depends(get_db)) -> dict[str, str]:
+def delete_lead(lead_id: str, _admin: dict[str, Any] = Depends(require_admin_user), db: Session = Depends(get_db)) -> dict[str, str]:
     """Delete a lead (soft delete)"""
     svc = get_entity_service(db)
     entity = svc.get(UUID(lead_id))
@@ -443,6 +462,7 @@ def delete_lead(lead_id: str, db: Session = Depends(get_db)) -> dict[str, str]:
 def search_leads_suggest(
     q: str = Query(..., min_length=2, max_length=100),
     limit: int = Query(10, ge=1, le=50),
+    _admin: dict[str, Any] = Depends(require_admin_user),
     db: Session = Depends(get_db),
 ) -> list[LeadResponse]:
     """Suggested search for lead autocompletion"""

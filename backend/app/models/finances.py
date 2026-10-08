@@ -2,7 +2,7 @@
 # Tables: finances, products, suppliers
 
 from sqlalchemy import (
-    Column, String, Text, Numeric, DateTime, ForeignKey, Boolean, JSON, Index
+    Column, String, Text, Numeric, DateTime, Date, ForeignKey, Boolean, JSON, Index, FetchedValue
 )
 from sqlalchemy.dialects.postgresql import UUID, TIMESTAMP
 from sqlalchemy.orm import relationship
@@ -20,14 +20,19 @@ class Finances(Base):
     __tablename__ = "finances"
 
     id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
-    type = Column(String, nullable=True)  # recette, depense, investissement
+    type = Column(String(20), nullable=True)  # Legacy alias; unknown historical values stay NULL.
+    type_operation = Column(String(20), nullable=False)  # ENCAISSEMENT / DECAISSEMENT / INCONNU
     type_transaction = Column(String, nullable=True)  # You can keep both for compatibility
     categorie = Column(String, nullable=True)
-    montant = Column(Numeric(12, 2), nullable=True)
-    devise = Column(String, nullable=False, default="FCFA")
+    montant = Column(Numeric(18, 2), nullable=False)
+    montant_xof = Column(Numeric(18, 2), nullable=True)
+    devise = Column(String(4), nullable=False, default="XOF")
+    taux_change = Column(Numeric(18, 8), nullable=True, default=1)
+    taux_source = Column(Text, nullable=True)
+    date_operation = Column(Date, nullable=True)
     date = Column(TIMESTAMP(timezone=True), nullable=True)
     description = Column(Text, nullable=True)
-    reference = Column(String, nullable=True)
+    reference = Column(String, nullable=False, unique=True)
     document_media_id = Column(UUID(as_uuid=False), nullable=True)
     statut = Column(String, nullable=True, default="brouillon")  # brouillon, valide, annule
     # NEW: Link to Entity (unified client/supplier/partner)
@@ -73,6 +78,7 @@ class Product(Base):
     __tablename__ = "products"
 
     id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
+    reference = Column(String(50), nullable=False, unique=True, server_default=FetchedValue())
     designation = Column(String, nullable=True)
     nom = Column(String, nullable=False)
     categorie = Column(String, nullable=True)

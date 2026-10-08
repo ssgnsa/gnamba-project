@@ -38,7 +38,7 @@ const buildOutDir = resolveBuildOutDir();
 // Ensure Vite environment variables are inlined during build
 const envVars: Record<string, string> = {
   'import.meta.env.VITE_API_MODE': JSON.stringify(process.env.VITE_API_MODE || 'local'),
-  'import.meta.env.VITE_LOCAL_API_URL': JSON.stringify('__VITE_LOCAL_API_URL__'),
+  'import.meta.env.VITE_LOCAL_API_URL': JSON.stringify(process.env.VITE_LOCAL_API_URL || ''),
   'import.meta.env.VITE_SELFHOSTED_MODE': JSON.stringify(process.env.VITE_SELFHOSTED_MODE || 'true'),
   'import.meta.env.VITE_FILEBROWSER_URL': JSON.stringify(process.env.VITE_FILEBROWSER_URL || '/filebrowser'),
   'import.meta.env.VITE_FILEBROWSER_API_URL': JSON.stringify(process.env.VITE_FILEBROWSER_API_URL || '/filebrowser/api'),
@@ -46,10 +46,7 @@ const envVars: Record<string, string> = {
   'import.meta.env.VITE_OLLAMA_MODEL': JSON.stringify(process.env.VITE_OLLAMA_MODEL || 'llama3.1:8b'),
   'import.meta.env.VITE_OLLAMA_URL': JSON.stringify(process.env.VITE_OLLAMA_URL || 'http://ollama.local:11434'),
   'import.meta.env.VITE_ONESIGNAL_APP_ID': JSON.stringify(process.env.VITE_ONESIGNAL_APP_ID || ''),
-  'import.meta.env.VITE_ONESIGNAL_API_KEY': JSON.stringify(process.env.VITE_ONESIGNAL_API_KEY || ''),
-  'import.meta.env.VITE_ONESIGNAL_USER_AUTH_KEY': JSON.stringify(process.env.VITE_ONESIGNAL_USER_AUTH_KEY || ''),
   'import.meta.env.VITE_SENTRY_DSN': JSON.stringify(process.env.VITE_SENTRY_DSN || ''),
-  'import.meta.env.VITE_AMPLITUDE_API_KEY': JSON.stringify(process.env.VITE_AMPLITUDE_API_KEY || ''),
   'import.meta.env.VITE_CLOUDFLARE_TURNSTILE_SITE_KEY': JSON.stringify(process.env.VITE_CLOUDFLARE_TURNSTILE_SITE_KEY || ''),
   'import.meta.env.VITE_CANONICAL_HOST': JSON.stringify(process.env.VITE_CANONICAL_HOST || ''),
   'import.meta.env.VITE_FILES_URL': JSON.stringify(process.env.VITE_FILES_URL || ''),

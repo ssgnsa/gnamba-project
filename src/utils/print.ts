@@ -185,14 +185,18 @@ async function fetchAsDataUrl(url: string): Promise<string> {
       : await fetch(resolvedUrl, { cache: "force-cache", mode: "cors" });
     console.log(
       "[PRINT] fetch",
-      url.substring(0, 80),
+      resolvedUrl.substring(0, 120),
       "→ status",
       resp.status,
       resp.ok,
     );
-    if (!resp.ok) return url;
+    if (!resp.ok) return "";
     const blob = await resp.blob();
     console.log("[PRINT] blob type:", blob.type, "size:", blob.size);
+    if (!blob.type.startsWith("image/")) {
+      console.error("[PRINT] ressource logo ignorée : type non image", blob.type);
+      return "";
+    }
     return await new Promise<string>((resolve) => {
       const reader = new FileReader();
       reader.onloadend = () => resolve(reader.result as string);
@@ -204,7 +208,7 @@ async function fetchAsDataUrl(url: string): Promise<string> {
     });
   } catch (e) {
     console.error("[PRINT] fetchAsDataUrl error:", e);
-    return url;
+    return "";
   }
 }
 
@@ -297,7 +301,7 @@ const buildItfBarcodeSvg = (value: string) => {
 function buildAttestationCoutumiereHTML(
   data: AttestationCoutumiereData,
 ): string {
-  const reference = safeText(data.reference);
+  const documentReference = safeText(data.numero_enregistrement || data.reference);
   const region = safeText(data.region);
   const departement = safeText(data.departement);
   const commune = safeText(data.commune);
@@ -310,12 +314,14 @@ function buildAttestationCoutumiereHTML(
   const quartier = safeText(data.quartier);
   const lotissement = safeText(data.lotissement);
   const numeroLot = safeText(data.numero_lot);
-  const superficieM2 = Number.isFinite(data.superficie_m2)
-    ? data.superficie_m2
-    : 0;
-  const superficie = safeText(superficieM2);
+  const dateEtablissement = safeText(data.date_etablissement);
+  const superficieRenseignee = Number.isFinite(data.superficie_m2);
+  const superficie = superficieRenseignee
+    ? safeText(data.superficie_m2)
+    : "—";
   const proprietaireNom = safeUpper(data.proprietaire_nom);
   const proprietairePrenom = safeUpper(data.proprietaire_prenom);
+  const historiquePossession = safeText(data.historique_possession);
   const naissanceDate = safeText(data.proprietaire_naissance_date);
   const naissanceLieu = safeText(data.proprietaire_naissance_lieu);
   const proprietaireDomicile = safeText(data.proprietaire_domicile);
@@ -327,27 +333,21 @@ function buildAttestationCoutumiereHTML(
   const chefNom = safeUpper(
     data.chef_nom || data.validation_chef_nom || data.chef_village,
   );
-  const villageLogoUrl = safeUrl(data.village_logo_url);
+  const villageLogoUrl =
+    safeUrl(data.village_logo_url) || safeUrl(data.logoUrl);
   const attestationType = String(data.attestation_type || "").toLowerCase();
-  const hasCessionPrice =
-    typeof data.prix_cession === "number" &&
-    Number.isFinite(data.prix_cession) &&
-    data.prix_cession > 0;
-  const hasCedant = Boolean(
-    data.cedant_nom || data.cedant_prenom || data.cedant_cni_numero,
-  );
-  const hasCessionHint = Boolean(data.date_cession) || hasCessionPrice;
-  const isCession =
-    attestationType === "cession" || hasCedant || hasCessionHint;
-  const documentTitle = isCession
-    ? "ATTESTATION DE CESSION DE DROITS COUTUMIERS"
-    : "ATTESTATION DE PROPRIÉTÉ VILLAGEOISE";
+  const isCession = attestationType === "cession";
 
   // Cession data
   const cedantNom = safeUpper(data.cedant_nom || "");
   const cedantPrenom = safeUpper(data.cedant_prenom || "");
   const cedantCni = safeText(data.cedant_cni_numero || "");
+  const cedantTelephone = safeText(data.cedant_telephone || "");
+  const cedantDomicile = safeText(data.cedant_domicile || "");
   const dateCession = safeText(data.date_cession || "");
+  const documentTitle = isCession
+    ? "ATTESTATION DE CESSION DE DROITS COUTUMIERS"
+    : "ATTESTATION DE PROPRIÉTÉ VILLAGEOISE";
   // Security elements
   const barcodeSvg = data.code_barre
     ? buildItfBarcodeSvg(
@@ -370,23 +370,23 @@ function buildAttestationCoutumiereHTML(
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     html, body {
-      width: 210mm; height: 297mm;
+      width: 210mm; min-height: 297mm;
       background: #FAFAF9;
       color: #1A1A1A;
       font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
       font-size: 10pt;
       line-height: 1.4;
-      overflow: hidden;
+      overflow: visible;
     }
     @media print {
       @page { size: A4 portrait; margin: 0; }
-      html, body { width: 210mm; height: 297mm; }
+      html, body { width: 210mm; min-height: 297mm; }
       body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
     }
 
     /* ══ PAGE : occupe exactement 210×297mm ══ */
     .page {
-      width: 210mm; height: 297mm;
+      width: 210mm; min-height: 297mm;
       position: relative;
       background: #FAFAF9;
       display: flex;
@@ -408,6 +408,7 @@ function buildAttestationCoutumiereHTML(
       );
       pointer-events: none;
       z-index: 2;
+      display: none;
     }
     .page::before { left: 0; }
     .page::after  { right: 0; }
@@ -438,6 +439,7 @@ function buildAttestationCoutumiereHTML(
       display: flex;
       flex-direction: column;
       min-height: 0;
+      justify-content: space-between;
     }
 
     /* ══ BANDE TRICOLORE ══ */
@@ -452,12 +454,12 @@ function buildAttestationCoutumiereHTML(
     /* ══ EN-TÊTE : grille 3 col → 4 | 2.5 | 4 ══ */
     .header {
       display: grid;
-      grid-template-columns: 4fr 58px 4fr;
-      align-items: start;
-      gap: 7px;
-      padding-bottom: 6px;
+      grid-template-columns: minmax(0, 1fr) 58px minmax(0, 1fr);
+      align-items: center;
+      gap: 9px;
+      padding-bottom: 4px;
       border-bottom: 1.5px solid #C5A467;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
       flex-shrink: 0;
     }
     .hdr-col {
@@ -471,6 +473,11 @@ function buildAttestationCoutumiereHTML(
     }
     .hdr-col .accent { color: #006B3F; font-weight: 600; font-size: 9pt; }
     .hdr-right { text-align: right; }
+    .document-reference {
+      font-size: 7pt;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+    }
     .hdr-right .devise { font-style: italic; font-size: 7.5pt; color: #555; font-weight: 300; }
     /* Logo village — aligné sous nom village, hauteur 22mm */
     .village-logo-wrap {
@@ -487,28 +494,32 @@ function buildAttestationCoutumiereHTML(
     .title-frame {
       position: relative;
       text-align: center;
-      margin: 6px 0 4px;
-      padding: 8px 20px 10px;
-      background: linear-gradient(180deg, rgba(197,164,103,0.09) 0%, rgba(250,250,249,0.5) 100%);
+      margin: 3px 0 4px;
+      padding: 4px 14px 5px;
+      border-bottom: 1px solid #C5A467;
       flex-shrink: 0;
     }
-    .title-frame::before, .title-frame::after {
-      content: '';
-      position: absolute;
-      left: 0; right: 0;
-      height: 6px;
-    }
-    .title-frame::before { top: 0;    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='6'%3E%3Cpolygon points='9,1 17,5 1,5' fill='none' stroke='%23C5A467' stroke-width='0.7' opacity='0.7'/%3E%3C/svg%3E") repeat-x center; }
-    .title-frame::after  { bottom: 0; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='6'%3E%3Cpolygon points='9,5 17,1 1,1' fill='none' stroke='%23C5A467' stroke-width='0.7' opacity='0.7'/%3E%3C/svg%3E") repeat-x center; }
+    .title-frame::before, .title-frame::after { content: none; }
     .doc-title {
       font-family: 'Playfair Display', Georgia, serif;
-      font-size: 19pt;
+      font-size: 15pt;
       font-weight: 700;
       color: #2C2C2C;
       letter-spacing: 1.5px;
       text-transform: uppercase;
       line-height: 1.25;
       display: block;
+    }
+    .doc-title-sub {
+      display: block;
+      margin-top: 1px;
+      color: #006B3F;
+      font-family: 'Inter', sans-serif;
+      font-size: 11pt;
+      font-weight: 600;
+      letter-spacing: 0.8px;
+      line-height: 1.2;
+      text-transform: uppercase;
     }
     .doc-subtitle {
       font-family: 'Inter', sans-serif;
@@ -526,7 +537,8 @@ function buildAttestationCoutumiereHTML(
       display: flex;
       align-items: center;
       gap: 8px;
-      margin: 4px 0 6px;
+      display: none;
+      margin: 0;
       flex-shrink: 0;
     }
     .ornament-rule .line { flex: 1; height: 0.75px; background: linear-gradient(90deg, transparent, #C5A467 30%, #C5A467 70%, transparent); }
@@ -541,12 +553,12 @@ function buildAttestationCoutumiereHTML(
     /* ══ BASE LÉGALE ══ */
     .legal-base {
       font-family: 'Inter', sans-serif;
-      font-size: 7.5pt;
+      font-size: 8pt;
       font-style: italic;
       color: #555;
       text-align: center;
       line-height: 1.35;
-      padding: 4px 16px;
+      padding: 3px 14px;
       background: rgba(0,107,63,0.03);
       border-top: 0.5px solid #e0d9cc;
       border-bottom: 0.5px solid #e0d9cc;
@@ -562,7 +574,7 @@ function buildAttestationCoutumiereHTML(
       line-height: 1.5;
       text-align: justify;
       color: #1A1A1A;
-      padding: 7px 10px 7px 14px;
+      padding: 6px 10px 6px 12px;
       border-left: 3px solid #C5A467;
       background: rgba(197,164,103,0.05);
       margin-bottom: 7px;
@@ -572,20 +584,21 @@ function buildAttestationCoutumiereHTML(
 
     /* ══ GRILLE DE SECTIONS : 12 colonnes, s'étire pour occuper tout l'espace restant ══ */
     .sections-wrap {
-      flex: 1 1 0;
-      height: 100%;
+      flex: 0 0 auto;
+      height: auto;
       min-height: 0;
       display: grid;
       grid-template-columns: repeat(12, 1fr);
-      grid-auto-rows: 1fr;
+      grid-auto-rows: min-content;
       gap: 6px;
-      align-content: stretch;
+      align-content: start;
     }
     /* alias pour la transition grille → wrap */
     .sections-grid {
       display: contents;
     }
     .col-6 { grid-column: span 6; }
+    .col-4 { grid-column: span 4; }
     .col-12 { grid-column: span 12; }
     .section-full { grid-column: 1 / -1; }
 
@@ -597,7 +610,6 @@ function buildAttestationCoutumiereHTML(
       display: flex;
       flex-direction: column;
     }
-    .section-card .dtable { flex: 1; }
     .section-head {
       display: flex;
       align-items: baseline;
@@ -629,15 +641,40 @@ function buildAttestationCoutumiereHTML(
       color: #444;
       white-space: nowrap;
       width: 38%;
-      border-bottom: 0.5px dotted #d0c9bc;
     }
     .dtable .val {
       color: #1A1A1A;
       font-weight: 400;
-      border-bottom: 0.5px dotted #d0c9bc;
     }
+    .dtable tr + tr td { border-top: 0.5px solid #eeeeea; }
     .dtable .lbl.fill, .dtable .val.fill {
       background: rgba(197,164,103,0.05);
+    }
+
+    .cession-fields {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5px 12px;
+    }
+    .cession-field {
+      min-width: 0;
+      padding: 3px 5px 4px;
+      border-bottom: 0.5px dotted #d0c9bc;
+    }
+    .cession-field-label {
+      display: block;
+      margin-bottom: 2px;
+      color: #444;
+      font-size: 7pt;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.35px;
+    }
+    .cession-field-value {
+      display: block;
+      color: #1a1a1a;
+      font-size: 8pt;
+      overflow-wrap: anywhere;
     }
 
     /* ══ CODE-BARRES ══ */
@@ -659,16 +696,24 @@ function buildAttestationCoutumiereHTML(
       margin-top: 6px;
       flex-shrink: 0;
     }
+    .footer-row.no-security { grid-template-columns: 1fr; }
+    .signatures-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 7px;
+      align-items: stretch;
+    }
+    .single-signature { max-width: 90mm; }
 
     /* ══ SIGNATURE — hauteur 18mm, filet pointillé ══ */
     .sig-box {
       border: 0.75px solid #C5A467;
-      padding: 8px 10px 10px;
-      background: rgba(197,164,103,0.04);
+      padding: 6px 8px 7px;
+      background: #fff;
       display: flex;
       flex-direction: column;
       align-items: center;
-      min-height: 100px;
+      min-height: 25mm;
     }
     .sig-box-title {
       font-family: 'Inter', sans-serif;
@@ -696,8 +741,8 @@ function buildAttestationCoutumiereHTML(
     .sig-box-line {
       width: 100%;
       border-top: 1.5px dashed #888;
-      margin-top: 18mm;
-      padding-top: 5px;
+      margin-top: auto;
+      padding-top: 12mm;
       font-family: 'Inter', sans-serif;
       font-size: 7.5pt;
       color: #777;
@@ -708,14 +753,14 @@ function buildAttestationCoutumiereHTML(
 
     /* ══ SÉCURITÉ — QR 32×32mm ══ */
     .security-box {
-      border: 0.75px solid #ddd5c4;
-      padding: 6px 7px;
-      background: rgba(0,107,63,0.04);
+      border-left: 0.75px solid #ddd5c4;
+      padding: 3px 0 3px 7px;
+      background: transparent;
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 3px;
-      font-size: 7pt;
+      font-size: 7.5pt;
     }
     .sec-qr {
       width: 121px; height: 121px;
@@ -726,7 +771,7 @@ function buildAttestationCoutumiereHTML(
     .sec-qr img { width: 100%; height: 100%; object-fit: contain; }
     .sec-ctrl {
       font-family: 'Courier New', monospace;
-      font-size: 7pt;
+      font-size: 7.5pt;
       font-weight: 700;
       color: #006B3F;
       letter-spacing: 0.3px;
@@ -753,15 +798,15 @@ function buildAttestationCoutumiereHTML(
     }
     .footer-mention {
       font-family: 'Inter', sans-serif;
-      font-size: 7pt;
+      font-size: 7.5pt;
       font-style: italic;
-      color: #777;
+      color: #555;
       line-height: 1.3;
     }
     .footer-date {
       font-family: 'Inter', sans-serif;
-      font-size: 7pt;
-      color: #777;
+      font-size: 7.5pt;
+      color: #555;
       text-align: right;
       font-style: italic;
     }
@@ -779,14 +824,16 @@ function buildAttestationCoutumiereHTML(
     <!-- Bande tricolore Côte d'Ivoire -->
     <div class="tricolor-bar"></div>
 
-    <!-- ══ EN-TÊTE : 4 colonnes — Localisation | Logo village | Emblème CI | République ══ -->
+    <!-- ══ EN-TÊTE COMMUN : institution | logo | informations documentaires ══ -->
     <div class="header">
-      <!-- Col 1 : Localisation administrative -->
+      <!-- Col gauche : institution et localisation -->
       <div class="hdr-col">
-        <span class="accent">RÉGION ${region ? region.toUpperCase() : "—"}</span><br>
-        Département de ${departement || "—"}<br>
-        Commune de ${commune || "—"}<br>
-        <strong>Village de ${villageNom.toUpperCase()}</strong>
+        RÉPUBLIQUE DE CÔTE D'IVOIRE<br>
+        <span class="devise">Union — Discipline — Travail</span><br>
+        ${region ? `<span class="accent">RÉGION ${region.toUpperCase()}</span><br>` : ""}
+        ${departement ? `Département de ${departement}<br>` : ""}
+        ${commune ? `Commune de ${commune}<br>` : ""}
+        ${villageNom ? `<strong>Village de ${villageNom.toUpperCase()}</strong>` : ""}
       </div>
 
       <!-- Col 2 : Logo villageois officiel -->
@@ -801,18 +848,18 @@ function buildAttestationCoutumiereHTML(
         }
       </div>
 
-      <!-- Col 3 : République -->
+      <!-- Col droite : nature et références -->
       <div class="hdr-col hdr-right">
-        RÉPUBLIQUE DE CÔTE D'IVOIRE<br>
-        <span class="devise">Union — Discipline — Travail</span><br>
-        <span style="font-size:7.5pt;color:#444;">Enreg. N° ${safeText(data.numero_enregistrement || reference)}</span>
+        <strong>${isCession ? "CESSION COUTUMIÈRE" : "PROPRIÉTÉ VILLAGEOISE"}</strong><br>
+        <span class="document-reference">Réf. ${documentReference || "—"}</span><br>
+        <span style="font-size:7.5pt;color:#444;">${dateEtablissement ? `Établie le ${dateEtablissement}` : ""}</span>
       </div>
     </div>
 
     <!-- ══ TITRE CENTRAL ══ -->
     <div class="title-frame">
-      <span class="doc-title">${documentTitle}</span>
-      <span class="doc-subtitle">Droits Fonciers Coutumiers — Territoire Villageois</span>
+      <span class="doc-title">${isCession ? "ATTESTATION DE CESSION" : "ATTESTATION DE PROPRIÉTÉ"}</span>
+      <span class="doc-title-sub">${isCession ? "DE DROITS COUTUMIERS" : "VILLAGEOISE"}</span>
     </div>
 
     <!-- ══ FILET ORNÉ ══ -->
@@ -832,41 +879,54 @@ function buildAttestationCoutumiereHTML(
 
     <!-- ══ DÉCLARATION SOLENNELLE ══ -->
     <div class="declaration">
-      Nous, soussigné, <strong>${chefNom}</strong>, Chef Coutumier du Village de
-      <strong>${villageNom.toUpperCase()}</strong>, attestons solennellement que les droits
-      fonciers coutumiers afférents à la parcelle désignée ci-après appartiennent de plein
-      droit coutumier à la personne dont l'identité suit, et ce en vertu d'une possession
-      paisible, publique et ininterrompue, reconnue par les autorités villageoises compétentes.
+      ${isCession
+        ? `La présente attestation constate la cession de droits coutumiers relatifs à la parcelle désignée ci-après, entre <strong>${cedantPrenom} ${cedantNom}</strong>, cédant, et <strong>${proprietairePrenom} ${proprietaireNom}</strong>, acquéreur.`
+        : `Nous, soussigné, <strong>${chefNom}</strong>, Chef Coutumier du Village de <strong>${villageNom.toUpperCase()}</strong>, attestons solennellement que les droits fonciers coutumiers afférents à la parcelle désignée ci-après appartiennent de plein droit coutumier à <strong>${proprietairePrenom} ${proprietaireNom}</strong>, en vertu d'une possession paisible, publique et ininterrompue, reconnue par les autorités villageoises compétentes.`}
     </div>
 
     <!-- ══ SECTIONS DONNÉES : grille 12 colonnes, remplissage vertical ══ -->
     <div class="sections-wrap">
 
-      <!-- I. IDENTITÉ DU TITULAIRE — 6 col -->
+      ${isCession ? `
       <div class="section-card col-6">
-        <div class="section-head">
-          <span class="section-num">I.</span>
-          <span class="section-label">Identité du Titulaire</span>
-        </div>
+        <div class="section-head"><span class="section-num">I.</span><span class="section-label">Cédant</span></div>
         <table class="dtable">
-          <tr><td class="lbl fill">Nom &amp; Prénoms</td><td class="val fill"><strong>${proprietairePrenom} ${proprietaireNom}</strong></td></tr>
-          <tr><td class="lbl">Né(e) le</td><td class="val">${naissanceDate || "—"} à ${naissanceLieu || "—"}</td></tr>
-          ${proprietaireProfession ? `<tr><td class="lbl">Profession</td><td class="val">${proprietaireProfession}</td></tr>` : '<tr><td class="lbl">Profession</td><td class="val">—</td></tr>'}
-          <tr><td class="lbl">CNI N°</td><td class="val">${cniNumero || "—"}${cniDate ? ` — délivrée le ${cniDate}${cniLieu ? " à " + cniLieu : ""}` : ""}</td></tr>
+          <tr><td class="lbl fill">Nom &amp; prénoms</td><td class="val fill"><strong>${cedantPrenom} ${cedantNom}</strong></td></tr>
+          <tr><td class="lbl">Pièce / référence</td><td class="val">${cedantCni || "—"}</td></tr>
+          <tr><td class="lbl">Domicile</td><td class="val">${cedantDomicile || "—"}</td></tr>
+          <tr><td class="lbl">Téléphone</td><td class="val">${cedantTelephone || "—"}</td></tr>
+        </table>
+      </div>
+      <div class="section-card col-6">
+        <div class="section-head"><span class="section-num">II.</span><span class="section-label">Acquéreur</span></div>
+        <table class="dtable">
+          <tr><td class="lbl fill">Nom &amp; prénoms</td><td class="val fill"><strong>${proprietairePrenom} ${proprietaireNom}</strong></td></tr>
+          <tr><td class="lbl">Pièce / référence</td><td class="val">${cniNumero || "—"}</td></tr>
           <tr><td class="lbl">Domicile</td><td class="val">${proprietaireDomicile || "—"}</td></tr>
           <tr><td class="lbl">Téléphone</td><td class="val">${telephone || "—"}</td></tr>
         </table>
-      </div>
-
-      <!-- II/III. DESCRIPTION DE LA PARCELLE — 6 col -->
+      </div>` : `
       <div class="section-card col-6">
+        <div class="section-head"><span class="section-num">I.</span><span class="section-label">Acquéreur / Propriétaire</span></div>
+        <table class="dtable">
+          <tr><td class="lbl fill">Nom &amp; prénoms</td><td class="val fill"><strong>${proprietairePrenom} ${proprietaireNom}</strong></td></tr>
+          <tr><td class="lbl">Né(e) le</td><td class="val">${naissanceDate || "—"} à ${naissanceLieu || "—"}</td></tr>
+          ${proprietaireProfession ? `<tr><td class="lbl">Profession</td><td class="val">${proprietaireProfession}</td></tr>` : ""}
+          <tr><td class="lbl">Pièce / référence</td><td class="val">${cniNumero || "—"}${cniDate ? ` — délivrée le ${cniDate}${cniLieu ? " à " + cniLieu : ""}` : ""}</td></tr>
+          <tr><td class="lbl">Domicile</td><td class="val">${proprietaireDomicile || "—"}</td></tr>
+          <tr><td class="lbl">Téléphone</td><td class="val">${telephone || "—"}</td></tr>
+        </table>
+      </div>`}
+
+      <!-- Description de parcelle : symétrique à l'identité en propriété, pleine largeur en cession -->
+      <div class="section-card ${isCession ? "col-12" : "col-6"}">
         <div class="section-head">
           <span class="section-num">${isCession ? "III." : "II."}</span>
-          <span class="section-label">Description Parcellaire</span>
+          <span class="section-label">Parcelle concernée</span>
         </div>
         <table class="dtable">
           <tr><td class="lbl fill">Lot N°</td><td class="val fill"><strong>${numeroLot || "—"}</strong></td></tr>
-          <tr><td class="lbl">Superficie</td><td class="val">${superficie} m²</td></tr>
+          <tr><td class="lbl">Superficie</td><td class="val">${superficie}${superficieRenseignee ? " m²" : ""}</td></tr>
           <tr><td class="lbl">Quartier</td><td class="val">${quartier || "—"}</td></tr>
           <tr><td class="lbl">Lotissement</td><td class="val">${lotissement || "—"}</td></tr>
           <tr><td class="lbl">Village</td><td class="val">${villageNom.toUpperCase()}</td></tr>
@@ -874,23 +934,30 @@ function buildAttestationCoutumiereHTML(
         </table>
       </div>
 
-      <!-- CESSION (si applicable) — 12 col -->
+      <!-- ACTE DE CESSION — hauteur déterminée par les données disponibles -->
       ${
         isCession
           ? `
       <div class="section-card col-12">
         <div class="section-head">
-          <span class="section-num">II.</span>
+          <span class="section-num">IV.</span>
           <span class="section-label">Acte de Cession de Droits Coutumiers</span>
         </div>
-        <table class="dtable">
-          <tr>
-            <td class="lbl fill" style="width:20%;">Cédant</td>
-            <td class="val fill"><strong>${cedantPrenom} ${cedantNom}</strong>${cedantCni ? " &mdash; CNI&nbsp;" + cedantCni : ""}</td>
-            <td class="lbl" style="width:20%;">Date de cession</td>
-            <td class="val">${dateCession || "—"}</td>
-          </tr>
-        </table>
+        <div class="cession-fields">
+          <div class="cession-field">
+            <span class="cession-field-label">Cédant</span>
+            <strong class="cession-field-value">${cedantPrenom} ${cedantNom}</strong>
+          </div>
+          <div class="cession-field">
+            <span class="cession-field-label">Acquéreur</span>
+            <strong class="cession-field-value">${proprietairePrenom} ${proprietaireNom}</strong>
+          </div>
+          <div class="cession-field">
+            <span class="cession-field-label">Date de cession</span>
+            <span class="cession-field-value">${dateCession || "—"}</span>
+          </div>
+          ${historiquePossession ? `<div class="cession-field"><span class="cession-field-label">Déclaration / historique</span><span class="cession-field-value">${historiquePossession}</span></div>` : ""}
+        </div>
       </div>`
           : ""
       }
@@ -900,18 +967,31 @@ function buildAttestationCoutumiereHTML(
     <!-- CODE-BARRES pleine largeur -->
     ${barcodeSvg ? `<div class="barcode-wrap" style="margin:5px 0;">${barcodeSvg}</div>` : ""}
 
-    <!-- ══ BAS DE PAGE : VISA + SÉCURITÉ ══ -->
-    <div class="footer-row">
-      <div class="sig-box">
-        <div class="sig-box-title">Chef Coutumier du Village</div>
+    <!-- ══ VALIDATION : parties signataires propres à chaque modèle ══ -->
+    <div class="footer-row ${qrDataUrl || controlNumber || hashSha256 ? "" : "no-security"}">
+      ${isCession ? `
+      <div class="signatures-grid">
+        <div class="sig-box">
+          <div class="sig-box-title">Le Cédant</div>
+          <div class="sig-box-name">${cedantPrenom} ${cedantNom}</div>
+          <div class="sig-box-line">Signature</div>
+        </div>
+        <div class="sig-box">
+          <div class="sig-box-title">L'Acquéreur</div>
+          <div class="sig-box-name">${proprietairePrenom} ${proprietaireNom}</div>
+          <div class="sig-box-line">Signature</div>
+        </div>
+      </div>` : `
+      <div class="sig-box single-signature">
+        <div class="sig-box-title">Le Chef du Village</div>
         <div class="sig-box-name">${chefNom || "—"}</div>
         <div class="sig-box-line">Signature &amp; Sceau</div>
-      </div>
-      <div class="security-box">
+      </div>`}
+      ${qrDataUrl || controlNumber || hashSha256 ? `<div class="security-box">
         ${qrDataUrl ? `<div class="sec-qr"><img src="${qrDataUrl}" alt="Code de vérification"/></div>` : ""}
         ${controlNumber ? `<div class="sec-ctrl">N° ${controlNumber}</div>` : ""}
         ${hashSha256 ? `<div class="sec-hash">${hashSha256.substring(0, 32)}</div>` : ""}
-      </div>
+      </div>` : ""}
     </div>
 
     <!-- ══ PIED DE PAGE FINAL ══ -->
@@ -922,8 +1002,8 @@ function buildAttestationCoutumiereHTML(
         établie par l'autorité coutumière du Village de <strong>${villageNom.toUpperCase()}</strong>.
       </div>
       <div class="footer-date">
-        Délivré à ${safeText(data.lieu_signature) || villageNom.toUpperCase()}<br>
-        le ${safeText(data.date_etablissement) || "22/05/2026 — 07:30"}
+        ${safeText(data.lieu_signature) ? `Délivré à ${safeText(data.lieu_signature)}<br>` : ""}
+        ${dateEtablissement ? `le ${dateEtablissement}` : ""}
       </div>
     </div>
 
@@ -937,6 +1017,7 @@ function buildAttestationCoutumiereHTML(
 
 export async function printAttestationCoutumiere(
   data: AttestationCoutumiereData,
+  printWindow?: Window | null,
 ) {
   console.log(
     "[PRINT] village_logo_url reçu:",
@@ -959,7 +1040,7 @@ export async function printAttestationCoutumiere(
     );
   }
   const html = buildAttestationCoutumiereHTML(resolved);
-  openPrintWindow(html);
+  openPrintWindow(html, printWindow);
 }
 
 /**
@@ -2003,17 +2084,37 @@ function sanitizePrintHtml(html: string): string {
   }
 }
 
-function openPrintWindow(html: string) {
-  const win = window.open("", "_blank", "width=900,height=700");
+function openPrintWindow(html: string, targetWindow?: Window | null) {
+  const win = targetWindow ?? window.open("", "_blank", "width=900,height=700");
   if (!win) {
     alert("Veuillez autoriser les fenêtres popup pour imprimer.");
     return;
   }
   const safeHtml = sanitizePrintHtml(html);
+  win.document.open();
   win.document.write(safeHtml);
   win.document.close();
   win.focus();
-  setTimeout(() => {
-    win.print();
-  }, 800);
+
+  const waitForRender = async () => {
+    if (win.document.fonts?.ready) await win.document.fonts.ready;
+    const images = Array.from(win.document.images);
+    await Promise.all(
+      images.map((image) => {
+        if (image.complete) return Promise.resolve();
+        return new Promise<void>((resolve) => {
+          image.addEventListener("load", () => resolve(), { once: true });
+          image.addEventListener("error", () => resolve(), { once: true });
+        });
+      }),
+    );
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    if (!win.closed) {
+      win.addEventListener("afterprint", () => win.close(), { once: true });
+      win.print();
+    }
+  };
+
+  void waitForRender();
 }

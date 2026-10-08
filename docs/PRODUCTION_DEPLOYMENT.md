@@ -1,4 +1,14 @@
-# 🚀 GUIDE DE DÉPLOIEMENT PRODUCTION EGS
+> **Document historique — ne pas exécuter tel quel.**
+>
+> Ce guide décrit l’ancienne pile Supabase/Kong et référence des fichiers Compose
+> qui ne font plus partie de la source de vérité (`docker-compose.prod.secure.yml`).
+> La cible actuelle est documentée dans
+> [Architecture de release unique](industrialisation/ARCHITECTURE_RELEASE_UNIQUE.md),
+> avec `docker-compose.yml`, FastAPI/Alembic et le préflight en lecture seule
+> `scripts/validate-prod-deployment.sh`. Toute migration de production doit
+> d’abord passer par une sauvegarde restaurable et les validations contrôlées.
+
+# 🚀 GUIDE DE DÉPLOIEMENT PRODUCTION EGS (ARCHIVE)
 
 **Versioning**: Phase 2 - Stabilisation sécurité & versions (2026-06-03)  
 **Rôle**: Enterprise Architect  

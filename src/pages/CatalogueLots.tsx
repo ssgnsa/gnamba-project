@@ -180,6 +180,15 @@ function toRemotePayload(
 ): VitrineLot {
   return {
     id: lot.id,
+    lot_id: lot.lot_id,
+    property_id: lot.property_id,
+    prix: lot.prix,
+    surface: lot.surface,
+    localisation: lot.localisation,
+    photos: lot.photos,
+    publier: lot.publier,
+    ordre: lot.ordre,
+    tags: lot.tags,
     reference: lot.reference,
     titre: lot.titre,
     description: lot.description,

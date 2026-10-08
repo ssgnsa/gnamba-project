@@ -91,6 +91,8 @@ export interface Project {
 
 export interface Property {
   id: string;
+  reference?: string;
+  titre?: string;
   type_bien:
     | "studio"
     | "chambre"
@@ -99,13 +101,31 @@ export interface Property {
     | "terrain"
     | "magasin"
     | "bureau"
-    | "villa";
+    | "villa"
+    | "maison"
+    | "duplex"
+    | "triplex"
+    | "loft"
+    | "local_commercial"
+    | "entrepot"
+    | "garage"
+    | "parking"
+    | "autre";
   adresse: string;
+  commune?: string | null;
+  ville?: string | null;
+  localite_statut?: "HOLD" | "VERIFIEE";
+  localite_preuve_reference?: string | null;
+  localite_anstat_code?: string | null;
+  localite_verifiee_le?: string | null;
+  localite_verifiee_par?: string | null;
+  publier_vitrine?: boolean;
+  titre_fige_le?: string | null;
   proprietaire_id: string | null; // Reference to Client
   proprietaire?: string | null; // For backward compatibility
   loyer_mensuel: number;
   charges: number; // Charges mensuelles
-  statut: "disponible" | "loue" | "en_vente" | "vendu";
+  statut: "disponible" | "en_vente" | "loue" | "louee" | "vendue" | "en_travaux" | "retiree" | "archivee";
   description: string | null;
   cover_image_url: string | null;
   created_at: string;
@@ -199,6 +219,7 @@ export interface LandFile {
 
 export interface Product {
   id: string;
+  reference: string;
   nom: string;
   categorie:
     | "fournitures_bureau"
@@ -233,11 +254,17 @@ export interface Order {
 
 export interface Finance {
   id: string;
-  type_transaction: "recette" | "depense";
+  type_transaction: "recette" | "depense" | null;
+  type_operation?: "ENCAISSEMENT" | "DECAISSEMENT" | "INCONNU";
   categorie: string;
   statut?: string;
   montant: number;
-  date_transaction: string;
+  montant_xof?: number;
+  devise?: string;
+  taux_change?: number;
+  taux_source?: string;
+  date_operation?: string;
+  date_transaction: string | null;
   mode_paiement: "virement" | "especes" | "mobile_money" | "cheque";
   reference: string;
   description: string;
@@ -334,6 +361,9 @@ export interface FoncierLot {
   // Coordonnées GPS (ajoutées migration 20260324)
   latitude?: number | null;
   longitude?: number | null;
+  // Noms exposés par l’API Foncier actuelle.
+  gps_lat?: number | null;
+  gps_lng?: number | null;
   gps_precision?: number | null;
   limite_nord_lat?: number | null;
   limite_nord_lng?: number | null;
@@ -378,6 +408,15 @@ export interface FoncierLot {
 
 export interface VitrineLot {
   id: string;
+  lot_id?: string | null;
+  property_id?: string | null;
+  prix?: number | null;
+  surface?: number | null;
+  localisation?: string | null;
+  photos?: unknown[] | null;
+  publier?: boolean;
+  ordre?: number;
+  tags?: string[] | null;
   reference: string;
   titre: string;
   description: string;

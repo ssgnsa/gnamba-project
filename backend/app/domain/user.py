@@ -9,8 +9,8 @@ class User:
     id: str
     entity_id: str | None = None
     password_hash: str = ""
-    role: str = "employe"
-    access_level: str = "employe"
+    role: str = "guest"
+    access_level: str = "guest"
     is_active: bool = True
     # Identity fields (moved to the linked Entity). Populated by the repository
     # via user -> entity_id -> Entity. Kept for the API contract (UserResponse).

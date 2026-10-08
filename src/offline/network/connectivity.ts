@@ -43,8 +43,11 @@ class RuntimeConnectivityMonitor {
     // avoids embedding legacy/local addresses into production bundles.
     const url = getLocalApiBaseUrl();
     if (!url) return { url: undefined };
-    // Defensive: ensure loopback-like hosts are not used even if envs slip through
-    if (isLikelyLoopback(url)) return { url: undefined };
+    // Local API URLs are expected in development (usually through the Vite
+    // proxy). Keep the defensive loopback rejection for non-development builds.
+    if (!import.meta.env.DEV && isLikelyLoopback(url)) {
+      return { url: undefined };
+    }
     return { url };
   }
 

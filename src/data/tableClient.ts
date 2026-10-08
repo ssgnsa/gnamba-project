@@ -18,7 +18,23 @@ const tableEndpoints: Record<string, string> = {
   media_files: "/media",
   // Mapping legacy french table name to API endpoint
   locataires: "/tenants",
+  tasks: "/tasks",
+  taches: "/tasks",
+  properties: "/immobilier/properties",
+  lease_contracts: "/immobilier/contracts",
+  rent_payments: "/immobilier/payments",
+  site_realisations: "/site/realisations",
+  vitrine_lots: "/site/vitrine-lots",
 };
+
+const supportsResourceById = new Set([
+  "tasks",
+  "properties",
+  "lease_contracts",
+  "rent_payments",
+  "site_realisations",
+  "vitrine_lots",
+]);
 
 class ApiTableQuery {
   private operation: "select" | "insert" | "update" | "delete" | "upsert" =
@@ -138,6 +154,14 @@ class ApiTableQuery {
     return tableEndpoints[this.table] ?? `/tables/${encodeURIComponent(this.table)}`;
   }
 
+  private requestEndpoint() {
+    const id = this.idFilter();
+    if (!id || !supportsResourceById.has(this.table)) {
+      return this.endpoint();
+    }
+    return `${this.endpoint()}/${encodeURIComponent(id)}`;
+  }
+
   private idFilter(): string | null {
     const filter = this.filters.find((item) => item.column === "id" && item.operator === "eq");
     return typeof filter?.value === "string" ? filter.value : null;
@@ -206,16 +230,25 @@ class ApiTableQuery {
     try {
       const id = this.idFilter();
       if (this.operation === "select") {
+        const usesResourceEndpoint = Boolean(id && supportsResourceById.has(this.table));
         const result = await apiClient.request<any>(
-          `${this.endpoint()}${this.queryString()}`,
+          `${this.requestEndpoint()}${usesResourceEndpoint ? "" : this.queryString()}`,
         );
-        let rows = Array.isArray(result.data)
-          ? this.applyFilters(result.data)
-          : result.data;
+        const paginated = result.data && !Array.isArray(result.data)
+          ? result.data.items
+          : undefined;
+        const sourceRows = Array.isArray(paginated)
+          ? paginated
+          : Array.isArray(result.data)
+            ? result.data
+            : result.data && usesResourceEndpoint
+              ? [result.data]
+              : [];
+        let rows = this.applyFilters(sourceRows);
         if (Array.isArray(rows)) {
-          if (this.rangeFrom !== null && this.rangeTo !== null) {
+          if (!Array.isArray(paginated) && this.rangeFrom !== null && this.rangeTo !== null) {
             rows = rows.slice(this.rangeFrom, this.rangeTo + 1);
-          } else if (this.limitCount !== null) {
+          } else if (!Array.isArray(paginated) && this.limitCount !== null) {
             rows = rows.slice(0, this.limitCount);
           }
         }
@@ -226,7 +259,13 @@ class ApiTableQuery {
             : rows;
         return {
           data,
-          count: this.countMode && Array.isArray(rows) ? rows.length : null,
+          count: this.countMode
+            ? typeof result.data?.total === "number"
+              ? result.data.total
+              : Array.isArray(rows)
+                ? rows.length
+                : null
+            : null,
           error: result.error ? { message: result.error } : null,
         };
       }

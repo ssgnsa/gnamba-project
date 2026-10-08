@@ -8,8 +8,13 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.api.deps import require_admin_user
 
-router = APIRouter(prefix="/api/v1/tasks", tags=["tasks"])
+router = APIRouter(
+    prefix="/api/v1/tasks",
+    tags=["tasks"],
+    dependencies=[Depends(require_admin_user)],
+)
 
 
 class TaskResponse(BaseModel):
@@ -52,6 +57,7 @@ class TaskUpdateRequest(BaseModel):
 def list_tasks(
     search: Optional[str] = None,
     statut: Optional[str] = None,
+    priorite: Optional[str] = None,
     employee_id: Optional[str] = None,
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
@@ -72,6 +78,9 @@ def list_tasks(
     if statut:
         query += " AND statut = :statut"
         params["statut"] = statut
+    if priorite:
+        query += " AND priorite = :priorite"
+        params["priorite"] = priorite
     if employee_id:
         query += " AND employee_id = :employee_id"
         params["employee_id"] = employee_id
@@ -193,15 +202,6 @@ def update_task(task_id: str, payload: TaskUpdateRequest, db: Session = Depends(
 
 
 @router.delete("/{task_id}")
-def delete_task(task_id: str, db: Session = Depends(get_db)) -> dict[str, str]:
-    """Supprime une tâche"""
-    result = db.execute(
-        text("DELETE FROM tasks WHERE id = :task_id"),
-        {"task_id": task_id},
-    )
-    db.commit()
-
-    if result.rowcount == 0:
-        raise HTTPException(status_code=404, detail="Tâche introuvable")
-
-    return {"status": "ok", "message": "Tâche supprimée"}
+def delete_task(task_id: str) -> dict[str, str]:
+    """Physical task deletion is prohibited; a reasoned archive route is needed."""
+    raise HTTPException(status_code=403, detail="Archivage motivé requis; suppression refusée")

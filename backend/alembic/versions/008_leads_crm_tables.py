@@ -40,7 +40,8 @@ def upgrade() -> None:
         sa.Column('score', sa.Integer(), nullable=False, server_default='0'),
         sa.Column('qualifie', sa.Boolean(), nullable=False, server_default='false'),
         sa.Column('date_qualification', sa.DateTime(timezone=True), nullable=True),
-        sa.Column('assigne_a', postgresql.UUID(as_uuid=False), nullable=True),
+        # users.id is declared as VARCHAR in 001_initial_create_users.
+        sa.Column('assigne_a', sa.String(), nullable=True),
         sa.Column('notes', sa.Text(), nullable=True),
         sa.Column('metadata_json', postgresql.JSON(), nullable=False, server_default='{}'),
         sa.Column('row_version', sa.Integer(), nullable=False, server_default='1'),
@@ -133,7 +134,7 @@ def upgrade() -> None:
         sa.Column('resultat', sa.String(50), nullable=True),
         sa.Column('prochaine_action', sa.Text(), nullable=True),
         sa.Column('prochaine_action_date', sa.DateTime(timezone=True), nullable=True),
-        sa.Column('user_id', postgresql.UUID(as_uuid=False), nullable=True),
+        sa.Column('user_id', sa.String(), nullable=True),
         sa.Column('duration_seconds', sa.Integer(), nullable=True),
         sa.Column('metadata_json', postgresql.JSON(), nullable=False, server_default='{}'),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),

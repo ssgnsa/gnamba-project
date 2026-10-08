@@ -8,35 +8,57 @@ from uuid import UUID
 from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, text
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.api.deps import require_admin_user
 from app.models.property import Property
 from app.models.entity import Entity
 from app.schemas.immobilier import (
     PropertyCreate,
     PropertyUpdate,
+    PropertyLocalityVerification,
+    PropertyTransition,
     PropertyResponse,
     PropertySearchParams,
     PaginatedPropertyResponse,
     PropertyStatsResponse,
 )
+from app.services.immobilier_audit import (
+    record_property_transition_refusal,
+    set_immobilier_audit_context,
+)
 
-router = APIRouter(prefix="/properties", tags=["immobilier-properties"])
+router = APIRouter(
+    prefix="/properties",
+    tags=["immobilier-properties"],
+    dependencies=[Depends(require_admin_user)],
+)
 
 
 def _property_to_response(prop: Property, include_relations: bool = False) -> PropertyResponse:
     """Convertit un Property ORM en PropertyResponse"""
     data = {
         "id": prop.id,
+        "reference": prop.reference,
+        "titre": prop.titre,
+        "localite_statut": prop.localite_statut,
+        "localite_preuve_reference": prop.localite_preuve_reference,
+        "localite_anstat_code": prop.localite_anstat_code,
+        "localite_verifiee_le": prop.localite_verifiee_le,
+        "localite_verifiee_par": prop.localite_verifiee_par,
         "type_bien": prop.type_bien,
         "adresse": prop.adresse,
+        "ville": prop.ville,
+        "commune": prop.commune,
         "proprietaire_name": prop.proprietaire,
         "valeur": float(prop.valeur) if prop.valeur else None,
         "loyer_mensuel": float(prop.loyer_mensuel) if prop.loyer_mensuel else None,
         "charges_mensuelles": float(prop.charges_mensuelles) if getattr(prop, "charges_mensuelles", None) else None,
         "statut": prop.statut,
+        "publier_vitrine": prop.publier_vitrine,
+        "titre_fige_le": prop.titre_fige_le.isoformat() if prop.titre_fige_le else None,
         "description": prop.description,
         "cover_image_url": prop.cover_image_url,
         "created_at": prop.created_at.isoformat() if prop.created_at else None,
@@ -52,13 +74,19 @@ def _property_to_response(prop: Property, include_relations: bool = False) -> Pr
 
 
 @router.post("", response_model=PropertyResponse, status_code=201)
-def create_property(payload: PropertyCreate, db: Session = Depends(get_db)) -> PropertyResponse:
+def create_property(
+    payload: PropertyCreate,
+    db: Session = Depends(get_db),
+    current_user: dict[str, Any] = Depends(require_admin_user),
+) -> PropertyResponse:
     """Crée un nouveau bien immobilier"""
-    # TODO: Add authorization check
-    
+    set_immobilier_audit_context(db, current_user)
     prop = Property(
+        id=str(payload.id) if payload.id else None,
         type_bien=payload.type_bien,
         adresse=payload.adresse,
+        ville=payload.ville,
+        commune=payload.commune,
         proprietaire=payload.proprietaire_name if hasattr(payload, 'proprietaire_name') else None,
         valeur=payload.valeur,
         loyer_mensuel=payload.loyer_mensuel,
@@ -69,9 +97,50 @@ def create_property(payload: PropertyCreate, db: Session = Depends(get_db)) -> P
     )
     
     db.add(prop)
-    db.commit()
-    db.refresh(prop)
+    try:
+        db.commit()
+        db.refresh(prop)
+    except Exception:
+        db.rollback()
+        raise
     
+    return _property_to_response(prop)
+
+
+@router.post("/{property_id}/localite/verification", response_model=PropertyResponse)
+def verify_property_locality(
+    property_id: UUID,
+    payload: PropertyLocalityVerification,
+    db: Session = Depends(get_db),
+    current_user: dict[str, Any] = Depends(require_admin_user),
+) -> PropertyResponse:
+    """Valide une localité après contrôle du justificatif et du code ANStat."""
+    prop = db.execute(
+        select(Property)
+        .where(Property.id == property_id)
+        .where(Property.deleted_at.is_(None))
+        .with_for_update()
+    ).scalar_one_or_none()
+    if not prop:
+        raise HTTPException(status_code=404, detail="Bien immobilier introuvable")
+    if prop.localite_statut == "VERIFIEE":
+        raise HTTPException(
+            status_code=409,
+            detail="La localité est déjà vérifiée; une procédure de révocation est requise pour la modifier",
+        )
+
+    set_immobilier_audit_context(db, current_user)
+    prop.commune = payload.commune
+    prop.ville = payload.ville
+    prop.localite_preuve_reference = payload.preuve_reference
+    prop.localite_anstat_code = payload.anstat_code
+    prop.localite_statut = "VERIFIEE"
+    try:
+        db.commit()
+        db.refresh(prop)
+    except Exception:
+        db.rollback()
+        raise
     return _property_to_response(prop)
 
 
@@ -159,20 +228,20 @@ def get_properties_stats(db: Session = Depends(get_db)) -> PropertyStatsResponse
     rent_sum = db.execute(
         select(func.sum(Property.loyer_mensuel))
         .where(Property.deleted_at.is_(None))
-        .where(Property.statut == "loue")
+        .where(Property.statut.in_(("loue", "louee")))
     ).scalar() or 0
-    
+
     disponible = stat_dict.get("disponible", 0)
-    loue = stat_dict.get("loue", 0)
-    total_active = total - stat_dict.get("vendu", 0) - stat_dict.get("en_travaux", 0)
+    loue = stat_dict.get("louee", 0) + stat_dict.get("loue", 0)
+    total_active = total - stat_dict.get("vendue", 0) - stat_dict.get("archivee", 0)
     occupancy_rate = (loue / total_active * 100) if total_active > 0 else 0
     
     return PropertyStatsResponse(
         total_properties=total,
         disponible=stat_dict.get("disponible", 0),
-        loue=stat_dict.get("loue", 0),
+        loue=loue,
         en_vente=stat_dict.get("en_vente", 0),
-        vendu=stat_dict.get("vendu", 0),
+        vendu=stat_dict.get("vendue", 0),
         en_travaux=stat_dict.get("en_travaux", 0),
         total_monthly_rent=float(rent_sum),
         occupancy_rate=round(occupancy_rate, 2),
@@ -201,16 +270,35 @@ def update_property(
     property_id: UUID,
     payload: PropertyUpdate,
     db: Session = Depends(get_db),
+    current_user: dict[str, Any] = Depends(require_admin_user),
 ) -> PropertyResponse:
     """Met à jour un bien immobilier"""
     prop = db.execute(
-        select(Property).where(Property.id == property_id).where(Property.deleted_at.is_(None))
+        select(Property).where(Property.id == property_id).where(Property.deleted_at.is_(None)).with_for_update()
     ).scalar_one_or_none()
     
     if not prop:
         raise HTTPException(status_code=404, detail="Bien immobilier introuvable")
     
     update_data = payload.model_dump(exclude_unset=True)
+    editable_fields = {
+        "type_bien", "adresse", "ville", "commune", "proprietaire_name",
+        "valeur", "loyer_mensuel", "charges_mensuelles", "description",
+        "cover_image_url",
+    }
+    # Keep the API-to-ORM boundary explicit even if the request schema changes.
+    update_data = {key: update_data[key] for key in editable_fields if key in update_data}
+
+    if prop.titre_fige_le and any(
+        update_data.get(field, getattr(prop, field)) != getattr(prop, field)
+        for field in ("type_bien", "commune", "ville")
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Titre gelé: dépubliez le bien avant de modifier type ou localité",
+        )
+
+    set_immobilier_audit_context(db, current_user)
     for key, value in update_data.items():
         if key == "properitaire_entity_id" and hasattr(payload, "proprietaire_name"):
             # Handle the rename for backward compatibility
@@ -220,41 +308,109 @@ def update_property(
     
     prop.updated_at = datetime.utcnow()
 
+    try:
+        db.commit()
+        db.refresh(prop)
+    except Exception:
+        db.rollback()
+        raise
+
+    return _property_to_response(prop)
+
+
+@router.post("/{property_id}/transition", response_model=PropertyResponse)
+def transition_property(
+    property_id: UUID,
+    payload: PropertyTransition,
+    db: Session = Depends(get_db),
+    current_user: dict[str, Any] = Depends(require_admin_user),
+) -> PropertyResponse:
+    """Applique une transition opérationnelle via la matrice métier SQL."""
+    prop = db.execute(
+        select(Property).where(Property.id == property_id)
+        .where(Property.deleted_at.is_(None)).with_for_update()
+    ).scalar_one_or_none()
+    if not prop:
+        raise HTTPException(status_code=404, detail="Bien immobilier introuvable")
+
+    new_status = payload.statut
+    allowed = db.execute(
+        text("""
+            SELECT EXISTS (
+                SELECT 1 FROM public.immobilier_statut_transitions
+                WHERE from_status=:old_status AND to_status=:new_status
+            )
+        """),
+        {"old_status": prop.statut, "new_status": new_status},
+    ).scalar_one()
+    if not allowed:
+        record_property_transition_refusal(
+            db, current_user, str(prop.id), new_status,
+            f"Transition interdite: {prop.statut} → {new_status}",
+        )
+        raise HTTPException(status_code=409, detail="Transition de statut interdite")
+
+    set_immobilier_audit_context(db, current_user)
+    prop.statut = new_status
+    prop.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(prop)
-
     return _property_to_response(prop)
 
 
 @router.delete("/{property_id}")
 def delete_property(
     property_id: UUID,
-    soft: bool = Query(True, description="Soft delete (archiver) ou hard delete"),
-    db: Session = Depends(get_db),
 ) -> dict[str, str]:
-    """Supprime un bien immobilier"""
+    """Deletion is disabled until a reasoned archive is available."""
+    raise HTTPException(status_code=403, detail="Archivage motivé requis; suppression refusée")
+
+
+@router.post("/{property_id}/publish", response_model=PropertyResponse)
+def publish_property(
+    property_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: dict[str, Any] = Depends(require_admin_user),
+) -> PropertyResponse:
     prop = db.execute(
         select(Property).where(Property.id == property_id)
+        .where(Property.deleted_at.is_(None)).with_for_update()
     ).scalar_one_or_none()
-    
     if not prop:
         raise HTTPException(status_code=404, detail="Bien immobilier introuvable")
-    
-    if soft:
-        prop.deleted_at = datetime.utcnow()
-        prop.deleted_by = None
-        db.commit()
-        return {"status": "ok", "message": "Bien immobilier archivé"}
-    else:
-        db.delete(prop)
-        db.commit()
-        return {"status": "ok", "message": "Bien immobilier supprimé définitivement"}
+    if prop.statut not in {"disponible", "en_vente"}:
+        raise HTTPException(status_code=409, detail="Seuls les biens disponibles ou en vente peuvent être publiés")
+    set_immobilier_audit_context(db, current_user)
+    prop.publier_vitrine = True
+    db.commit()
+    db.refresh(prop)
+    return _property_to_response(prop)
+
+
+@router.post("/{property_id}/unpublish", response_model=PropertyResponse)
+def unpublish_property(
+    property_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: dict[str, Any] = Depends(require_admin_user),
+) -> PropertyResponse:
+    prop = db.execute(
+        select(Property).where(Property.id == property_id)
+        .where(Property.deleted_at.is_(None)).with_for_update()
+    ).scalar_one_or_none()
+    if not prop:
+        raise HTTPException(status_code=404, detail="Bien immobilier introuvable")
+    set_immobilier_audit_context(db, current_user)
+    prop.publier_vitrine = False
+    db.commit()
+    db.refresh(prop)
+    return _property_to_response(prop)
 
 
 @router.post("/{property_id}/restore", response_model=PropertyResponse)
 def restore_property(
     property_id: UUID,
     db: Session = Depends(get_db),
+    current_user: dict[str, Any] = Depends(require_admin_user),
 ) -> PropertyResponse:
     """Restaure un bien immobilier archivé"""
     prop = db.execute(
@@ -264,6 +420,7 @@ def restore_property(
     if not prop:
         raise HTTPException(status_code=404, detail="Bien immobilier introuvable ou non archivé")
     
+    set_immobilier_audit_context(db, current_user)
     prop.deleted_at = None
     prop.deleted_by = None
     prop.updated_at = datetime.utcnow()

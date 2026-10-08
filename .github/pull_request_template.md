@@ -27,7 +27,7 @@ Decrire le probleme traite et le resultat attendu.
 - PostgreSQL/Alembic:
 - Docker/infra:
 - Documentation:
-- Supabase/legacy:
+- API locale / adaptateurs legacy:
 
 ## Rollback
 
@@ -50,8 +50,8 @@ Backend:
 
 Infrastructure:
 
-- [ ] `docker compose -f docker-compose.selfhosted.yml config`
-- [ ] `docker compose -f backend/docker-compose.yml config`
+- [ ] `docker compose -f docker-compose.yml config`
+- [ ] `python3 scripts/deploy_new_host.py validate --env-file <env valide>` (si nouvel hôte)
 
 Securite:
 
@@ -81,4 +81,3 @@ Sinon:
 ## Dette restante
 
 Lister ce qui doit etre traite dans la PR suivante.
-

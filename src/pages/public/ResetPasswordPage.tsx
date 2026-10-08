@@ -13,6 +13,7 @@ export default function ResetPasswordPage({ onSuccess }: Props) {
   const { settings } = useSettings();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [resetToken, setResetToken] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [showConfirmPwd, setShowConfirmPwd] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -31,9 +32,11 @@ export default function ResetPasswordPage({ onSuccess }: Props) {
     .toUpperCase();
 
   useEffect(() => {
-    // Vérifier si nous sommes dans un flux de réinitialisation
-    const hash = window.location.hash;
-    if (hash.includes("access_token") || hash.includes("type=recovery")) {
+    const fragment = new URLSearchParams(window.location.hash.slice(1));
+    const token = fragment.get("token") || "";
+    if (token) {
+      setResetToken(token);
+      window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
       setLoading(false);
     } else {
       setError("Lien de réinitialisation invalide ou expiré.");
@@ -49,8 +52,8 @@ export default function ResetPasswordPage({ onSuccess }: Props) {
       return;
     }
 
-    if (password.length < 6) {
-      setError("Le mot de passe doit contenir au moins 6 caractères.");
+    if (password.length < 12) {
+      setError("Le mot de passe doit contenir au moins 12 caractères.");
       return;
     }
 
@@ -62,13 +65,7 @@ export default function ResetPasswordPage({ onSuccess }: Props) {
     setSaving(true);
     setError("");
 
-    const result = await apiClient.request<{ message?: string }>(
-      "/auth/reset-password",
-      {
-        method: "POST",
-        body: JSON.stringify({ password }),
-      },
-    );
+    const result = await apiClient.auth.resetPassword(resetToken, password);
 
     setSaving(false);
 

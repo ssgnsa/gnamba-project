@@ -1,47 +1,87 @@
 from __future__ import annotations
 
+import importlib
+
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.api.deps import get_current_user
 
 
-client = TestClient(app, raise_server_exceptions=True)
+def test_site_content_writes_require_admin(monkeypatch) -> None:
+    site_content_module = importlib.import_module("app.api.v1.site_content.router")
+
+    calls: list[tuple[str, dict | None]] = []
+
+    class FakeSession:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def execute(self, statement, params=None):
+            calls.append((str(statement), params))
+
+        def commit(self):
+            calls.append(("COMMIT", None))
+
+    monkeypatch.setattr(site_content_module, "SessionLocal", FakeSession)
+    client = TestClient(app, raise_server_exceptions=False)
+    payload = {"section": "hero", "key": "security_test", "value": "Valeur"}
+
+    writes = [
+        ("post", "/api/site-content", payload),
+        ("patch", "/api/site-content/1", payload),
+        ("delete", "/api/site-content/1", None),
+    ]
+    try:
+        # Anonymous calls are rejected before a database session is opened.
+        for method, path, body in writes:
+            response = getattr(client, method)(path, json=body) if body else getattr(client, method)(path)
+            assert response.status_code == 401, response.text
+        assert calls == []
+
+        # An authenticated non-admin is denied by the same server dependency.
+        app.dependency_overrides[get_current_user] = lambda: {"id": "test-user", "role": "gestionnaire"}
+        for method, path, body in writes:
+            response = getattr(client, method)(path, json=body) if body else getattr(client, method)(path)
+            assert response.status_code == 403, response.text
+        assert calls == []
+
+        # An authorized admin reaches the write path and commits.
+        app.dependency_overrides[get_current_user] = lambda: {
+            "id": "test-admin",
+            "role": "admin",
+            "mfa_verified": True,
+        }
+        response = client.post("/api/site-content", json=payload)
+        assert response.status_code == 200, response.text
+        assert response.json()["status"] == "ok"
+        assert any(sql == "COMMIT" for sql, _ in calls)
+    finally:
+        app.dependency_overrides.clear()
 
 
-def test_site_content_crud_flow() -> None:
-    # Create or upsert a site content key
-    payload = {"section": "hero", "key": "test_title", "value": "Titre de test"}
-    resp = client.post("/api/site-content", json=payload)
-    assert resp.status_code == 200, resp.text
-    assert resp.json().get("status") == "ok"
+def test_site_content_public_read_remains_available(monkeypatch) -> None:
+    site_content_module = importlib.import_module("app.api.v1.site_content.router")
 
-    # Read list and find our key
-    list_resp = client.get("/api/site-content")
-    assert list_resp.status_code == 200
-    items = list_resp.json()
-    found = [i for i in items if i.get("key") == "test_title"]
-    assert len(found) >= 1
-    # If id is not returned via list, try to patch by locating any matching key
-    # The table exposes id in the generic tables API, but here we can attempt delete via tables as well
+    class FakeResult:
+        def fetchall(self):
+            return [("hero", "title", "Site public")]
 
-    # Try update via patch (use first item's id if present)
-    maybe_id = None
-    # Try querying through generic tables endpoint to find id
-    tbl = client.get("/api/tables/site_content")
-    if tbl.status_code == 200:
-        for row in tbl.json():
-            if row.get("key") == "test_title":
-                maybe_id = row.get("id")
-                break
+    class FakeSession:
+        def __enter__(self):
+            return self
 
-    if maybe_id:
-        patch_resp = client.patch(f"/api/site-content/{maybe_id}", json={"section": "hero", "key": "test_title", "value": "Titre modifié"})
-        assert patch_resp.status_code == 200
-        assert patch_resp.json().get("status") == "ok"
+        def __exit__(self, *_args):
+            return False
 
-        del_resp = client.delete(f"/api/site-content/{maybe_id}")
-        assert del_resp.status_code == 200
-        assert del_resp.json().get("status") == "ok"
-    else:
-        # If id not found, at least ensure the key is present in list
-        assert any(i.get("key") == "test_title" for i in items)
+        def execute(self, *_args, **_kwargs):
+            return FakeResult()
+
+    monkeypatch.setattr(site_content_module, "SessionLocal", FakeSession)
+    app.dependency_overrides.clear()
+    response = TestClient(app).get("/api/site-content")
+    assert response.status_code == 200
+    assert response.json() == [{"section": "hero", "key": "title", "value": "Site public"}]

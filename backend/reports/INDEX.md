@@ -1,5 +1,11 @@
 # 📋 EGS — Audit Reports Index
 
+> **Index historique — ne pas utiliser comme plan d'exécution autonome.**
+> Les inventaires SQL/Supabase et leurs statistiques décrivent l'audit du
+> 13 juillet 2026. La source de vérité active est Alembic dans `backend/`;
+> `scripts/deploy/safe_migration_deploy.py` exige désormais un DSN explicite
+> et délègue les applications au script contrôlé `scripts/apply-migrations.sh`.
+
 **Generated** : 13 juillet 2026  
 **Location** : `/home/soma/gnamba-project/backend/reports/`
 
@@ -106,10 +112,13 @@ PYTHONPATH=. .venv/bin/python3 scripts/audit/schema_compare.py
 PYTHONPATH=. .venv/bin/python3 scripts/audit/migration_dependency_analysis.py
 
 # Étape 3 : Dry-run
-PYTHONPATH=. .venv/bin/python3 scripts/deploy/safe_migration_deploy.py --dry-run
+ DATABASE_URL='postgresql://<role-applicatif>:<mot-de-passe>@<hôte>/<base>' \
+   PYTHONPATH=. .venv/bin/python3 scripts/deploy/safe_migration_deploy.py --dry-run
 
 # Étape 6 : Déployer (interactif)
-PYTHONPATH=. .venv/bin/python3 scripts/deploy/safe_migration_deploy.py --apply
+ DATABASE_URL='postgresql://<role-applicatif>:<mot-de-passe>@<hôte>/<base>' \
+   EGS_BACKUP_VERIFIED=1 EGS_MIGRATION_APPROVED=1 \
+   PYTHONPATH=. .venv/bin/python3 scripts/deploy/safe_migration_deploy.py --apply
 ```
 
 **Utilité** : Checklist pas-à-pas pour prod. À suivre exactement.

@@ -18,6 +18,7 @@ import {
   ConfigModal,
   AuditModal,
 } from "../components/foncier/parts";
+import WorkflowValidation from "../components/foncier/WorkflowValidation";
 export default function Foncier() {
   const { settings } = useSettings();
   const { profile } = useAuth();
@@ -267,33 +268,101 @@ export default function Foncier() {
           />
         )}
 
-        {/* Tab: Attestations - placeholder for now */}
+        {/* Tab: Attestations */}
         {activeTab === "attestations" && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
-            <FileText size={48} className="mx-auto text-gray-300 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Gestion des attestations</h3>
-            <p className="text-gray-500 mb-6">Sélectionnez un lot pour générer ou consulter ses attestations.</p>
-            <button
-              onClick={() => setActiveTab("lots")}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              Voir les lots
-            </button>
+          <div className="space-y-4">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Gestion des attestations</h3>
+                  <p className="text-sm text-gray-500">Consultez, imprimez et vérifiez les attestations de chaque lot.</p>
+                </div>
+                <button
+                  onClick={() => setActiveTab("lots")}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  Voir les lots
+                </button>
+              </div>
+
+              {lots.length === 0 ? (
+                <div className="text-sm text-gray-500">Aucune attestation disponible pour le moment.</div>
+              ) : (
+                <div className="space-y-3">
+                  {lots.slice(0, 8).map((lot) => (
+                    <div key={lot.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4">
+                      <div>
+                        <div className="font-medium text-gray-900">{lot.reference}</div>
+                        <div className="text-sm text-gray-500">{lot.numero_lot} · {lot.village}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => openAttestation(lot)}
+                          className="px-3 py-2 text-sm rounded-lg border border-gray-200 text-gray-700 hover:bg-white"
+                        >
+                          Nouvelle attestation
+                        </button>
+                        <button
+                          onClick={() => openAttestationHistory(lot)}
+                          className="px-3 py-2 text-sm rounded-lg border border-gray-200 text-gray-700 hover:bg-white"
+                          aria-label="Voir l'historique"
+                        >
+                          Voir l'historique
+                        </button>
+                        <button
+                          onClick={() => handlePrintAttestation(lot)}
+                          className="px-3 py-2 text-sm rounded-lg border border-gray-200 text-gray-700 hover:bg-white"
+                        >
+                          Imprimer
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
-        {/* Tab: Workflow - placeholder for now */}
+        {/* Tab: Workflow */}
         {activeTab === "workflow" && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
-            <CheckCircle size={48} className="mx-auto text-gray-300 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Workflow de validation</h3>
-            <p className="text-gray-500 mb-6">Sélectionnez un lot pour gérer le workflow de validation Chef de village.</p>
-            <button
-              onClick={() => setActiveTab("lots")}
-              className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
-            >
-              Voir les lots
-            </button>
+          <div className="space-y-4">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Workflow de validation</h3>
+                  <p className="text-sm text-gray-500">Soumission, validation du Chef de village et scan original.</p>
+                </div>
+                <button
+                  onClick={() => setActiveTab("lots")}
+                  className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+                >
+                  Voir les lots
+                </button>
+              </div>
+
+              {lots.length === 0 ? (
+                <div className="text-sm text-gray-500">Aucun lot disponible pour le workflow de validation.</div>
+              ) : (
+                <div className="space-y-3">
+                  {lots.slice(0, 8).map((lot) => (
+                    <div key={lot.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4">
+                      <div>
+                        <div className="font-medium text-gray-900">{lot.reference}</div>
+                        <div className="text-sm text-gray-500">{lot.numero_lot} · {lot.village}</div>
+                      </div>
+                      <button
+                        onClick={() => openWorkflow(lot.id)}
+                        className="px-3 py-2 text-sm rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
+                        aria-label="Ouvrir la validation"
+                      >
+                        Valider ce lot
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -420,16 +489,23 @@ export default function Foncier() {
         <div>
           {workflowModalOpen && workflowSelectedLot && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-              <div className="relative w-full max-w-2xl mx-4 sm:mx-0 max-h-[90vh] overflow-y-auto">
+              <div className="relative w-full max-w-3xl mx-4 sm:mx-0 max-h-[90vh] overflow-y-auto">
                 <div className="bg-white rounded-lg shadow-lg w-full">
                   <div className="flex items-center justify-between p-4 border-b rounded-t-lg">
                     <h3 className="text-lg font-semibold text-gray-900">Workflow de Validation</h3>
                     <button onClick={() => setWorkflowModalOpen(false)} className="text-gray-500 hover:text-gray-700 text-2xl leading-none">×</button>
                   </div>
-                  {/* WorkflowValidation component would go here */}
-                  <div className="p-8 text-center text-gray-500">
-                    <p>WorkflowValidation component - à connecter</p>
-                    <button onClick={() => setWorkflowModalOpen(false)} className="mt-4 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Fermer</button>
+                  <div className="p-4">
+                    <WorkflowValidation
+                      lotId={workflowSelectedLot}
+                      userName={profile?.full_name ?? undefined}
+                      isAdmin={profile?.role === "admin"}
+                      isOnline={isOnline}
+                      onWorkflowComplete={() => {
+                        setWorkflowModalOpen(false);
+                        void fetchData();
+                      }}
+                    />
                   </div>
                 </div>
               </div>

@@ -34,11 +34,12 @@ Migrations are in `backend/alembic/versions/` as sequential Python files (18 com
 ### Docker
 
 ```powershell
-docker-compose up -d     # Start the EGS frontend container only
+docker-compose up -d     # Start the canonical EGS stack
 docker-compose down      # Stop containers
 ```
 
-Local PostgreSQL is managed separately (not by docker-compose.yml).
+For backend-only development, `backend/docker-compose.yml` is a local
+development scenario and is not a production deployment target.
 
 ## Architecture
 

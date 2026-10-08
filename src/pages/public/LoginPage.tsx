@@ -13,7 +13,7 @@ interface Props {
 }
 
 export default function LoginPage({ onSuccess, onForgotPassword }: Props) {
-  const { signIn } = useAuth();
+  const { signIn, verifyMfa } = useAuth();
   const { settings } = useSettings();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -21,6 +21,8 @@ export default function LoginPage({ onSuccess, onForgotPassword }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [mfaRequired, setMfaRequired] = useState(false);
+  const [mfaCode, setMfaCode] = useState("");
   const [rememberMe, setRememberMe] = useState(() => {
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem("egs:remember_me") === "true";
@@ -109,8 +111,21 @@ export default function LoginPage({ onSuccess, onForgotPassword }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (mfaRequired) {
+      setLoading(true);
+      setError("");
+      const result = await verifyMfa(mfaCode);
+      setLoading(false);
+      if (result.error) {
+        setError("Code MFA invalide ou expiré. Vérifiez votre application d’authentification.");
+        return;
+      }
+      clearRateLimit();
+      onSuccess();
+      return;
+    }
     const normalizedEmail = normalizeCredential(email).toLowerCase();
-    const normalizedPassword = normalizeCredential(password);
+    const normalizedPassword = password;
 
     if (!normalizedEmail || !normalizedPassword) return;
     const rateLimit = checkRateLimit();
@@ -188,6 +203,11 @@ export default function LoginPage({ onSuccess, onForgotPassword }: Props) {
       setError(
         `Connexion impossible (${code || "erreur"}). Réessayez ou vérifiez la configuration API locale.`,
       );
+      return;
+    }
+    if (code === "mfa_required") {
+      setMfaRequired(true);
+      setNotice("Saisissez le code à 6 chiffres de votre application d’authentification.");
       return;
     }
     clearRateLimit();
@@ -351,6 +371,26 @@ export default function LoginPage({ onSuccess, onForgotPassword }: Props) {
                 </div>
               </div>
 
+              {mfaRequired && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
+                    Code MFA
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]{6}"
+                    maxLength={6}
+                    value={mfaCode}
+                    onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ""))}
+                    placeholder="000000"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-base tracking-[0.4em] text-center focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition"
+                    required
+                    autoComplete="one-time-code"
+                  />
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wide">
                   Mot de passe
@@ -432,9 +472,11 @@ export default function LoginPage({ onSuccess, onForgotPassword }: Props) {
                 type="submit"
                 disabled={
                   loading ||
-                  !email ||
-                  !password ||
-                  (turnstileSiteKey ? !turnstileToken : false)
+                  (mfaRequired
+                    ? mfaCode.length !== 6
+                    : !email ||
+                      !password ||
+                      (turnstileSiteKey ? !turnstileToken : false))
                 }
                 className="w-full flex items-center justify-center gap-2 py-3.5 bg-blue-700 hover:bg-blue-800 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl font-semibold transition-all shadow-sm text-sm mt-2"
               >
@@ -443,37 +485,13 @@ export default function LoginPage({ onSuccess, onForgotPassword }: Props) {
                 ) : (
                   <LogIn size={16} />
                 )}
-                {loading ? "Connexion..." : "Se connecter"}
+                {loading
+                  ? "Connexion..."
+                  : mfaRequired
+                    ? "Valider le code MFA"
+                    : "Se connecter"}
               </button>
             </form>
-
-            {import.meta.env.DEV && (
-              <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
-                <div className="flex items-start gap-2.5">
-                  <AlertCircle
-                    size={16}
-                    className="text-amber-600 mt-0.5 flex-shrink-0"
-                  />
-                  <div className="text-sm text-amber-900">
-                    <p className="font-semibold">Compte administrateur local</p>
-                    <p className="mt-1">
-                      Email:{" "}
-                      <span className="font-mono">admin@egs.local</span>
-                    </p>
-                    <p>
-                      Mot de passe:{" "}
-                      <span className="font-mono">
-                        {import.meta.env.VITE_INITIAL_ADMIN_PASSWORD || "(non configuré)"}
-                      </span>
-                    </p>
-                    <p className="mt-2 text-xs text-amber-800">
-                      Si ce compte n'apparaît pas, relancez `dbClient db reset`
-                      puis `dbClient start` pour rejouer le seed local.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
 
             <div className="mt-6 pt-5 border-t border-gray-100 text-center">
               <p className="text-xs text-gray-400">

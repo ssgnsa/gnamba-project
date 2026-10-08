@@ -1,6 +1,8 @@
+import { useEffect, useState } from "react";
 import { ArrowRight, Building2, CheckCircle2, MessageCircle, Phone, Shield, Zap, Target, Users, Search, TrendingUp, Home, Sparkles } from "lucide-react";
 import type { PublicPage } from "../../lib/publicRoutes";
 import { OFFICIAL_CONTACT, buildWhatsAppUrl } from "../../lib/officialContact";
+import apiClient from "../../api/client";
 
 // Premium UI Components
 import {
@@ -41,8 +43,31 @@ const stats = [
   { n: "24h", l: "Réponse garantie", icon: Zap },
 ];
 
+type PublicProperty = {
+  id: string;
+  reference: string;
+  titre: string;
+  description: string | null;
+  commune: string | null;
+  ville: string | null;
+  loyer_mensuel: number | null;
+  valeur: number | null;
+  cover_image_url: string | null;
+};
+
 export default function PublicImmobilier({ onNavigate }: Props) {
+  const [publishedProperties, setPublishedProperties] = useState<PublicProperty[]>([]);
   const whatsappUrl = buildWhatsAppUrl(OFFICIAL_CONTACT.phone);
+
+  useEffect(() => {
+    let active = true;
+    void apiClient.request<PublicProperty[]>("/site/properties").then((result) => {
+      if (active && !result.error && Array.isArray(result.data)) {
+        setPublishedProperties(result.data);
+      }
+    });
+    return () => { active = false; };
+  }, []);
 
   const nav = (page: PublicPage) => {
     onNavigate(page);
@@ -86,6 +111,39 @@ export default function PublicImmobilier({ onNavigate }: Props) {
               </a>
             </Flex>
           </Flex>
+        </Container>
+      </section>
+
+      <section className="py-16 bg-white" aria-labelledby="biens-publies-title">
+        <Container size="xl">
+          <div className="text-center mb-10">
+            <Badge variant="secondary" size="md">Biens disponibles</Badge>
+            <h2 id="biens-publies-title" className="mt-3 text-3xl font-bold text-neutral-900">Biens immobiliers publiés</h2>
+            <p className="mt-2 text-neutral-500">Seuls les biens approuvés pour la vitrine apparaissent ici.</p>
+          </div>
+          {publishedProperties.length === 0 ? (
+            <p className="text-center text-sm text-neutral-500">Aucun bien immobilier publié pour le moment.</p>
+          ) : (
+            <Grid cols={{ base: 1, sm: 2, lg: 3 }} gap="lg">
+              {publishedProperties.map((property) => (
+                <Card key={property.id} variant="elevated" padding="lg">
+                  {property.cover_image_url && (
+                    <img src={property.cover_image_url} alt="" className="mb-4 h-48 w-full rounded-xl object-cover" />
+                  )}
+                  <p className="text-xs font-medium uppercase tracking-wide text-sky-700">{property.reference}</p>
+                  <CardTitle className="mt-1 text-lg">{property.titre}</CardTitle>
+                  <p className="mt-1 text-sm text-neutral-500">{property.commune || property.ville}</p>
+                  {property.description && <p className="mt-3 line-clamp-3 text-sm text-neutral-600">{property.description}</p>}
+                  {(property.loyer_mensuel || property.valeur) && (
+                    <p className="mt-4 font-semibold text-sky-700">
+                      {new Intl.NumberFormat("fr-FR").format(property.loyer_mensuel || property.valeur || 0)} FCFA
+                      {property.loyer_mensuel ? "/mois" : ""}
+                    </p>
+                  )}
+                </Card>
+              ))}
+            </Grid>
+          )}
         </Container>
       </section>
 

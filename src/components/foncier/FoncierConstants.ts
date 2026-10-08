@@ -231,17 +231,12 @@ export type AttestationScan = { url: string; original_name: string };
 
 export type AuditQueryRow = {
   id: string;
-  lot_id: string;
+  entity_id: string;
   action: string;
-  performed_by: string | null;
-  performed_at: string;
+  user_name: string | null;
+  created_at: string;
   old_values: any;
   new_values: any;
-  foncier_lots: {
-    reference: string;
-    numero_lot: string;
-    village: string;
-  } | null;
 };
 
 export const auditActions = [
@@ -564,4 +559,3 @@ export const buildAttestationVerificationUrl = (
 };
 
 export { FONCIER_ATTESTATION_WITH_TEMOINS_SELECT } from "../../lib/foncierAttestation";
-

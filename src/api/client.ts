@@ -9,14 +9,15 @@ export interface ApiResult<T = any> {
   error: string | null;
   count?: number | null;
   status?: number;
+  code?: string | null;
 }
 
 interface AuthResult {
   user: any;
-  session: any;
   access_token?: string;
-  refresh_token?: string;
   code?: string;
+  mfa_challenge_required?: boolean;
+  aal?: string;
 }
 
 export function resolveApiBaseUrl(
@@ -42,6 +43,8 @@ export function resolveApiBaseUrl(
 class ApiClient {
   private baseUrl: string;
   private defaultHeaders: Record<string, string>;
+  private accessToken: string | null = null;
+  private refreshPromise: Promise<ApiResult<AuthResult>> | null = null;
 
   private buildQueryString(params?: Record<string, any>): string {
     if (!params) return '';
@@ -66,19 +69,45 @@ class ApiClient {
     this.defaultHeaders = {
       'Content-Type': 'application/json',
     };
+    if (typeof window !== 'undefined') {
+      // Remove bearer tokens persisted by releases predating HttpOnly refresh cookies.
+      window.localStorage.removeItem('egs:local_auth_token');
+      window.localStorage.removeItem('egs:local_refresh_token');
+    }
   }
 
   private getAuthHeaders(): Record<string, string> {
-    if (typeof window === 'undefined') return {};
-    const token = window.localStorage.getItem('egs:local_auth_token');
-    if (token) {
-      return { Authorization: `Bearer ${token}` };
-    }
-    return {};
+    return this.accessToken ? { Authorization: `Bearer ${this.accessToken}` } : {};
   }
 
-  async request<T = any>(endpoint: string, options: RequestInit = {}): Promise<ApiResult<T>> {
+  private refreshSession(): Promise<ApiResult<AuthResult>> {
+    if (!this.refreshPromise) {
+      this.refreshPromise = this.auth.refresh().finally(() => {
+        this.refreshPromise = null;
+      });
+    }
+    return this.refreshPromise;
+  }
+
+  private shouldRefreshAfterUnauthorized(endpoint: string): boolean {
+    // A rejected MFA code, password reset or logout must not rotate the
+    // refresh cookie as a side effect. Protected business endpoints can still
+    // transparently renew an expired access token.
+    return endpoint === '/auth/me' || !endpoint.startsWith('/auth/');
+  }
+
+  private assertSecureCredentialTransport(endpoint: string): void {
+    if (typeof window === 'undefined' || (!this.accessToken && !/^\/auth\//.test(endpoint))) return;
+    const localHost = /^(localhost|127\.0\.0\.1|\[::1\])$/i.test(window.location.hostname);
+    const apiUrl = new URL(this.baseUrl, window.location.origin);
+    if (!localHost && (window.location.protocol !== 'https:' || apiUrl.protocol !== 'https:')) {
+      throw new Error('La connexion sécurisée HTTPS est obligatoire pour l’authentification.');
+    }
+  }
+
+  async request<T = any>(endpoint: string, options: RequestInit = {}, retryWithSession = true): Promise<ApiResult<T>> {
     const doFetch = async (withAuth = true): Promise<Response> => {
+      this.assertSecureCredentialTransport(endpoint);
       const headers = {
         ...this.defaultHeaders,
         ...(withAuth ? this.getAuthHeaders() : {}),
@@ -91,6 +120,7 @@ class ApiClient {
 
       return fetch(`${this.baseUrl}${endpoint}`, {
         ...options,
+        credentials: 'include',
         headers,
       });
     };
@@ -98,25 +128,32 @@ class ApiClient {
     try {
       let response = await doFetch();
 
-      if (response.status === 401 && typeof window !== 'undefined') {
-        const refreshToken = window.localStorage.getItem('egs:local_refresh_token');
-        if (refreshToken) {
-          const refreshResult = await this.auth.refresh(refreshToken);
-          if (!refreshResult.error && refreshResult.data?.access_token) {
-            this.persistLocalAuthToken(
-              refreshResult.data.access_token,
-              refreshResult.data.refresh_token ?? refreshToken,
-            );
-            response = await doFetch();
-          } else {
-            this.clearStoredLocalAuthToken();
-          }
+      if (retryWithSession && response.status === 401 && typeof window !== 'undefined' && this.shouldRefreshAfterUnauthorized(endpoint)) {
+        const refreshResult = await this.refreshSession();
+        if (!refreshResult.error && refreshResult.data?.access_token) {
+          this.persistLocalAuthToken(refreshResult.data.access_token);
+          response = await doFetch();
+        } else {
+          this.clearStoredLocalAuthToken();
         }
       }
 
       if (!response.ok) {
         const errorText = await response.text();
-        return { data: null, error: `HTTP ${response.status}: ${errorText}`, count: null, status: response.status };
+        let errorPayload: { code?: string; detail?: string } = {};
+        try {
+          errorPayload = JSON.parse(errorText) as { code?: string; detail?: string };
+        } catch {
+          // Keep the raw response in the public error message below.
+        }
+        const detail = typeof errorPayload.detail === 'string' ? errorPayload.detail : errorText;
+        return {
+          data: null,
+          error: `HTTP ${response.status}: ${detail}`,
+          count: null,
+          status: response.status,
+          code: errorPayload.code ?? null,
+        };
       }
 
       const data = await response.json();
@@ -128,6 +165,7 @@ class ApiClient {
 
   async fetchStorageFile(fileUrl: string): Promise<Blob> {
     if (typeof window === 'undefined') throw new Error('Storage files are browser-only');
+    this.assertSecureCredentialTransport('/storage/files');
 
     const parsed = new URL(fileUrl, window.location.origin);
     const prefix = '/storage/';
@@ -138,24 +176,15 @@ class ApiClient {
     const endpoint = `/storage/files/${parsed.pathname.slice(prefix.length)}${parsed.search}`;
     const fetchFile = () => fetch(`${this.baseUrl}${endpoint}`, {
       headers: this.getAuthHeaders(),
+      credentials: 'include',
     });
 
     let response = await fetchFile();
     if (response.status === 401) {
-      const refreshToken = window.localStorage.getItem('egs:local_refresh_token');
-      if (refreshToken) {
-        const refreshResponse = await fetch(`${this.baseUrl}/auth/refresh`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refresh_token: refreshToken }),
-        });
-        if (refreshResponse.ok) {
-          const tokens = await refreshResponse.json() as { access_token?: string; refresh_token?: string };
-          if (tokens.access_token) {
-            await this.persistLocalAuthToken(tokens.access_token, tokens.refresh_token || refreshToken);
-            response = await fetchFile();
-          }
-        }
+      const refreshResult = await this.refreshSession();
+      if (!refreshResult.error && refreshResult.data?.access_token) {
+        this.persistLocalAuthToken(refreshResult.data.access_token);
+        response = await fetchFile();
       }
     }
 
@@ -169,15 +198,20 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     }),
+    verifyMfa: async (code: string) => this.request<AuthResult>('/auth/mfa/verify', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    }),
     logout: async () => this.request('/auth/logout', { method: 'POST' }),
     me: async () => this.request('/auth/me'),
-    refresh: async (refreshToken: string) => this.request('/auth/refresh', {
-      method: 'POST',
-      body: JSON.stringify({ refresh_token: refreshToken }),
-    }),
-    resetPassword: async (email: string) => this.request('/auth/password/reset', {
+    refresh: async () => this.request('/auth/refresh', { method: 'POST' }, false),
+    requestPasswordReset: async (email: string) => this.request('/auth/password/forgot', {
       method: 'POST',
       body: JSON.stringify({ email }),
+    }),
+    resetPassword: async (token: string, newPassword: string) => this.request('/auth/password/reset', {
+      method: 'POST',
+      body: JSON.stringify({ token, new_password: newPassword }),
     }),
     updatePassword: async (currentPassword: string, newPassword: string) => this.request('/auth/change-password', {
       method: 'POST',
@@ -187,19 +221,17 @@ class ApiClient {
 
   // Named exports for backward compatibility
   async clearStoredLocalAuthToken() {
-    if (typeof window !== 'undefined') {
-      window.localStorage.removeItem('egs:local_auth_token');
-      window.localStorage.removeItem('egs:local_refresh_token');
-    }
+    this.accessToken = null;
     return { data: null, error: null, count: 1, status: 200 };
   }
 
-  async persistLocalAuthToken(accessToken: string, refreshToken: string) {
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem('egs:local_auth_token', accessToken);
-      window.localStorage.setItem('egs:local_refresh_token', refreshToken);
-    }
-    return { data: { access_token: accessToken, refresh_token: refreshToken }, error: null, count: 1, status: 200 };
+  async persistLocalAuthToken(accessToken: string) {
+    this.accessToken = accessToken;
+    return { data: { access_token: accessToken }, error: null, count: 1, status: 200 };
+  }
+
+  getStoredLocalAuthToken(): string | null {
+    return this.accessToken;
   }
 
   // Settings module
@@ -215,6 +247,7 @@ class ApiClient {
       });
     },
     getAll: async () => this.request('/settings'),
+    getPublic: async () => this.request('/settings/public'),
     upsert: async (items: Array<{ key: string; value: string }>) => this.request('/settings', {
       method: 'POST',
       body: JSON.stringify({ items }),
@@ -228,7 +261,18 @@ class ApiClient {
       return this.request(`/foncier/lots${query}`);
     },
     getLot: async (id: string) => this.request(`/foncier/lots/${id}`),
-    createLot: async (data: any) => this.request('/foncier/lots', { method: 'POST', body: JSON.stringify(data) }),
+    createLot: async (data: any) => {
+      const ilotId = data?.ilot_id;
+      if (!ilotId) {
+        return { data: null, error: 'ilot_id requis pour créer un lot', status: 400 } as ApiResult;
+      }
+      const payload = { ...data };
+      delete payload.ilot_id;
+      return this.request(`/foncier/ilots/${encodeURIComponent(ilotId)}/lots`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    },
     updateLot: async (id: string, data: any) => this.request(`/foncier/lots/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
     deleteLot: async (id: string) => this.request(`/foncier/lots/${id}`, { method: 'DELETE' }),
     signAttestation: async (attestationId: string, payload: any) => this.request(`/foncier/attestations/${attestationId}/sign`, { method: 'POST', body: JSON.stringify(payload) }),
@@ -280,7 +324,7 @@ class ApiClient {
           const name = (file as any).name || `upload-${Date.now()}`;
           fileToSend = new File([file as Blob], name, { type: (file as any).type || 'application/octet-stream' });
         }
-      } catch (e) {
+      } catch {
         const name = (file as any).name || `upload-${Date.now()}`;
         fileToSend = new File([file as Blob], name, { type: (file as any).type || 'application/octet-stream' });
       }
@@ -329,7 +373,7 @@ class ApiClient {
           const name = (file as any).name || `replace-${Date.now()}`;
           fileToSend = new File([file as Blob], name, { type: (file as any).type || 'application/octet-stream' });
         }
-      } catch (e) {
+      } catch {
         const name = (file as any).name || `replace-${Date.now()}`;
         fileToSend = new File([file as Blob], name, { type: (file as any).type || 'application/octet-stream' });
       }
@@ -435,6 +479,17 @@ class ApiClient {
         this.request('/immobilier/properties', { method: 'POST', body: JSON.stringify(data) }),
       update: async (id: string, data: any) =>
         this.request(`/immobilier/properties/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+      transition: async (id: string, statut: string) =>
+        this.request(`/immobilier/properties/${id}/transition`, {
+          method: 'POST',
+          body: JSON.stringify({ statut }),
+        }),
+      verifyLocality: async (id: string, data: { commune?: string | null; ville?: string | null; preuve_reference: string; anstat_code: string }) =>
+        this.request(`/immobilier/properties/${id}/localite/verification`, { method: 'POST', body: JSON.stringify(data) }),
+      publish: async (id: string) =>
+        this.request(`/immobilier/properties/${id}/publish`, { method: 'POST' }),
+      unpublish: async (id: string) =>
+        this.request(`/immobilier/properties/${id}/unpublish`, { method: 'POST' }),
       delete: async (id: string) =>
         this.request(`/immobilier/properties/${id}`, { method: 'DELETE' }),
     },
@@ -541,8 +596,8 @@ export const clearStoredLocalAuthToken = async () => {
   return apiClient.clearStoredLocalAuthToken();
 };
 
-export const persistLocalAuthToken = async (accessToken: string, refreshToken: string) => {
-  return apiClient.persistLocalAuthToken(accessToken, refreshToken);
+export const persistLocalAuthToken = async (accessToken: string, _refreshToken?: string) => {
+  return apiClient.persistLocalAuthToken(accessToken);
 };
 
 // Export types

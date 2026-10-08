@@ -8,7 +8,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
 
-from app.api.deps import get_current_user
+from app.api.deps import get_optional_current_user, require_permission
+from app.core.authorization import has_permission
 from app.core.database import SessionLocal
 from app.core.security import AuthorizationError, get_http_exception_for_error
 
@@ -27,7 +28,9 @@ class PageLayoutRow(BaseModel):
 
 
 @router.get("", response_model=list[PageLayoutRow])
-def list_page_layouts() -> list[PageLayoutRow]:
+def list_page_layouts(
+    _admin: dict[str, Any] = Depends(require_permission("site_vitrine", "read_draft")),
+) -> list[PageLayoutRow]:
     with SessionLocal() as session:
         rows = session.execute(
             text("""
@@ -80,7 +83,11 @@ def list_page_layouts() -> list[PageLayoutRow]:
 
 
 @router.get("/{page_slug}", response_model=PageLayoutRow)
-def get_page_layout(page_slug: str) -> PageLayoutRow:
+def get_page_layout(
+    page_slug: str,
+    current_user: dict[str, Any] | None = Depends(get_optional_current_user),
+) -> PageLayoutRow:
+    admin_view = has_permission(current_user, "site_vitrine", "read_draft")
     with SessionLocal() as session:
         row = session.execute(
             text("""
@@ -94,11 +101,12 @@ def get_page_layout(page_slug: str) -> PageLayoutRow:
                        og_image_media_id
                 FROM page_layouts
                 WHERE COALESCE(page_slug, page_key) = :page_slug
+                  AND (:admin_view OR is_published = TRUE)
                 ORDER BY updated_at DESC NULLS LAST,
                          created_at DESC NULLS LAST
                 LIMIT 1
             """),
-            {"page_slug": page_slug},
+            {"page_slug": page_slug, "admin_view": admin_view},
         ).fetchone()
     if row:
         return PageLayoutRow(
@@ -117,12 +125,9 @@ def get_page_layout(page_slug: str) -> PageLayoutRow:
 @router.post("", response_model=PageLayoutRow)
 def upsert_page_layout(
     payload: PageLayoutRow,
-    current_user: dict[str, Any] = Depends(get_current_user),
+    current_user: dict[str, Any] = Depends(require_permission("site_vitrine", "create")),
 ) -> PageLayoutRow:
     try:
-        if current_user.get("role") != "admin":
-            raise AuthorizationError("Accès refusé")
-
         if not payload.page_slug or not payload.page_slug.strip():
             raise HTTPException(status_code=422, detail="page_slug requis")
 
@@ -248,12 +253,9 @@ def upsert_page_layout(
 @router.patch("/{page_slug}/publish", response_model=PageLayoutRow)
 def publish_page_layout(
     page_slug: str,
-    current_user: dict[str, Any] = Depends(get_current_user),
+    current_user: dict[str, Any] = Depends(require_permission("site_vitrine", "publish")),
 ) -> PageLayoutRow:
     try:
-        if current_user.get("role") != "admin":
-            raise AuthorizationError("Accès refusé")
-
         with SessionLocal() as session:
             session.execute(
                 text(

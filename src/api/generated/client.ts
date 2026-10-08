@@ -6313,7 +6313,7 @@ export const getCaptureLeadApiV1LeadsCapturePostUrl = () => {
 
 
 
-  return `/api/v1/leads/capture`
+  return `/api/v1/site/lead-capture`
 }
 
 /**

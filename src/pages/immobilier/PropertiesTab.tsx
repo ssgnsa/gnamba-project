@@ -7,6 +7,8 @@ import {
   User,
   History,
   X,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import type { Property, LeaseContract, Client } from "../../types";
 import Modal from "../../components/ui/Modal";
@@ -27,6 +29,7 @@ import {
 } from "../../lib/manualSyncStore";
 import { generateUUID } from "../../utils/reference";
 import { clientsRepository } from "../../lib/dbClient.service";
+import apiClient from "../../api/client";
 import {
   getTenantName,
   getPropertyStatusConfig,
@@ -38,6 +41,8 @@ import {
 const emptyForm = {
   type_bien: "studio" as Property["type_bien"],
   adresse: "",
+  commune: "",
+  ville: "",
   proprietaire_id: "",
   loyer_mensuel: "",
   charges: "",
@@ -84,6 +89,15 @@ export default function PropertiesTab({
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [historyProperty, setHistoryProperty] = useState<Property | null>(null);
+  const [localityProperty, setLocalityProperty] = useState<Property | null>(null);
+  const [localityForm, setLocalityForm] = useState({
+    commune: "",
+    ville: "",
+    preuve_reference: "",
+    anstat_code: "",
+  });
+  const [localitySaving, setLocalitySaving] = useState(false);
+  const [localityError, setLocalityError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const destructiveActionsDisabled = shouldBlockDestructiveAction(
     user,
@@ -112,6 +126,8 @@ export default function PropertiesTab({
     setForm({
       type_bien: p.type_bien,
       adresse: p.adresse,
+      commune: p.commune || "",
+      ville: p.ville || "",
       proprietaire_id: p.proprietaire_id || "",
       loyer_mensuel: String(p.loyer_mensuel),
       charges: String(p.charges || 0),
@@ -148,12 +164,18 @@ export default function PropertiesTab({
         id: existing?.id ?? generateUUID(),
         type_bien: form.type_bien,
         adresse: form.adresse.trim(),
+        commune: form.commune.trim() || null,
+        ville: form.ville.trim() || null,
         proprietaire_id: form.proprietaire_id.trim() || null,
         loyer_mensuel: parseFloat(form.loyer_mensuel) || 0,
         charges: parseFloat(form.charges) || 0,
         statut: form.statut,
         description: form.description.trim() || null,
         cover_image_url: existing?.cover_image_url ?? null,
+        reference: existing?.reference,
+        titre: existing?.titre,
+        publier_vitrine: existing?.publier_vitrine ?? false,
+        titre_fige_le: existing?.titre_fige_le ?? null,
         created_at: existing?.created_at ?? now,
         updated_at: now,
         sync_status: "pending",
@@ -210,6 +232,81 @@ export default function PropertiesTab({
     }
   };
 
+  const handleTogglePublication = async (property: Property) => {
+    if (property.localite_statut !== "VERIFIEE") {
+      showToast("error", "Publication refusée", "La localité doit être validée avec une preuve et un code ANStat.");
+      return;
+    }
+    const result = property.publier_vitrine
+      ? await apiClient.immobilier.properties.unpublish(property.id)
+      : await apiClient.immobilier.properties.publish(property.id);
+    if (result.error || !result.data) {
+      showToast("error", "Publication refusée", result.error || "Action impossible");
+      return;
+    }
+    const cached = readManualCache<LocalProperty>(PROPERTIES_CACHE_KEY);
+    writeManualCache(
+      PROPERTIES_CACHE_KEY,
+      cached.map((item) =>
+        item.id === property.id
+          ? { ...item, ...(result.data as Property), sync_status: "synced", sync_error: null }
+          : item,
+      ),
+    );
+    onRefresh();
+  };
+
+  const openLocalityVerification = (property: Property) => {
+    setLocalityProperty(property);
+    setLocalityForm({
+      commune: property.commune || "",
+      ville: property.ville || "",
+      preuve_reference: "",
+      anstat_code: "",
+    });
+    setLocalityError(null);
+  };
+
+  const handleVerifyLocality = async () => {
+    if (!localityProperty) return;
+    if (!localityForm.commune.trim() && !localityForm.ville.trim()) {
+      setLocalityError("Saisissez la commune ou la ville vérifiée.");
+      return;
+    }
+    if (!localityForm.preuve_reference.trim() || !localityForm.anstat_code.trim()) {
+      setLocalityError("La référence du justificatif et le code ANStat sont obligatoires.");
+      return;
+    }
+
+    setLocalitySaving(true);
+    setLocalityError(null);
+    try {
+      const result = await apiClient.immobilier.properties.verifyLocality(localityProperty.id, {
+        commune: localityForm.commune.trim() || null,
+        ville: localityForm.ville.trim() || null,
+        preuve_reference: localityForm.preuve_reference.trim(),
+        anstat_code: localityForm.anstat_code.trim(),
+      });
+      if (result.error || !result.data) {
+        throw new Error(result.error || "La validation de la localité a échoué.");
+      }
+      const cached = readManualCache<LocalProperty>(PROPERTIES_CACHE_KEY);
+      writeManualCache(
+        PROPERTIES_CACHE_KEY,
+        cached.map((item) => item.id === localityProperty.id
+          ? { ...item, ...(result.data as Property), sync_status: "synced", sync_error: null }
+          : item),
+      );
+      setLocalityProperty(null);
+      onRefresh();
+      showToast("success", "Localité vérifiée", "Le titre et la référence IMM ont été générés par le serveur.");
+    } catch (err: any) {
+      setLocalityError(err.message || "La validation de la localité a échoué.");
+    } finally {
+      setLocalitySaving(false);
+    }
+  };
+
   const getActiveContract = (propertyId: string) =>
     activeContracts.find(
       (c) => c.property_id === propertyId && c.statut === "actif",
@@ -241,6 +338,20 @@ export default function PropertiesTab({
     { value: "bureau", label: "Bureau" },
     { value: "villa", label: "Villa" },
   ];
+  const propertyStatusOptions = editingId
+    ? [
+        { value: "disponible", label: "Disponible" },
+        { value: "en_vente", label: "En vente" },
+        { value: "louee", label: "Loué" },
+        { value: "vendue", label: "Vendu" },
+        { value: "en_travaux", label: "En travaux" },
+        { value: "retiree", label: "Retiré" },
+        { value: "archivee", label: "Archivé" },
+      ]
+    : [
+        { value: "disponible", label: "Disponible" },
+        { value: "en_travaux", label: "En travaux" },
+      ];
 
   return (
     <>
@@ -282,11 +393,18 @@ export default function PropertiesTab({
                   <div className="p-2 rounded-xl bg-blue-50">
                     <Building2 size={20} className="text-blue-600" />
                   </div>
-                  <Badge label={st.label} color={st.color} />
+                  <div className="flex flex-col items-end gap-1">
+                    <Badge label={st.label} color={st.color} />
+                    <Badge
+                      label={p.localite_statut === "VERIFIEE" ? "Localité vérifiée" : "Localité · HOLD"}
+                      color={p.localite_statut === "VERIFIEE" ? "green" : "orange"}
+                    />
+                  </div>
                 </div>
                 <div className="font-semibold text-gray-800 mb-1">
-                  {getPropertyTypeLabel(p.type_bien)}
+                  {p.titre || getPropertyTypeLabel(p.type_bien)}
                 </div>
+                {p.reference && <div className="text-xs text-gray-400 mb-1">{p.reference}</div>}
                 <div className="text-sm text-gray-500 mb-2 truncate">
                   {p.adresse}
                 </div>
@@ -333,6 +451,23 @@ export default function PropertiesTab({
                     )}
                   </div>
                   <div className="flex gap-1">
+                    {p.localite_statut !== "VERIFIEE" && (
+                      <button
+                        onClick={() => openLocalityVerification(p)}
+                        className="px-2 py-1 rounded-lg text-xs text-amber-800 bg-amber-50 hover:bg-amber-100 transition-colors"
+                        title="Enregistrer la preuve administrative et la vérification ANStat"
+                      >
+                        Vérifier localité
+                      </button>
+                    )}
+                    <button
+                      onClick={() => void handleTogglePublication(p)}
+                      disabled={!p.publier_vitrine && p.localite_statut !== "VERIFIEE"}
+                      className={`p-1.5 rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${p.publier_vitrine ? "text-emerald-600 hover:bg-emerald-50" : "text-gray-400 hover:text-emerald-600 hover:bg-emerald-50"}`}
+                      title={p.publier_vitrine ? "Dépublier de la vitrine" : p.localite_statut === "VERIFIEE" ? "Publier sur la vitrine" : "Localité HOLD : publication interdite"}
+                    >
+                      {p.publier_vitrine ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
                     {historyCount > 0 && (
                       <button
                         onClick={() => setHistoryProperty(p)}
@@ -417,6 +552,75 @@ export default function PropertiesTab({
       )}
 
       <Modal
+        isOpen={!!localityProperty}
+        onClose={() => setLocalityProperty(null)}
+        title="Vérifier la localité du bien"
+      >
+        <div className="space-y-4">
+          <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            Vérifiez l’adresse dans la BD Adresse officielle ou sur un justificatif administratif, puis confirmez le rattachement avec le référentiel ANStat. La validation générera le titre IMM définitif.
+          </p>
+          {localityError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+              {localityError}
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block text-xs font-medium text-gray-600">
+              Commune vérifiée
+              <input
+                value={localityForm.commune}
+                onChange={(e) => setLocalityForm({ ...localityForm, commune: e.target.value })}
+                className={`${inputClass} mt-1`}
+              />
+            </label>
+            <label className="block text-xs font-medium text-gray-600">
+              Ville vérifiée
+              <input
+                value={localityForm.ville}
+                onChange={(e) => setLocalityForm({ ...localityForm, ville: e.target.value })}
+                className={`${inputClass} mt-1`}
+              />
+            </label>
+          </div>
+          <label className="block text-xs font-medium text-gray-600">
+            Référence du justificatif administratif / BD Adresse
+            <input
+              value={localityForm.preuve_reference}
+              onChange={(e) => setLocalityForm({ ...localityForm, preuve_reference: e.target.value })}
+              className={`${inputClass} mt-1`}
+              placeholder="ID média, certificat ou référence de pièce"
+            />
+          </label>
+          <label className="block text-xs font-medium text-gray-600">
+            Code de rattachement ANStat
+            <input
+              value={localityForm.anstat_code}
+              onChange={(e) => setLocalityForm({ ...localityForm, anstat_code: e.target.value })}
+              className={`${inputClass} mt-1`}
+              placeholder="Code du référentiel vérifié"
+            />
+          </label>
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={() => setLocalityProperty(null)}
+              className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50"
+            >
+              Garder en HOLD
+            </button>
+            <button
+              onClick={() => void handleVerifyLocality()}
+              disabled={localitySaving}
+              className="flex-1 px-4 py-2.5 rounded-xl text-white text-sm font-medium hover:opacity-90 disabled:opacity-50"
+              style={{ backgroundColor: settings.primary_color, color: "var(--color-on-primary)" }}
+            >
+              {localitySaving ? "Validation..." : "Confirmer la vérification"}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
         title={editingId ? "Modifier le Bien" : "Nouveau Bien Immobilier"}
@@ -461,10 +665,9 @@ export default function PropertiesTab({
                 }
                 className={inputClass}
               >
-                <option value="disponible">Disponible</option>
-                <option value="loue">Loué</option>
-                <option value="en_vente">En Vente</option>
-                <option value="vendu">Vendu</option>
+                {propertyStatusOptions.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
               </select>
             </div>
           </div>
@@ -479,6 +682,28 @@ export default function PropertiesTab({
               className={inputClass}
               placeholder="Ex: Cocody, Rue des Jardins..."
             />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Commune suggérée (à vérifier)</label>
+              <input
+                type="text"
+                value={form.commune}
+                onChange={(e) => setForm({ ...form, commune: e.target.value })}
+                className={inputClass}
+                placeholder="Ex: Cocody"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Ville suggérée (à vérifier)</label>
+              <input
+                type="text"
+                value={form.ville}
+                onChange={(e) => setForm({ ...form, ville: e.target.value })}
+                className={inputClass}
+                placeholder="Ex: Abidjan"
+              />
+            </div>
           </div>
           <div>
             <SelectWithCreate

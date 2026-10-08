@@ -1,6 +1,6 @@
 import { FC, useState, useEffect, useCallback } from "react";
 import { FileText, Printer, Download, Loader2, AlertCircle } from "lucide-react";
-import dbClient from "@/lib/dbClient.service";
+import { auditApi } from "@/api/foncier";
 import Badge from "@/components/ui/Badge";
 import { formatDateLong } from "@/utils/reference";
 import { printAuditReport } from "@/utils/print";
@@ -52,26 +52,16 @@ export const AuditModal: FC<AuditModalProps> = ({
     setError(null);
     
     try {
-      const from = (page - 1) * pageSize;
-      const to = from + pageSize - 1;
-      
-      let query = dbClient
-        .from("activity_logs")
-        .select("id, entity_type, entity_id, action, old_values, new_values, user_id, user_name, user_email, ip_address, device_id, metadata, created_at", { count: "exact" })
-        .in("entity_type", ["foncier_lot", "foncier_attestation", "foncier_village", "foncier_lotissement", "foncier_ilot"])
-        .order("created_at", { ascending: false })
-        .range(from, to);
-
-      if (actionFilter) {
-        query = query.eq("action", actionFilter);
-      }
-
-      const result = await query;
-      
+      const result = await auditApi.list({
+        entity_type: ["foncier_lot", "foncier_attestation", "foncier_village", "foncier_lotissement", "foncier_ilot"],
+        action: actionFilter || undefined,
+        page,
+        page_size: pageSize,
+      });
       if (result.error) throw result.error;
       
-      setRecords(result.data || []);
-      setTotalCount(result.count || 0);
+      setRecords(result.data?.items || []);
+      setTotalCount(result.data?.total || 0);
     } catch (err: any) {
       console.error("Error fetching audit:", err);
       setError(err.message || "Impossible de charger l'audit");

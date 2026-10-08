@@ -9,6 +9,7 @@ import {
   BarChart3,
 } from "lucide-react";
 import dbClient from '../lib/dbClient.service';
+import apiClient from "../api/client";
 import { tenantsRepository } from '../lib/dbClient.service';
 import type { Property, Tenant, RentPayment, LeaseContract } from "../types";
 import { useSettings } from "../context/SettingsContext";
@@ -222,7 +223,7 @@ export default function Immobilier() {
 
   const totalProperties = properties.length;
   const occupiedProperties = properties.filter(
-    (p) => p.statut === "loue",
+    (p) => p.statut === "louee",
   ).length;
   const availableProperties = properties.filter(
     (p) => p.statut === "disponible",
@@ -316,10 +317,75 @@ export default function Immobilier() {
         return nextItems;
       };
 
-      const syncedProperties = await syncCollection(
-        localProperties,
-        "properties",
-      );
+      const syncedProperties = [...localProperties];
+      for (const item of localProperties) {
+        const status = normalizeManualStatus(item.sync_status);
+        if (status === "synced") continue;
+        const index = syncedProperties.findIndex((entry) => entry.id === item.id);
+
+        if (status === "deleted") {
+          const nextStatus = item.statut === "vendue" ? "archivee" : "retiree";
+          const result = await apiClient.immobilier.properties.transition(item.id, nextStatus);
+          if (result.error) {
+            failedCount += 1;
+            if (index >= 0) syncedProperties[index] = { ...item, sync_error: result.error };
+            continue;
+          }
+          if (index >= 0) syncedProperties.splice(index, 1);
+          syncedCount += 1;
+          continue;
+        }
+
+        const payload = {
+          id: item.id,
+          type_bien: item.type_bien,
+          adresse: item.adresse,
+          commune: item.commune || null,
+          ville: item.ville || null,
+          proprietaire_name: item.proprietaire || null,
+          valeur: item.valeur ?? null,
+          loyer_mensuel: item.loyer_mensuel ?? 0,
+          charges_mensuelles: item.charges ?? 0,
+          statut: item.statut === "loue" ? "louee" : item.statut === "vendu" ? "vendue" : item.statut,
+          description: item.description || null,
+          cover_image_url: item.cover_image_url || null,
+        };
+        const desiredStatus = payload.statut;
+        const createPayload = {
+          ...payload,
+          statut: ["disponible", "en_travaux"].includes(desiredStatus)
+            ? desiredStatus
+            : "disponible",
+        };
+        const updatePayload = { ...payload };
+        delete (updatePayload as { id?: string }).id;
+        delete (updatePayload as { statut?: string }).statut;
+        const existing = await apiClient.immobilier.properties.get(item.id);
+        let result = existing.status === 404
+          ? await apiClient.immobilier.properties.create(createPayload)
+          : existing.error
+            ? existing
+            : await apiClient.immobilier.properties.update(item.id, updatePayload);
+        const legacyLeaseAlias = desiredStatus === "louee" && result.data?.statut === "loue";
+        if (!result.error && result.data && result.data.statut !== desiredStatus && !legacyLeaseAlias) {
+          result = await apiClient.immobilier.properties.transition(item.id, desiredStatus);
+        }
+        if (result.error || !result.data) {
+          failedCount += 1;
+          if (index >= 0) syncedProperties[index] = { ...item, sync_error: result.error || "Réponse serveur invalide" };
+          continue;
+        }
+        if (index >= 0) {
+          syncedProperties[index] = {
+            ...item,
+            ...(result.data as Property),
+            sync_status: "synced",
+            sync_error: null,
+            deleted_at: null,
+          };
+        }
+        syncedCount += 1;
+      }
       writeManualCache(PROPERTIES_CACHE_KEY, syncedProperties);
 
       // Use server-side endpoint name 'tenants' to avoid legacy '/tables/locataires' 404

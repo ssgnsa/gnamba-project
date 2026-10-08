@@ -63,6 +63,9 @@ export default function PublicContact() {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
+  const [consent, setConsent] = useState(false);
+  const [website, setWebsite] = useState("");
+  const [formStartedAt, setFormStartedAt] = useState(() => Date.now());
 
   // Anti-abus - Rate limiting (max 5 messages par heure)
   const RATE_LIMIT_MAX = 5;
@@ -179,7 +182,7 @@ export default function PublicContact() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name || !form.email || !form.message) return;
+    if (!form.name || !form.email || !form.message || !consent) return;
 
     const rateLimit = checkRateLimit();
     if (!rateLimit.allowed) {
@@ -199,9 +202,10 @@ export default function PublicContact() {
         email: form.email,
         sujet: form.subject || "Contact via formulaire",
         message: form.message,
-        statut: "nouveau",
-      })
-      .select();
+        _website: website,
+        _form_started_at: formStartedAt / 1000,
+        _consent: consent,
+      });
 
     if (!err) {
       incrementRateLimit();
@@ -420,7 +424,7 @@ export default function PublicContact() {
                     <CardTitle className="text-2xl font-bold text-neutral-900">Message envoyé avec succès !</CardTitle>
                     <CardDescription className="max-w-md">Merci pour votre message, <span className="font-semibold text-neutral-700">{form.name}</span>.</CardDescription>
                     <CardDescription className="max-w-md">Notre équipe vous contactera rapidement pour préciser votre besoin et proposer la meilleure suite.</CardDescription>
-                    <Button variant="primary" size="lg" onClick={() => { setSent(false); setForm({ name: "", phone: "", email: "", subject: "", message: "" }); }} iconLeft={<Sparkles size={18} />}>
+                    <Button variant="primary" size="lg" onClick={() => { setSent(false); setForm({ name: "", phone: "", email: "", subject: "", message: "" }); setConsent(false); setWebsite(""); setFormStartedAt(Date.now()); }} iconLeft={<Sparkles size={18} />}>
                       Envoyer un autre message
                     </Button>
                   </Flex>
@@ -436,6 +440,20 @@ export default function PublicContact() {
                       </div>
                     )}
                     <form onSubmit={handleSubmit} className="space-y-6">
+                      <div
+                        aria-hidden="true"
+                        style={{ position: "absolute", left: "-10000px" }}
+                      >
+                        <label htmlFor="contact-website">Ne pas remplir</label>
+                        <input
+                          id="contact-website"
+                          name="website"
+                          tabIndex={-1}
+                          autoComplete="off"
+                          value={website}
+                          onChange={(event) => setWebsite(event.target.value)}
+                        />
+                      </div>
                       <Grid cols={{ base: 1, sm: 2 }} gap="md">
                         <Input
                           label="Nom complet *"
@@ -479,6 +497,20 @@ export default function PublicContact() {
                         rows={6}
                         required
                       />
+
+                      <label className="flex items-start gap-3 text-sm text-neutral-700">
+                        <input
+                          type="checkbox"
+                          checked={consent}
+                          onChange={(event) => setConsent(event.target.checked)}
+                          required
+                          className="mt-1"
+                        />
+                        <span>
+                          J’accepte que mes coordonnées et mon message soient utilisés
+                          pour répondre à ma demande.
+                        </span>
+                      </label>
 
                       <Button
                         type="submit"

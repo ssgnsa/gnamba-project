@@ -22,13 +22,14 @@ pip install -r requirements.txt
 2. Configure database:
 
 ```bash
-export DATABASE_URL="postgresql://postgres:password@localhost:5432/egs_local"
+export DATABASE_URL="postgresql://<utilisateur>:<mot_de_passe>@localhost:5432/egs_local"
 ```
 
 3. Run migrations:
 
 ```bash
-alembic upgrade head
+python -m app.core.alembic_version_capacity --apply
+python -m alembic upgrade head
 ```
 
 4. Start the server:
@@ -56,23 +57,23 @@ tests/           # Unit and integration tests
 
 ### Authentication
 
-**POST /api/auth/login**
+**POST /api/v1/auth/login**
 
 ```json
 {
   "email": "admin@egs.local",
-  "password": "deadsoulja28@"
+  "password": "<mot_de_passe_fort>"
 }
 ```
 
 Returns: `{access_token, refresh_token, user}`
 
-**GET /api/auth/me**
+**GET /api/v1/auth/me**
 
 - Header: `Authorization: Bearer <token>`
 - Returns: `{user}`
 
-**POST /api/auth/refresh**
+**POST /api/v1/auth/refresh**
 
 ```json
 {
@@ -82,19 +83,19 @@ Returns: `{access_token, refresh_token, user}`
 
 Returns: `{access_token, refresh_token, user}`
 
-**POST /api/auth/logout**
+**POST /api/v1/auth/logout**
 
 - Header: `Authorization: Bearer <token>`
 - Returns: `{status: "ok"}`
 
 ### Users
 
-**POST /api/users**
+**POST /api/v1/users**
 
 ```json
 {
   "email": "user@egs.local",
-  "password": "Test123!",
+  "password": "<mot_de_passe_fort>",
   "full_name": "User Name",
   "access_level": "employe"
 }
@@ -121,7 +122,8 @@ alembic revision --autogenerate -m "your migration message"
 Apply pending migrations:
 
 ```bash
-alembic upgrade head
+python -m app.core.alembic_version_capacity --apply
+python -m alembic upgrade head
 ```
 
 View migration history:
@@ -136,12 +138,14 @@ See [ADR 0001](../docs/adr/0001-source-of-truth-fastapi.md) and [ADR 0002](../do
 
 ## Environment Variables
 
-| Variable                             | Default                                                 | Description                |
-| ------------------------------------ | ------------------------------------------------------- | -------------------------- |
-| DATABASE_URL                         | postgresql://postgres:postgres@localhost:5432/egs_local | PostgreSQL connection      |
-| LOCAL_AUTH_SECRET                    | egs-local-dev-secret-change-me                          | JWT signing key            |
-| LOCAL_AUTH_ACCESS_TOKEN_TTL_SECONDS  | 3600                                                    | Token lifetime (seconds)   |
-| LOCAL_AUTH_REFRESH_TOKEN_TTL_SECONDS | 2592000                                                 | Refresh lifetime (seconds) |
+| Variable                             | Default | Description                          |
+| ------------------------------------ | ------- | ------------------------------------ |
+| DATABASE_URL                         | —       | PostgreSQL connection (required)     |
+| LOCAL_AUTH_SECRET                    | —       | JWT signing key (32+ random chars)   |
+| EGS_ADMIN_TOTP_SECRET                | —       | Production admin TOTP secret, outside DB/Git |
+| EGS_ADMIN_TOTP_USER_ID               | —       | Admin user ID bound to that TOTP secret |
+| LOCAL_AUTH_ACCESS_TOKEN_TTL_SECONDS  | 600     | Access token lifetime (seconds)      |
+| LOCAL_AUTH_REFRESH_TOKEN_TTL_SECONDS | 604800  | Refresh cookie lifetime (seconds)    |
 
 ## Development Notes
 
@@ -153,8 +157,8 @@ See [ADR 0001](../docs/adr/0001-source-of-truth-fastapi.md) and [ADR 0002](../do
 
 ## Next Steps
 
-1. Implement client/lead modules
-2. Integrate MinIO for document storage
-3. Add foncier (land management) workflows
-4. Migrate frontend AuthContext to use local API
-5. Implement remaining business modules
+1. Extend client/lead modules through versioned routers
+2. Keep document storage behind the local API
+3. Maintain foncier workflows through `/api/v1`
+4. Keep frontend AuthContext and repositories on the canonical local API
+5. Extend business modules with matching Alembic migrations

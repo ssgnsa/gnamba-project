@@ -13,7 +13,6 @@ import {
   Calendar,
 } from "lucide-react";
 import type { LeaseContract, Property, Tenant, RentPayment, Client } from "../../types";
-import dbClient from "../../lib/dbClient.service";
 import { apiClient } from "../../api/client";
 import Modal from "../../components/ui/Modal";
 import Badge from "../../components/ui/Badge";
@@ -204,7 +203,7 @@ function hasContractOverlap(
 
 async function updatePropertyStatus(
   propertyId: string,
-  statut: "loue" | "disponible",
+  statut: "louee" | "disponible",
 ) {
   const cached = readManualCache<LocalProperty>(PROPERTIES_CACHE_KEY);
   const next = cached.map((property) =>
@@ -378,7 +377,7 @@ export default function ContractsTab({
 
       const targetPropertyId = form.property_id;
       if (form.statut === "actif") {
-        await updatePropertyStatus(targetPropertyId, "loue");
+        await updatePropertyStatus(targetPropertyId, "louee");
       }
 
       // Check if this is a new active contract (not editing) that should trigger print
@@ -549,7 +548,7 @@ export default function ContractsTab({
       writeManualCache(CONTRACTS_CACHE_KEY, sortContracts(next));
 
       if (newStatus === "actif") {
-        await updatePropertyStatus(c.property_id, "loue");
+        await updatePropertyStatus(c.property_id, "louee");
       } else {
         const stillActive = contracts.some(
           (other) =>
@@ -871,6 +870,8 @@ export default function ContractsTab({
                 createModalTitle="Nouveau Bien Immobilier"
                 createFields={[
                   { key: "adresse", label: "Adresse", type: "text", placeholder: "Ex: Cocody, Rue des Jardins...", required: true },
+                  { key: "commune", label: "Commune", type: "text", placeholder: "Commune du bien...", required: false },
+                  { key: "ville", label: "Ville", type: "text", placeholder: "Ville du bien...", required: false },
                   { key: "type_bien", label: "Type de Bien", type: "select", required: true, options: [
                     { value: "studio", label: "Studio" },
                     { value: "chambre", label: "Chambre" },
@@ -883,18 +884,13 @@ export default function ContractsTab({
                   ]},
                   { key: "loyer_mensuel", label: "Loyer/mois (FCFA)", type: "number", placeholder: "0", required: false },
                   { key: "charges", label: "Charges/mois (FCFA)", type: "number", placeholder: "0", required: false },
-                  { key: "statut", label: "Statut", type: "select", required: true, options: [
-                    { value: "disponible", label: "Disponible" },
-                    { value: "loue", label: "Loué" },
-                    { value: "en_vente", label: "En Vente" },
-                    { value: "vendu", label: "Vendu" },
-                  ]},
                   { key: "proprietaire_id", label: "Propriétaire", type: "select", required: false },
                   { key: "description", label: "Description", type: "textarea", placeholder: "Caractéristiques, équipements...", required: false },
                 ]}
                 validateCreateForm={(data) => {
                   const errors: Record<string, string> = {};
                   if (!data.adresse?.trim()) errors.adresse = "L'adresse est obligatoire";
+                  if (!data.commune?.trim() && !data.ville?.trim()) errors.commune = "La commune ou la ville est obligatoire pour le titre";
                   return Object.keys(errors).length > 0 ? errors : null;
                 }}
                 onCreate={async (data) => {
@@ -905,15 +901,25 @@ export default function ContractsTab({
                     proprietaire_id: data.proprietaire_id || null,
                     loyer_mensuel: parseFloat(data.loyer_mensuel) || 0,
                     charges: parseFloat(data.charges) || 0,
-                    statut: data.statut || "disponible",
+                    statut: "disponible",
                     description: data.description || null,
                     updated_at: now,
                   };
-                  const { data: newProp, error } = await dbClient.from("properties").insert(payload).select("id").single();
-                  if (error) throw error;
+                  const { data: newProp, error } = await apiClient.immobilier.properties.create({
+                    type_bien: payload.type_bien,
+                    adresse: payload.adresse,
+                    commune: data.commune?.trim() || null,
+                    ville: data.ville?.trim() || null,
+                    proprietaire_name: payload.proprietaire_id,
+                    loyer_mensuel: payload.loyer_mensuel,
+                    charges_mensuelles: payload.charges,
+                    statut: "disponible",
+                    description: payload.description,
+                  });
+                  if (error || !newProp) throw new Error(error || "Création du bien refusée");
                   // Update local cache
                   const cached = readManualCache<any>(PROPERTIES_CACHE_KEY);
-                  const updated = { ...newProp, sync_status: "pending", sync_error: null, deleted_at: null };
+                  const updated = { ...newProp, sync_status: "synced", sync_error: null, deleted_at: null };
                   writeManualCache(PROPERTIES_CACHE_KEY, [...cached, updated]);
                   return { value: newProp.id, label: `${data.adresse} (${data.type_bien})` };
                 }}
@@ -1115,7 +1121,7 @@ export default function ContractsTab({
 
                       // Update property status to 'loue' when creating an active contract
                       if (newContract.statut === "actif") {
-                        await updatePropertyStatus(newContract.property_id, "loue");
+                        await updatePropertyStatus(newContract.property_id, "louee");
                       }
                       try {
                         showToast("success", "Contrat créé", `Contrat ${newContract.reference} créé pour ${prenom} ${nom}`);

@@ -1,5 +1,11 @@
 # 🔍 EGS — Audit Schéma & Stratégie de Conformité DB
 
+> **Rapport historique — statut à revalider avant toute exécution.**
+> Les commandes et comptages de cet audit concernent l'inventaire Supabase/SQL
+> du 13 juillet 2026. Pour l'état actuel, utiliser les contrôles du dépôt et
+> le chemin Alembic contrôlé (`scripts/apply-migrations.sh`), avec un DSN
+> explicite, une sauvegarde vérifiée et une approbation de fenêtre.
+
 **Date**: 13 juillet 2026  
 **Statut**: ✅ **AUDIT COMPLET** — Awaiting deployment approval  
 **Scope**: Vérification d'architecture unifiée, suppression Supabase, conformité migrations DB
@@ -129,7 +135,7 @@ SELECT COUNT(*) FROM pg_policies WHERE schemaname='public';
 
 **Étape 1 - Backup**
 ```bash
-pg_dump postgresql://postgres:postgres@localhost:5432/egs_local \
+pg_dump postgresql://<role-applicatif>:<mot-de-passe>@<hôte>:5432/egs_local \
   -Fp > backups/migration_backups/backup_$(date +%Y%m%d_%H%M%S).sql
 ```
 

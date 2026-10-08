@@ -26,6 +26,8 @@ export async function loadVillageConfig(
     config[rowKey as keyof FoncierConfigMap] = row.value;
   });
 
+  if (Object.keys(config).length === 0) return null;
+
   return {
     region: "",
     departement: "",

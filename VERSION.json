@@ -1,8 +1,12 @@
 {
   "application": "EGS ERP",
-  "git_commit": "d6875613efd2010bf554ddb251add008ebf27099",
-  "branch": "feat/selfhosted-adapter",
-  "build_date": "2026-07-07T18:15:08Z",
-  "build_hash": "aa73f3d26424bbe1115cffb49a903eb092159cf5d30e4a164a76b43fedf6acda",
-  "environment": "production"
+  "git_commit": "dce8a11bb2b3be2a2b408773731cd8169702baa4",
+  "branch": "codex/egs-release-candidate-20261006T153148Z",
+  "git_ref": "refs/heads/codex/egs-release-candidate-20261006T153148Z",
+  "build_date": "2026-10-08T16:07:52Z",
+  "build_hash": "b03f33c1dc8804ce075df55c027c55767a14c26a3f8028b1a462e8d3f776f360",
+  "environment": "production",
+  "workspace_dirty": true,
+  "workspace_hash": "a75346c3399033e7e693016c1f8793ec90bd33ac0b52c039cab25bc8d33ea622",
+  "artifact_hash": "6ba2f7ed319f463aaf6ff4b9408daa70d858ac7d3f2a2bf40e03ab3a1da8473e"
 }

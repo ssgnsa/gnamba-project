@@ -5,7 +5,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 DEPLOY_DIR="${EGS_DEPLOY_DIR:-/var/www/egs/current}"
-APP_NAME="EGS ERP"
 
 log() {
   printf '[deploy-production] %s\n' "$*" >&2
@@ -20,29 +19,25 @@ ensure_command() {
   command -v "$1" >/dev/null 2>&1 || fail "Commande requise absente: $1"
 }
 
-write_version_file() {
-  local build_date git_commit branch_name build_hash version_file root_version_file
-  build_date="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-  git_commit="$(git -C "$ROOT_DIR" rev-parse --verify HEAD)"
-  branch_name="$(git -C "$ROOT_DIR" rev-parse --abbrev-ref HEAD)"
-  build_hash="$(sha256sum "$ROOT_DIR/dist/index.html" 2>/dev/null | awk '{print $1}' || true)"
-  version_file="$ROOT_DIR/dist/VERSION.json"
-  root_version_file="$ROOT_DIR/VERSION.json"
-
-  cat > "$version_file" <<EOF
-{
-  "application": "$APP_NAME",
-  "git_commit": "$git_commit",
-  "branch": "$branch_name",
-  "build_date": "$build_date",
-  "build_hash": "${build_hash:-unknown}",
-  "environment": "production"
+assert_clean_worktree() {
+  if [[ -n "$(git status --porcelain)" ]]; then
+    fail "Le worktree doit être propre avant un déploiement de production. Utilisez un commit CI signé."
+  fi
 }
-EOF
 
-  cp "$version_file" "$root_version_file"
+configure_production_build_env() {
+  export VITE_API_URL="${VITE_API_URL:-https://api.gnambaservices.ci/api/v1}"
+  export VITE_LOCAL_API_URL="${VITE_LOCAL_API_URL:-$VITE_API_URL}"
+  export VITE_SELFHOSTED_MODE="true"
 
-  printf '%s\n' "$version_file"
+  if [[ "$VITE_API_URL" =~ ^https?://(localhost|127\.0\.0\.1|\[::1\])(:[0-9]+)?(/|$) ]]; then
+    fail "VITE_API_URL ne doit pas pointer vers une adresse loopback en production"
+  fi
+  if [[ "$VITE_LOCAL_API_URL" =~ ^https?://(localhost|127\.0\.0\.1|\[::1\])(:[0-9]+)?(/|$) ]]; then
+    fail "VITE_LOCAL_API_URL ne doit pas pointer vers une adresse loopback en production"
+  fi
+
+  log "API frontend de production: $VITE_API_URL"
 }
 
 reload_nginx() {
@@ -75,6 +70,9 @@ main() {
 
   cd "$ROOT_DIR"
 
+  assert_clean_worktree
+  configure_production_build_env
+
   log "Commit validé: $(git rev-parse --short HEAD)"
   log "Installation des dépendances propres avec npm ci"
   npm ci
@@ -83,21 +81,20 @@ main() {
   rm -rf dist dist-local
 
   log "Build officiel: npm run build"
-  npm run build
+  EGS_WRITE_ROOT_VERSION=false npm run build
 
-  log "Génération de VERSION.json"
-  write_version_file
+  log "VERSION.json généré par le build"
 
   log "Vérification de release"
   npm run release:check
+  npm run validate:frontend -- --strict
 
   log "Publication vers $DEPLOY_DIR"
   mkdir -p "$DEPLOY_DIR"
 
   if command -v rsync >/dev/null 2>&1; then
-    rsync -a --delete "$ROOT_DIR/dist"/ "$DEPLOY_DIR"/
+    rsync -a "$ROOT_DIR/dist"/ "$DEPLOY_DIR"/
   else
-    find "$DEPLOY_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
     cp -a "$ROOT_DIR/dist/." "$DEPLOY_DIR/"
   fi
 

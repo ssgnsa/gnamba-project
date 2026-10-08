@@ -1,11 +1,35 @@
 from io import BytesIO
 
 from fastapi.testclient import TestClient
+import pytest
 
 from app.main import app
+from app.api.deps import get_current_user
+from app.core.database import SessionLocal
+from sqlalchemy import text
 
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def authenticated_admin():
+    app.dependency_overrides[get_current_user] = lambda: {
+        "id": "media-admin",
+        "role": "admin",
+        "mfa_verified": True,
+    }
+    yield
+    app.dependency_overrides.clear()
+
+
+def test_media_management_requires_authentication():
+    app.dependency_overrides.clear()
+    response = client.get("/api/v1/media")
+    assert response.status_code == 401, response.text
+    app.dependency_overrides[get_current_user] = lambda: {"id": "media-user", "role": "gestionnaire"}
+    purge = client.delete("/api/v1/media/not-a-real-id/purge")
+    assert purge.status_code == 403, purge.text
 
 
 def test_media_audit_route_contract():
@@ -17,14 +41,25 @@ def test_media_audit_route_contract():
         json={
             "media_id": None,
             "action": "upload_test",
-            "actor_id": "qa",
+            "actor_id": "client-supplied-actor-is-ignored",
             "metadata": {"source": "pytest"},
         },
     )
     assert create_response.status_code == 200, create_response.text
     payload = create_response.json()
-    assert payload["action"] == "upload_test"
-    assert payload["metadata"]["source"] == "pytest"
+    try:
+        assert payload["action"] == "upload_test"
+        assert payload["metadata"]["source"] == "pytest"
+        assert payload["actor_id"] == "media-admin"
+
+        read_response = client.get("/api/v1/media/audit")
+        assert read_response.status_code == 200, read_response.text
+        persisted = next(item for item in read_response.json() if item["id"] == payload["id"])
+        assert persisted["metadata"]["source"] == "pytest"
+    finally:
+        with SessionLocal() as session:
+            session.execute(text("DELETE FROM media_audit_logs WHERE id = :id"), {"id": payload["id"]})
+            session.commit()
 
 
 def test_media_upload_accepts_legacy_metadata_json_field():

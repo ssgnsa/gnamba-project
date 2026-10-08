@@ -8,7 +8,7 @@
 set -u
 
 API="${API_BASE:-http://localhost:8000}"
-TOKEN="${VITE_LOCAL_API_KEY:-}"
+TOKEN="${EGS_API_BEARER_TOKEN:-}"
 
 # --- couleurs / helper
 OK(){ printf "  [OK] %s\n" "$*"; }
@@ -36,7 +36,7 @@ for BASE in "$API/api/v1/site/vitrine-lots" "$API/api/v1/tables/vitrine_lots"; d
     code_t=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $TOKEN" "$BASE")
     echo "     GET avec token  -> $code_t"
   else
-    echo "     (pas de VITE_LOCAL_API_KEY dans l'env — POST avec token ignoré)" 
+    echo "     (pas de EGS_API_BEARER_TOKEN dans l'env — POST avec token ignoré)"
   fi
   [ "$code_n" = "200" ] && OK "GET ouvert" || FAIL "GET code=$code_n"
 

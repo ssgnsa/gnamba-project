@@ -7,7 +7,7 @@ import json
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from app.api.deps import get_media_service, get_optional_current_user
+from app.api.deps import get_media_service, require_permission
 from app.services.media_service import MediaService
 
 router = APIRouter(prefix="/api/v1/media", tags=["media"])
@@ -139,7 +139,7 @@ def upload_media(
     description: str = Form(""),
     tags: str | None = Form(None),
     metadata: str | None = Form(None),
-    current_user: dict[str, Any] | None = Depends(get_optional_current_user),
+    current_user: dict[str, Any] = Depends(require_permission("media", "create")),
     service: MediaService = Depends(get_media_service),
 ) -> MediaResponse:
     category, alt_text, description, parsed_tags = _normalize_media_metadata(metadata, category, alt_text, description, tags)
@@ -150,6 +150,7 @@ def upload_media(
 @router.get("", response_model=list[MediaResponse])
 def list_media(
     include_deleted: bool = False,
+    _user: dict[str, Any] = Depends(require_permission("media", "read_private")),
     service: MediaService = Depends(get_media_service),
 ) -> list[MediaResponse]:
     return [MediaResponse(**item) for item in service.list_media(include_deleted=include_deleted)]
@@ -161,6 +162,7 @@ def list_media_usage(
     entity_type: str | None = None,
     entity_id: str | None = None,
     usage_type: str | None = None,
+    _user: dict[str, Any] = Depends(require_permission("media", "read_private")),
     service: MediaService = Depends(get_media_service),
 ) -> list[MediaResponse | MediaUsageResponse]:
     if media_id:
@@ -173,6 +175,7 @@ def list_media_usage(
 @router.get("/audit", response_model=list[MediaAuditLogResponse])
 def list_media_audit_logs(
     media_id: str | None = None,
+    _admin: dict[str, Any] = Depends(require_permission("media", "read_audit")),
     service: MediaService = Depends(get_media_service),
 ):
     return [MediaAuditLogResponse(**item) for item in service.list_media_audit_logs(media_id)]
@@ -181,15 +184,19 @@ def list_media_audit_logs(
 @router.post("/audit", response_model=MediaAuditLogResponse)
 def create_media_audit_log(
     payload: MediaAuditLogCreateRequest,
+    admin: dict[str, Any] = Depends(require_permission("media", "write_audit")),
     service: MediaService = Depends(get_media_service),
 ) -> MediaAuditLogResponse:
-    created = service.create_media_audit_log(payload.model_dump())
+    data = payload.model_dump()
+    data["actor_id"] = admin.get("id")
+    created = service.create_media_audit_log(data)
     return MediaAuditLogResponse(**created)
 
 
 @router.post("/usage", response_model=MediaUsageResponse)
 def create_media_usage(
     payload: MediaUsageCreateRequest,
+    _user: dict[str, Any] = Depends(require_permission("media", "create_usage")),
     service: MediaService = Depends(get_media_service),
 ) -> MediaUsageResponse:
     usage = service.create_media_usage(payload.model_dump())
@@ -197,7 +204,11 @@ def create_media_usage(
 
 
 @router.delete("/usage/{usage_id}", response_model=dict[str, str])
-def delete_media_usage(usage_id: str, service: MediaService = Depends(get_media_service)) -> dict[str, str]:
+def delete_media_usage(
+    usage_id: str,
+    _user: dict[str, Any] = Depends(require_permission("media", "delete_usage")),
+    service: MediaService = Depends(get_media_service),
+) -> dict[str, str]:
     deleted = service.delete_media_usage(usage_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Usage introuvable")
@@ -205,7 +216,11 @@ def delete_media_usage(usage_id: str, service: MediaService = Depends(get_media_
 
 
 @router.get("/{media_id}", response_model=MediaResponse)
-def get_media(media_id: str, service: MediaService = Depends(get_media_service)) -> MediaResponse:
+def get_media(
+    media_id: str,
+    _user: dict[str, Any] = Depends(require_permission("media", "read_private")),
+    service: MediaService = Depends(get_media_service),
+) -> MediaResponse:
     media = service.get_media(media_id)
     if not media:
         raise HTTPException(status_code=404, detail="Media introuvable")
@@ -216,6 +231,7 @@ def get_media(media_id: str, service: MediaService = Depends(get_media_service))
 def update_media(
     media_id: str,
     payload: dict[str, Any],
+    _user: dict[str, Any] = Depends(require_permission("media", "update")),
     service: MediaService = Depends(get_media_service),
 ) -> MediaResponse:
     updated = service.update_media(media_id, payload)
@@ -227,7 +243,7 @@ def update_media(
 @router.delete("/{media_id}", response_model=MediaDeleteResponse)
 def delete_media(
     media_id: str,
-    current_user: dict[str, Any] | None = Depends(get_optional_current_user),
+    current_user: dict[str, Any] = Depends(require_permission("media", "delete")),
     service: MediaService = Depends(get_media_service),
 ) -> MediaDeleteResponse:
     deleted = service.soft_delete(media_id, current_user.get("id") if current_user else None)
@@ -237,7 +253,11 @@ def delete_media(
 
 
 @router.post("/{media_id}/restore", response_model=MediaResponse)
-def restore_media(media_id: str, service: MediaService = Depends(get_media_service)) -> MediaResponse:
+def restore_media(
+    media_id: str,
+    _user: dict[str, Any] = Depends(require_permission("media", "restore")),
+    service: MediaService = Depends(get_media_service),
+) -> MediaResponse:
     restored = service.restore(media_id)
     if not restored:
         raise HTTPException(status_code=404, detail="Media introuvable")
@@ -245,7 +265,11 @@ def restore_media(media_id: str, service: MediaService = Depends(get_media_servi
 
 
 @router.delete("/{media_id}/purge", response_model=MediaPurgeResponse)
-def purge_media(media_id: str, service: MediaService = Depends(get_media_service)) -> MediaPurgeResponse:
+def purge_media(
+    media_id: str,
+    _admin: dict[str, Any] = Depends(require_permission("media", "purge")),
+    service: MediaService = Depends(get_media_service),
+) -> MediaPurgeResponse:
     purged = service.purge(media_id)
     if not purged:
         raise HTTPException(status_code=404, detail="Media introuvable")
@@ -261,7 +285,7 @@ def replace_media(
     description: str = Form(""),
     tags: str | None = Form(None),
     metadata: str | None = Form(None),
-    current_user: dict[str, Any] | None = Depends(get_optional_current_user),
+    current_user: dict[str, Any] = Depends(require_permission("media", "replace")),
     service: MediaService = Depends(get_media_service),
 ) -> MediaResponse:
     category, alt_text, description, parsed_tags = _normalize_media_metadata(metadata, category, alt_text, description, tags)
@@ -283,6 +307,7 @@ def replace_media(
 @router.get("/{media_id}/versions")
 def list_media_versions(
     media_id: str,
+    _user: dict[str, Any] = Depends(require_permission("media", "read_private")),
     service: MediaService = Depends(get_media_service),
 ):
     return service.list_media_versions(media_id)

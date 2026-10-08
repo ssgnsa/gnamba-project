@@ -193,8 +193,8 @@ export function isDateRangeOverlap(
 
 export function getPropertyStatusFromContractStatus(
   statut: string,
-): "loue" | "disponible" | null {
-  if (statut === "actif") return "loue";
+): "louee" | "disponible" | null {
+  if (statut === "actif") return "louee";
   if (statut === "termine" || statut === "resilie") return "disponible";
   return null;
 }
@@ -254,9 +254,13 @@ export function getPropertyStatusConfig(statut: string): {
     { label: string; color: "green" | "blue" | "orange" | "gray" }
   > = {
     disponible: { label: "Disponible", color: "green" },
-    loue: { label: "Loué", color: "blue" },
+    loue: { label: "Loué (historique)", color: "blue" },
+    louee: { label: "Loué", color: "blue" },
     en_vente: { label: "En Vente", color: "orange" },
-    vendu: { label: "Vendu", color: "gray" },
+    vendue: { label: "Vendu", color: "gray" },
+    en_travaux: { label: "En travaux", color: "orange" },
+    retiree: { label: "Retiré", color: "gray" },
+    archivee: { label: "Archivé", color: "gray" },
   };
 
   return (
@@ -299,6 +303,15 @@ export function getPropertyTypeLabel(type: string): string {
     magasin: "Magasin",
     bureau: "Bureau",
     villa: "Villa",
+    maison: "Maison",
+    duplex: "Duplex",
+    triplex: "Triplex",
+    loft: "Loft",
+    local_commercial: "Local commercial",
+    entrepot: "Entrepôt",
+    garage: "Garage",
+    parking: "Parking",
+    autre: "Autre",
   };
 
   return labels[type] || type || "Autre";

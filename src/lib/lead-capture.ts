@@ -11,7 +11,7 @@ const CONFIG = {
   consentCheckboxId: "lead-capture-consent",
 };
 
-const LOCAL_CAPTURE_PATH = "/leads/capture";
+const LOCAL_CAPTURE_PATH = "/site/lead-capture";
 const PHONE_SELECTORS = [
   'input[type="tel"]',
   'input[name*="phone" i]',
@@ -133,6 +133,7 @@ function findPhoneInput(form: HTMLFormElement): HTMLInputElement | null {
 
 export function initLeadCapture() {
   document.addEventListener("submit", async (event) => {
+    if (event.defaultPrevented) return;
     const form = event.target as HTMLFormElement;
     const originalAction = form.getAttribute("action");
     const phoneInput = findPhoneInput(form);

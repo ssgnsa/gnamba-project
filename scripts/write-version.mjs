@@ -15,6 +15,7 @@ function git(args, options = {}) {
   return execFileSync('git', args, {
     cwd: root,
     encoding: options.encoding ?? 'utf8',
+    maxBuffer: options.maxBuffer ?? 64 * 1024 * 1024,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
 }
@@ -111,11 +112,14 @@ async function main() {
   } catch {
     // Detached HEAD is represented explicitly; git_commit remains authoritative.
   }
+  const gitRef = process.env.EGS_RELEASE_REF || (branch === 'detached' ? 'detached' : `refs/heads/${branch}`);
+  branch = process.env.EGS_RELEASE_BRANCH || branch;
 
   const manifest = {
     application: 'EGS ERP',
     git_commit: gitCommit,
     branch,
+    git_ref: gitRef,
     build_date: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
     build_hash: buildHash,
     environment: 'production',
@@ -126,7 +130,9 @@ async function main() {
   const json = `${JSON.stringify(manifest, null, 2)}\n`;
 
   await writeFile(distVersionFile, json);
-  await writeFile(versionFile, json);
+  if (process.env.EGS_WRITE_ROOT_VERSION !== 'false') {
+    await writeFile(versionFile, json);
+  }
   process.stdout.write(`${distVersionFile}\n`);
 }
 

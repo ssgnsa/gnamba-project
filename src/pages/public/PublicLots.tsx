@@ -14,8 +14,7 @@ import {
 import dbClient from "../../data/tableClient";
 import type { VitrineLot } from "../../types";
 import { formatMontant } from "../../utils/reference";
-import { captureLead } from "../../lib/lead-capture";
-import { clientsRepository } from "../../data/clients.repository";
+import { apiClient } from "../../api/client";
 import { OFFICIAL_CONTACT, buildWhatsAppUrl } from "../../lib/officialContact";
 
 // Premium UI Components
@@ -214,9 +213,11 @@ export default function PublicLots() {
   const [selectedLot, setSelectedLot] = useState<PublicLotCard | null>(null);
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [leadForm, setLeadForm] = useState<LeadFormData>(emptyLeadForm);
+  const [leadConsent, setLeadConsent] = useState(false);
+  const [website, setWebsite] = useState("");
+  const [formStartedAt, setFormStartedAt] = useState(() => Date.now());
   const [submitting, setSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
-  const [leadBridgeError, setLeadBridgeError] = useState<string | null>(null);
   const [filterVillage, setFilterVillage] = useState<string>("");
   const [filterMinPrice, setFilterMinPrice] = useState<string>("");
   const [filterMaxPrice, setFilterMaxPrice] = useState<string>("");
@@ -307,7 +308,9 @@ export default function PublicLots() {
     setSelectedLot(lot);
     setShowLeadForm(true);
     setSubmitSuccess(false);
-    setLeadBridgeError(null);
+    setLeadConsent(false);
+    setWebsite("");
+    setFormStartedAt(Date.now());
     setLeadForm({
       ...emptyLeadForm,
       message: lot.isExample
@@ -318,76 +321,30 @@ export default function PublicLots() {
 
   const handleSubmitLead = async (e: FormEvent) => {
     e.preventDefault();
-    if (!selectedLot) return;
+    if (!selectedLot || !leadConsent) return;
 
     setSubmitting(true);
     setError(null);
-    setLeadBridgeError(null);
 
     try {
-      const client = await clientsRepository.create({
-        nom: leadForm.nom,
-        prenom: leadForm.prenom,
-        email: leadForm.email,
-        telephone: leadForm.telephone,
-        adresse: "",
-        type_client: "particulier",
-        notes: "Demande via vitrine lots",
+      const inquiry = await apiClient.request("/site/vitrine-lot-inquiries", {
+        method: "POST",
+        body: JSON.stringify({
+          lot_id: selectedLot.isExample ? null : selectedLot.id,
+          is_example: selectedLot.isExample,
+          reference: selectedLot.reference,
+          village: selectedLot.village,
+          nom: leadForm.nom,
+          prenom: leadForm.prenom,
+          email: leadForm.email,
+          telephone: leadForm.telephone,
+          message: leadForm.message,
+          website,
+          form_started_at: formStartedAt / 1000,
+          consent: leadConsent,
+        }),
       });
-
-      const { data: opportunity, error: oppError } = await dbClient
-        .from("opportunites")
-        .insert({
-          client_id: client.data?.id,
-          titre: selectedLot.isExample
-            ? `Intérêt lot représentatif ${selectedLot.reference}`
-            : `Intérêt lot ${selectedLot.reference}`,
-          description: leadForm.message,
-          statut: "nouveau",
-          priorite: "normale",
-          valeur_potentielle: Number(selectedLot.prixVente),
-          source: "vitrine_lots",
-        })
-        .select()
-        .single();
-
-      if (oppError) throw oppError;
-
-      await dbClient.from("taches").insert({
-        titre: `Suivi demande lot: ${leadForm.prenom} ${leadForm.nom}`,
-        description: selectedLot.isExample
-          ? `Nouvelle demande pour un exemple de lot (${selectedLot.reference}) à ${selectedLot.village}.\n\nMessage: ${leadForm.message}\n\nTél: ${leadForm.telephone}\nEmail: ${leadForm.email}`
-          : `Nouvelle demande pour le lot ${selectedLot.reference} à ${selectedLot.village}.\n\nMessage: ${leadForm.message}\n\nTél: ${leadForm.telephone}\nEmail: ${leadForm.email}`,
-        categorie: "commercial",
-        priorite: "haute",
-        opportunite_id: opportunity.id,
-        echeance: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-      });
-
-      const bridgeResult = await captureLead({
-        phone: leadForm.telephone,
-        first_name: leadForm.prenom,
-        last_name: leadForm.nom,
-        email: leadForm.email,
-        source: "vitrine_lots",
-        source_page: "/lots-disponibles",
-        source_form: "public_lots",
-        consent_text: selectedLot.isExample
-          ? "J'accepte d'être recontacté par GNAMBA SERVICES au sujet d'un exemple de lot à vendre."
-          : "J'accepte d'être recontacté par GNAMBA SERVICES pour ce lot à vendre.",
-        channels_optin: {
-          sms: true,
-          whatsapp: true,
-          email: true,
-          telegram: false,
-        },
-      });
-
-      if (!bridgeResult.success) {
-        setLeadBridgeError(
-          "La demande est enregistrée, mais sa transmission à notre équipe a rencontré un souci. La fiche reste bien enregistrée.",
-        );
-      }
+      if (inquiry.error) throw new Error(inquiry.error);
 
       setSubmitSuccess(true);
       setLeadForm(emptyLeadForm);
@@ -406,6 +363,9 @@ export default function PublicLots() {
     setShowLeadForm(false);
     setSelectedLot(null);
     setLeadForm(emptyLeadForm);
+    setLeadConsent(false);
+    setWebsite("");
+    setFormStartedAt(Date.now());
   };
 
   const whatsappUrl = buildWhatsAppUrl(OFFICIAL_CONTACT.phone);
@@ -720,12 +680,16 @@ export default function PublicLots() {
                     {error}
                   </div>
                 )}
-                {leadBridgeError && (
-                  <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-start gap-2">
-                    <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
-                    {leadBridgeError}
-                  </div>
-                )}
+                <div aria-hidden="true" style={{ position: "absolute", left: "-10000px" }}>
+                  <label htmlFor="lot-inquiry-website">Ne pas remplir</label>
+                  <input
+                    id="lot-inquiry-website"
+                    tabIndex={-1}
+                    autoComplete="off"
+                    value={website}
+                    onChange={(event) => setWebsite(event.target.value)}
+                  />
+                </div>
 
                 <Grid cols={2} gap="md">
                   <Input
@@ -776,6 +740,17 @@ export default function PublicLots() {
                   rows={3}
                 />
 
+                <label className="flex items-start gap-3 text-sm text-neutral-700">
+                  <input
+                    type="checkbox"
+                    checked={leadConsent}
+                    onChange={(event) => setLeadConsent(event.target.checked)}
+                    required
+                    className="mt-1"
+                  />
+                  <span>J’accepte d’être recontacté au sujet de cette demande.</span>
+                </label>
+
                 <Flex gap="3" className="pt-2">
                   <Button
                     type="button"
@@ -790,7 +765,7 @@ export default function PublicLots() {
                     type="submit"
                     variant="primary"
                     size="md"
-                    disabled={submitting}
+                    disabled={submitting || !leadConsent}
                     loading={submitting}
                     className="flex-1 min-h-[48px]"
                   >

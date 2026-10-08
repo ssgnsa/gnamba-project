@@ -367,7 +367,6 @@ function ContactSection({ props }: { props: ContactProps }) {
         email: form.email,
         sujet: props.title || "Contact site vitrine",
         message: form.message,
-        statut: "nouveau",
       }),
     });
 
@@ -623,10 +622,10 @@ function FeaturedLotsSection({ props, onNavigate }: { props: FeaturedLotsProps; 
   useEffect(() => {
     let cancelled = false;
     const limit = props.limit || 3;
-    cachedFetch<any[]>(`/tables/vitrine_lots?publier_sur_vitrine=eq.true&order=ordre_affichage.asc,created_at.desc&limit=${limit}`, contentVersion)
+    cachedFetch<any[]>("/site/vitrine-lots", contentVersion)
       .then((data) => {
         if (!cancelled) {
-          setLots(data || []);
+          setLots((data || []).slice(0, limit));
           setLoading(false);
         }
       });
@@ -716,9 +715,9 @@ function SiteRealisationsSection({ props, onNavigate }: { props: SiteRealisation
   useEffect(() => {
     let cancelled = false;
     const limit = props.limit || 3;
-    cachedFetch<any[]>(`/tables/site_realisations?publier_vitrine=eq.true&order=ordre_affichage.asc&limit=${limit}`, contentVersion)
+    cachedFetch<any[]>("/site/realisations", contentVersion)
       .then((data) => {
-        if (!cancelled) { setRealisations(data || []); setLoading(false); }
+        if (!cancelled) { setRealisations((data || []).slice(0, limit)); setLoading(false); }
       });
     return () => { cancelled = true; };
   }, [props.limit, contentVersion]);
@@ -902,7 +901,7 @@ function ContactFormSection({ props }: { props: ContactFormProps }) {
     event.preventDefault();
     if (!form.name || !form.email || !form.message) { setError("Nom, email et message sont requis."); return; }
     setSending(true); setError("");
-    const { error: insertError } = await apiClient.request("/tables/contact_messages", { method: "POST", body: JSON.stringify({ nom: form.name, telephone: form.phone, email: form.email, sujet: props.title || "Contact site vitrine", message: form.message, statut: "nouveau" }) });
+    const { error: insertError } = await apiClient.request("/tables/contact_messages", { method: "POST", body: JSON.stringify({ nom: form.name, telephone: form.phone, email: form.email, sujet: props.title || "Contact site vitrine", message: form.message }) });
     setSending(false);
     if (insertError) { setError(insertError); return; }
     setSent(true); setForm({ name: "", phone: "", email: "", message: "" });

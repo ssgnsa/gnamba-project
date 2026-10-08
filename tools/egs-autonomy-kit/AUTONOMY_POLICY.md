@@ -24,7 +24,7 @@ Il existe **une seule catégorie d'arrêt dur** (§F). Tout le reste se résout 
 
 **Défaut :** utiliser la valeur présente dans `.env.example` / `.env.production` si elle existe. Sinon, générer une valeur placeholder explicite (`__A_DEFINIR__`) et le signaler dans `loop_state.json` (`notes`). Ne jamais inventer silencieusement une valeur de secret (clé API, mot de passe) — un placeholder explicite, jamais une fausse valeur plausible.
 
-Rappel des variables officielles : `VITE_API_MODE`, `VITE_LOCAL_API_URL`, `VITE_API_KEY`, `VITE_STORAGE_BASE_URL`, `VITE_SELFHOSTED_MODE`. `VITE_API_URL` est legacy et ne doit jamais être réintroduite.
+Rappel des variables officielles : `VITE_API_MODE`, `VITE_LOCAL_API_URL`, `VITE_STORAGE_BASE_URL`, `VITE_SELFHOSTED_MODE`. Aucun secret ni clé d'authentification ne doit être passé dans une variable `VITE_*`.
 
 ## D. Opération potentiellement destructive sur les données
 

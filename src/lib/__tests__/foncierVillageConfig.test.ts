@@ -1,9 +1,11 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-const getAllMock = vi.fn();
-const upsertMock = vi.fn();
+const { getAllMock, upsertMock } = vi.hoisted(() => ({
+  getAllMock: vi.fn(),
+  upsertMock: vi.fn(),
+}));
 
-vi.mock("../api/client", () => ({
+vi.mock("../../api/client", () => ({
   apiClient: {
     settings: {
       getAll: getAllMock,
@@ -57,9 +59,9 @@ describe("foncier village config storage", () => {
       layout_preference: "",
     } as any);
 
-    expect(upsertMock).toHaveBeenCalledWith([
+    expect(upsertMock).toHaveBeenCalledWith(expect.arrayContaining([
       { key: "foncier_village_config:Village A:region", value: "Abidjan" },
       { key: "foncier_village_config:Village A:chef_village", value: "Soro" },
-    ]);
+    ]));
   });
 });

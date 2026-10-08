@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 const mockOpenConfig = vi.fn();
@@ -160,5 +160,55 @@ describe("Foncier module", () => {
     render(<Foncier />);
 
     expect(mockOpenConfig).not.toHaveBeenCalled();
+  });
+
+  it("renders a real attestation action panel instead of the placeholder", () => {
+    const originalActiveTab = baseState.activeTab;
+    baseState.activeTab = "attestations";
+    baseState.lots = [
+      {
+        id: "lot-1",
+        reference: "REF-001",
+        numero_lot: "A1",
+        village: "Braffouebý",
+        proprietaire_nom: "N'Dri",
+        proprietaire_prenom: "Kouassi",
+        statut: "actif",
+      },
+    ] as any;
+
+    render(<Foncier />);
+
+    expect(screen.getByText(/Gestion des attestations/i)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /voir l'historique/i })).toBeTruthy();
+    expect(screen.queryByText(/Sélectionnez un lot pour générer ou consulter ses attestations/i)).toBeNull();
+
+    baseState.activeTab = originalActiveTab;
+    baseState.lots = [];
+  });
+
+  it("renders a real workflow action panel instead of the placeholder", () => {
+    const originalActiveTab = baseState.activeTab;
+    baseState.activeTab = "workflow";
+    baseState.lots = [
+      {
+        id: "lot-2",
+        reference: "REF-002",
+        numero_lot: "B2",
+        village: "Braffouebý",
+        proprietaire_nom: "Koffi",
+        proprietaire_prenom: "Yao",
+        statut: "soumis",
+      },
+    ] as any;
+
+    render(<Foncier />);
+
+    expect(screen.getByRole("heading", { name: "Workflow de validation" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /ouvrir la validation/i })).toBeTruthy();
+    expect(screen.queryByText(/Sélectionnez un lot pour gérer le workflow de validation Chef de village/i)).toBeNull();
+
+    baseState.activeTab = originalActiveTab;
+    baseState.lots = [];
   });
 });

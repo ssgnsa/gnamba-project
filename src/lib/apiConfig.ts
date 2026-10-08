@@ -12,10 +12,6 @@ export const resolveApiUrl = (): string | undefined => {
 };
 
 export const resolveApiAnonKey = (): string | undefined => {
-  // Prefer explicit API key env; fall back to local keys if present (still controlled centrally).
-  return (
-    import.meta.env.VITE_API_KEY?.trim() ||
-    import.meta.env.VITE_LOCAL_API_KEY?.trim() ||
-    undefined
-  );
+  // This self-hosted API uses JWT bearer auth; no public bundle API key exists.
+  return undefined;
 };

@@ -5,20 +5,40 @@ import json
 import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
-from uuid import NAMESPACE_URL, uuid4, uuid5
+from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_optional_current_user
+from app.api.deps import enforce_permission, get_current_user, require_admin_user
 from app.core.database import get_db
+from app.models.foncier import ActivityLog
 from app.repositories.generic_table_repository import GenericTableRepository
 
-router = APIRouter(prefix="/api/v1/rpc", tags=["rpc"])
+router = APIRouter(
+    prefix="/api/v1/rpc",
+    tags=["rpc"],
+    dependencies=[Depends(require_admin_user)],
+)
 
 
 def _repo(db: Session, table: str) -> GenericTableRepository:
-    return GenericTableRepository(db, table, {}, {})
+    inspector = inspect(db.get_bind())
+    if not inspector.has_table(table):
+        raise HTTPException(status_code=404, detail=f"Table Foncier indisponible: {table}")
+    columns = {
+        column["name"]: str(column["type"])
+        for column in inspector.get_columns(table)
+    }
+    return GenericTableRepository(
+        db,
+        table,
+        columns,
+        {},
+        skip_ensure_table=True,
+        commit_on_write=False,
+    )
 
 
 def _optional_user_id(current_user: dict[str, Any] | None) -> str | None:
@@ -26,6 +46,43 @@ def _optional_user_id(current_user: dict[str, Any] | None) -> str | None:
         return None
     user_id = current_user.get("id")
     return str(user_id) if user_id else None
+
+
+def _audit_activity(
+    db: Session,
+    current_user: dict[str, Any],
+    *,
+    entity_type: str = "foncier_lot",
+    entity_id: str,
+    entity_reference: str | None,
+    action: str,
+    old_values: dict[str, Any] | None = None,
+    new_values: dict[str, Any] | None = None,
+) -> ActivityLog:
+    actor_id = _optional_user_id(current_user)
+    if not actor_id:
+        raise HTTPException(status_code=401, detail="Utilisateur non authentifié")
+    try:
+        normalized_entity_id = str(UUID(entity_id))
+        normalized_user_id = str(UUID(actor_id))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Identifiant d'audit invalide") from exc
+    log = ActivityLog(
+        entity_type=entity_type,
+        entity_id=normalized_entity_id,
+        entity_reference=entity_reference,
+        action=action,
+        action_category="data",
+        old_values=old_values,
+        new_values=new_values,
+        changed_fields=sorted(set((old_values or {}) | (new_values or {}))),
+        user_id=normalized_user_id,
+        user_role=current_user.get("role"),
+        user_name=current_user.get("full_name"),
+        log_metadata={"source": "foncier_rpc"},
+    )
+    db.add(log)
+    return log
 
 
 def _normalize_text(value: Any) -> str:
@@ -113,8 +170,21 @@ async def invoke_rpc(
     name: str,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: dict[str, Any] | None = Depends(get_optional_current_user),
+    current_user: dict[str, Any] = Depends(get_current_user),
 ) -> Any:
+    read_only_rpcs = {
+        "check_foncier_duplicate",
+        "search_foncier_lots",
+        "foncier_stats_by_village",
+        "ensure_foncier_hierarchy",
+        "get_funnel_stats",
+        "get_next_attestation_version",
+    }
+    enforce_permission(
+        current_user,
+        "foncier",
+        "read" if name in read_only_rpcs else "write",
+    )
     payload = await request.json()
     if not isinstance(payload, dict):
         raise HTTPException(status_code=400, detail="Payload RPC invalide")
@@ -210,26 +280,25 @@ async def invoke_rpc(
         row = lot_repo.get(lot_id)
         if not row:
             raise HTTPException(status_code=404, detail="Lot introuvable")
+        if row.get("deleted_at"):
+            raise HTTPException(status_code=409, detail="Lot déjà archivé")
+        now = datetime.now(timezone.utc)
+        reason = _normalize_text(payload.get("p_reason")) or "archivage"
         updated = lot_repo.update(
             lot_id,
             {
-                "deleted_at": datetime.now(timezone.utc).isoformat(),
-                "deleted_reason": _normalize_text(payload.get("p_reason"))
-                or "archivage",
+                "deleted_at": now.isoformat(),
+                "deleted_reason": reason,
                 "deleted_by": _optional_user_id(current_user),
             },
         )
-        audit_repo = _repo(db, "foncier_audit")
-        audit_repo.create(
-            {
-                "lot_id": lot_id,
-                "action": "soft_delete",
-                "performed_by": _optional_user_id(current_user),
-                "new_values": {
-                    "deleted_at": updated.get("deleted_at") if updated else None,
-                },
-            }
+        _audit_activity(
+            db, current_user, entity_id=lot_id,
+            entity_reference=row.get("reference"), action="archive",
+            old_values={"deleted_at": row.get("deleted_at")},
+            new_values={"deleted_at": now.isoformat(), "deleted_reason": reason},
         )
+        db.commit()
         return updated
 
     if name == "restore_foncier_lot":
@@ -240,6 +309,8 @@ async def invoke_rpc(
         row = lot_repo.get(lot_id)
         if not row:
             raise HTTPException(status_code=404, detail="Lot introuvable")
+        if not row.get("deleted_at"):
+            raise HTTPException(status_code=409, detail="Lot non archivé")
         updated = lot_repo.update(
             lot_id,
             {
@@ -248,15 +319,13 @@ async def invoke_rpc(
                 "deleted_by": None,
             },
         )
-        audit_repo = _repo(db, "foncier_audit")
-        audit_repo.create(
-            {
-                "lot_id": lot_id,
-                "action": "restore",
-                "performed_by": _optional_user_id(current_user),
-                "new_values": {"deleted_at": None},
-            }
+        _audit_activity(
+            db, current_user, entity_id=lot_id,
+            entity_reference=row.get("reference"), action="restore",
+            old_values={"deleted_at": row.get("deleted_at")},
+            new_values={"deleted_at": None, "deleted_reason": None},
         )
+        db.commit()
         return updated
 
     if name == "ensure_foncier_hierarchy":
@@ -286,18 +355,19 @@ async def invoke_rpc(
         action = _normalize_text(payload.get("p_action"))
         if not lot_id or not action:
             raise HTTPException(status_code=400, detail="p_lot_id et p_action requis")
-        audit_repo = _repo(db, "foncier_audit")
-        created = audit_repo.create(
-            {
-                "lot_id": lot_id,
-                "action": action,
-                "old_values": payload.get("p_old_values") or payload.get("p_old_value"),
-                "new_values": payload.get("p_new_values")
-                or payload.get("p_details")
-                or payload.get("details"),
-                "performed_by": _optional_user_id(current_user),
-            }
+        lot = _repo(db, "foncier_lots").get(lot_id)
+        if not lot:
+            raise HTTPException(status_code=404, detail="Lot introuvable")
+        old_values = payload.get("p_old_values") or payload.get("p_old_value")
+        new_values = payload.get("p_new_values") or payload.get("p_details") or payload.get("details")
+        created = _audit_activity(
+            db, current_user, entity_id=lot_id,
+            entity_reference=lot.get("reference"), action=action,
+            old_values=old_values if isinstance(old_values, dict) else None,
+            new_values=new_values if isinstance(new_values, dict) else None,
         )
+        db.commit()
+        db.refresh(created)
         return created
 
     if name == "create_foncier_attestation_atomic":
@@ -418,12 +488,20 @@ async def invoke_rpc(
             )
 
         if base_attestation and base_attestation.get("id"):
+            previous_deleted_at = datetime.now(timezone.utc).isoformat()
             attestation_repo.update(
                 _normalize_text(base_attestation["id"]),
                 {
-                    "deleted_at": datetime.now(timezone.utc).isoformat(),
+                    "deleted_at": previous_deleted_at,
                 },
             )
+
+        _audit_activity(
+            db, current_user, entity_type="foncier_attestation",
+            entity_id=attestation_id, entity_reference=reference,
+            action="create", new_values={"statut": statut, "version": version},
+        )
+        db.commit()
 
         return [created_attestation]
 
@@ -449,6 +527,7 @@ async def invoke_rpc(
                 "print_count": int(row.get("print_count") or 0) + 1,
             },
         )
+        db.commit()
         return updated
 
     if name == "get_funnel_stats":

@@ -15,14 +15,15 @@ Usage:
 import sys
 import argparse
 import json
+from pathlib import Path
 from datetime import datetime, timezone
 from uuid import UUID
 from typing import List, Dict, Any, Tuple, Set
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-# Ajouter le backend au path
-sys.path.insert(0, '/home/soma/gnamba-project/backend')
+# Ajouter le backend au path sans dépendre du chemin du checkout hôte.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 
 from app.core.database import SessionLocal, engine
 from app.models.entity import Entity

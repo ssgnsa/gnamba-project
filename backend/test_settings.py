@@ -1,8 +1,9 @@
 import os
+import secrets
 os.environ["DATABASE_URL"] = "postgresql://postgres:postgres@127.0.1:5432/egs_local"
 os.environ["JWT_SECRET"] = "EgsLocalAuthSecret2026SecureAndLong!"
 os.environ["LOCAL_AUTH_SECRET"] = "EgsLocalAuthSecret2026SecureAndLong!"
-os.environ["INITIAL_ADMIN_PASSWORD"] = "EgsAdminInitialPass2026Secure!"
+os.environ["INITIAL_ADMIN_PASSWORD"] = secrets.token_urlsafe(24)
 
 from fastapi.testclient import TestClient
 from app.main import app

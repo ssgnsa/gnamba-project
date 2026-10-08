@@ -9,7 +9,7 @@ import {
   Image,
   X,
 } from "lucide-react";
-import dbClient from '../lib/dbClient.service';
+import { productRepository } from '../lib/dbClient.service';
 import { Product } from "../types";
 import Modal from "../components/ui/Modal";
 import Badge from "../components/ui/Badge";
@@ -60,7 +60,7 @@ export default function Fournitures() {
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      const { data, error } = await dbClient.from("products").select("*").order("nom");
+      const { data, error } = await productRepository.list();
       if (error) {
         console.error("[Fournitures] Error fetching products:", error);
         setProducts([]);
@@ -122,16 +122,12 @@ export default function Fournitures() {
         unite: form.unite,
         description: form.description,
         image_url: form.image_url || null,
-        updated_at: new Date().toISOString(),
       };
       if (editingId) {
-        const { error } = await dbClient
-          .from("products")
-          .update(payload)
-          .eq("id", editingId);
+        const { error } = await productRepository.update(editingId, payload);
         if (error) throw error;
       } else {
-        const { error } = await dbClient.from("products").insert(payload);
+        const { error } = await productRepository.create(payload);
         if (error) throw error;
       }
       setModalOpen(false);
@@ -149,9 +145,9 @@ export default function Fournitures() {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Supprimer ce produit ?")) return;
-    const { error } = await dbClient.from("products").delete().eq("id", id);
+    const { error } = await productRepository.delete(id);
     if (error) {
-      setFormError(error.message);
+      setFormError(error);
       return;
     }
     fetchProducts();

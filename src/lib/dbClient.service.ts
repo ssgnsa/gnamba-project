@@ -2,7 +2,7 @@
  * Database Client Service - Local API client with repository pattern
  * Provides typed access to all database operations via apiClient
  */
-import type { FoncierLot, FoncierAttestation, FoncierVillage, UserProfile } from '../types';
+import type { FoncierLot, FoncierAttestation, FoncierVillage, Finance, Product, UserProfile } from '../types';
 import { apiClient } from '../api/client.ts';
 import tableClient from '../data/tableClient.ts';
 
@@ -11,6 +11,105 @@ export interface RepoResult<T> {
   data: T | null;
   error: string | null;
   count?: number | null;
+}
+
+const normalizeFoncierLabel = (value: unknown): string =>
+  String(value ?? "")
+    .normalize("NFKC")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLocaleLowerCase("fr-FR");
+
+async function resolveExistingIlotId(
+  lotData: Partial<FoncierLot>,
+): Promise<{ ilotId?: string; error?: string }> {
+  if (lotData.ilot_id) return { ilotId: String(lotData.ilot_id) };
+
+  const villageName = normalizeFoncierLabel(lotData.village);
+  const lotissementName = normalizeFoncierLabel(lotData.nom_lotissement);
+  const ilotNumber = normalizeFoncierLabel(lotData.numero_ilot);
+  if (!villageName || !lotissementName || !ilotNumber) {
+    return { error: "Village, lotissement et îlot sont requis pour créer un lot." };
+  }
+
+  const getAll = async <T,>(path: string): Promise<T[] | string> => {
+    const pageSize = 200;
+    const rows: T[] = [];
+    for (let offset = 0; ; offset += pageSize) {
+      const separator = path.includes("?") ? "&" : "?";
+      const result = await apiClient.request<T[]>(
+        `${path}${separator}limit=${pageSize}&offset=${offset}`,
+      );
+      if (result.error) return result.error;
+      const page = Array.isArray(result.data) ? result.data : [];
+      rows.push(...page);
+      if (page.length < pageSize) return rows;
+    }
+  };
+
+  const villages = await getAll<{
+    id: string;
+    nom: string;
+    commune?: string | null;
+    departement?: string | null;
+    region?: string | null;
+  }>("/foncier/villages");
+  if (typeof villages === "string") {
+    return { error: `Impossible de charger les villages : ${villages}` };
+  }
+  const villageMatches = villages.filter((village) => {
+    if (normalizeFoncierLabel(village.nom) !== villageName) return false;
+    return (["commune", "departement", "region"] as const).every((field) => {
+      const requested = normalizeFoncierLabel(lotData[field]);
+      return !requested || normalizeFoncierLabel(village[field]) === requested;
+    });
+  });
+  if (villageMatches.length !== 1) {
+    return {
+      error:
+        villageMatches.length === 0
+          ? "Village introuvable. Créez ou sélectionnez d’abord un village enregistré."
+          : "Plusieurs villages correspondent. Précisez commune, département ou région.",
+    };
+  }
+
+  const lotissements = await getAll<{
+    id: string;
+    nom: string;
+  }>(`/foncier/villages/${encodeURIComponent(villageMatches[0].id)}/lotissements`);
+  if (typeof lotissements === "string") {
+    return { error: `Impossible de charger les lotissements : ${lotissements}` };
+  }
+  const lotissementMatches = lotissements.filter(
+    (lotissement) => normalizeFoncierLabel(lotissement.nom) === lotissementName,
+  );
+  if (lotissementMatches.length !== 1) {
+    return {
+      error:
+        lotissementMatches.length === 0
+          ? "Lotissement introuvable dans ce village. Enregistrez-le d’abord."
+          : "Plusieurs lotissements correspondent dans ce village; sélectionnez un identifiant précis.",
+    };
+  }
+
+  const ilots = await apiClient.request<Array<{ id: string; numero: string }>>(
+    `/foncier/lotissements/${encodeURIComponent(lotissementMatches[0].id)}/ilots`,
+  );
+  if (ilots.error) {
+    return { error: `Impossible de charger les îlots : ${ilots.error}` };
+  }
+  const ilotMatches = (ilots.data ?? []).filter(
+    (ilot) => normalizeFoncierLabel(ilot.numero) === ilotNumber,
+  );
+  if (ilotMatches.length !== 1) {
+    return {
+      error:
+        ilotMatches.length === 0
+          ? "Îlot introuvable dans ce lotissement. Enregistrez-le d’abord."
+          : "Plusieurs îlots correspondent dans ce lotissement; sélectionnez un identifiant précis.",
+    };
+  }
+  return { ilotId: ilotMatches[0].id };
 }
 
 // ============================================
@@ -49,7 +148,22 @@ export const foncierRepository = {
     if (result.error) {
       return { data: null, error: result.error, count: null };
     }
-    return { data: result.data as FoncierLot[], error: null, count: result.count };
+
+    const responseData = result.data as
+      | FoncierLot[]
+      | { items?: FoncierLot[]; total?: number }
+      | null;
+    const lots = Array.isArray(responseData)
+      ? responseData
+      : Array.isArray(responseData?.items)
+        ? responseData.items
+        : [];
+    const count =
+      !Array.isArray(responseData) && typeof responseData?.total === 'number'
+        ? responseData.total
+        : result.count;
+
+    return { data: lots, error: null, count };
   },
 
   /**
@@ -338,8 +452,20 @@ export const foncierRepository = {
     if (result.error) {
       return { data: null, error: result.error, count: null };
     }
-    const data = result.data as FoncierAttestation[];
-    return { data: data?.[0] ?? null, error: null, count: data?.length || 0 };
+    const responseData = result.data as
+      | FoncierAttestation[]
+      | { items?: FoncierAttestation[]; total?: number }
+      | null;
+    const attestations = Array.isArray(responseData)
+      ? responseData
+      : Array.isArray(responseData?.items)
+        ? responseData.items
+        : [];
+    const count = Array.isArray(responseData)
+      ? attestations.length
+      : responseData?.total ?? attestations.length;
+
+    return { data: attestations[0] ?? null, error: null, count };
   },
 
   /**
@@ -354,7 +480,14 @@ export const foncierRepository = {
       }
       return { data: result.data as FoncierLot, error: null, count: 1 };
     } else {
-      const result = await apiClient.foncier.createLot(lotData);
+      const hierarchy = await resolveExistingIlotId(lotData);
+      if (!hierarchy.ilotId) {
+        return { data: null, error: hierarchy.error ?? "Îlot introuvable.", count: null };
+      }
+      const result = await apiClient.foncier.createLot({
+        ...lotData,
+        ilot_id: hierarchy.ilotId,
+      });
 
       if (result.error) {
         return { data: null, error: result.error, count: null };
@@ -407,11 +540,9 @@ export const foncierRepository = {
    * Get audit logs
    */
   async getAudit(page: number, pageSize: number, actionFilter?: string): Promise<RepoResult<any[]>> {
-    const from = (page - 1) * pageSize;
-
     const params = new URLSearchParams();
-    params.append('offset', String(from));
-    params.append('limit', String(pageSize));
+    params.append('page', String(page));
+    params.append('page_size', String(pageSize));
     if (actionFilter) {
       params.append('action', actionFilter);
     }
@@ -421,7 +552,12 @@ export const foncierRepository = {
     if (result.error) {
       return { data: null, error: result.error, count: null };
     }
-    return { data: result.data as any[], error: null, count: result.count || 0 };
+    const response = result.data as { items?: any[]; total?: number } | null;
+    return {
+      data: response?.items ?? [],
+      error: null,
+      count: response?.total ?? 0,
+    };
   },
 
   /**
@@ -888,5 +1024,55 @@ export const dataService = {
 
 // Named export for supabase for backward compatibility
 export const supabase = tableClient as any;
+
+/** Canonical finance API. The legacy table-style field names stay in the
+ * response during transition, while all writes use type_operation/date_operation.
+ */
+export const financeRepository = {
+  async list(params: { limit: number; offset: number }) {
+    const query = new URLSearchParams({
+      limit: String(params.limit),
+      offset: String(params.offset),
+    });
+    return apiClient.request<Finance[]>(`/finance?${query.toString()}`);
+  },
+  async create(payload: Record<string, unknown>) {
+    return apiClient.request<Finance>("/finance", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+  async update(id: string, payload: Record<string, unknown>) {
+    return apiClient.request<Finance>(`/finance/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+  },
+};
+
+/** Product API keeps references server generated and immutable. */
+export const productRepository = {
+  async list() {
+    return apiClient.request<Product[]>("/products");
+  },
+  async create(payload: Record<string, unknown>) {
+    return apiClient.request<Product>("/products", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+  async update(id: string, payload: Record<string, unknown>) {
+    return apiClient.request<Product>(`/products/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+  },
+  async delete(id: string) {
+    return apiClient.request(`/products/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+  },
+};
+
 // Default export - compatibility shim using tableClient (which wraps apiClient)
 export default tableClient as any;

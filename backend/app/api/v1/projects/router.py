@@ -7,9 +7,14 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.api.deps import require_admin_user
 from app.repositories.generic_table_repository import GenericTableRepository
 
-router = APIRouter(prefix="/api/v1/projects", tags=["projects"])
+router = APIRouter(
+    prefix="/api/v1/projects",
+    tags=["projects"],
+    dependencies=[Depends(require_admin_user)],
+)
 
 
 class ProjectCreateRequest(BaseModel):

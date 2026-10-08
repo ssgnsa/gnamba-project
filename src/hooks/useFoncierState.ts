@@ -7,6 +7,7 @@ import { useVillages } from "./useVillages";
 import { useFoncierSync } from "./useFoncierSync";
 import { useFoncierAudit } from "./useFoncierAudit";
 import { useFoncierLogic } from "./useFoncierLogic";
+import { printAttestationAnnex, printAttestationCoutumiere } from "../utils/print";
 import type { FoncierLot } from "../types";
 import type { FoncierConfigMap } from "../components/foncier/FoncierConstants";
 
@@ -305,20 +306,189 @@ export function useFoncierState(): UseFoncierStateReturn {
   }, [lotsHook, logicHook]);
 
   const handlePrintAttestation = useCallback(async (lot: FoncierLot) => {
+    const printWindow = window.open("", "_blank", "width=900,height=700");
+    if (!printWindow) {
+      alert("Veuillez autoriser les fenêtres popup pour imprimer.");
+      return;
+    }
+
+    printWindow.document.write(
+      "<!doctype html><html lang=\"fr\"><head><meta charset=\"utf-8\"><title>Préparation de l’attestation</title></head><body>Préparation de l’attestation…</body></html>",
+    );
+    printWindow.document.close();
+
     try {
-      await attestationsHook.getLatestAttestation(lot.id);
-      // Print logic would go here
+      const record = await attestationsHook.getLatestAttestation(lot.id);
+      if (!record) {
+        printWindow.close();
+        alert("Aucune attestation disponible pour ce lot.");
+        return;
+      }
+      if (record.statut !== "valide" || !record.reference || !record.date_etablissement) {
+        printWindow.close();
+        alert("Seule une attestation validée avec référence et date peut être imprimée.");
+        return;
+      }
+
+      const payload = {
+        reference: record.reference,
+        numero_enregistrement: record.numero_enregistrement ?? "",
+        date_etablissement: record.date_etablissement,
+        original: Boolean(record.original),
+        statut: record.statut,
+        mode_acquisition: record.mode_acquisition ?? "",
+        historique_possession: record.historique_possession ?? "",
+        domicile: record.domicile ?? "",
+        limites_nord: record.limites_nord ?? "",
+        limites_sud: record.limites_sud ?? "",
+        limites_est: record.limites_est ?? "",
+        limites_ouest: record.limites_ouest ?? "",
+        coordonnees_gps: record.coordonnees_gps ?? {
+          lat: Number(record.gps_lat ?? lot.gps_lat ?? 0),
+          lng: Number(record.gps_lng ?? lot.gps_lng ?? 0),
+          precision: Number(record.gps_precision ?? lot.gps_precision ?? 0),
+        },
+        gps_points: record.gps_points ?? [],
+        registre_volume: record.registre_volume ?? "",
+        registre_page: record.registre_page ?? null,
+        registre_ligne: record.registre_ligne ?? null,
+        control_number: record.control_number ?? "",
+        hash_sha256: record.hash_sha256 ?? "",
+        validation_agent_nom: record.validation_agent_nom ?? "",
+        validation_chef_nom: record.validation_chef_nom ?? "",
+        attestation_type: record.type ?? record.attestation_type ?? "standard",
+        village: lot.village ?? record.village ?? "",
+        quartier: lot.quartier ?? record.quartier ?? "",
+        lotissement: lot.nom_lotissement ?? record.lotissement ?? "",
+        numero_lot: lot.numero_lot ?? record.numero_lot ?? "",
+        superficie_m2: Number(record.superficie_m2 ?? lot.superficie ?? 0),
+        cedant_nom: record.cedant_nom ?? "",
+        cedant_prenom: record.cedant_prenom ?? "",
+        cedant_cni_numero: record.cedant_cni_numero ?? "",
+        cedant_telephone: record.cedant_telephone ?? "",
+        cedant_domicile: record.cedant_domicile ?? "",
+        date_cession: record.date_cession ?? "",
+        proprietaire_nom: lot.proprietaire_nom ?? record.proprietaire_nom ?? "",
+        proprietaire_prenom: lot.proprietaire_prenom ?? record.proprietaire_prenom ?? "",
+        proprietaire_naissance_date: record.proprietaire_naissance_date ?? "",
+        proprietaire_naissance_lieu: record.proprietaire_naissance_lieu ?? "",
+        proprietaire_domicile: record.proprietaire_domicile ?? "",
+        proprietaire_profession: record.proprietaire_profession ?? "",
+        proprietaire_cni_numero: record.proprietaire_cni_numero ?? "",
+        proprietaire_cni_date: record.proprietaire_cni_date ?? "",
+        proprietaire_cni_lieu: record.proprietaire_cni_lieu ?? "",
+        proprietaire_telephone: record.proprietaire_telephone ?? "",
+        chef_village: record.chef_village ?? "",
+        chef_nom: record.chef_nom ?? record.validation_chef_nom ?? "",
+        lieu_signature: record.lieu_signature ?? lot.village ?? "",
+        village_logo_url: record.village_logo_url ?? "",
+        logoUrl: record.logo_url ?? settings.logo_url ?? "",
+        qrDataUrl: record.qr_data_url ?? record.qrDataUrl ?? "",
+        code_barre: record.code_barre ?? "",
+        lot: {
+          id: lot.id,
+          reference: lot.reference,
+          numero_lot: lot.numero_lot,
+          village: lot.village,
+          quartier: lot.quartier,
+          lotissement: lot.nom_lotissement,
+          superficie_m2: lot.superficie ?? 0,
+          gps_lat: lot.gps_lat,
+          gps_lng: lot.gps_lng,
+          gps_precision: lot.gps_precision,
+        },
+        temoins: record.foncier_attestation_temoins ?? [],
+      } as any;
+
+      await printAttestationCoutumiere(payload, printWindow);
     } catch (err) {
       console.error("Print error:", err);
+      if (!printWindow.closed) printWindow.close();
+      alert("Impossible d’imprimer l’attestation.");
     }
-  }, [attestationsHook]);
+  }, [attestationsHook, settings.logo_url]);
 
   const handlePrintAttestationAnnex = useCallback(async (lot: FoncierLot) => {
     try {
       await attestationsHook.getLatestAttestation(lot.id);
-      // Print annex logic would go here
+      const record = attestationsHook.latestAttestation;
+      if (!record) {
+        alert("Aucune attestation disponible pour ce lot.");
+        return;
+      }
+      if (record.statut !== "valide" || !record.reference || !record.date_etablissement) {
+        alert("Seule une attestation validée avec référence et date peut être imprimée.");
+        return;
+      }
+
+      const payload = {
+        reference: record.reference,
+        numero_enregistrement: record.numero_enregistrement ?? "",
+        date_etablissement: record.date_etablissement,
+        original: Boolean(record.original),
+        statut: record.statut,
+        mode_acquisition: record.mode_acquisition ?? "",
+        historique_possession: record.historique_possession ?? "",
+        domicile: record.domicile ?? "",
+        limites_nord: record.limites_nord ?? "",
+        limites_sud: record.limites_sud ?? "",
+        limites_est: record.limites_est ?? "",
+        limites_ouest: record.limites_ouest ?? "",
+        coordonnees_gps: record.coordonnees_gps ?? {
+          lat: Number(record.gps_lat ?? lot.gps_lat ?? 0),
+          lng: Number(record.gps_lng ?? lot.gps_lng ?? 0),
+          precision: Number(record.gps_precision ?? lot.gps_precision ?? 0),
+        },
+        gps_points: record.gps_points ?? [],
+        registre_volume: record.registre_volume ?? "",
+        registre_page: record.registre_page ?? null,
+        registre_ligne: record.registre_ligne ?? null,
+        control_number: record.control_number ?? "",
+        hash_sha256: record.hash_sha256 ?? "",
+        validation_agent_nom: record.validation_agent_nom ?? "",
+        validation_chef_nom: record.validation_chef_nom ?? "",
+        attestation_type: record.type ?? record.attestation_type ?? "standard",
+        village: lot.village ?? record.village ?? "",
+        quartier: lot.quartier ?? record.quartier ?? "",
+        lotissement: lot.nom_lotissement ?? record.lotissement ?? "",
+        numero_lot: lot.numero_lot ?? record.numero_lot ?? "",
+        superficie_m2: Number(record.superficie_m2 ?? lot.superficie ?? 0),
+        proprietaire_nom: lot.proprietaire_nom ?? record.proprietaire_nom ?? "",
+        proprietaire_prenom: lot.proprietaire_prenom ?? record.proprietaire_prenom ?? "",
+        proprietaire_naissance_date: record.proprietaire_naissance_date ?? "",
+        proprietaire_naissance_lieu: record.proprietaire_naissance_lieu ?? "",
+        proprietaire_domicile: record.proprietaire_domicile ?? "",
+        proprietaire_profession: record.proprietaire_profession ?? "",
+        proprietaire_cni_numero: record.proprietaire_cni_numero ?? "",
+        proprietaire_cni_date: record.proprietaire_cni_date ?? "",
+        proprietaire_cni_lieu: record.proprietaire_cni_lieu ?? "",
+        proprietaire_telephone: record.proprietaire_telephone ?? "",
+        chef_village: record.chef_village ?? "",
+        chef_nom: record.chef_nom ?? record.validation_chef_nom ?? "",
+        lieu_signature: record.lieu_signature ?? lot.village ?? "",
+        village_logo_url: record.village_logo_url ?? "",
+        logoUrl: record.logo_url ?? "",
+        qrDataUrl: record.qr_data_url ?? record.qrDataUrl ?? "",
+        code_barre: record.code_barre ?? "",
+        lot: {
+          id: lot.id,
+          reference: lot.reference,
+          numero_lot: lot.numero_lot,
+          village: lot.village,
+          quartier: lot.quartier,
+          lotissement: lot.nom_lotissement,
+          superficie_m2: lot.superficie ?? 0,
+          gps_lat: lot.gps_lat,
+          gps_lng: lot.gps_lng,
+          gps_precision: lot.gps_precision,
+        },
+        temoins: record.foncier_attestation_temoins ?? [],
+      } as any;
+
+      await printAttestationAnnex(payload);
     } catch (err) {
       console.error("Print annex error:", err);
+      alert("Impossible d’imprimer l’annexe technique.");
     }
   }, [attestationsHook]);
 

@@ -1,11 +1,11 @@
 import { FC, useState, useEffect, useCallback } from "react";
 import { FileText, Printer, ExternalLink } from "lucide-react";
-import dbClient from "@/lib/dbClient.service";
+import { attestationsApi } from "@/api/foncier";
 import Badge from "@/components/ui/Badge";
 import { formatDateLong } from "@/utils/reference";
 import { printAttestationCoutumiere, printAttestationAnnex } from "@/utils/print";
 import type { AttestationFull } from "../FoncierConstants";
-import { getAttestationStatusInfo, buildAttestationVerificationUrl, FONCIER_ATTESTATION_WITH_TEMOINS_SELECT } from "../FoncierConstants";
+import { getAttestationStatusInfo, buildAttestationVerificationUrl } from "../FoncierConstants";
 import { getUsageForSlot } from "@/lib/mediaUtils";
 import { StorageLink } from "@/components/media/StorageImage";
 
@@ -52,22 +52,13 @@ export const AttestationHistoryModal: FC<AttestationHistoryModalProps> = ({
     setError(null);
     
     try {
-      // Use the specialized select with witnesses
-      const baseQuery = dbClient
-        .from("foncier_attestations")
-        .select(FONCIER_ATTESTATION_WITH_TEMOINS_SELECT)
-        .eq("lot_id", lot.id)
-        .order("created_at", { ascending: false });
+      const result = await attestationsApi.listByLot(lot.id);
+      if (result.error) throw new Error(result.error);
 
-      let result = await baseQuery.is("deleted_at", null);
-      
-      if (result.error && result.error.code === "42703") {
-        result = await baseQuery;
-      }
-
-      if (result.error) throw result.error;
-      
-      const data = result.data || [];
+      const data = (result.data || []).map((attestation) => ({
+        ...attestation,
+        foncier_attestation_temoins: (attestation as any).temoins || [],
+      })) as unknown as AttestationFull[];
       setRecords(data);
       
       // Fetch scans for each attestation

@@ -289,7 +289,6 @@ export default function PublicHome({ onNavigate }: Props) {
         email: form.email.trim(),
         sujet: "Contact via page d'accueil",
         message: form.message.trim(),
-        statut: "nouveau",
       });
 
       if (error) throw error;

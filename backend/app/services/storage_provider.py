@@ -7,6 +7,8 @@ from pathlib import PurePosixPath, PureWindowsPath
 from typing import Any
 from urllib.parse import quote
 
+from app.core.config import settings
+
 
 class StorageProvider(ABC):
     name: str = "storage"
@@ -41,7 +43,8 @@ class LocalStorageProvider(StorageProvider):
     name = "local"
 
     def __init__(self, storage_root: str | None = None):
-        self.storage_root = Path(storage_root or os.getenv("LOCAL_STORAGE_ROOT", "backend/storage/uploads")).resolve()
+        configured_storage_root = storage_root or settings.STORAGE_ROOT
+        self.storage_root = Path(configured_storage_root).resolve()
         self.storage_root.mkdir(parents=True, exist_ok=True)
         self.base_url = os.getenv("LOCAL_STORAGE_BASE_URL", "http://localhost:8000/storage").rstrip("/")
 

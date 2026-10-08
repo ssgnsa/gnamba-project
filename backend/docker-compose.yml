@@ -5,9 +5,9 @@ services:
     environment:
       POSTGRES_DB: egs_local
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -28,15 +28,20 @@ services:
       dockerfile: Dockerfile
     container_name: egs-backend
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/egs_local
-      LOCAL_AUTH_SECRET: egs-local-dev-secret-change-me
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      LOCAL_AUTH_SECRET: ${LOCAL_AUTH_SECRET:?LOCAL_AUTH_SECRET is required}
+      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:-}
+      AUTO_RESET_DEFAULT_ADMIN_PASSWORD: "false"
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-true}
+      AUTH_REQUIRE_HTTPS: ${AUTH_REQUIRE_HTTPS:-true}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-https://gnambaservices.ci}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_started
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
 
 volumes:
   postgres_data:

@@ -74,3 +74,7 @@ class MediaRepositoryPort(ABC):
     @abstractmethod
     def list_media_audit_logs(self, media_id: str | None = None) -> list[dict[str, Any]]:
         raise NotImplementedError
+
+    @abstractmethod
+    def create_media_audit_log(self, payload: dict[str, Any]) -> dict[str, Any]:
+        raise NotImplementedError

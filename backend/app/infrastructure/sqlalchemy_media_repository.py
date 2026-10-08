@@ -3,10 +3,12 @@ from __future__ import annotations
 import json
 import uuid
 import hashlib
+import os
+import re
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import UploadFile
+from fastapi import HTTPException, UploadFile
 from sqlalchemy import text
 
 from app.core.database import DATABASE_URL, SessionLocal
@@ -16,8 +18,14 @@ from app.services.storage_provider import StorageProvider
 
 
 class SqlAlchemyMediaRepository(MediaRepositoryPort):
+    MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+
     def __init__(self) -> None:
-        self.ensure_schema()
+        # PostgreSQL schema changes are owned exclusively by Alembic. Keep
+        # runtime DDL only for disposable SQLite test databases or an
+        # explicitly enabled local compatibility mode.
+        if self._is_sqlite() or os.getenv("ALLOW_RUNTIME_SCHEMA_DDL", "false").lower() == "true":
+            self.ensure_schema()
 
     def _is_sqlite(self) -> bool:
         database_url = DATABASE_URL or ""
@@ -318,9 +326,21 @@ class SqlAlchemyMediaRepository(MediaRepositoryPort):
         if storage_provider is None:
             from app.services.storage_provider import get_storage_provider
             storage_provider = get_storage_provider()
-        filename = f"{category}/{self._now().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:8]}_{upload_file.filename or 'file'}"
+        normalized_category = re.sub(r"[^A-Za-z0-9_-]+", "_", (category or "autre").strip()).strip("._-")[:50] or "autre"
+        original_name = (upload_file.filename or "file").replace("\\", "/").rsplit("/", 1)[-1] or "file"
+        filename = f"{normalized_category}/{self._now().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:8]}_{original_name}"
         storage_key = filename.replace("//", "/")
-        content = upload_file.file.read()
+        content = upload_file.file.read(self.MAX_UPLOAD_BYTES + 1)
+        if len(content) > self.MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="Fichier trop volumineux (maximum 25 Mo)")
+        blocked_types = {
+            "text/html",
+            "application/xhtml+xml",
+            "application/javascript",
+            "text/javascript",
+        }
+        if (upload_file.content_type or "").lower() in blocked_types:
+            raise HTTPException(status_code=415, detail="Type de fichier non autorisé")
         # compute content hash for deduplication
         content_hash = hashlib.sha256(content).hexdigest() if content is not None else None
 
@@ -343,7 +363,7 @@ class SqlAlchemyMediaRepository(MediaRepositoryPort):
             if existing_row:
                 return self._row_to_domain(existing_row).to_payload()
 
-        storage_provider.upload_bytes(storage_key, content, upload_file.content_type or "application/octet-stream", upload_file.filename)
+        storage_provider.upload_bytes(storage_key, content, upload_file.content_type or "application/octet-stream", original_name)
         public_url = storage_provider.public_url(storage_key)
         tags_value = tags or []
         sqlite_tags_value = json.dumps(tags_value) if self._is_sqlite() else tags_value
@@ -371,7 +391,7 @@ class SqlAlchemyMediaRepository(MediaRepositoryPort):
                     "id": self._uuid(),
                     "filename": storage_key,
                     "storage_key": storage_key,
-                    "original_name": upload_file.filename or "",
+                    "original_name": original_name,
                     "url": public_url,
                     "category": category,
                     "uploaded_by": user_id,
@@ -392,6 +412,38 @@ class SqlAlchemyMediaRepository(MediaRepositoryPort):
                     "taxonomy_id": None,
                 },
             ).fetchone()
+            if row:
+                audit_metadata = json.dumps(
+                    {
+                        "filename": original_name,
+                        "category": normalized_category,
+                        "content_hash": content_hash,
+                        "size": len(content),
+                    }
+                )
+                audit_metadata_expression = ":audit_metadata"
+                if not self._is_sqlite():
+                    audit_metadata_expression = "CAST(:audit_metadata AS JSONB)"
+                session.execute(
+                    text(
+                        f"""
+                        INSERT INTO media_audit_logs (
+                            id, media_id, action, actor_id, metadata, created_at
+                        )
+                        VALUES (
+                            :audit_id, :media_id, 'upload', :actor_id,
+                            {audit_metadata_expression}, :created_at
+                        )
+                        """
+                    ),
+                    {
+                        "audit_id": self._uuid(),
+                        "media_id": row[0],
+                        "actor_id": user_id,
+                        "audit_metadata": audit_metadata,
+                        "created_at": self._now(),
+                    },
+                )
             session.commit()
         return self._row_to_domain(row).to_payload() if row else {}
 
@@ -666,14 +718,76 @@ class SqlAlchemyMediaRepository(MediaRepositoryPort):
                         """
                     )
                 ).fetchall()
-        return [
-            {
-                "id": str(row[0]) if row[0] is not None else None,
-                "media_id": str(row[1]) if row[1] is not None else None,
-                "action": row[2],
-                "actor_id": str(row[3]) if row[3] is not None else None,
-                "metadata": row[4],
-                "created_at": row[5],
-            }
-            for row in rows
-        ]
+        result: list[dict[str, Any]] = []
+        for row in rows:
+            metadata = row[4]
+            if isinstance(metadata, str):
+                try:
+                    metadata = json.loads(metadata)
+                except (TypeError, ValueError):
+                    metadata = {}
+            result.append(
+                {
+                    "id": str(row[0]) if row[0] is not None else None,
+                    "media_id": str(row[1]) if row[1] is not None else None,
+                    "action": row[2],
+                    "actor_id": str(row[3]) if row[3] is not None else None,
+                    "metadata": metadata if isinstance(metadata, dict) else {},
+                    "created_at": row[5],
+                }
+            )
+        return result
+
+    def create_media_audit_log(self, payload: dict[str, Any]) -> dict[str, Any]:
+        audit_id = self._uuid()
+        metadata = payload.get("metadata") or {}
+        with SessionLocal() as session:
+            if self._is_sqlite():
+                metadata_value = json.dumps(metadata)
+                metadata_expression = ":metadata"
+            else:
+                metadata_value = json.dumps(metadata)
+                metadata_expression = "CAST(:metadata AS JSONB)"
+
+            session.execute(
+                text(
+                    f"""
+                    INSERT INTO media_audit_logs (id, media_id, action, actor_id, metadata, created_at)
+                    VALUES (:id, :media_id, :action, :actor_id, {metadata_expression}, :created_at)
+                    """
+                ),
+                {
+                    "id": audit_id,
+                    "media_id": payload.get("media_id"),
+                    "action": payload["action"],
+                    "actor_id": payload.get("actor_id"),
+                    "metadata": metadata_value,
+                    "created_at": self._now(),
+                },
+            )
+            session.commit()
+            row = session.execute(
+                text(
+                    """
+                    SELECT id, media_id, action, actor_id, metadata, created_at
+                    FROM media_audit_logs
+                    WHERE id = :id
+                    """
+                ),
+                {"id": audit_id},
+            ).fetchone()
+
+        metadata_result = row[4] if row else metadata
+        if isinstance(metadata_result, str):
+            try:
+                metadata_result = json.loads(metadata_result)
+            except (TypeError, ValueError):
+                metadata_result = {}
+        return {
+            "id": str(row[0]) if row and row[0] is not None else audit_id,
+            "media_id": str(row[1]) if row and row[1] is not None else None,
+            "action": row[2] if row else payload["action"],
+            "actor_id": str(row[3]) if row and row[3] is not None else None,
+            "metadata": metadata_result if isinstance(metadata_result, dict) else {},
+            "created_at": row[5] if row else None,
+        }
