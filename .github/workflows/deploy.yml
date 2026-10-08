@@ -242,6 +242,7 @@ jobs:
             'POSTGRES_PASSWORD=ci-compose-validation' \
             'DATABASE_URL=postgresql://postgres:ci-compose-validation@egs-postgres:5432/egs_local' \
             'LOCAL_AUTH_SECRET=ci-compose-validation-secret-012345678901234567890123456789' \
+            'INITIAL_ADMIN_PASSWORD=ci-compose-admin-password-0123456789' \
             'FB_ADMIN_PASSWORD=ci-compose-validation' > .env.server
           docker compose --env-file .env.server config --quiet
           docker compose --env-file .env.server config --format json |
