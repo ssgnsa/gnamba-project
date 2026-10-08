@@ -16,11 +16,13 @@ fi
 echo "📝 Configuration des variables d'environnement..."
 
 API_BASE_URL="${VITE_API_URL:-${VITE_LOCAL_API_URL:-https://api.gnambaservices.ci}}"
+STORAGE_BASE_URL="${VITE_STORAGE_BASE_URL:-https://files.gnambaservices.ci/egs}"
 
 for file in /var/www/egs/current/assets/*.js; do
   if [ -f "$file" ]; then
     sed -i "s|__VITE_API_URL__|${API_BASE_URL}|g" "$file"
     sed -i "s|__VITE_LOCAL_API_URL__|${API_BASE_URL}|g" "$file"
+    sed -i "s|__VITE_STORAGE_BASE_URL__|${STORAGE_BASE_URL}|g" "$file"
     sed -i "s|__VITE_API_MODE__|${VITE_API_MODE:-local}|g" "$file"
   fi
 done

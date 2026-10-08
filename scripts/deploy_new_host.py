@@ -28,12 +28,14 @@ REQUIRED_VALUES = (
     "POSTGRES_PASSWORD",
     "EGS_DB_APP_PASSWORD",
     "DATABASE_URL",
+    "MIGRATION_DATABASE_URL",
     "LOCAL_AUTH_SECRET",
     "INITIAL_ADMIN_PASSWORD",
     "FB_ADMIN_PASSWORD",
     "PUBLIC_APP_URL",
     "VITE_API_URL",
     "VITE_LOCAL_API_URL",
+    "VITE_STORAGE_BASE_URL",
     "CORS_ORIGINS",
 )
 OPTIONAL_VALUES = {
@@ -53,6 +55,7 @@ OPTIONAL_VALUES = {
 SECRET_VALUES = (
     "POSTGRES_PASSWORD",
     "EGS_DB_APP_PASSWORD",
+    "MIGRATION_DATABASE_URL",
     "LOCAL_AUTH_SECRET",
     "FB_ADMIN_PASSWORD",
 )
@@ -72,6 +75,7 @@ COMPOSE_INTERPOLATION_KEYS = {
     "EGS_API_ENV_FILE",
     "APP_NAME",
     "DATABASE_URL",
+    "MIGRATION_DATABASE_URL",
     "LOCAL_AUTH_SECRET",
     "INITIAL_ADMIN_PASSWORD",
     "AUTH_LOGIN_RATE_LIMIT",
@@ -88,6 +92,7 @@ COMPOSE_INTERPOLATION_KEYS = {
     "API_PORT",
     "VITE_API_URL",
     "VITE_LOCAL_API_URL",
+    "VITE_STORAGE_BASE_URL",
     "WEB_PORT",
     "FB_ADMIN_PASSWORD",
     "EGS_RELEASE_SHA",
@@ -105,6 +110,7 @@ HOST_DAEMON_OVERRIDE_ENV = {
 FORBIDDEN_API_VALUES = {
     "DATABASE_URL",
     "EGS_DB_APP_PASSWORD",
+    "MIGRATION_DATABASE_URL",
     "EGS_EXPECTED_HOSTNAME",
     "EGS_API_ENV_FILE",
     "FB_ADMIN_PASSWORD",
@@ -207,13 +213,64 @@ def validate_environment(
             "et correspondre à EGS_DB_APP_PASSWORD"
         )
 
+    try:
+        migration_database = urlsplit(values["MIGRATION_DATABASE_URL"])
+        migration_database_port = migration_database.port
+    except ValueError as exc:
+        raise DeploymentError(
+            "MIGRATION_DATABASE_URL n'est pas une URL PostgreSQL valide"
+        ) from exc
+    if (
+        migration_database.scheme not in {"postgresql", "postgresql+psycopg2"}
+        or migration_database.hostname != "egs-postgres"
+        or migration_database_port != 5432
+        or migration_database.path != "/egs_local"
+        or unquote(migration_database.username or "") != "postgres"
+        or unquote(migration_database.password or "") != values["POSTGRES_PASSWORD"]
+        or migration_database.query
+        or migration_database.fragment
+    ):
+        raise DeploymentError(
+            "MIGRATION_DATABASE_URL doit cibler exclusivement "
+            "postgres@egs-postgres:5432/egs_local et correspondre à POSTGRES_PASSWORD"
+        )
+
     origins = {
         _origin(values[name], name)
         for name in ("PUBLIC_APP_URL", "VITE_API_URL", "VITE_LOCAL_API_URL")
     }
+    try:
+        storage = urlsplit(values["VITE_STORAGE_BASE_URL"])
+        storage_port = storage.port
+    except ValueError as exc:
+        raise DeploymentError("VITE_STORAGE_BASE_URL n'est pas une URL valide") from exc
+    if (
+        storage.scheme != "https"
+        or not storage.hostname
+        or storage.username
+        or storage.password
+        or storage.query
+        or storage.fragment
+        or storage.path in {"", "/"}
+    ):
+        raise DeploymentError(
+            "VITE_STORAGE_BASE_URL doit être une URL HTTPS de stockage, sans identifiants, "
+            "query ni fragment"
+        )
+    try:
+        storage_address = ipaddress.ip_address(storage.hostname)
+    except ValueError:
+        storage_address = None
+    if storage.hostname.lower() == "localhost" or (
+        storage_address is not None and storage_address.is_loopback
+    ):
+        raise DeploymentError("VITE_STORAGE_BASE_URL ne peut pas pointer vers une adresse loopback")
+    if storage_port is not None and not 1 <= storage_port <= 65535:
+        raise DeploymentError("VITE_STORAGE_BASE_URL contient un port invalide")
+    origins.add(f"https://{storage.netloc}")
     cors_origins = {item.strip().rstrip("/") for item in values["CORS_ORIGINS"].split(",")}
     if "*" in cors_origins or not origins.issubset(cors_origins):
-        raise DeploymentError("CORS_ORIGINS doit autoriser les trois origines HTTPS configurées")
+        raise DeploymentError("CORS_ORIGINS doit autoriser toutes les origines HTTPS configurées")
 
     hostname = values["EGS_EXPECTED_HOSTNAME"]
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.-]{0,252}", hostname):
@@ -670,6 +727,10 @@ def _deploy(env_file: Path, release_sha: str) -> None:
             "EGS_REQUIRE_EMPTY_DATABASE=1",
             "-e",
             "EGS_DEPLOYMENT_TARGET=new-host",
+            "-e",
+            "EGS_ALLOW_BOOTSTRAP_SUPERUSER=1",
+            "-e",
+            "DATABASE_URL=${MIGRATION_DATABASE_URL}",
             "egs-api",
             "python",
             "-m",

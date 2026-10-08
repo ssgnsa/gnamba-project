@@ -43,8 +43,11 @@ le serveur actuel et ne contacte pas son PostgreSQL.
    `postgresql://egs_app:<EGS_DB_APP_PASSWORD>@egs-postgres:5432/egs_local`.
    La procédure vérifie cette cible avant le moindre accès DB; les variables
    héritées du shell ne peuvent pas remplacer les valeurs validées dans Compose.
-6. Configurer les trois URL HTTPS publiques et inclure leurs origines (sans
-   chemins) dans `CORS_ORIGINS`. Router les hôtes web et Filebrowser vers
+6. Configurer les URL HTTPS publiques de l’application, de l’API et du
+   stockage/Filebrowser. Renseigner `VITE_STORAGE_BASE_URL` avec l’URL HTTPS
+   publique incluant le préfixe de stockage (par exemple
+   `https://files.gnambaservices.ci/egs`) et inclure son origine, sans chemin,
+   dans `CORS_ORIGINS`. Router les hôtes web et Filebrowser vers
    `http://127.0.0.1:18080` et le domaine API directement vers
    `http://127.0.0.1:18000`. Modifier `API_PORT` ou `WEB_PORT` uniquement si le
    proxy est reconfiguré en conséquence. Le proxy doit transmettre

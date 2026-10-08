@@ -27,13 +27,19 @@ VALUES = {
         + quote(APP_PASSWORD, safe="")
         + "@egs-postgres:5432/egs_local"
     ),
+    "MIGRATION_DATABASE_URL": (
+        "postgresql://postgres:"
+        + quote("p" * 40, safe="")
+        + "@egs-postgres:5432/egs_local"
+    ),
     "LOCAL_AUTH_SECRET": "s" * 40,
     "INITIAL_ADMIN_PASSWORD": "correct-horse-battery",
     "FB_ADMIN_PASSWORD": "f" * 40,
     "PUBLIC_APP_URL": "https://egs.example.test",
     "VITE_API_URL": "https://api.egs.example.test/api/v1",
     "VITE_LOCAL_API_URL": "https://api.egs.example.test",
-    "CORS_ORIGINS": "https://egs.example.test,https://api.egs.example.test",
+    "VITE_STORAGE_BASE_URL": "https://files.egs.example.test/egs",
+    "CORS_ORIGINS": "https://egs.example.test,https://api.egs.example.test,https://files.egs.example.test",
 }
 
 
@@ -75,6 +81,11 @@ class NewHostEnvironmentTests(unittest.TestCase):
 
     def test_rejects_loopback_public_origins(self):
         values = {**VALUES, "PUBLIC_APP_URL": "https://127.0.0.1"}
+        with self.assertRaisesRegex(DeploymentError, "loopback"):
+            validate_environment(values)
+
+    def test_rejects_loopback_storage_url(self):
+        values = {**VALUES, "VITE_STORAGE_BASE_URL": "https://127.0.0.1/egs"}
         with self.assertRaisesRegex(DeploymentError, "loopback"):
             validate_environment(values)
 

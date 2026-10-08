@@ -97,6 +97,7 @@ services:
       VITE_API_MODE: local
       VITE_API_URL: ${VITE_API_URL:?VITE_API_URL is required}
       VITE_LOCAL_API_URL: ${VITE_LOCAL_API_URL:?VITE_LOCAL_API_URL is required}
+      VITE_STORAGE_BASE_URL: ${VITE_STORAGE_BASE_URL:?VITE_STORAGE_BASE_URL is required}
     tmpfs:
       - /run/egs-runtime:rw,noexec,nosuid,size=16m
     ports:
