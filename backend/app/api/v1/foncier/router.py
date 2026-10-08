@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from app.core.database import get_db, SessionLocal
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_permission
 from app.services.foncier import (
     get_village_service, get_lotissement_service, get_ilot_service,
     get_lot_service, get_attestation_service, get_audit_service,
@@ -21,15 +21,22 @@ from app.schemas.foncier import (
     LotissementCreate, LotissementUpdate, LotissementResponse,
     IlotCreate, IlotUpdate, IlotResponse,
     LotCreate, LotUpdate, LotResponse, LotSearchParams, LotArchiveRequest,
-    AttestationCreate, AttestationUpdate, AttestationResponse,
+    AttestationCreate, AttestationUpdate, AttestationResponse, AttestationRevokeRequest,
     AttestationSubmitRequest, AttestationValidateRequest, AttestationScanRequest,
     TemoinCreate, TemoinResponse, DuplicateCheckParams,
-    AttestationVerificationResponse, PaginatedResponse,
+    AttestationVerificationResponse, PaginatedResponse, PaginatedAttestationResponse,
     ActivityLogResponse, AuditSearchParams, TimelineResponse,
     SyncStatusResponse, SyncQueueItem, ConflictResolutionRequest
 )
 
-router = APIRouter(prefix="/api/v1/foncier", tags=["foncier"])
+# Les règles métier détaillées de B.6 restent ouvertes. Tant qu'elles ne sont
+# pas validées, les routes privées Foncier sont réservées à l'Administrateur
+# par la politique centralisée (refus par défaut pour les autres rôles).
+router = APIRouter(
+    prefix="/api/v1/foncier",
+    tags=["foncier"],
+    dependencies=[Depends(require_permission("foncier", "read"))],
+)
 
 # ============================================
 # DEPENDENCY - USER ID
@@ -189,10 +196,14 @@ def update_lotissement(
 
 @router.delete("/lotissements/{lotissement_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_lotissement(lotissement_id: UUID, db: Session = Depends(get_db)):
-    """Supprime un lotissement"""
+    """Refuse la suppression physique tant qu'aucun cycle de vie n'est validé."""
     service = get_lotissement_service(db)
-    if not service.delete(lotissement_id):
+    if not service.repo.get(lotissement_id):
         raise HTTPException(status_code=404, detail="Lotissement introuvable")
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail="Suppression physique désactivée; règle d'archivage à valider.",
+    )
 
 # ============================================
 # ÎLOTS
@@ -247,10 +258,14 @@ def update_ilot(
 
 @router.delete("/ilots/{ilot_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_ilot(ilot_id: UUID, db: Session = Depends(get_db)):
-    """Supprime un îlot"""
+    """Refuse la suppression physique tant qu'aucun cycle de vie n'est validé."""
     service = get_ilot_service(db)
-    if not service.delete(ilot_id):
+    if not service.repo.get(ilot_id):
         raise HTTPException(status_code=404, detail="Îlot introuvable")
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail="Suppression physique désactivée; règle d'archivage à valider.",
+    )
 
 # ============================================
 # LOTS
@@ -473,7 +488,7 @@ def list_attestations_by_lot(lot_id: UUID, db: Session = Depends(get_db)):
     service = get_attestation_service(db)
     return service.get_by_lot(lot_id)
 
-@router.get("/attestations", response_model=PaginatedResponse)
+@router.get("/attestations", response_model=PaginatedAttestationResponse)
 def search_attestations(
     lot_id: Optional[UUID] = None,
     statut: Optional[str] = None,
@@ -484,8 +499,8 @@ def search_attestations(
     """Recherche d'attestations"""
     service = get_attestation_service(db)
     items, total = service.search(lot_id=lot_id, statut=statut, limit=page_size, offset=(page - 1) * page_size)
-    return PaginatedResponse(
-        items=items,
+    return PaginatedAttestationResponse(
+        items=[AttestationResponse.model_validate(item, from_attributes=True) for item in items],
         total=total,
         page=page,
         page_size=page_size,
@@ -518,11 +533,19 @@ def submit_attestation(
     attestation_id: UUID,
     data: AttestationSubmitRequest,
     db: Session = Depends(get_db),
-    user_id: UUID = Depends(get_user_id)
+    user_id: UUID = Depends(get_user_id),
+    current_user: dict = Depends(get_current_user),
 ):
     """Soumet une attestation pour validation (brouillon -> soumis)"""
     service = get_attestation_service(db)
-    attestation = service.submit(attestation_id, data, user_id)
+    actor_name = (current_user.get("full_name") or "").strip()
+    if not actor_name:
+        raise HTTPException(status_code=400, detail="Le profil utilisateur doit avoir un nom")
+    attestation = service.submit(
+        attestation_id,
+        data.model_copy(update={"agent_nom": actor_name}),
+        user_id,
+    )
     if not attestation:
         raise HTTPException(status_code=400, detail="Attestation introuvable ou ne peut pas être soumise")
     return attestation
@@ -532,11 +555,19 @@ def validate_attestation(
     attestation_id: UUID,
     data: AttestationValidateRequest,
     db: Session = Depends(get_db),
-    user_id: UUID = Depends(get_user_id)
+    user_id: UUID = Depends(get_user_id),
+    current_user: dict = Depends(get_current_user),
 ):
     """Valide une attestation (soumis -> valide)"""
     service = get_attestation_service(db)
-    attestation = service.validate(attestation_id, data, user_id)
+    actor_name = (current_user.get("full_name") or "").strip()
+    if not actor_name:
+        raise HTTPException(status_code=400, detail="Le profil utilisateur doit avoir un nom")
+    attestation = service.validate(
+        attestation_id,
+        data.model_copy(update={"chef_nom": actor_name}),
+        user_id,
+    )
     if not attestation:
         raise HTTPException(status_code=400, detail="Attestation introuvable ou ne peut pas être validée")
     return attestation
@@ -558,13 +589,13 @@ def scan_attestation(
 @router.post("/attestations/{attestation_id}/revoke", response_model=AttestationResponse)
 def revoke_attestation(
     attestation_id: UUID,
-    reason: str,
+    data: AttestationRevokeRequest,
     db: Session = Depends(get_db),
     user_id: UUID = Depends(get_user_id)
 ):
     """Révoque une attestation"""
     service = get_attestation_service(db)
-    attestation = service.revoke(attestation_id, reason, user_id)
+    attestation = service.revoke(attestation_id, data.reason.strip(), user_id)
     if not attestation:
         raise HTTPException(status_code=400, detail="Attestation introuvable ou ne peut pas être révoquée")
     return attestation
@@ -640,7 +671,7 @@ def get_timeline(
 
 @router.get("/audit", response_model=PaginatedResponse)
 def search_audit(
-    entity_type: Optional[str] = None,
+    entity_type: Optional[List[str]] = Query(None),
     entity_id: Optional[UUID] = None,
     action: Optional[str] = None,
     user_id: Optional[UUID] = None,
@@ -663,6 +694,7 @@ def search_audit(
         offset=(page - 1) * page_size
     )
     items, total = service.search(params)
+    items = [ActivityLogResponse.model_validate(item, from_attributes=True) for item in items]
     return PaginatedResponse(
         items=items,
         total=total,
@@ -830,28 +862,47 @@ def get_dashboard_stats(
             raise HTTPException(status_code=403, detail="Accès refusé")
         return service.get_stats(village_id)
     else:
-        # Global stats
-        result = db.execute(text("""
-            SELECT 
-                COUNT(DISTINCT v.id) as total_villages,
-                COUNT(DISTINCT ls.id) as total_lotissements,
-                COUNT(DISTINCT i.id) as total_ilots,
-                COUNT(l.id) as total_lots,
-                COUNT(CASE WHEN l.statut = 'actif' THEN 1 END) as lots_actifs,
-                COUNT(CASE WHEN l.statut = 'vendu' THEN 1 END) as lots_vendus,
-                COUNT(CASE WHEN l.statut = 'litige' THEN 1 END) as lots_litiges,
-                COUNT(CASE WHEN l.statut = 'reserve' THEN 1 END) as lots_reserves,
-                COALESCE(SUM(l.superficie), 0) as superficie_totale,
-                COUNT(a.id) as total_attestations,
-                COUNT(CASE WHEN a.statut = 'valide' THEN 1 END) as attestations_validees
+        # Les statistiques par village agrègent les tables séparément; sommer
+        # ces résultats évite de multiplier les lots par leurs attestations.
+        village_stats = service.get_all_with_stats()
+        result = {
+            "total_villages": len(village_stats),
+            "total_lotissements": 0,
+            "total_ilots": 0,
+            "total_lots": 0,
+            "lots_actifs": 0,
+            "lots_vendus": 0,
+            "lots_litiges": 0,
+            "lots_reserves": 0,
+            "superficie_totale": 0,
+            "total_attestations": 0,
+            "attestations_validees": 0,
+        }
+        aggregate_fields = {
+            "total_lots": "total_lots",
+            "lots_actifs": "lots_actifs",
+            "lots_vendus": "lots_vendus",
+            "lots_litiges": "lots_litiges",
+            "lots_reserves": "lots_reserves",
+            "superficie_totale": "superficie_totale",
+            "nb_attestations": "total_attestations",
+            "nb_attestations_validees": "attestations_validees",
+        }
+        for stats in village_stats:
+            for source, target in aggregate_fields.items():
+                result[target] += stats.get(source) or 0
+
+        counts = db.execute(text("""
+            SELECT COUNT(DISTINCT ls.id) AS total_lotissements,
+                   COUNT(DISTINCT i.id) AS total_ilots
             FROM foncier_villages v
             LEFT JOIN foncier_lotissements ls ON ls.village_id = v.id
             LEFT JOIN foncier_ilots i ON i.lotissement_id = ls.id
-            LEFT JOIN foncier_lots l ON l.ilot_id = i.id AND l.deleted_at IS NULL
-            LEFT JOIN foncier_attestations a ON a.lot_id = l.id AND a.deleted_at IS NULL
             WHERE v.actif = true
-        """)).fetchone()
-        return dict(result._mapping)
+        """)).one()
+        result["total_lotissements"] = counts.total_lotissements
+        result["total_ilots"] = counts.total_ilots
+        return result
 
 
 # ============================================

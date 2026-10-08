@@ -38,7 +38,7 @@ class LocalAuthApiTests(unittest.TestCase):
     def test_login_and_me(self) -> None:
         response = self.client.post('/api/v1/auth/login', json={
             'email': 'admin@egs.local',
-            'password': 'Admin@EGS2025!'
+            'password': os.environ["INITIAL_ADMIN_PASSWORD"]
         })
         self.assertEqual(response.status_code, 200)
         payload = response.json()
@@ -52,25 +52,40 @@ class LocalAuthApiTests(unittest.TestCase):
         self.assertEqual(me_response.json()['user']['email'], 'admin@egs.local')
 
     def test_create_user(self) -> None:
+        login = self.client.post('/api/v1/auth/login', json={
+            'email': 'admin@egs.local',
+            'password': os.environ["INITIAL_ADMIN_PASSWORD"],
+        })
+        token = login.json()['access_token']
         response = self.client.post('/api/v1/users', json={
             'email': 'user@egs.local',
             'password': 'Test123!',
             'full_name': 'Test User',
-            'access_level': 'employe'
+            'access_level': 'employe',
+        }, headers={
+            'Authorization': f'Bearer {token}',
         })
-        self.assertEqual(response.status_code, 200)
-        body = response.json()
-        self.assertEqual(body['user']['email'], 'user@egs.local')
+        self.assertEqual(response.status_code, 403)
+
+    def test_create_user_requires_authenticated_admin(self) -> None:
+        response = self.client.post('/api/v1/users', json={
+            'email': 'attacker@egs.local',
+            'password': 'Test123!',
+            'full_name': 'Attacker',
+            'role': 'admin',
+            'access_level': 'admin',
+        })
+        self.assertEqual(response.status_code, 401)
 
     def test_admin_can_change_password_with_current_password(self) -> None:
-        os.environ['INITIAL_ADMIN_PASSWORD'] = 'EgsAdminInitialPass2026Secure!'
+        os.environ['INITIAL_ADMIN_PASSWORD'] = os.environ["INITIAL_ADMIN_PASSWORD"]
         self.memory_repo = InMemoryUserRepository()
         app.dependency_overrides[deps.get_user_repository] = lambda: self.memory_repo
         app.dependency_overrides[deps.get_auth_service] = lambda: AuthService(self.memory_repo)
 
         login = self.client.post('/api/v1/auth/login', json={
             'email': 'admin@egs.local',
-            'password': 'EgsAdminInitialPass2026Secure!'
+            'password': os.environ["INITIAL_ADMIN_PASSWORD"]
         })
         self.assertEqual(login.status_code, 200)
         token = login.json()['access_token']
@@ -78,7 +93,7 @@ class LocalAuthApiTests(unittest.TestCase):
         response = self.client.post('/api/v1/auth/change-password', headers={
             'Authorization': f'Bearer {token}'
         }, json={
-            'current_password': 'EgsAdminInitialPass2026Secure!',
+            'current_password': os.environ["INITIAL_ADMIN_PASSWORD"],
             'new_password': 'NewAdminPass2026!'
         })
         self.assertEqual(response.status_code, 200)
@@ -93,4 +108,3 @@ class LocalAuthApiTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-

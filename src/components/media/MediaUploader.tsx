@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Upload, X, CheckCircle, AlertCircle, Image, Tag } from "lucide-react";
+import { Upload, X, CheckCircle, AlertCircle, Image, Plus } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { apiClient } from "../../api/client";
 import { isSelfHostedMode } from "../../lib/selfHosted";
@@ -111,6 +111,7 @@ export default function MediaUploader({
   const [items, setItems] = useState<UploadItem[]>([]);
   const [altText, setAltText] = useState("");
   const [tags, setTags] = useState<string[]>([]);
+  const [newTag, setNewTag] = useState("");
   const [uploading, setUploading] = useState(false);
   const [previewUrls, setPreviewUrls] = useState<Map<number, string>>(
     new Map(),
@@ -156,9 +157,10 @@ export default function MediaUploader({
   const buildAutoAltText = (fileName: string) =>
     fileName.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
 
-  const addTag = (t: string) => {
-    const tag = t.trim().toLowerCase().replace(/\s+/g, "-");
+  const addTag = () => {
+    const tag = newTag.trim().toLowerCase().replace(/\s+/g, "-");
     if (tag && !tags.includes(tag)) setTags((prev) => [...prev, tag]);
+    setNewTag("");
   };
 
   const removeTag = (t: string) => setTags((prev) => prev.filter((x) => x !== t));
@@ -221,7 +223,7 @@ export default function MediaUploader({
         }
 
         const result = await apiClient.media.upload(fileToSend, {
-          category: "autre",
+          category: defaultCategory,
           alt_text: effectiveAltText,
           description: "",
           tags,
@@ -259,7 +261,7 @@ export default function MediaUploader({
       }
 
       const ext = mainFile.name.split(".").pop();
-      const base = `autre/${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      const base = `${defaultCategory}/${Date.now()}_${Math.random().toString(36).slice(2)}`;
       const filename = `${base}.${ext}`;
 
       const uploadContentType = canCompress
@@ -359,7 +361,7 @@ export default function MediaUploader({
           original_name: item.file.name,
           url: publicUrl,
           thumbnail_url: thumbnailUrl,
-          category: "autre",
+          category: defaultCategory,
           uploaded_by: user?.id ?? null,
           size: mainFile.size,
           type: mainFile.type,
@@ -417,6 +419,7 @@ export default function MediaUploader({
   return (
     <div className="space-y-4">
       <div>
+        <p className="text-xs text-gray-500 mb-2">Catégorie : {CATEGORY_LABELS[defaultCategory]}</p>
         <label className="block text-xs font-medium text-gray-600 mb-1">Texte alternatif</label>
         <input
           value={altText}
@@ -424,6 +427,23 @@ export default function MediaUploader({
           placeholder="Optionnel — description pour SEO..."
           className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
         />
+        <div className="flex gap-2 mt-2">
+          <input
+            value={newTag}
+            onChange={(e) => setNewTag(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                addTag();
+              }
+            }}
+            placeholder="Ajouter une étiquette"
+            className="min-w-0 flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm"
+          />
+          <button type="button" onClick={addTag} className="inline-flex items-center gap-1 rounded-lg border px-3 text-sm">
+            <Plus size={14} /> Ajouter
+          </button>
+        </div>
         {tags.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-2">
             {tags.map((t) => (

@@ -10,14 +10,16 @@ import {
   FAQProps,
   FooterProps,
 } from "./types";
+import StorageImage, { useStorageImageUrl } from "../media/StorageImage";
 
 function HeroPreview({ props }: { props: HeroProps }) {
+  const bgImageUrl = useStorageImageUrl(props.bg_image_url);
   return (
     <div
       className="relative h-48 overflow-hidden rounded-lg"
       style={{
-        background: props.bg_image_url
-          ? `url(${props.bg_image_url}) center/cover`
+        background: bgImageUrl
+          ? `url(${bgImageUrl}) center/cover`
           : "linear-gradient(135deg, #0f766e 0%, #0284c7 100%)",
       }}
     >
@@ -113,7 +115,7 @@ function GalleryPreview({ props }: { props: GalleryProps }) {
               className="aspect-video bg-slate-100 rounded-lg overflow-hidden"
             >
               {img.url ? (
-                <img
+                <StorageImage
                   src={img.url}
                   alt={img.caption}
                   className="w-full h-full object-cover"
@@ -245,7 +247,7 @@ function FooterPreview({ props }: { props: FooterProps }) {
       <div className="flex items-center justify-between mb-4">
         <div>
           {props.logo_url ? (
-            <img
+            <StorageImage
               src={props.logo_url}
               alt="Logo"
               className="h-8 object-contain"

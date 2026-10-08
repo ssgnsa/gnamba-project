@@ -9,9 +9,10 @@ from pydantic import BaseModel
 from datetime import datetime
 
 from app.core.database import get_db
+from app.api.deps import require_admin_user
 from app.services.lead.campaign_processor import CampaignProcessor
 
-router = APIRouter(tags=["leads-campaigns"])
+router = APIRouter(tags=["leads-campaigns"], dependencies=[Depends(require_admin_user)])
 
 
 class CampaignCreateRequest(BaseModel):

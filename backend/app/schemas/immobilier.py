@@ -3,7 +3,7 @@
 
 from datetime import date, datetime
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from uuid import UUID
 
 
@@ -20,35 +20,83 @@ class ImmobilierBase(BaseModel):
 # ============================================
 
 class PropertyBase(ImmobilierBase):
-    type_bien: Optional[str] = Field(None, pattern=r"^(studio|chambre|chambre-salon|appartement|terrain|magasin|bureau|villa)$")
+    type_bien: Optional[str] = Field(None, pattern=r"^(studio|chambre|chambre-salon|appartement|terrain|magasin|bureau|villa|maison|duplex|triplex|loft|local_commercial|entrepot|garage|parking|autre)$")
     adresse: Optional[str] = None
+    ville: Optional[str] = Field(None, max_length=100)
+    commune: Optional[str] = Field(None, max_length=100)
     proprietaire_name: Optional[str] = None  # Current model uses String, will migrate to UUID FK
     valeur: Optional[float] = Field(None, ge=0)
     loyer_mensuel: Optional[float] = Field(None, ge=0)
     charges_mensuelles: Optional[float] = Field(default=0, ge=0)
-    statut: Optional[str] = Field(None, pattern=r"^(disponible|loue|en_vente|vendu|en_travaux)$")
+    statut: Optional[str] = Field(None, pattern=r"^(disponible|en_vente|loue|louee|vendue|en_travaux|retiree|archivee)$")
     description: Optional[str] = None
     cover_image_url: Optional[str] = None
 
 
 class PropertyCreate(PropertyBase):
-    type_bien: str = Field(..., pattern=r"^(studio|chambre|chambre-salon|appartement|terrain|magasin|bureau|villa)$")
+    model_config = {"from_attributes": True, "extra": "forbid"}
+
+    id: Optional[UUID] = None  # Preserve an offline UUID during server synchronization.
+    type_bien: str = Field(..., pattern=r"^(studio|chambre|chambre-salon|appartement|terrain|magasin|bureau|villa|maison|duplex|triplex|loft|local_commercial|entrepot|garage|parking|autre)$")
+    adresse: str = Field(..., min_length=1, max_length=2000)
+    statut: str = Field("disponible", pattern=r"^(disponible|en_travaux)$")
+
+    @model_validator(mode="after")
+    def require_structured_locality(self):
+        """A new property needs a locality before it can enter the API flow."""
+        if not (self.commune and self.commune.strip()) and not (
+            self.ville and self.ville.strip()
+        ):
+            raise ValueError("Une commune ou la ville est obligatoire")
+        return self
+
+
+class PropertyLocalityVerification(BaseModel):
+    model_config = {"extra": "forbid"}
+
+    commune: Optional[str] = Field(None, max_length=100)
+    ville: Optional[str] = Field(None, max_length=100)
+    preuve_reference: str = Field(..., min_length=1, max_length=1000)
+    anstat_code: str = Field(..., min_length=1, max_length=32)
+
+    @model_validator(mode="after")
+    def require_locality(self):
+        if not (self.commune and self.commune.strip()) and not (self.ville and self.ville.strip()):
+            raise ValueError("Une commune ou une ville vérifiée est obligatoire")
+        return self
 
 
 class PropertyUpdate(BaseModel):
-    type_bien: Optional[str] = Field(None, pattern=r"^(studio|chambre|chambre-salon|appartement|terrain|magasin|bureau|villa)$")
+    model_config = {"extra": "forbid"}
+
+    type_bien: Optional[str] = Field(None, pattern=r"^(studio|chambre|chambre-salon|appartement|terrain|magasin|bureau|villa|maison|duplex|triplex|loft|local_commercial|entrepot|garage|parking|autre)$")
     adresse: Optional[str] = None
+    ville: Optional[str] = Field(None, max_length=100)
+    commune: Optional[str] = Field(None, max_length=100)
     proprietaire_name: Optional[str] = None
     valeur: Optional[float] = Field(None, ge=0)
     loyer_mensuel: Optional[float] = Field(None, ge=0)
     charges_mensuelles: Optional[float] = Field(None, ge=0)
-    statut: Optional[str] = Field(None, pattern=r"^(disponible|loue|en_vente|vendu|en_travaux)$")
     description: Optional[str] = None
     cover_image_url: Optional[str] = None
 
 
+class PropertyTransition(BaseModel):
+    model_config = {"extra": "forbid"}
+    statut: str = Field(..., pattern=r"^(disponible|en_vente|louee|vendue|en_travaux|retiree|archivee)$")
+
+
 class PropertyResponse(PropertyBase):
     id: UUID
+    reference: Optional[str] = None
+    titre: Optional[str] = None
+    localite_statut: str = "HOLD"
+    localite_preuve_reference: Optional[str] = None
+    localite_anstat_code: Optional[str] = None
+    localite_verifiee_le: Optional[datetime] = None
+    localite_verifiee_par: Optional[str] = None
+    publier_vitrine: bool
+    titre_fige_le: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
     deleted_at: Optional[datetime] = None

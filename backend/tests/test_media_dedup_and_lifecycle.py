@@ -1,11 +1,24 @@
 from io import BytesIO
 
 from fastapi.testclient import TestClient
+import pytest
 
+from app.api import deps
 from app.main import app
 
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def authenticated_admin():
+    app.dependency_overrides[deps.get_current_user] = lambda: {
+        "id": "media-admin",
+        "role": "admin",
+        "mfa_verified": True,
+    }
+    yield
+    app.dependency_overrides.clear()
 
 
 def test_media_deduplication_and_lifecycle():

@@ -25,6 +25,7 @@ import {
   ENTITY_TYPE_LABELS,
 } from "../../lib/mediaUtils";
 import type { MediaFile, MediaUsage, MediaVersion } from "../../types";
+import StorageImage, { StorageLink } from "./StorageImage";
 
 interface MediaDetailModalProps {
   file: MediaFile;
@@ -231,7 +232,7 @@ export default function MediaDetailModal({
             </div>
           </div>
           <div className="flex items-center gap-1 ml-4">
-            <a
+            <StorageLink
               href={file.url}
               target="_blank"
               rel="noopener noreferrer"
@@ -239,15 +240,15 @@ export default function MediaDetailModal({
               title="Ouvrir dans un nouvel onglet"
             >
               <ExternalLink size={16} />
-            </a>
-            <a
+            </StorageLink>
+            <StorageLink
               href={file.url}
               download={file.original_name}
               className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
               title="Télécharger"
             >
               <Download size={16} />
-            </a>
+            </StorageLink>
             <button
               onClick={() => {
                 onDelete(file);
@@ -270,7 +271,7 @@ export default function MediaDetailModal({
         <div className="flex flex-1 overflow-hidden">
           <div className="w-72 flex-shrink-0 bg-gray-50 flex items-center justify-center p-4 border-r border-gray-100">
             <div className="w-full egs-table">
-              <img
+              <StorageImage
                 src={file.url}
                 alt={file.alt_text || file.original_name}
                 crossOrigin="anonymous"
@@ -533,7 +534,7 @@ export default function MediaDetailModal({
                       >
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-lg overflow-hidden bg-gray-200 flex-shrink-0">
-                            <img
+                            <StorageImage
                               src={v.old_url}
                               alt=""
                               crossOrigin="anonymous"
@@ -553,14 +554,14 @@ export default function MediaDetailModal({
                             </p>
                           </div>
                         </div>
-                        <a
+                        <StorageLink
                           href={v.old_url}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                         >
                           <ExternalLink size={13} />
-                        </a>
+                        </StorageLink>
                       </div>
                     ))
                   )}

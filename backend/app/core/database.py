@@ -8,10 +8,12 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 load_dotenv(Path(__file__).resolve().parents[2] / ".env", override=False)
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://postgres:postgres@localhost:5432/egs_local"
-)
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError(
+        "DATABASE_URL doit être défini explicitement; aucun DSN PostgreSQL "
+        "implicite n'est autorisé"
+    )
 
 engine = create_engine(
     DATABASE_URL,

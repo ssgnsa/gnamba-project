@@ -39,6 +39,7 @@ const buildOutDir = resolveBuildOutDir();
 const envVars: Record<string, string> = {
   'import.meta.env.VITE_API_MODE': JSON.stringify(process.env.VITE_API_MODE || 'local'),
   'import.meta.env.VITE_LOCAL_API_URL': JSON.stringify('__VITE_LOCAL_API_URL__'),
+  'import.meta.env.VITE_STORAGE_BASE_URL': JSON.stringify('__VITE_STORAGE_BASE_URL__'),
   'import.meta.env.VITE_SELFHOSTED_MODE': JSON.stringify(process.env.VITE_SELFHOSTED_MODE || 'true'),
   'import.meta.env.VITE_FILEBROWSER_URL': JSON.stringify(process.env.VITE_FILEBROWSER_URL || '/filebrowser'),
   'import.meta.env.VITE_FILEBROWSER_API_URL': JSON.stringify(process.env.VITE_FILEBROWSER_API_URL || '/filebrowser/api'),
@@ -78,7 +79,7 @@ export default defineConfig({
     allowedHosts: ["gnambaservices.ci"],
     proxy: {
       '/api/v1': {
-        target: 'http://localhost:8000/api/v1',
+        target: 'http://localhost:8000',
         changeOrigin: true,
         secure: false,
       },

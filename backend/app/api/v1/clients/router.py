@@ -9,6 +9,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.api.deps import require_permission
 from app.models.entity import Entity
 from app.schemas.entity import EntityCreate, EntityUpdate, EntityResponse
 from app.services.entity_service import get_entity_service
@@ -192,6 +193,7 @@ def list_clients(
     actif: Optional[bool] = Query(None, description="Filtrer par statut actif"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    _user: dict[str, Any] = Depends(require_permission("clients", "read_private")),
     db: Session = Depends(get_db),
 ) -> list[ClientResponse]:
     """Liste les clients (entités de type client)"""
@@ -214,7 +216,11 @@ def list_clients(
 
 
 @router.get("/{client_id}", response_model=ClientResponse)
-def get_client(client_id: str, db: Session = Depends(get_db)) -> ClientResponse:
+def get_client(
+    client_id: str,
+    _user: dict[str, Any] = Depends(require_permission("clients", "read_private")),
+    db: Session = Depends(get_db),
+) -> ClientResponse:
     """Récupère un client par ID"""
     svc = get_entity_service(db)
     entity = svc.get(UUID(client_id))
@@ -224,7 +230,11 @@ def get_client(client_id: str, db: Session = Depends(get_db)) -> ClientResponse:
 
 
 @router.post("", response_model=ClientResponse, status_code=201)
-def create_client(payload: ClientCreateRequest, db: Session = Depends(get_db)) -> ClientResponse:
+def create_client(
+    payload: ClientCreateRequest,
+    _user: dict[str, Any] = Depends(require_permission("clients", "create")),
+    db: Session = Depends(get_db),
+) -> ClientResponse:
     """Crée un nouveau client (entité de type client)"""
     svc = get_entity_service(db)
 
@@ -249,7 +259,12 @@ def create_client(payload: ClientCreateRequest, db: Session = Depends(get_db)) -
 
 
 @router.patch("/{client_id}", response_model=ClientResponse)
-def update_client(client_id: str, payload: ClientUpdateRequest, db: Session = Depends(get_db)) -> ClientResponse:
+def update_client(
+    client_id: str,
+    payload: ClientUpdateRequest,
+    _user: dict[str, Any] = Depends(require_permission("clients", "update")),
+    db: Session = Depends(get_db),
+) -> ClientResponse:
     """Met à jour un client"""
     svc = get_entity_service(db)
     entity = svc.update(UUID(client_id), _client_payload_to_entity_update(payload))
@@ -259,7 +274,11 @@ def update_client(client_id: str, payload: ClientUpdateRequest, db: Session = De
 
 
 @router.delete("/{client_id}")
-def delete_client(client_id: str, db: Session = Depends(get_db)) -> dict[str, str]:
+def delete_client(
+    client_id: str,
+    _user: dict[str, Any] = Depends(require_permission("clients", "delete")),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
     """Supprime (soft delete = inactive) un client"""
     svc = get_entity_service(db)
     entity = svc.get(UUID(client_id))
@@ -271,7 +290,11 @@ def delete_client(client_id: str, db: Session = Depends(get_db)) -> dict[str, st
 
 
 @router.post("/{client_id}/activate", response_model=ClientResponse)
-def activate_client(client_id: str, db: Session = Depends(get_db)) -> ClientResponse:
+def activate_client(
+    client_id: str,
+    _user: dict[str, Any] = Depends(require_permission("clients", "update")),
+    db: Session = Depends(get_db),
+) -> ClientResponse:
     """Réactive un client"""
     svc = get_entity_service(db)
     entity = svc.update(UUID(client_id), EntityUpdate(status="active"))
@@ -284,6 +307,7 @@ def activate_client(client_id: str, db: Session = Depends(get_db)) -> ClientResp
 def search_clients_suggest(
     q: str = Query(..., min_length=2, max_length=100),
     limit: int = Query(10, ge=1, le=50),
+    _user: dict[str, Any] = Depends(require_permission("clients", "read_private")),
     db: Session = Depends(get_db),
 ) -> list[ClientResponse]:
     """Recherche suggérée pour autocomplétion clients"""

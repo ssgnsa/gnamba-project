@@ -1,17 +1,19 @@
 from fastapi import FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
 from pathlib import Path
 import os
 import json
+import logging
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api import v1_router
+from app.api.storage_files import router as storage_files_router
 from app.core.bootstrap import initialize_system_seed
 from app.core.config import settings
 from app.core.database import SessionLocal
-from app.core.security import AuthenticationError, AuthorizationError
+from app.core.security import AuthenticationError, AuthorizationError, RateLimitError
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 VERSION_FILE_PATHS = [ROOT_DIR / "VERSION.json", ROOT_DIR / "dist" / "VERSION.json"]
@@ -41,14 +43,12 @@ app = FastAPI(title=settings.APP_NAME, version="0.2.0")
 import mimetypes
 mimetypes.add_type("image/webp", ".webp")
 
-# Serve storage files (media uploads)
-storage_root = Path(os.getenv("LOCAL_STORAGE_ROOT", "backend/storage/uploads")).resolve()
-storage_root.mkdir(parents=True, exist_ok=True)
-app.mount("/storage", StaticFiles(directory=storage_root), name="storage")
+# Serve storage files through an authorization-aware route.
+app.include_router(storage_files_router)
 
-# CORS middleware - uses CORS_ORIGINS from environment (comma-separated)
-cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:8080,").split(",")
-cors_origins = [origin.strip() for origin in cors_origins if origin.strip()]
+# CORS middleware - uses the shared configuration so local dev ports are allowed
+# without requiring each environment file to be manually updated.
+cors_origins = settings.cors_origins()
 
 app.add_middleware(
     CORSMiddleware,
@@ -58,6 +58,26 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["*"],
 )
+
+
+class AuthTransportSecurityMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        auth_path = request.url.path.startswith(("/api/v1/auth/", "/api/auth/"))
+        if auth_path and settings.AUTH_REQUIRE_HTTPS:
+            host = (request.url.hostname or "").lower()
+            local = host in {"localhost", "127.0.0.1", "::1", "testserver"}
+            forwarded_proto = request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip().lower()
+            if forwarded_proto != "https":
+                try:
+                    forwarded_proto = json.loads(request.headers.get("cf-visitor", "{}")).get("scheme", "").lower()
+                except (TypeError, json.JSONDecodeError):
+                    forwarded_proto = ""
+            if not local and request.url.scheme != "https" and forwarded_proto != "https":
+                return JSONResponse(
+                    status_code=426,
+                    content={"detail": "HTTPS est obligatoire pour les parcours d’authentification."},
+                )
+        return await call_next(request)
 
 
 class LegacyAPIPrefixMiddleware(BaseHTTPMiddleware):
@@ -72,6 +92,7 @@ class LegacyAPIPrefixMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(LegacyAPIPrefixMiddleware)
+app.add_middleware(AuthTransportSecurityMiddleware)
 
 # Custom exception handlers for authentication/authorization errors to return structured format
 @app.exception_handler(AuthenticationError)
@@ -88,6 +109,15 @@ async def authorization_error_handler(request: Request, exc: AuthorizationError)
         content={"detail": str(exc), "code": "invalid_or_missing_token"},
     )
 
+
+@app.exception_handler(RateLimitError)
+async def rate_limit_error_handler(request: Request, exc: RateLimitError):
+    return JSONResponse(
+        status_code=429,
+        content={"detail": "Trop de tentatives. Réessayez plus tard.", "code": "rate_limited"},
+        headers={"Retry-After": str(settings.AUTH_RATE_LIMIT_WINDOW_SECONDS)},
+    )
+
 # Include versioned API routers
 app.include_router(v1_router)
 
@@ -99,9 +129,6 @@ def run_system_seed() -> None:
     db = SessionLocal()
     try:
         initialize_system_seed(db)
-    except Exception:
-        import logging
-        logging.exception("seed_system a échoué au démarrage")
     finally:
         db.close()
 
@@ -134,9 +161,24 @@ def check_whatsapp_configuration() -> None:
         logging.warning("WhatsApp provider %s configured but missing env vars: %s", provider, ",".join(missing))
 
 
+@app.on_event("startup")
+def check_password_reset_configuration() -> None:
+    if not (settings.SMTP_HOST and settings.SMTP_FROM):
+        logging.getLogger(__name__).warning(
+            "Password reset email is not configured; forgot-password requests will not deliver email"
+        )
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "service": "egs-local-api"}
+
+
+@app.get("/ready")
+def readiness() -> dict[str, str]:
+    with SessionLocal() as db:
+        db.execute(text("SELECT version_num FROM alembic_version LIMIT 1")).scalar_one()
+    return {"status": "ready", "service": "egs-local-api"}
 
 
 @app.get("/api/v1/health")

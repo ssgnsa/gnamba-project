@@ -19,6 +19,25 @@ interface AuthResult {
   code?: string;
 }
 
+export function resolveApiBaseUrl(
+  configuredBase = '/api/v1',
+  origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173',
+): string {
+  const trimmed = configuredBase.replace(/\/+$/, '');
+  const normalized = trimmed.endsWith('/api/v1')
+    ? trimmed
+    : `${trimmed}/api/v1`;
+
+  const isLocalFrontend = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+  const isLocalApi = /^https?:\/\/localhost:8000\/api\/v1$/.test(normalized) || /^http:\/\/127\.0\.0\.1:8000\/api\/v1$/.test(normalized);
+
+  if (isLocalFrontend && isLocalApi) {
+    return '/api/v1';
+  }
+
+  return normalized;
+}
+
 // Core API client class
 class ApiClient {
   private baseUrl: string;
@@ -43,10 +62,7 @@ class ApiClient {
 
   constructor() {
     const configuredBase = import.meta.env.VITE_API_URL || '/api/v1';
-    const trimmed = configuredBase.replace(/\/+$/, '');
-    this.baseUrl = trimmed.endsWith('/api/v1')
-      ? trimmed
-      : `${trimmed}/api/v1`;
+    this.baseUrl = resolveApiBaseUrl(configuredBase);
     this.defaultHeaders = {
       'Content-Type': 'application/json',
     };
@@ -108,6 +124,43 @@ class ApiClient {
     } catch (error) {
       return { data: null, error: error instanceof Error ? error.message : 'Unknown error', count: null, status: 0 };
     }
+  }
+
+  async fetchStorageFile(fileUrl: string): Promise<Blob> {
+    if (typeof window === 'undefined') throw new Error('Storage files are browser-only');
+
+    const parsed = new URL(fileUrl, window.location.origin);
+    const prefix = '/storage/';
+    if (!parsed.pathname.startsWith(prefix)) {
+      throw new Error('URL de stockage invalide');
+    }
+
+    const endpoint = `/storage/files/${parsed.pathname.slice(prefix.length)}${parsed.search}`;
+    const fetchFile = () => fetch(`${this.baseUrl}${endpoint}`, {
+      headers: this.getAuthHeaders(),
+    });
+
+    let response = await fetchFile();
+    if (response.status === 401) {
+      const refreshToken = window.localStorage.getItem('egs:local_refresh_token');
+      if (refreshToken) {
+        const refreshResponse = await fetch(`${this.baseUrl}/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        });
+        if (refreshResponse.ok) {
+          const tokens = await refreshResponse.json() as { access_token?: string; refresh_token?: string };
+          if (tokens.access_token) {
+            await this.persistLocalAuthToken(tokens.access_token, tokens.refresh_token || refreshToken);
+            response = await fetchFile();
+          }
+        }
+      }
+    }
+
+    if (!response.ok) throw new Error(`Lecture du fichier refusée (${response.status})`);
+    return response.blob();
   }
 
   // Auth module

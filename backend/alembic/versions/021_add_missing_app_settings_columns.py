@@ -17,28 +17,11 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Add missing columns to app_settings table
-    op.add_column('app_settings', sa.Column('value_type', sa.String(20), nullable=False, server_default='json'))
-    op.add_column('app_settings', sa.Column('category', sa.String(50), nullable=False, server_default='general'))
-    op.add_column('app_settings', sa.Column('description', sa.Text(), nullable=True))
-    op.add_column('app_settings', sa.Column('is_public', sa.Boolean(), nullable=False, server_default='false'))
-    op.add_column('app_settings', sa.Column('is_editable', sa.Boolean(), nullable=False, server_default='true'))
-    op.add_column('app_settings', sa.Column('validation_schema', postgresql.JSON(), nullable=True))
-    op.add_column('app_settings', sa.Column('default_value', postgresql.JSON(), nullable=True))
-    
-    # Create indexes
-    op.create_index('idx_app_settings_category', 'app_settings', ['category'])
-    op.create_index('idx_app_settings_public', 'app_settings', ['is_public'])
+    # Revision 014 already defines these columns and indexes. Retain this
+    # revision as a no-op instead of duplicating its schema objects.
+    pass
 
 
 def downgrade() -> None:
-    op.drop_index('idx_app_settings_public', table_name='app_settings')
-    op.drop_index('idx_app_settings_category', table_name='app_settings')
-    
-    op.drop_column('app_settings', 'default_value')
-    op.drop_column('app_settings', 'validation_schema')
-    op.drop_column('app_settings', 'is_editable')
-    op.drop_column('app_settings', 'is_public')
-    op.drop_column('app_settings', 'description')
-    op.drop_column('app_settings', 'category')
-    op.drop_column('app_settings', 'value_type')
+    # The columns and indexes belong to revision 014 and must remain intact.
+    pass

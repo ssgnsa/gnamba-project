@@ -121,6 +121,7 @@ services:
       - /home/soma/partage:/srv
     environment:
       - FB_DATABASE=/database/filebrowser.db
+      - FB_ADMIN_PASSWORD=gnambaAdmin2025!
 volumes:
   postgres_data:
   filebrowser_db:

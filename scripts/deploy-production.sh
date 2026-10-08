@@ -21,13 +21,12 @@ ensure_command() {
 }
 
 write_version_file() {
-  local build_date git_commit branch_name build_hash version_file root_version_file
+  local build_date git_commit branch_name build_hash version_file
   build_date="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
   git_commit="$(git -C "$ROOT_DIR" rev-parse --verify HEAD)"
   branch_name="$(git -C "$ROOT_DIR" rev-parse --abbrev-ref HEAD)"
   build_hash="$(sha256sum "$ROOT_DIR/dist/index.html" 2>/dev/null | awk '{print $1}' || true)"
   version_file="$ROOT_DIR/dist/VERSION.json"
-  root_version_file="$ROOT_DIR/VERSION.json"
 
   cat > "$version_file" <<EOF
 {
@@ -39,8 +38,6 @@ write_version_file() {
   "environment": "production"
 }
 EOF
-
-  cp "$version_file" "$root_version_file"
 
   printf '%s\n' "$version_file"
 }

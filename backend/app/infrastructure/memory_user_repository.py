@@ -4,7 +4,7 @@ import os
 import time
 from typing import Any
 
-from app.core.security import hash_password
+from app.core.security import hash_password, validate_password
 from app.domain.user import User
 from app.repositories.user_repository import UserRepositoryPort
 
@@ -18,7 +18,10 @@ class InMemoryUserRepository(UserRepositoryPort):
     def _seed_default_admin(self) -> None:
         if self._users_by_email:
             return
-        admin_password = os.getenv("INITIAL_ADMIN_PASSWORD", "Admin@EGS2025!")
+        admin_password = os.getenv("INITIAL_ADMIN_PASSWORD")
+        if not admin_password:
+            return
+        validate_password(admin_password)
         admin = User(
             id="local-admin",
             email="admin@egs.local",
@@ -64,8 +67,8 @@ class InMemoryUserRepository(UserRepositoryPort):
             email=payload["email"],
             password_hash=hash_password(payload["password"]),
             full_name=payload.get("full_name", ""),
-            role=payload.get("role") or "employe",
-            access_level=payload.get("access_level", "employe"),
+            role=payload.get("role") or "guest",
+            access_level=payload.get("access_level") or "guest",
             poste=payload.get("poste"),
             department=payload.get("department"),
             phone=payload.get("phone"),

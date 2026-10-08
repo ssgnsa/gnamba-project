@@ -12,6 +12,7 @@ from sqlalchemy import select, func, or_
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.api.deps import require_admin_user
 from app.models.property import RentPayment, Property, LeaseContract
 from app.models.entity import Entity
 from app.schemas.immobilier import (
@@ -23,7 +24,11 @@ from app.schemas.immobilier import (
     RentPaymentStatsResponse,
 )
 
-router = APIRouter(prefix="/payments", tags=["immobilier-payments"])
+router = APIRouter(
+    prefix="/payments",
+    tags=["immobilier-payments"],
+    dependencies=[Depends(require_admin_user)],
+)
 
 
 def _payment_to_response(payment: RentPayment, include_relations: bool = False) -> RentPaymentResponse:
@@ -296,26 +301,9 @@ def update_payment(
 @router.delete("/{payment_id}")
 def delete_payment(
     payment_id: UUID,
-    soft: bool = Query(True, description="Soft delete (archiver) ou hard delete"),
-    db: Session = Depends(get_db),
 ) -> dict[str, str]:
-    """Supprime un paiement"""
-    payment = db.execute(
-        select(RentPayment).where(RentPayment.id == payment_id)
-    ).scalar_one_or_none()
-    
-    if not payment:
-        raise HTTPException(status_code=404, detail="Paiement introuvable")
-    
-    if soft:
-        payment.deleted_at = datetime.utcnow()
-        payment.deleted_by = None
-        db.commit()
-        return {"status": "ok", "message": "Paiement archivé"}
-    else:
-        db.delete(payment)
-        db.commit()
-        return {"status": "ok", "message": "Paiement supprimé définitivement"}
+    """Payments must be corrected with a reversal or credit note."""
+    raise HTTPException(status_code=403, detail="Corrigez le paiement par écriture inverse ou avoir")
 
 
 @router.post("/{payment_id}/restore", response_model=RentPaymentResponse)

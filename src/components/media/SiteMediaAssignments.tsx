@@ -8,6 +8,7 @@ import {
 } from "../../lib/mediaUtils";
 import { useAuth } from "../../context/AuthContext";
 import type { MediaFile } from "../../types";
+import StorageImage from "./StorageImage";
 import MediaPicker from "./MediaPicker";
 
 interface SlotDef {
@@ -188,7 +189,7 @@ function SlotCard({ slot }: SlotCardProps) {
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500" />
               </div>
             ) : current ? (
-              <img
+              <StorageImage
                 src={current.url}
                 alt={slot.label}
                 crossOrigin="anonymous"

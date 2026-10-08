@@ -8,8 +8,13 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.api.deps import require_admin_user
 
-router = APIRouter(prefix="/api/v1/tasks", tags=["tasks"])
+router = APIRouter(
+    prefix="/api/v1/tasks",
+    tags=["tasks"],
+    dependencies=[Depends(require_admin_user)],
+)
 
 
 class TaskResponse(BaseModel):
@@ -193,15 +198,6 @@ def update_task(task_id: str, payload: TaskUpdateRequest, db: Session = Depends(
 
 
 @router.delete("/{task_id}")
-def delete_task(task_id: str, db: Session = Depends(get_db)) -> dict[str, str]:
-    """Supprime une tâche"""
-    result = db.execute(
-        text("DELETE FROM tasks WHERE id = :task_id"),
-        {"task_id": task_id},
-    )
-    db.commit()
-
-    if result.rowcount == 0:
-        raise HTTPException(status_code=404, detail="Tâche introuvable")
-
-    return {"status": "ok", "message": "Tâche supprimée"}
+def delete_task(task_id: str) -> dict[str, str]:
+    """Physical task deletion is prohibited; a reasoned archive route is needed."""
+    raise HTTPException(status_code=403, detail="Archivage motivé requis; suppression refusée")

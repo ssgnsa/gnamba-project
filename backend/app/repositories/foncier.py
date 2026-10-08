@@ -107,8 +107,7 @@ class VillageRepository(BaseRepository):
     
     def get_by_code(self, code: str) -> Optional[FoncierVillage]:
         return self.db.query(FoncierVillage).filter(
-            FoncierVillage.code == code,
-            FoncierVillage.actif == True
+            FoncierVillage.code == code
         ).first()
     
     def search(self, params: LotSearchParams) -> Tuple[List[FoncierVillage], int]:
@@ -140,30 +139,46 @@ class VillageRepository(BaseRepository):
         }
     
     def get_stats(self, village_id: UUID) -> Dict[str, Any]:
-        # Requête SQL brute pour performance
+        # Agréger lots et attestations séparément afin que plusieurs
+        # attestations ne multiplient pas les surfaces ou le nombre de lots.
         result = self.db.execute(text("""
-            SELECT 
-                v.id as village_id,
-                v.nom as village_nom,
-                v.code as village_code,
-                COUNT(l.id) as total_lots,
-                COUNT(CASE WHEN l.statut = 'actif' THEN 1 END) as lots_actifs,
-                COUNT(CASE WHEN l.statut = 'vendu' THEN 1 END) as lots_vendus,
-                COUNT(CASE WHEN l.statut = 'litige' THEN 1 END) as lots_litiges,
-                COUNT(CASE WHEN l.statut = 'reserve' THEN 1 END) as lots_reserves,
-                COUNT(CASE WHEN l.statut = 'archive' THEN 1 END) as lots_archives,
-                COALESCE(SUM(l.superficie), 0) as superficie_totale,
-                COALESCE(SUM(CASE WHEN l.statut = 'vendu' THEN l.superficie ELSE 0 END), 0) as superficie_vendue,
-                COUNT(a.id) as nb_attestations,
-                COUNT(CASE WHEN a.statut = 'valide' THEN 1 END) as nb_attestations_validees,
-                COALESCE(SUM(CASE WHEN l.statut = 'vendu' THEN l.prix_cession ELSE 0 END), 0) as ca_total
+            WITH lot_stats AS (
+                SELECT v.id AS village_id,
+                       COUNT(l.id) AS total_lots,
+                       COUNT(*) FILTER (WHERE l.statut = 'actif') AS lots_actifs,
+                       COUNT(*) FILTER (WHERE l.statut = 'vendu') AS lots_vendus,
+                       COUNT(*) FILTER (WHERE l.statut = 'litige') AS lots_litiges,
+                       COUNT(*) FILTER (WHERE l.statut = 'reserve') AS lots_reserves,
+                       COUNT(*) FILTER (WHERE l.statut = 'archive') AS lots_archives,
+                       COALESCE(SUM(l.superficie), 0) AS superficie_totale,
+                       COALESCE(SUM(l.superficie) FILTER (WHERE l.statut = 'vendu'), 0) AS superficie_vendue,
+                       COALESCE(SUM(l.prix_cession) FILTER (WHERE l.statut = 'vendu'), 0) AS ca_total
+                FROM foncier_villages v
+                LEFT JOIN foncier_lotissements ls ON ls.village_id = v.id
+                LEFT JOIN foncier_ilots i ON i.lotissement_id = ls.id
+                LEFT JOIN foncier_lots l ON l.ilot_id = i.id AND l.deleted_at IS NULL
+                WHERE v.id = :village_id AND v.actif = true
+                GROUP BY v.id
+            ), attestation_stats AS (
+                SELECT v.id AS village_id,
+                       COUNT(a.id) AS nb_attestations,
+                       COUNT(*) FILTER (WHERE a.statut = 'valide') AS nb_attestations_validees
+                FROM foncier_villages v
+                LEFT JOIN foncier_lotissements ls ON ls.village_id = v.id
+                LEFT JOIN foncier_ilots i ON i.lotissement_id = ls.id
+                LEFT JOIN foncier_lots l ON l.ilot_id = i.id AND l.deleted_at IS NULL
+                LEFT JOIN foncier_attestations a ON a.lot_id = l.id AND a.deleted_at IS NULL
+                WHERE v.id = :village_id AND v.actif = true
+                GROUP BY v.id
+            )
+            SELECT v.id AS village_id, v.nom AS village_nom, v.code AS village_code,
+                   ls.total_lots, ls.lots_actifs, ls.lots_vendus, ls.lots_litiges,
+                   ls.lots_reserves, ls.lots_archives, ls.superficie_totale,
+                   ls.superficie_vendue, ats.nb_attestations,
+                   ats.nb_attestations_validees, ls.ca_total
             FROM foncier_villages v
-            LEFT JOIN foncier_lotissements ls ON ls.village_id = v.id
-            LEFT JOIN foncier_ilots i ON i.lotissement_id = ls.id
-            LEFT JOIN foncier_lots l ON l.ilot_id = i.id AND l.deleted_at IS NULL
-            LEFT JOIN foncier_attestations a ON a.lot_id = l.id AND a.deleted_at IS NULL
-            WHERE v.id = :village_id AND v.deleted_at IS NULL
-            GROUP BY v.id, v.nom, v.code
+            JOIN lot_stats ls ON ls.village_id = v.id
+            JOIN attestation_stats ats ON ats.village_id = v.id
         """), {"village_id": str(village_id)}).fetchone()
         
         if result:
@@ -172,28 +187,44 @@ class VillageRepository(BaseRepository):
     
     def get_all_with_stats(self) -> List[Dict]:
         result = self.db.execute(text("""
-            SELECT 
-                v.id as village_id,
-                v.nom as village_nom,
-                v.code as village_code,
-                COUNT(l.id) as total_lots,
-                COUNT(CASE WHEN l.statut = 'actif' THEN 1 END) as lots_actifs,
-                COUNT(CASE WHEN l.statut = 'vendu' THEN 1 END) as lots_vendus,
-                COUNT(CASE WHEN l.statut = 'litige' THEN 1 END) as lots_litiges,
-                COUNT(CASE WHEN l.statut = 'reserve' THEN 1 END) as lots_reserves,
-                COUNT(CASE WHEN l.statut = 'archive' THEN 1 END) as lots_archives,
-                COALESCE(SUM(l.superficie), 0) as superficie_totale,
-                COALESCE(SUM(CASE WHEN l.statut = 'vendu' THEN l.superficie ELSE 0 END), 0) as superficie_vendue,
-                COUNT(a.id) as nb_attestations,
-                COUNT(CASE WHEN a.statut = 'valide' THEN 1 END) as nb_attestations_validees,
-                COALESCE(SUM(CASE WHEN l.statut = 'vendu' THEN l.prix_cession ELSE 0 END), 0) as ca_total
+            WITH lot_stats AS (
+                SELECT v.id AS village_id,
+                       COUNT(l.id) AS total_lots,
+                       COUNT(*) FILTER (WHERE l.statut = 'actif') AS lots_actifs,
+                       COUNT(*) FILTER (WHERE l.statut = 'vendu') AS lots_vendus,
+                       COUNT(*) FILTER (WHERE l.statut = 'litige') AS lots_litiges,
+                       COUNT(*) FILTER (WHERE l.statut = 'reserve') AS lots_reserves,
+                       COUNT(*) FILTER (WHERE l.statut = 'archive') AS lots_archives,
+                       COALESCE(SUM(l.superficie), 0) AS superficie_totale,
+                       COALESCE(SUM(l.superficie) FILTER (WHERE l.statut = 'vendu'), 0) AS superficie_vendue,
+                       COALESCE(SUM(l.prix_cession) FILTER (WHERE l.statut = 'vendu'), 0) AS ca_total
+                FROM foncier_villages v
+                LEFT JOIN foncier_lotissements ls ON ls.village_id = v.id
+                LEFT JOIN foncier_ilots i ON i.lotissement_id = ls.id
+                LEFT JOIN foncier_lots l ON l.ilot_id = i.id AND l.deleted_at IS NULL
+                WHERE v.actif = true
+                GROUP BY v.id
+            ), attestation_stats AS (
+                SELECT v.id AS village_id,
+                       COUNT(a.id) AS nb_attestations,
+                       COUNT(*) FILTER (WHERE a.statut = 'valide') AS nb_attestations_validees
+                FROM foncier_villages v
+                LEFT JOIN foncier_lotissements ls ON ls.village_id = v.id
+                LEFT JOIN foncier_ilots i ON i.lotissement_id = ls.id
+                LEFT JOIN foncier_lots l ON l.ilot_id = i.id AND l.deleted_at IS NULL
+                LEFT JOIN foncier_attestations a ON a.lot_id = l.id AND a.deleted_at IS NULL
+                WHERE v.actif = true
+                GROUP BY v.id
+            )
+            SELECT v.id AS village_id, v.nom AS village_nom, v.code AS village_code,
+                   ls.total_lots, ls.lots_actifs, ls.lots_vendus, ls.lots_litiges,
+                   ls.lots_reserves, ls.lots_archives, ls.superficie_totale,
+                   ls.superficie_vendue, ats.nb_attestations,
+                   ats.nb_attestations_validees, ls.ca_total
             FROM foncier_villages v
-            LEFT JOIN foncier_lotissements ls ON ls.village_id = v.id
-            LEFT JOIN foncier_ilots i ON i.lotissement_id = ls.id
-            LEFT JOIN foncier_lots l ON l.ilot_id = i.id AND l.deleted_at IS NULL
-            LEFT JOIN foncier_attestations a ON a.lot_id = l.id AND a.deleted_at IS NULL
-            WHERE v.deleted_at IS NULL
-            GROUP BY v.id, v.nom, v.code
+            JOIN lot_stats ls ON ls.village_id = v.id
+            JOIN attestation_stats ats ON ats.village_id = v.id
+            WHERE v.actif = true
             ORDER BY v.nom
         """)).fetchall()
         
@@ -211,8 +242,8 @@ class LotissementRepository(BaseRepository):
     def get_by_village(self, village_id: UUID, include_deleted: bool = False) -> List[FoncierLotissement]:
         query = self.db.query(FoncierLotissement).filter(FoncierLotissement.village_id == village_id)
         if not include_deleted:
-            # Note: lotissements n'ont pas deleted_at, on regarde le village
-            query = query.join(FoncierVillage).filter(FoncierVillage.deleted_at.is_(None))
+            # Les villages sont archivés via `actif`, sans colonne deleted_at.
+            query = query.join(FoncierVillage).filter(FoncierVillage.actif.is_(True))
         return query.order_by(FoncierLotissement.nom).all()
     
     def search(self, village_id: UUID, params: LotSearchParams) -> Tuple[List[FoncierLotissement], int]:
@@ -577,7 +608,10 @@ class AuditRepository(BaseRepository):
         query = self.db.query(ActivityLog)
         
         if params.entity_type:
-            query = query.filter(ActivityLog.entity_type == params.entity_type)
+            if isinstance(params.entity_type, str):
+                query = query.filter(ActivityLog.entity_type == params.entity_type)
+            else:
+                query = query.filter(ActivityLog.entity_type.in_(params.entity_type))
         if params.entity_id:
             query = query.filter(ActivityLog.entity_id == params.entity_id)
         if params.action:

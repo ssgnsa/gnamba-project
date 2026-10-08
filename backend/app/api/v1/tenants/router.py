@@ -9,11 +9,16 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.api.deps import require_admin_user
 from app.models.entity import Entity
 from app.schemas.entity import EntityCreate, EntityUpdate
 from app.services.entity_service import get_entity_service
 
-router = APIRouter(prefix="/api/v1/tenants", tags=["tenants"])
+router = APIRouter(
+    prefix="/api/v1/tenants",
+    tags=["tenants"],
+    dependencies=[Depends(require_admin_user)],
+)
 
 
 # ============================================

@@ -10,6 +10,7 @@ from sqlalchemy import select, func, or_, and_, text
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.api.deps import require_admin_user
 from app.models.entity import Entity
 from app.schemas.entity import (
     EntityCreate,
@@ -22,7 +23,11 @@ from app.schemas.entity import (
     PartyToEntityMapping,
 )
 
-router = APIRouter(prefix="/api/v1/entities", tags=["entities"])
+router = APIRouter(
+    prefix="/api/v1/entities",
+    tags=["entities"],
+    dependencies=[Depends(require_admin_user)],
+)
 
 
 # ============================================

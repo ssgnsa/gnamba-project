@@ -30,8 +30,8 @@ class User(Base):
     email = Column(String, nullable=False, index=True, unique=True)
     full_name = Column(String, nullable=False)
     password_hash = Column(String, nullable=False)
-    role = Column(String, default=RoleEnum.EMPLOYE.value, nullable=False)
-    access_level = Column(String, default=AccessLevelEnum.EMPLOYE.value, nullable=False)
+    role = Column(String, default=RoleEnum.GUEST.value, nullable=False)
+    access_level = Column(String, default=AccessLevelEnum.GUEST.value, nullable=False)
     poste = Column(String, nullable=True)
     department = Column(String, nullable=True)
     phone = Column(String, nullable=True)
@@ -148,3 +148,33 @@ class AuthLoginFailure(Base):
             "ip_address": self.ip_address,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
+
+
+class AuthPasswordResetToken(Base):
+    __tablename__ = "auth_password_reset_tokens"
+
+    id = Column(String, primary_key=True, index=True)
+    user_id = Column(String, nullable=False, index=True)
+    token_hash = Column(String, nullable=False, unique=True, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    used_at = Column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        Index(
+            "uq_auth_password_reset_tokens_active_user",
+            "user_id",
+            unique=True,
+            postgresql_where=used_at.is_(None),
+            sqlite_where=used_at.is_(None),
+        ),
+    )
+
+
+class AuthRateLimitEvent(Base):
+    __tablename__ = "auth_rate_limit_events"
+
+    id = Column(String, primary_key=True, index=True)
+    event_type = Column(String, nullable=False, index=True)
+    identifier = Column(String, nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)

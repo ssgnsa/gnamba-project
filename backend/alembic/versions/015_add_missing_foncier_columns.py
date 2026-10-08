@@ -25,17 +25,17 @@ def upgrade() -> None:
     # ============================================================
     # FONCIER_VILLAGES - add missing columns
     # ============================================================
-    op.add_column('foncier_villages', sa.Column('updated_by', postgresql.UUID(as_uuid=False), nullable=True))
+    # updated_by is already created by revision 006_foncier_tables.
 
     # ============================================================
     # FONCIER_LOTISSEMENTS - add missing columns
     # ============================================================
-    op.add_column('foncier_lotissements', sa.Column('updated_by', postgresql.UUID(as_uuid=False), nullable=True))
+    # updated_by is already created by revision 006_foncier_tables.
     
     # ============================================================
     # FONCIER_ILOTS - add missing columns
     # ============================================================
-    op.add_column('foncier_ilots', sa.Column('updated_by', postgresql.UUID(as_uuid=False), nullable=True))
+    # updated_by is already created by revision 006_foncier_tables.
     
     # ============================================================
     # FONCIER_LOTS - add missing columns
@@ -56,9 +56,6 @@ def upgrade() -> None:
     op.add_column('foncier_lots', sa.Column('limites_sud', sa.Text(), nullable=True))
     op.add_column('foncier_lots', sa.Column('limites_est', sa.Text(), nullable=True))
     op.add_column('foncier_lots', sa.Column('limites_ouest', sa.Text(), nullable=True))
-    op.add_column('foncier_lots', sa.Column('gps_lat', sa.Numeric(9, 6), nullable=True))
-    op.add_column('foncier_lots', sa.Column('gps_lng', sa.Numeric(9, 6), nullable=True))
-    op.add_column('foncier_lots', sa.Column('gps_precision', sa.Numeric(5, 2), nullable=True))
     op.add_column('foncier_lots', sa.Column('gps_points', postgresql.JSON(), nullable=False, server_default='[]'))
     op.add_column('foncier_lots', sa.Column('registre_volume', sa.String(50), nullable=True))
     op.add_column('foncier_lots', sa.Column('registre_page', sa.Integer(), nullable=True))
@@ -148,12 +145,10 @@ def upgrade() -> None:
     op.add_column('foncier_attestations', sa.Column('pdf_media_id', postgresql.UUID(as_uuid=False), nullable=True))
     op.add_column('foncier_attestations', sa.Column('pdf_generated_at', sa.DateTime(timezone=True), nullable=True))
     op.add_column('foncier_attestations', sa.Column('printed_by', postgresql.UUID(as_uuid=False), nullable=True))
-    op.add_column('foncier_attestations', sa.Column('printed_at', sa.DateTime(timezone=True), nullable=True))
-    op.add_column('foncier_attestations', sa.Column('print_count', sa.Integer(), nullable=False, server_default='0'))
 
     # Add check constraints for type and statut
     op.create_check_constraint('ck_attestation_type', 'foncier_attestations', "type IN ('standard', 'cession', 'succession', 'mutation')")
-    op.create_check_constraint('ck_attestation_statut', 'foncier_attestations', "statut IN ('brouillon', 'soumis', 'valide', 'archive', 'revoque', 'expire', 'annule')")
+    # ck_attestation_statut is already created by revision 006_foncier_tables.
 
     # ============================================================
     # FONCIER_ATTESTATION_TEMOINS - add missing columns
@@ -162,7 +157,6 @@ def upgrade() -> None:
     op.add_column('foncier_attestation_temoins', sa.Column('telephone', sa.String(50), nullable=True))
     op.add_column('foncier_attestation_temoins', sa.Column('cni', sa.String(50), nullable=True))
     op.add_column('foncier_attestation_temoins', sa.Column('empreinte_media_id', postgresql.UUID(as_uuid=False), nullable=True))
-    op.add_column('foncier_attestation_temoins', sa.Column('signed_at', sa.DateTime(timezone=True), nullable=True))
 
     print("Migration 015 completed: Added missing Foncier columns")
 
@@ -174,7 +168,6 @@ def downgrade() -> None:
     
     # Drop constraints first
     op.drop_constraint('ck_attestation_type', 'foncier_attestations', type_='check')
-    op.drop_constraint('ck_attestation_statut', 'foncier_attestations', type_='check')
     op.drop_constraint('ck_lot_type', 'foncier_lots', type_='check')
     
     # Columns to drop from foncier_lots
@@ -182,7 +175,7 @@ def downgrade() -> None:
         "version", "type", "date_etablissement", "mode_acquisition", "historique_possession", 
         "domicile", "cedant_nom", "cedant_prenom", "cedant_cni_numero", "cedant_telephone", 
         "cedant_domicile", "limites_nord", "limites_sud", "limites_est", "limites_ouest",
-        "gps_lat", "gps_lng", "gps_precision", "gps_points", "registre_volume", "registre_page", 
+        "gps_points", "registre_volume", "registre_page",
         "registre_ligne", "numero_enregistrement", "qr_payload", "signature_numerique", 
         "hash_sha256", "control_number", "signature_nonce", "signature_issued_at",
         "validation_agent_nom", "validation_agent_id", "validation_agent_date",
@@ -191,7 +184,7 @@ def downgrade() -> None:
         "chef_signature_manuscrite_requise", "chef_signature_media_id", 
         "chef_empreinte_media_id", "temoin_empreinte_media_ids", "revoke_reason", 
         "revoked_at", "revoked_by", "pdf_media_id", "pdf_generated_at", 
-        "printed_by", "printed_at", "print_count"
+        "printed_by"
     ]
     
     for col in lots_columns:
@@ -211,7 +204,7 @@ def downgrade() -> None:
         "proprietaire_empreinte_media_id", "chef_signature_manuscrite_requise", 
         "chef_signature_media_id", "chef_empreinte_media_id", "temoin_empreinte_media_ids", 
         "revoke_reason", "revoked_at", "revoked_by", "verify_url", "pdf_media_id", 
-        "pdf_generated_at", "printed_by", "printed_at", "print_count"
+        "pdf_generated_at", "printed_by"
     ]
     
     for col in attestations_columns:
@@ -219,15 +212,10 @@ def downgrade() -> None:
     
     # Columns to drop from foncier_attestation_temoins
     temoins_columns = [
-        "profession", "telephone", "cni", "empreinte_media_id", "signed_at"
+        "profession", "telephone", "cni", "empreinte_media_id"
     ]
     
     for col in temoins_columns:
         op.drop_column('foncier_attestation_temoins', col)
-    
-    # Updated_by columns
-    op.drop_column('foncier_villages', 'updated_by')
-    op.drop_column('foncier_lotissements', 'updated_by')
-    op.drop_column('foncier_ilots', 'updated_by')
     
     print("Migration 015 downgraded: Removed Foncier columns")

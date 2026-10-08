@@ -43,7 +43,7 @@ def upgrade() -> None:
     op.create_table(
         'user_profiles',
         sa.Column('id', postgresql.UUID(as_uuid=False), nullable=False, server_default=sa.text('uuid_generate_v4()')),
-        sa.Column('user_id', postgresql.UUID(as_uuid=False), nullable=False),
+        sa.Column('user_id', sa.String(), nullable=False),
         sa.Column('avatar_media_id', postgresql.UUID(as_uuid=False), nullable=True),
         sa.Column('theme', sa.String(20), nullable=False, server_default='light'),
         sa.Column('language', sa.String(10), nullable=False, server_default='fr'),

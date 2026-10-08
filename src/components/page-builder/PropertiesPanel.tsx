@@ -16,6 +16,7 @@ import {
   FooterLink,
 } from "./types";
 import MediaPicker from "../media/MediaPicker";
+import StorageImage from "../media/StorageImage";
 import { useState } from "react";
 
 interface PropsPanelProps {
@@ -73,7 +74,7 @@ function ImageField({
         </button>
       </div>
       {value && (
-        <img
+        <StorageImage
           src={value}
           alt=""
           className="mt-2 h-16 w-full object-cover rounded-lg border border-slate-200"
@@ -348,7 +349,7 @@ function GalleryEditor({
             <div key={i} className="relative group">
               <div className="aspect-video bg-slate-100 rounded-lg overflow-hidden">
                 {img.url && (
-                  <img
+                  <StorageImage
                     src={img.url}
                     alt={img.caption}
                     className="w-full h-full object-cover"

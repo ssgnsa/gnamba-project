@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { promises as nodeFsPromises } from "node:fs";
+import { describe, expect, it, vi } from "vitest";
 import {
   ContextManager,
   DiagnosticEngine,
@@ -50,12 +51,28 @@ describe("Codex assistant scaffold", () => {
   });
 
   it("runs the codex status command", async () => {
-    const manager = new ContextManager();
-    const result = await runCodexCommand("codex.status", {
-      contextManager: manager,
-    });
+    // `codex.status` refreshes and persists `.codex/context/server-context.json`
+    // relative to the current working directory, which is the Git checkout when
+    // the suite runs. Persisting to the real checkout would dirty a tracked file
+    // and break the release rule "a build/test run must not mutate the checkout",
+    // so the write is captured in memory while the persistence path stays exercised.
+    const writeFile = vi.spyOn(nodeFsPromises, "writeFile").mockResolvedValue(undefined);
 
-    expect(result.ok).toBe(true);
-    expect(result.data).toBeDefined();
+    try {
+      const manager = new ContextManager();
+      const result = await runCodexCommand("codex.status", {
+        contextManager: manager,
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.data).toBeDefined();
+      expect(writeFile).toHaveBeenCalledWith(
+        ".codex/context/server-context.json",
+        expect.any(String),
+        "utf8",
+      );
+    } finally {
+      writeFile.mockRestore();
+    }
   });
 });

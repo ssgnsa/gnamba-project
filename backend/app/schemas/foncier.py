@@ -2,7 +2,7 @@
 # Validation request/response pour API REST
 
 from datetime import date, datetime
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 from pydantic import BaseModel, Field, field_validator
 from uuid import UUID
 
@@ -11,7 +11,7 @@ from uuid import UUID
 # ============================================
 
 class FoncierBase(BaseModel):
-    model_config = {"from_attributes": True}
+    model_config = {"from_attributes": True, "populate_by_name": True}
 
 class PaginatedResponse(BaseModel):
     items: List[Any]
@@ -286,7 +286,14 @@ class TemoinCreate(BaseModel):
     telephone: Optional[str] = None
     cni: Optional[str] = None
 
-class TemoinResponse(TemoinCreate):
+class TemoinResponse(BaseModel):
+    # Les témoins historiques peuvent contenir des chaînes vides, même si
+    # les nouvelles créations restent soumises aux contraintes de TemoinCreate.
+    nom: str
+    prenom: str
+    profession: Optional[str] = None
+    telephone: Optional[str] = None
+    cni: Optional[str] = None
     id: UUID
     attestation_id: UUID
     empreinte_media_id: Optional[UUID] = None
@@ -380,7 +387,12 @@ class AttestationScanRequest(BaseModel):
     media_id: UUID
     original_name: str
 
+class AttestationRevokeRequest(BaseModel):
+    reason: str = Field(..., min_length=1, max_length=2000)
+
 class AttestationResponse(AttestationBase):
+    # Les données historiques de GPS peuvent être un tableau vide.
+    gps_points: Optional[Union[Dict[str, Any], List[Any]]] = None
     id: UUID
     lot_id: UUID
     reference: str
@@ -407,7 +419,7 @@ class AttestationResponse(AttestationBase):
     chef_signature_manuscrite_requise: bool = True
     chef_signature_media_id: Optional[UUID] = None
     chef_empreinte_media_id: Optional[UUID] = None
-    temoin_empreinte_media_ids: List[UUID] = Field(default_factory=list)
+    temoin_empreinte_media_ids: Optional[List[UUID]] = None
     
     # Révocation
     revoke_reason: Optional[str] = None
@@ -431,6 +443,13 @@ class AttestationResponse(AttestationBase):
     client_updated_at: Optional[datetime] = None
     last_modified_device_id: Optional[str] = None
     deleted_at: Optional[datetime] = None
+
+class PaginatedAttestationResponse(BaseModel):
+    items: List[AttestationResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
 
 class AttestationPdfResponse(BaseModel):
     pdf_url: str
@@ -464,7 +483,11 @@ class ActivityLogBase(FoncierBase):
     user_id: Optional[UUID] = None
     user_role: Optional[str] = None
     user_name: Optional[str] = None
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict,
+        validation_alias="log_metadata",
+        serialization_alias="metadata",
+    )
 
 class ActivityLogCreate(ActivityLogBase):
     ip_address: Optional[str] = None
@@ -477,7 +500,7 @@ class ActivityLogResponse(ActivityLogBase):
     created_at: datetime
 
 class AuditSearchParams(BaseModel):
-    entity_type: Optional[str] = None
+    entity_type: Optional[Union[str, List[str]]] = None
     entity_id: Optional[UUID] = None
     action: Optional[str] = None
     user_id: Optional[UUID] = None

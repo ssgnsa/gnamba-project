@@ -5,7 +5,6 @@
  */
 
 import { dataService } from "../lib/dbClient.service";
-import { dbClient, withRetry } from "./dbClient";
 
 export interface LotSearchParams {
   search?: string;
@@ -95,12 +94,7 @@ export const foncierRepository = {
   },
 
   async getVillagesList() {
-    return withRetry(() =>
-      dbClient
-        .from("foncier_villages")
-        .select("id, nom, logo_url, region, commune, departement")
-        .order("nom"),
-    );
+    return dataService.getVillagesList();
   },
 
   async createVillage(villageData: Partial<Record<string, unknown>>) {

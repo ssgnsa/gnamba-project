@@ -1,5 +1,6 @@
 import DOMPurify from "dompurify";
 import { getLocalApiBaseUrl } from "@/lib/selfHosted";
+import { apiClient } from "@/api/client";
 
 export interface AttestationCoutumiereData {
   reference: string;
@@ -173,7 +174,15 @@ async function fetchAsDataUrl(url: string): Promise<string> {
   if (!url) return "";
   if (url.startsWith("data:")) return url;
   try {
-    const resp = await fetch(url, { cache: "force-cache", mode: "cors" });
+    const apiOrigin = new URL(getLocalApiBaseUrl()).origin;
+    const assetBase = /^\/?storage\//i.test(url)
+      ? apiOrigin
+      : window.location.origin;
+    const resolvedUrl = new URL(url, assetBase).toString();
+    const storagePath = new URL(resolvedUrl).pathname;
+    const resp = storagePath.startsWith("/storage/")
+      ? new Response(await apiClient.fetchStorageFile(resolvedUrl))
+      : await fetch(resolvedUrl, { cache: "force-cache", mode: "cors" });
     console.log(
       "[PRINT] fetch",
       url.substring(0, 80),

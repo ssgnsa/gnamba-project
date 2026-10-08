@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 import unittest
 from fastapi.testclient import TestClient
 
@@ -29,7 +31,7 @@ class UnifiedV1ApiTests(unittest.TestCase):
     def test_v1_auth_login_and_me(self) -> None:
         response = self.client.post(
             "/api/v1/auth/login",
-            json={"email": "admin@egs.local", "password": "Admin@EGS2025!"},
+            json={"email": "admin@egs.local", "password": os.environ["INITIAL_ADMIN_PASSWORD"]},
         )
         assert response.status_code == 200
         payload = response.json()
@@ -43,10 +45,10 @@ class UnifiedV1ApiTests(unittest.TestCase):
         assert me_response.status_code == 200
         assert me_response.json()["user"]["email"] == "admin@egs.local"
 
-    def test_v1_users_listing_requires_admin(self) -> None:
+    def test_v1_users_listing_requires_verified_admin(self) -> None:
         login = self.client.post(
             "/api/v1/auth/login",
-            json={"email": "admin@egs.local", "password": "Admin@EGS2025!"},
+            json={"email": "admin@egs.local", "password": os.environ["INITIAL_ADMIN_PASSWORD"]},
         )
         token = login.json()["access_token"]
 
@@ -54,8 +56,7 @@ class UnifiedV1ApiTests(unittest.TestCase):
             "/api/v1/users",
             headers={"Authorization": f"Bearer {token}"},
         )
-        assert response.status_code == 200
-        assert len(response.json()) >= 1
+        assert response.status_code == 403
 
     def test_legacy_user_without_entity_still_maps_identity_fields(self) -> None:
         from app.infrastructure.sqlalchemy_user_repository import _to_domain
@@ -77,15 +78,16 @@ class UnifiedV1ApiTests(unittest.TestCase):
         assert domain_user.full_name == "Legacy User"
         assert domain_user.entity_id == "legacy-user-1"
 
-    def test_v1_lead_capture_endpoint_is_mounted(self) -> None:
+    def test_public_lead_capture_endpoint_is_mounted(self) -> None:
         response = self.client.post(
-            "/api/v1/leads/capture",
+            "/api/v1/site/lead-capture",
             json={
                 "phone": "+2250102030405",
                 "first_name": "Awa",
                 "source": "web_form",
                 "source_page": "/contact",
                 "source_form": "contact",
+                "consent_text": "J'accepte d'être contactée",
             },
         )
 
@@ -93,3 +95,17 @@ class UnifiedV1ApiTests(unittest.TestCase):
         payload = response.json()
         assert payload["success"] is True
         assert payload["data"]["phone"] == "+2250102030405"
+
+    def test_legacy_lead_capture_remains_admin_only(self) -> None:
+        response = self.client.post(
+            "/api/v1/leads/capture",
+            json={"phone": "+2250700000000"},
+        )
+        assert response.status_code == 401
+
+    def test_public_lead_capture_requires_consent(self) -> None:
+        response = self.client.post(
+            "/api/v1/site/lead-capture",
+            json={"phone": "+2250700000001", "consent_text": " "},
+        )
+        assert response.status_code == 422

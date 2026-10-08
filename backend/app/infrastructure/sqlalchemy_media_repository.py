@@ -392,6 +392,38 @@ class SqlAlchemyMediaRepository(MediaRepositoryPort):
                     "taxonomy_id": None,
                 },
             ).fetchone()
+            if row:
+                audit_metadata = json.dumps(
+                    {
+                        "filename": upload_file.filename or "",
+                        "category": category,
+                        "content_hash": content_hash,
+                        "size": len(content),
+                    }
+                )
+                audit_metadata_expression = ":audit_metadata"
+                if not self._is_sqlite():
+                    audit_metadata_expression = "CAST(:audit_metadata AS JSONB)"
+                session.execute(
+                    text(
+                        f"""
+                        INSERT INTO media_audit_logs (
+                            id, media_id, action, actor_id, metadata, created_at
+                        )
+                        VALUES (
+                            :audit_id, :media_id, 'upload', :actor_id,
+                            {audit_metadata_expression}, :created_at
+                        )
+                        """
+                    ),
+                    {
+                        "audit_id": self._uuid(),
+                        "media_id": row[0],
+                        "actor_id": user_id,
+                        "audit_metadata": audit_metadata,
+                        "created_at": self._now(),
+                    },
+                )
             session.commit()
         return self._row_to_domain(row).to_payload() if row else {}
 
@@ -666,14 +698,76 @@ class SqlAlchemyMediaRepository(MediaRepositoryPort):
                         """
                     )
                 ).fetchall()
-        return [
-            {
-                "id": str(row[0]) if row[0] is not None else None,
-                "media_id": str(row[1]) if row[1] is not None else None,
-                "action": row[2],
-                "actor_id": str(row[3]) if row[3] is not None else None,
-                "metadata": row[4],
-                "created_at": row[5],
-            }
-            for row in rows
-        ]
+        result: list[dict[str, Any]] = []
+        for row in rows:
+            metadata = row[4]
+            if isinstance(metadata, str):
+                try:
+                    metadata = json.loads(metadata)
+                except (TypeError, ValueError):
+                    metadata = {}
+            result.append(
+                {
+                    "id": str(row[0]) if row[0] is not None else None,
+                    "media_id": str(row[1]) if row[1] is not None else None,
+                    "action": row[2],
+                    "actor_id": str(row[3]) if row[3] is not None else None,
+                    "metadata": metadata if isinstance(metadata, dict) else {},
+                    "created_at": row[5],
+                }
+            )
+        return result
+
+    def create_media_audit_log(self, payload: dict[str, Any]) -> dict[str, Any]:
+        audit_id = self._uuid()
+        metadata = payload.get("metadata") or {}
+        with SessionLocal() as session:
+            if self._is_sqlite():
+                metadata_value = json.dumps(metadata)
+                metadata_expression = ":metadata"
+            else:
+                metadata_value = json.dumps(metadata)
+                metadata_expression = "CAST(:metadata AS JSONB)"
+
+            session.execute(
+                text(
+                    f"""
+                    INSERT INTO media_audit_logs (id, media_id, action, actor_id, metadata, created_at)
+                    VALUES (:id, :media_id, :action, :actor_id, {metadata_expression}, :created_at)
+                    """
+                ),
+                {
+                    "id": audit_id,
+                    "media_id": payload.get("media_id"),
+                    "action": payload["action"],
+                    "actor_id": payload.get("actor_id"),
+                    "metadata": metadata_value,
+                    "created_at": self._now(),
+                },
+            )
+            session.commit()
+            row = session.execute(
+                text(
+                    """
+                    SELECT id, media_id, action, actor_id, metadata, created_at
+                    FROM media_audit_logs
+                    WHERE id = :id
+                    """
+                ),
+                {"id": audit_id},
+            ).fetchone()
+
+        metadata_result = row[4] if row else metadata
+        if isinstance(metadata_result, str):
+            try:
+                metadata_result = json.loads(metadata_result)
+            except (TypeError, ValueError):
+                metadata_result = {}
+        return {
+            "id": str(row[0]) if row and row[0] is not None else audit_id,
+            "media_id": str(row[1]) if row and row[1] is not None else None,
+            "action": row[2] if row else payload["action"],
+            "actor_id": str(row[3]) if row and row[3] is not None else None,
+            "metadata": metadata_result if isinstance(metadata_result, dict) else {},
+            "created_at": row[5] if row else None,
+        }
