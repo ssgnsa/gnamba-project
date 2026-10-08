@@ -263,6 +263,7 @@ jobs:
             "EGS_API_ENV_FILE=$GITHUB_WORKSPACE/$api_env_file" \
             'POSTGRES_PASSWORD=ci-new-host-postgres-password-0123456789' \
             "EGS_DB_APP_PASSWORD=$app_password" \
+            'MIGRATION_DATABASE_URL=postgresql://postgres:ci-new-host-postgres-password-0123456789@egs-postgres:5432/egs_local' \
             "DATABASE_URL=postgresql://egs_app:${app_password}@egs-postgres:5432/egs_local" \
             'LOCAL_AUTH_SECRET=ci-new-host-local-auth-secret-0123456789' \
             'INITIAL_ADMIN_PASSWORD=ci-new-host-admin-password' \
@@ -270,7 +271,8 @@ jobs:
             'PUBLIC_APP_URL=https://egs.example.test' \
             'VITE_API_URL=https://api.egs.example.test/api/v1' \
             'VITE_LOCAL_API_URL=https://api.egs.example.test' \
-            'CORS_ORIGINS=https://egs.example.test,https://api.egs.example.test' \
+            'VITE_STORAGE_BASE_URL=https://files.egs.example.test/egs' \
+            'CORS_ORIGINS=https://egs.example.test,https://api.egs.example.test,https://files.egs.example.test' \
             > "$env_file"
           chmod 0600 "$env_file"
           python3 scripts/test_deploy_new_host.py
