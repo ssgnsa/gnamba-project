@@ -26,6 +26,7 @@ import type { Page } from "./components/Sidebar";
 import type { PublicPage } from "./lib/publicRoutes";
 import { PUBLIC_PAGE_PATHS, getPublicPageFromPath } from "./lib/publicRoutes";
 import { apiClient } from "./api/client";
+import { startManualSyncService } from "./lib/manualSyncService";
 import { useContentVersion } from "./hooks/useContentVersion";
 import type { PageSection } from "./components/page-builder/types";
 import PublicPageLayoutRenderer from "./components/public/PublicPageLayoutRenderer";
@@ -575,24 +576,12 @@ function AppContent() {
 
   // Démarrer le service de synchronisation en background
   useEffect(() => {
-    try {
-      // lazy require to avoid SSR issues
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { startManualSyncService } = require("./lib/manualSyncService");
-      const stop = startManualSyncService({
-        onError: (err: Error) => {
-          try {
-            showToast("error", "Sync automatique", err.message || String(err));
-          } catch (e) {
-            // ignore
-          }
-        },
-      });
-      return () => stop();
-    } catch (e) {
-      // ignore in non-browser environments
-    }
-  }, []);
+    const stop = startManualSyncService({
+      onError: (err: Error | string) =>
+        showToast("error", "Sync automatique", err instanceof Error ? err.message : err),
+    });
+    return () => stop();
+  }, [showToast]);
 
   // ============================================
   // GESTION DYNAMIQUE DU TITRE DE L'ONGLET

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { apiClient } from "../../api/client";
 import MediaPicker from "../../components/media/MediaPicker";
+import StorageImage from "../../components/media/StorageImage";
 import PageBuilder from "../../components/page-builder/PageBuilder";
 import { SECTION_META, PAGE_SLUGS } from "../../components/page-builder/types";
 import { bumpContentVersion } from "../../hooks/useContentVersion";
@@ -733,7 +734,7 @@ export default function SiteEditor() {
                 <div className="flex items-center gap-3">
                   {editingReal.image_url ? (
                     <div className="relative">
-                      <img
+                      <StorageImage
                         src={editingReal.image_url}
                         alt="Réalisation"
                         crossOrigin="anonymous"
@@ -845,7 +846,7 @@ export default function SiteEditor() {
                     </td>
                     <td className="px-6 py-4 hidden md:table-cell">
                       {r.image_url ? (
-                        <img
+                        <StorageImage
                           src={r.image_url}
                           alt={r.title}
                           crossOrigin="anonymous"
@@ -1145,7 +1146,7 @@ export default function SiteEditor() {
                 <div className="flex items-center gap-3">
                   {editingLot.image_url ? (
                     <div className="relative">
-                      <img
+                      <StorageImage
                         src={editingLot.image_url}
                         alt="Lot"
                         crossOrigin="anonymous"
@@ -1260,7 +1261,7 @@ export default function SiteEditor() {
                     </td>
                     <td className="px-6 py-4 hidden md:table-cell">
                       {lot.image_url ? (
-                        <img
+                        <StorageImage
                           src={lot.image_url}
                           alt={lot.titre}
                           crossOrigin="anonymous"

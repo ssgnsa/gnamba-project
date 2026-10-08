@@ -6,7 +6,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import UUID, TIMESTAMP
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 
 from app.core.database import Base
@@ -14,6 +14,10 @@ from app.core.database import Base
 
 def gen_uuid():
     return str(uuid.uuid4())
+
+
+def utc_now():
+    return datetime.now(timezone.utc)
 
 
 class PageLayout(Base):
@@ -72,41 +76,44 @@ class VitrineLot(Base):
     __tablename__ = "vitrine_lots"
 
     id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
-    lot_id = Column(UUID(as_uuid=False), nullable=True)
-    property_id = Column(UUID(as_uuid=False), nullable=True)
-    titre = Column(String, nullable=True)
+    lot_id = Column(UUID(as_uuid=False), ForeignKey("foncier_lots.id", ondelete="CASCADE"), nullable=True)
+    property_id = Column(UUID(as_uuid=False), ForeignKey("properties.id", ondelete="CASCADE"), nullable=True)
+    titre = Column(String(255), nullable=True)
     description = Column(Text, nullable=True)
     prix = Column(Numeric(12, 2), nullable=True)
     surface = Column(Numeric(10, 2), nullable=True)
-    localisation = Column(String, nullable=True)
+    localisation = Column(Text, nullable=True)
     photos = Column(JSON, nullable=True, default=list)
     publier = Column(Boolean, nullable=True, default=True)
     ordre = Column(Integer, nullable=True, default=0)
-    tags = Column(JSON, nullable=True, default=list)
-    reference = Column(String, nullable=True)
-    village = Column(String, nullable=True)
-    quartier = Column(String, nullable=True)
-    commune = Column(String, nullable=True)
-    departement = Column(String, nullable=True)
-    region = Column(String, nullable=True)
+    tags = Column(ARRAY(String), nullable=True, default=list)
+    reference = Column(Text, nullable=True)
+    village = Column(Text, nullable=True)
+    quartier = Column(Text, nullable=True)
+    commune = Column(Text, nullable=True)
+    departement = Column(Text, nullable=True)
+    region = Column(Text, nullable=True)
     superficie = Column(Numeric(10, 2), nullable=True)
     prix_vente = Column(Numeric(12, 2), nullable=True)
-    statut = Column(String, nullable=True, default="disponible")
-    documents = Column(JSON, nullable=True, default=list)
-    caracteristiques = Column(JSON, nullable=True, default=dict)
-    image_url = Column(String, nullable=True)
-    image_alt = Column(String, nullable=True)
-    contact_phone = Column(String, nullable=True)
-    contact_email = Column(String, nullable=True)
+    statut = Column(String(50), nullable=True, default="disponible")
+    documents = Column(Text, nullable=True)
+    caracteristiques = Column(ARRAY(String), nullable=True, default=list)
+    image_url = Column(Text, nullable=True)
+    image_alt = Column(Text, nullable=True)
+    contact_phone = Column(Text, nullable=True)
+    contact_email = Column(Text, nullable=True)
     publier_sur_vitrine = Column(Boolean, nullable=True, default=True)
     ordre_affichage = Column(Integer, nullable=True, default=0)
     notes = Column(Text, nullable=True)
-    created_by = Column(UUID(as_uuid=False), nullable=True)
-    updated_by = Column(UUID(as_uuid=False), nullable=True)
-    created_at = Column(TIMESTAMP(timezone=True), default=datetime.utcnow, nullable=False)
-    updated_at = Column(TIMESTAMP(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_by = Column(String, nullable=True)
+    updated_by = Column(String, nullable=True)
+    created_at = Column(TIMESTAMP(timezone=True), default=utc_now, nullable=False)
+    updated_at = Column(TIMESTAMP(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
 
     __table_args__ = (
+        Index("idx_vitrine_lot", "lot_id"),
+        Index("idx_vitrine_property", "property_id"),
+        Index("idx_vitrine_publier", "publier"),
         Index("idx_vitrine_lot_reference", "reference"),
         Index("idx_vitrine_lot_statut", "statut"),
         Index("idx_vitrine_lot_publie", "publier_sur_vitrine"),

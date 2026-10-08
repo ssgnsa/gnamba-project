@@ -54,6 +54,7 @@ class DashboardService:
                 SUM(montant) as total
             FROM finances
             WHERE date_transaction >= :start_date
+              AND COALESCE(statut, '') <> 'annule'
             GROUP BY type_transaction
         """, {
             "start_date": current_month_start.strftime("%Y-%m-%d")
@@ -74,6 +75,7 @@ class DashboardService:
                 SUM(montant) as total
             FROM finances
             WHERE date_transaction >= :start_date AND date_transaction < :end_date
+              AND COALESCE(statut, '') <> 'annule'
             GROUP BY type_transaction
         """, {
             "start_date": previous_month_start.strftime("%Y-%m-%d"),
@@ -120,6 +122,7 @@ class DashboardService:
                 SUM(CASE WHEN type_transaction = 'depense' THEN montant ELSE 0 END) as depenses
             FROM finances
             WHERE date_transaction >= :six_months_ago
+              AND COALESCE(statut, '') <> 'annule'
             GROUP BY to_char(date_transaction::date, 'MM/YYYY')
             ORDER BY month
         """, {
@@ -148,6 +151,7 @@ class DashboardService:
                 SUM(montant) as total
             FROM finances
             WHERE type_transaction = 'recette' AND date_transaction >= :six_months_ago
+              AND COALESCE(statut, '') <> 'annule'
             GROUP BY categorie
             ORDER BY total DESC
         """, {
@@ -160,6 +164,7 @@ class DashboardService:
                 SUM(montant) as total
             FROM finances
             WHERE type_transaction = 'depense' AND date_transaction >= :six_months_ago
+              AND COALESCE(statut, '') <> 'annule'
             GROUP BY categorie
             ORDER BY total DESC
         """, {

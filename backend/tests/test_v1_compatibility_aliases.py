@@ -3,11 +3,24 @@ from __future__ import annotations
 from io import BytesIO
 
 from fastapi.testclient import TestClient
+import pytest
 
+from app.api.deps import get_current_user
 from app.main import app
 
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def authenticated_admin():
+    app.dependency_overrides[get_current_user] = lambda: {
+        "id": "compat-admin",
+        "role": "admin",
+        "mfa_verified": True,
+    }
+    yield
+    app.dependency_overrides.clear()
 
 
 def test_v1_settings_and_site_content_aliases_are_available() -> None:
@@ -114,4 +127,3 @@ def test_media_schema_guard_handles_missing_columns(monkeypatch) -> None:
 
     repo = SqlAlchemyMediaRepository()
     assert repo.ensure_schema() is None
-

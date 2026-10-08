@@ -7,6 +7,7 @@ import { printAttestationCoutumiere, printAttestationAnnex } from "@/utils/print
 import type { AttestationFull } from "../FoncierConstants";
 import { getAttestationStatusInfo, buildAttestationVerificationUrl, FONCIER_ATTESTATION_WITH_TEMOINS_SELECT } from "../FoncierConstants";
 import { getUsageForSlot } from "@/lib/mediaUtils";
+import { StorageLink } from "@/components/media/StorageImage";
 
 interface AttestationHistoryModalProps {
   isOpen: boolean;
@@ -259,10 +260,10 @@ export const AttestationHistoryModal: FC<AttestationHistoryModalProps> = ({
                           <td className="px-4 py-3 text-sm text-gray-600">{record.numero_enregistrement || "—"}</td>
                           <td className="px-4 py-3 text-sm text-gray-600">
                             {scan ? (
-                              <a href={scan.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">
+                              <StorageLink href={scan.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">
                                 {scan.original_name || "Ouvrir"}
                                 <ExternalLink size={10} />
-                              </a>
+                              </StorageLink>
                             ) : (
                               "—"
                             )}

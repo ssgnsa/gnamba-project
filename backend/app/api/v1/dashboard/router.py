@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-import csv
-import io
 import os
-from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from app.api.deps import get_db, get_current_user
+from app.api.deps import get_db, get_current_user, require_admin_user
 from app.services.dashboard.service import DashboardService
 
-router = APIRouter(prefix="/api/v1/dashboard", tags=["dashboard"])
+router = APIRouter(
+    prefix="/api/v1/dashboard",
+    tags=["dashboard"],
+    dependencies=[Depends(require_admin_user)],
+)
 
 
 @router.get("")
@@ -62,51 +63,8 @@ def get_logs(
 
 @router.get("/report")
 def get_report(
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
 ):
     """
-    Generate a CSV report of financial transactions for the current month.
+    Data export remains prohibited until a separate business decision is signed.
     """
-    dashboard_service = DashboardService(db)
-    now = datetime.now()
-    start_date = datetime(now.year, now.month, 1)
-    if now.month == 12:
-        end_date = datetime(now.year + 1, 1, 1)
-    else:
-        end_date = datetime(now.year, now.month + 1, 1)
-
-    transactions = dashboard_service.get_transactions_for_period(start_date, end_date)
-    if not transactions:
-        # Return a CSV with just a header and a message
-        output = io.StringIO()
-        writer = csv.writer(output)
-        writer.writerow(["Date", "Type", "Category", "Description", "Amount"])
-        writer.writerow([start_date.strftime("%Y-%m-%d"), "No data", "", "No transactions found for the specified period", "0"])
-        csv_content = output.getvalue()
-        return Response(
-            content=csv_content,
-            media_type="text/csv",
-            headers={"Content-Disposition": f"attachment; filename=report_{start_date.strftime('%Y_%m')}.csv"}
-        )
-
-    # Prepare CSV
-    output = io.StringIO()
-    writer = csv.writer(output)
-    # Header
-    writer.writerow(["Date", "Type", "Category", "Description", "Amount"])
-    # Data
-    for t in transactions:
-        writer.writerow([
-            t.get("date_transaction", ""),
-            t.get("type_transaction", ""),
-            t.get("categorie", ""),
-            t.get("description", ""),
-            t.get("montant", 0)
-        ])
-    csv_content = output.getvalue()
-    return Response(
-        content=csv_content,
-        media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename=report_{start_date.strftime('%Y_%m')}.csv"}
-    )
+    raise HTTPException(status_code=403, detail="Les exports sont interdits")

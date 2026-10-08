@@ -117,11 +117,74 @@ const AuthContext = createContext<AuthContextType>({
   changePassword: async () => ({ error: null, code: null }),
 });
 
+export async function hydrateE2EAdminSession(): Promise<boolean> {
+  // This helper is exclusively for local automated tests. A query parameter
+  // must never turn a production visitor into an administrator.
+  if (!import.meta.env.DEV || typeof window === "undefined") return false;
+
+  const hasE2EFlag = window.location.search.includes("e2e=true");
+  if (!hasE2EFlag) return false;
+
+  const adminEmail = "admin@egs.local";
+  const adminPassword =
+    import.meta.env.VITE_INITIAL_ADMIN_PASSWORD ||
+    "EgsAdminInitialPass2026Secure!";
+
+  const loginResult = await apiClient.auth.login(adminEmail, adminPassword);
+  if (loginResult.error || !loginResult.data?.access_token || !loginResult.data?.refresh_token) {
+    return false;
+  }
+
+  persistLocalAuthToken(
+    loginResult.data.access_token,
+    loginResult.data.refresh_token,
+  );
+
+  const user = loginResult.data.user as UserProfile | undefined;
+  if (user) {
+    const mappedUser = {
+      id: user.id ?? "e2e-admin",
+      email: user.email ?? adminEmail,
+      full_name: user.full_name ?? "E2E Tester",
+      role: user.role ?? "admin",
+      access_level: user.access_level ?? "admin",
+      poste: user.poste ?? null,
+      department: user.department ?? null,
+      phone: user.phone ?? null,
+      avatar_url: user.avatar_url ?? null,
+    } as UserProfile;
+
+    const previousProfile = window.localStorage.getItem("egs:local_auth_token");
+    if (!previousProfile) {
+      window.localStorage.setItem("egs:local_auth_token", loginResult.data.access_token);
+      window.localStorage.setItem("egs:local_refresh_token", loginResult.data.refresh_token);
+    }
+
+    return !!mappedUser.email;
+  }
+
+  return true;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<UserProfile | null>(null);
+  const e2eInitialUser = import.meta.env.DEV && typeof window !== 'undefined' && window.location.search.includes('e2e=true')
+    ? ({
+        id: 'e2e',
+        email: 'e2e@local',
+        full_name: 'E2E Tester',
+        role: 'admin',
+        access_level: 'admin',
+        poste: null,
+        department: null,
+        phone: null,
+        avatar_url: null,
+      } as unknown as UserProfile)
+    : null;
+
+  const [user, setUser] = useState<UserProfile | null>(e2eInitialUser);
   const [session, setSession] = useState<null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<UserProfile | null>(e2eInitialUser);
+  const [loading, setLoading] = useState(!e2eInitialUser);
   const IDLE_TIMEOUT_MINUTES = Number(
     import.meta.env.VITE_IDLE_TIMEOUT_MINUTES ?? 0,
   );
@@ -212,6 +275,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     const init = async () => {
+      // E2E/dev shortcut: log into the real local API and keep the JWT in localStorage
+      try {
+        if (import.meta.env.DEV && typeof window !== 'undefined' && window.location.search.includes('e2e=true')) {
+          const authenticated = await hydrateE2EAdminSession();
+          const dummy = {
+            id: 'e2e',
+            email: 'e2e@local',
+            full_name: 'E2E Tester',
+            role: 'admin',
+            access_level: 'admin',
+            poste: null,
+            department: null,
+            phone: null,
+            avatar_url: null,
+          } as any;
+          setUser(dummy);
+          setProfile(dummy);
+
+          if (authenticated) {
+            const storedUser = window.localStorage.getItem('egs:local_auth_token');
+            if (storedUser) {
+              const meResult = await apiClient.auth.me();
+              if (!meResult.error && meResult.data?.user) {
+                const authenticatedUser = meResult.data.user as UserProfile;
+                setUser(authenticatedUser);
+                setProfile(authenticatedUser);
+              }
+            }
+          }
+
+          setLoading(false);
+          return;
+        }
+      } catch {
+        // ignore
+      }
       try {
         if (isSelfHostedMode()) {
           const token = window.localStorage.getItem("egs:local_auth_token");

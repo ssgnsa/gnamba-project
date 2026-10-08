@@ -18,6 +18,7 @@ import { useSettings } from "../context/SettingsContext";
 import { ACCESS_LEVEL_LABELS, useAuth } from "../context/AuthContext";
 import type { AccessLevel, UserRole } from "../types";
 import MediaPicker from "../components/media/MediaPicker";
+import StorageImage from "../components/media/StorageImage";
 import { isSelfHostedMode } from "../lib/selfHosted";
 import { apiClient } from "../api/client";
 import dbClient from '../lib/dbClient.service';
@@ -617,7 +618,7 @@ export default function Utilisateurs() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2.5">
                           {user.avatar_url ? (
-                            <img
+                            <StorageImage
                               src={user.avatar_url}
                               alt={user.full_name}
                               crossOrigin="anonymous"
@@ -814,7 +815,7 @@ export default function Utilisateurs() {
             <div className="flex items-center gap-3">
               {createForm.avatar_url ? (
                 <div className="relative">
-                  <img
+                    <StorageImage
                     src={createForm.avatar_url}
                     alt="Avatar"
                     className="w-12 h-12 rounded-full object-cover border-2 border-gray-200"
@@ -1010,7 +1011,7 @@ export default function Utilisateurs() {
             <div className="flex items-center gap-3">
               {form.avatar_url ? (
                 <div className="relative">
-                  <img
+                    <StorageImage
                     src={form.avatar_url}
                     alt="Avatar"
                     className="w-12 h-12 rounded-full object-cover border-2 border-gray-200"

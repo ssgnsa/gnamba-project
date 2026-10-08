@@ -1,10 +1,11 @@
 from __future__ import annotations
 import json
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
 
@@ -24,12 +25,14 @@ class GenericTableRepository:
         defaults: dict[str, Any] | None = None,
         field_mapping: dict[str, str] | None = None,
         skip_ensure_table: bool = False,
+        commit_on_write: bool = True,
     ) -> None:
         self.db = db
         self.table_name = table_name
         self.columns = columns
         self.defaults = defaults or {}
         self.field_mapping = field_mapping or {}
+        self.commit_on_write = commit_on_write
         if not skip_ensure_table:
             self._ensure_table()
 
@@ -38,6 +41,10 @@ class GenericTableRepository:
         definition = self.columns.get(name, "")
         if isinstance(value, (dict, list)) and "json" in definition.lower():
             return json.dumps(value)
+        # sqlite3 does not bind Decimal values directly. PostgreSQL keeps the
+        # Decimal path unchanged through its NUMERIC adapter.
+        if isinstance(value, Decimal) and self.db.get_bind().dialect.name == "sqlite":
+            return float(value)
         return value
 
     def _ensure_table(self) -> None:
@@ -57,12 +64,17 @@ class GenericTableRepository:
                     """
                 )
             )
+            inspector = inspect(self.db.get_bind())
+            existing_columns = {
+                column["name"] for column in inspector.get_columns(self.table_name)
+            }
             for name, definition in self.columns.items():
+                if name in existing_columns:
+                    continue
                 self.db.execute(
-                    text(
-                        f"ALTER TABLE {self.table_name} ADD COLUMN IF NOT EXISTS {name} {definition}"
-                    )
+                    text(f"ALTER TABLE {self.table_name} ADD COLUMN {name} {definition}")
                 )
+                existing_columns.add(name)
         else:
             self.db.execute(
                 text(
@@ -75,20 +87,18 @@ class GenericTableRepository:
                     """
                 )
             )
-        self.db.commit()
+        if self.commit_on_write:
+            self.db.commit()
 
     def _has_column(self, column_name: str) -> bool:
         """Vérifie si une colonne existe dans la table."""
-        result = self.db.execute(
-            text(
-                f"""
-                SELECT 1 FROM information_schema.columns
-                WHERE table_name = :table AND column_name = :column
-                """
-            ),
-            {"table": self.table_name, "column": column_name},
-        ).first()
-        return result is not None
+        inspector = inspect(self.db.get_bind())
+        if not inspector.has_table(self.table_name):
+            return False
+        return any(
+            column["name"] == column_name
+            for column in inspector.get_columns(self.table_name)
+        )
 
     def _get_default_order_column(self) -> str:
         """Retourne la colonne par défaut pour ORDER BY."""
@@ -149,7 +159,7 @@ class GenericTableRepository:
     def get(self, item_id: str) -> dict[str, Any] | None:
         """Récupère un enregistrement par ID."""
         row = self.db.execute(
-            text(f"SELECT * FROM {self.table_name} WHERE id = :id"),
+            text(f"SELECT * FROM {self.table_name} WHERE CAST(id AS TEXT) = :id"),
             {"id": item_id},
         ).mappings().first()
         return dict(row) if row else None
@@ -184,7 +194,8 @@ class GenericTableRepository:
             ),
             params,
         )
-        self.db.commit()
+        if self.commit_on_write:
+            self.db.commit()
         created = self.get(values["id"])
         return created or {"id": values["id"], **values}
 
@@ -206,19 +217,21 @@ class GenericTableRepository:
                 f"""
                 UPDATE {self.table_name}
                 SET {assignments}{updated_at_clause}
-                WHERE id = :id
+                WHERE CAST(id AS TEXT) = :id
                 """
             ),
             values,
         )
-        self.db.commit()
+        if self.commit_on_write:
+            self.db.commit()
         return self.get(item_id)
 
     def delete(self, item_id: str) -> bool:
         """Supprime définitivement un enregistrement."""
         result = self.db.execute(
-            text(f"DELETE FROM {self.table_name} WHERE id = :id"),
+            text(f"DELETE FROM {self.table_name} WHERE CAST(id AS TEXT) = :id"),
             {"id": item_id},
         )
-        self.db.commit()
+        if self.commit_on_write:
+            self.db.commit()
         return bool(result.rowcount)

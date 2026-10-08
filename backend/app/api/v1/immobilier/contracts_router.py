@@ -12,6 +12,11 @@ from sqlalchemy import select, func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.database import get_db
+from app.api.deps import require_admin_user
+from app.services.immobilier_audit import (
+    record_property_transition_refusal,
+    set_immobilier_audit_context,
+)
 from app.models.property import LeaseContract, Property
 from app.models.entity import Entity
 from app.schemas.immobilier import (
@@ -23,7 +28,11 @@ from app.schemas.immobilier import (
     LeaseContractStatsResponse,
 )
 
-router = APIRouter(prefix="/contracts", tags=["immobilier-contracts"])
+router = APIRouter(
+    prefix="/contracts",
+    tags=["immobilier-contracts"],
+    dependencies=[Depends(require_admin_user)],
+)
 
 
 def _contract_to_response(contract: LeaseContract, include_relations: bool = False) -> LeaseContractResponse:
@@ -55,14 +64,27 @@ def _contract_to_response(contract: LeaseContract, include_relations: bool = Fal
 
 
 @router.post("", response_model=LeaseContractResponse, status_code=201)
-def create_contract(payload: LeaseContractCreate, db: Session = Depends(get_db)) -> LeaseContractResponse:
+def create_contract(
+    payload: LeaseContractCreate,
+    db: Session = Depends(get_db),
+    current_user: dict[str, Any] = Depends(require_admin_user),
+) -> LeaseContractResponse:
     """Crée un nouveau bail"""
     # Verify property exists
     prop = db.execute(
-        select(Property).where(Property.id == payload.property_id).where(Property.deleted_at.is_(None))
+        select(Property).where(Property.id == payload.property_id)
+        .where(Property.deleted_at.is_(None)).with_for_update()
     ).scalar_one_or_none()
     if not prop:
         raise HTTPException(status_code=404, detail="Propriété introuvable")
+
+    contract_status = payload.statut or "actif"
+    if contract_status == "actif" and prop.statut != "disponible":
+        record_property_transition_refusal(
+            db, current_user, str(prop.id), "louee",
+            f"Création de bail refusée: état du bien {prop.statut}",
+        )
+        raise HTTPException(status_code=409, detail="Un bail actif exige un bien disponible")
     
     # Verify locataire entity exists
     locataire = db.execute(
@@ -85,7 +107,7 @@ def create_contract(payload: LeaseContractCreate, db: Session = Depends(get_db))
         loyer_mensuel=payload.loyer_mensuel,
         charges_mensuelles=payload.charges_mensuelles or 0,
         depot_garantie=payload.depot_garantie or 0,
-        statut=payload.statut or "actif",
+        statut=contract_status,
         reference=reference,
         notes=payload.notes,
         commission_rate=payload.commission_rate,
@@ -94,9 +116,11 @@ def create_contract(payload: LeaseContractCreate, db: Session = Depends(get_db))
     
     db.add(contract)
     
-    # Update property status to "loue"
-    prop.statut = "loue"
-    prop.updated_at = datetime.utcnow()
+    # A live lease transitions the operational property state in this same transaction.
+    if contract_status == "actif":
+        set_immobilier_audit_context(db, current_user)
+        prop.statut = "louee"
+        prop.updated_at = datetime.utcnow()
     
     db.commit()
     db.refresh(contract)
@@ -258,26 +282,9 @@ def update_contract(
 @router.delete("/{contract_id}")
 def delete_contract(
     contract_id: UUID,
-    soft: bool = Query(True, description="Soft delete (archiver) ou hard delete"),
-    db: Session = Depends(get_db),
 ) -> dict[str, str]:
-    """Supprime un bail"""
-    contract = db.execute(
-        select(LeaseContract).where(LeaseContract.id == contract_id)
-    ).scalar_one_or_none()
-    
-    if not contract:
-        raise HTTPException(status_code=404, detail="Bail introuvable")
-    
-    if soft:
-        contract.deleted_at = datetime.utcnow()
-        contract.deleted_by = None  # TODO: get from auth
-        db.commit()
-        return {"status": "ok", "message": "Bail archivé"}
-    else:
-        db.delete(contract)
-        db.commit()
-        return {"status": "ok", "message": "Bail supprimé définitivement"}
+    """Contract deletion is prohibited by the approved business decision."""
+    raise HTTPException(status_code=403, detail="La suppression de contrats est interdite")
 
 
 @router.post("/{contract_id}/restore", response_model=LeaseContractResponse)
@@ -308,6 +315,7 @@ def restore_contract(
 def terminate_contract(
     contract_id: UUID,
     db: Session = Depends(get_db),
+    current_user: dict[str, Any] = Depends(require_admin_user),
 ) -> LeaseContractResponse:
     """Termine un bail (passe à 'termine')"""
     contract = db.execute(
@@ -325,9 +333,14 @@ def terminate_contract(
 
     # Update property status
     prop = db.execute(
-        select(Property).where(Property.id == contract.property_id)
+        select(Property).where(Property.id == contract.property_id).with_for_update()
     ).scalar_one_or_none()
     if prop and prop.statut == "loue":
+        set_immobilier_audit_context(db, current_user)
+        prop.statut = "disponible"
+        prop.updated_at = datetime.utcnow()
+    elif prop and prop.statut == "louee":
+        set_immobilier_audit_context(db, current_user)
         prop.statut = "disponible"
         prop.updated_at = datetime.utcnow()
     

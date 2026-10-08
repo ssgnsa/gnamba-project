@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useSettings } from "../context/SettingsContext";
 import BrandLogo from "../components/BrandLogo";
+import StorageImage from "../components/media/StorageImage";
 import dbClient from '../lib/dbClient.service';
 import {
   Visiteur,
@@ -779,7 +780,7 @@ export default function RegistreVisiteur() {
   };
 
   // Imprimer badge
-  const imprimerBadge = (visite: Visite) => {
+  const imprimerBadge = async (visite: Visite) => {
     const badgeWindow = window.open("", "_blank", "width=400,height=600");
     if (!badgeWindow) {
       alert("Veuillez autoriser les fenêtres popup");
@@ -787,7 +788,20 @@ export default function RegistreVisiteur() {
     }
 
     const visiteur = visiteurs.find((v) => v.id === visite.visiteur_id);
-    const photoSrc = visiteur?.photo_base64 || visiteur?.photo_url;
+    let photoSrc = visiteur?.photo_base64 || visiteur?.photo_url;
+    if (photoSrc && new URL(photoSrc, window.location.origin).pathname.startsWith("/storage/")) {
+      try {
+        const blob = await apiClient.fetchStorageFile(photoSrc);
+        photoSrc = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(blob);
+        });
+      } catch {
+        photoSrc = undefined;
+      }
+    }
 
     const html = `<!DOCTYPE html>
 <html lang="fr">
@@ -1422,7 +1436,7 @@ export default function RegistreVisiteur() {
                       <div className="flex items-start justify-between">
                         <div className="flex items-start gap-4">
                           {photoUrl ? (
-                            <img
+                            <StorageImage
                               src={photoUrl}
                               alt={visite.visiteurs?.nom_complet}
                               crossOrigin="anonymous"
@@ -1573,7 +1587,7 @@ export default function RegistreVisiteur() {
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
                               {photoUrl ? (
-                                <img
+                                <StorageImage
                                   src={photoUrl}
                                   alt=""
                                   crossOrigin="anonymous"
@@ -1734,7 +1748,7 @@ export default function RegistreVisiteur() {
               <div className="flex items-start gap-4">
                 {duplicateVisiteur.photo_base64 ||
                 duplicateVisiteur.photo_url ? (
-                  <img
+                  <StorageImage
                     src={
                       duplicateVisiteur.photo_base64 ||
                       duplicateVisiteur.photo_url ||

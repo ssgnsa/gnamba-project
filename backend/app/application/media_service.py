@@ -68,3 +68,6 @@ class MediaApplicationService:
 
     def list_media_audit_logs(self, media_id: str | None = None) -> list[dict[str, Any]]:
         return self.media_repository.list_media_audit_logs(media_id)
+
+    def create_media_audit_log(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return self.media_repository.create_media_audit_log(payload)

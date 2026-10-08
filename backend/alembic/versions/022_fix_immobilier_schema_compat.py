@@ -56,53 +56,37 @@ def upgrade() -> None:
         """
     )
 
+    # rent_payments.property_id is part of the current ORM contract and is
+    # consumed by revision 023, but it is not created by the original 007.
+    op.execute("ALTER TABLE rent_payments ADD COLUMN IF NOT EXISTS property_id UUID")
+
     op.execute(
         """
-        DO $$
-        BEGIN
-            IF NOT EXISTS (
-                SELECT 1
-                FROM information_schema.columns
-                WHERE table_name = 'lease_contracts'
-                  AND column_name = 'property_id'
-            ) THEN
-                ALTER TABLE lease_contracts
-                    ADD COLUMN property_id UUID,
-                    ADD COLUMN locataire_id TEXT,
-                    ADD COLUMN locataire_entity_id UUID,
-                    ADD COLUMN date_debut TIMESTAMP WITH TIME ZONE,
-                    ADD COLUMN date_fin TIMESTAMP WITH TIME ZONE,
-                    ADD COLUMN loyer_mensuel NUMERIC(10, 2),
-                    ADD COLUMN charges_mensuelles NUMERIC(10, 2) DEFAULT 0,
-                    ADD COLUMN depot_garantie NUMERIC(10, 2) DEFAULT 0,
-                    ADD COLUMN statut TEXT DEFAULT 'actif',
-                    ADD COLUMN notes TEXT,
-                    ADD COLUMN reference TEXT,
-                    ADD COLUMN commission_rate NUMERIC(5, 2) DEFAULT 12.0,
-                    ADD COLUMN jour_echeance INTEGER DEFAULT 10;
-            END IF;
-        END $$;
+        ALTER TABLE lease_contracts
+            ADD COLUMN IF NOT EXISTS property_id UUID,
+            ADD COLUMN IF NOT EXISTS locataire_id TEXT,
+            ADD COLUMN IF NOT EXISTS locataire_entity_id UUID,
+            ADD COLUMN IF NOT EXISTS date_debut TIMESTAMP WITH TIME ZONE,
+            ADD COLUMN IF NOT EXISTS date_fin TIMESTAMP WITH TIME ZONE,
+            ADD COLUMN IF NOT EXISTS loyer_mensuel NUMERIC(10, 2),
+            ADD COLUMN IF NOT EXISTS charges_mensuelles NUMERIC(10, 2) DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS depot_garantie NUMERIC(10, 2) DEFAULT 0,
+            ADD COLUMN IF NOT EXISTS statut TEXT DEFAULT 'actif',
+            ADD COLUMN IF NOT EXISTS notes TEXT,
+            ADD COLUMN IF NOT EXISTS reference TEXT,
+            ADD COLUMN IF NOT EXISTS commission_rate NUMERIC(5, 2) DEFAULT 12.0,
+            ADD COLUMN IF NOT EXISTS jour_echeance INTEGER DEFAULT 10;
         """
     )
 
     op.execute(
         """
-        DO $$
-        BEGIN
-            IF NOT EXISTS (
-                SELECT 1
-                FROM information_schema.columns
-                WHERE table_name = 'rent_payments'
-                  AND column_name = 'locataire_entity_id'
-            ) THEN
-                ALTER TABLE rent_payments
-                    ADD COLUMN locataire_entity_id UUID,
-                    ADD COLUMN date_echeance TIMESTAMP WITH TIME ZONE,
-                    ADD COLUMN last_document_type TEXT,
-                    ADD COLUMN last_document_at TIMESTAMP WITH TIME ZONE,
-                    ADD COLUMN last_document_by UUID;
-            END IF;
-        END $$;
+        ALTER TABLE rent_payments
+            ADD COLUMN IF NOT EXISTS locataire_entity_id UUID,
+            ADD COLUMN IF NOT EXISTS date_echeance TIMESTAMP WITH TIME ZONE,
+            ADD COLUMN IF NOT EXISTS last_document_type TEXT,
+            ADD COLUMN IF NOT EXISTS last_document_at TIMESTAMP WITH TIME ZONE,
+            ADD COLUMN IF NOT EXISTS last_document_by UUID;
         """
     )
 
@@ -128,6 +112,27 @@ def upgrade() -> None:
         """
         CREATE INDEX IF NOT EXISTS idx_immobilier_payment_locataire_entity
             ON rent_payments (locataire_entity_id);
+        """
+    )
+    op.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_immobilier_payment_property
+            ON rent_payments (property_id);
+        """
+    )
+    op.execute(
+        """
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conname = 'fk_rent_payments_property_id_properties'
+            ) THEN
+                ALTER TABLE rent_payments
+                    ADD CONSTRAINT fk_rent_payments_property_id_properties
+                    FOREIGN KEY (property_id) REFERENCES properties(id) ON DELETE CASCADE;
+            END IF;
+        END $$;
         """
     )
 

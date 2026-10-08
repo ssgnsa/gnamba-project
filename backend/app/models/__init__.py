@@ -1,7 +1,14 @@
 """Data models."""
 
 # Core models
-from app.models.user import User, AuthSession, AuthAuditLog, AuthLoginFailure
+from app.models.user import (
+    User,
+    AuthSession,
+    AuthAuditLog,
+    AuthLoginFailure,
+    AuthPasswordResetToken,
+    AuthRateLimitEvent,
+)
 from app.models.party import Party
 from app.models.entity import Entity
 from app.models.project import ProjectModel
@@ -36,7 +43,8 @@ from app.models.settings import AppSettings, UserProfile
 
 __all__ = [
     # Core
-    "User", "AuthSession", "AuthAuditLog", "AuthLoginFailure", "Party", "Entity", "ProjectModel",
+    "User", "AuthSession", "AuthAuditLog", "AuthLoginFailure",
+    "AuthPasswordResetToken", "AuthRateLimitEvent", "Party", "Entity", "ProjectModel",
     "FoncierVillage", "FoncierLotissement", "FoncierIlot", "FoncierLot",
     "FoncierAttestation", "FoncierAttestationTemoin", "UserVillageAccess", "ActivityLog",
     

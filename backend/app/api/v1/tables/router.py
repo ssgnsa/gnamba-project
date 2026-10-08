@@ -1,15 +1,19 @@
 from __future__ import annotations
 
+import time
 from typing import Any
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.antispam import public_form_limiter
 from app.repositories.generic_table_repository import GenericTableRepository
+from app.api.deps import get_current_user, get_optional_current_user
+from app.api.deps import enforce_permission
 
 router = APIRouter(prefix="/api/v1/tables", tags=["tables"])
-
 
 TABLES: dict[str, tuple[str, dict[str, str], dict[str, Any], dict[str, str] | None, bool]] = {
     "tasks": (
@@ -179,14 +183,14 @@ TABLES: dict[str, tuple[str, dict[str, str], dict[str, Any], dict[str, str] | No
     "vitrine_lots": (
         "vitrine_lots",
         {
-            "lot_id": "TEXT",
-            "property_id": "TEXT",
-            "titre": "TEXT",
+            "lot_id": "UUID",
+            "property_id": "UUID",
+            "titre": "VARCHAR(255)",
             "description": "TEXT",
-            "prix": "REAL",
-            "surface": "REAL",
+            "prix": "NUMERIC(12,2)",
+            "surface": "NUMERIC(10,2)",
             "localisation": "TEXT",
-            "photos": "JSONB",
+            "photos": "JSON",
             "publier": "BOOLEAN",
             "ordre": "INTEGER",
             "tags": "TEXT[]",
@@ -197,9 +201,9 @@ TABLES: dict[str, tuple[str, dict[str, str], dict[str, Any], dict[str, str] | No
             "commune": "TEXT",
             "departement": "TEXT",
             "region": "TEXT",
-            "superficie": "REAL",
-            "prix_vente": "REAL",
-            "statut": "TEXT",
+            "superficie": "NUMERIC(10,2)",
+            "prix_vente": "NUMERIC(12,2)",
+            "statut": "VARCHAR(50)",
             "documents": "TEXT",
             "caracteristiques": "TEXT[]",
             "image_url": "TEXT",
@@ -357,20 +361,6 @@ TABLES: dict[str, tuple[str, dict[str, str], dict[str, Any], dict[str, str] | No
         {},
         None,
         True,  # skip_ensure_table - managed by Alembic migration 008
-    ),
-    "foncier_villages": (
-        "foncier_villages",
-        {
-            "nom": "TEXT",
-            "commune": "TEXT",
-            "departement": "TEXT",
-            "region": "TEXT",
-            "statut": "TEXT",
-            "superficie_totale": "REAL",
-        },
-        {"statut": "actif"},
-        None,
-        True,  # skip_ensure_table - managed by Alembic migration 006
     ),
     "parties": (
         "parties",
@@ -660,6 +650,12 @@ TABLES: dict[str, tuple[str, dict[str, str], dict[str, Any], dict[str, str] | No
     ),
 }
 
+ADMIN_TABLES = {
+    "site_content", "page_layouts", "site_realisations", "vitrine_lots",
+    "contact_messages", "media_files", "media_versions", "media_usage",
+    "media_audit_logs",
+}
+
 
 def _repository(table: str, db: Session) -> GenericTableRepository:
     config = TABLES.get(table)
@@ -671,29 +667,114 @@ def _repository(table: str, db: Session) -> GenericTableRepository:
     return GenericTableRepository(db, table_name, columns, defaults, field_mapping, skip_ensure_table=skip_ensure_table)
 
 
+def _canonical_vitrine_lot_uuid(value: Any, field_name: str) -> str:
+    if not isinstance(value, str):
+        raise HTTPException(status_code=422, detail=f"{field_name} doit être un UUID valide")
+    try:
+        return str(UUID(value))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=f"{field_name} doit être un UUID valide") from exc
+
+
 @router.get("/{table}")
-def list_rows(table: str, request: Request, db: Session = Depends(get_db)) -> list[dict[str, Any]]:
+def list_rows(
+    table: str,
+    request: Request,
+    limit: int = Query(default=100, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> list[dict[str, Any]]:
     repository = _repository(table, db)
-    rows = repository.list(
+    enforce_permission(current_user, "erp_table", "read", resource=table)
+
+    rows, _total = repository.list_paginated(
         order_by=request.query_params.get("order_by") or "created_at",
         descending=request.query_params.get("ascending") != "true",
+        limit=limit,
+        offset=offset,
     )
     for key, value in request.query_params.items():
-        if key in {"order_by", "ascending"}:
+        if key in {"order_by", "ascending", "limit", "offset"}:
             continue
         rows = [row for row in rows if str(row.get(key)) == value]
     return rows
 
 
 @router.post("/{table}")
-async def create_row(table: str, request: Request, db: Session = Depends(get_db)) -> dict[str, Any]:
+async def create_row(
+    table: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict[str, Any] | None = Depends(get_optional_current_user),
+) -> dict[str, Any]:
     payload = await request.json()
-    return _repository(table, db).create(payload)
+    if table == "contact_messages" and current_user is not None:
+        raise HTTPException(status_code=403, detail="La création de messages est réservée au formulaire public")
+    public_contact = table == "contact_messages" and current_user is None
+    if public_contact:
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=422, detail="Objet JSON requis")
+        allowed_fields = {
+            "nom", "email", "telephone", "sujet", "message",
+            "_website", "_form_started_at", "_consent",
+        }
+        if set(payload) - allowed_fields:
+            raise HTTPException(status_code=422, detail="Champs non autorisés")
+        if str(payload.get("_website") or "").strip():
+            return {"status": "ok"}
+        try:
+            elapsed = time.time() - float(payload.get("_form_started_at"))
+        except (TypeError, ValueError):
+            elapsed = 0
+        if elapsed < 2.5 or elapsed > 60 * 60 or payload.get("_consent") is not True:
+            raise HTTPException(status_code=422, detail="Formulaire invalide")
+        if not request.client or not request.client.host:
+            raise HTTPException(status_code=429, detail="Soumission temporairement indisponible")
+        if not public_form_limiter.allow(
+            request.client.host,
+            maximum=5,
+            window_seconds=60 * 60,
+        ):
+            raise HTTPException(status_code=429, detail="Soumission temporairement indisponible")
+        if not str(payload.get("email") or "").strip() or not str(payload.get("message") or "").strip():
+            raise HTTPException(status_code=422, detail="Email et message requis")
+        limits = {"nom": 255, "email": 255, "telephone": 50, "sujet": 255, "message": 10000}
+        if any(len(str(payload.get(key) or "")) > maximum for key, maximum in limits.items()):
+            raise HTTPException(status_code=422, detail="Un champ dépasse la taille autorisée")
+        payload = {key: value for key, value in payload.items() if not key.startswith("_")}
+    else:
+        if current_user is None:
+            raise HTTPException(status_code=401, detail="Authentification requise")
+        enforce_permission(current_user, "erp_table", "create", resource=table)
+    if table == "vitrine_lots":
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=422, detail="Un objet JSON est requis")
+        for field_name in ("id", "lot_id", "property_id"):
+            value = payload.get(field_name)
+            if value is not None:
+                payload[field_name] = _canonical_vitrine_lot_uuid(value, field_name)
+    created = _repository(table, db).create(payload)
+    return {"status": "ok"} if public_contact else created
 
 
 @router.patch("/{table}/{row_id}")
-async def update_row(table: str, row_id: str, request: Request, db: Session = Depends(get_db)) -> dict[str, Any]:
+async def update_row(
+    table: str,
+    row_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    enforce_permission(current_user, "erp_table", "update", resource=table)
+    if table == "vitrine_lots":
+        row_id = _canonical_vitrine_lot_uuid(row_id, "row_id")
     payload = await request.json()
+    if table == "vitrine_lots" and isinstance(payload, dict):
+        for field_name in ("id", "lot_id", "property_id"):
+            value = payload.get(field_name)
+            if value is not None:
+                payload[field_name] = _canonical_vitrine_lot_uuid(value, field_name)
     updated = _repository(table, db).update(row_id, payload)
     if not updated:
         raise HTTPException(status_code=404, detail="Ligne introuvable")
@@ -701,8 +782,15 @@ async def update_row(table: str, row_id: str, request: Request, db: Session = De
 
 
 @router.delete("/{table}/{row_id}")
-def delete_row(table: str, row_id: str, db: Session = Depends(get_db)) -> dict[str, str]:
+def delete_row(
+    table: str,
+    row_id: str,
+    db: Session = Depends(get_db),
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, str]:
+    enforce_permission(current_user, "erp_table", "delete", resource=table)
+    if table == "vitrine_lots":
+        row_id = _canonical_vitrine_lot_uuid(row_id, "row_id")
     if not _repository(table, db).delete(row_id):
         raise HTTPException(status_code=404, detail="Ligne introuvable")
     return {"status": "ok", "message": "Ligne supprimée"}
-

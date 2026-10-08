@@ -56,6 +56,7 @@ def test_sqlalchemy_repository_normalizes_uppercase_role_values() -> None:
 
 
 def test_seed_system_updates_stale_admin_password(monkeypatch) -> None:
+    monkeypatch.setenv("AUTO_RESET_DEFAULT_ADMIN_PASSWORD", "true")
     monkeypatch.setenv("INITIAL_ADMIN_PASSWORD", "FreshAdminPass2026!")
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(bind=engine)
@@ -78,7 +79,7 @@ def test_seed_system_updates_stale_admin_password(monkeypatch) -> None:
             id="00000000-0000-0000-0000-000000000001",
             email="admin@egs.local",
             full_name="Administrateur EGS",
-            password_hash=hash_password("Admin@EGS2025!"),
+            password_hash=hash_password("test-only-previous-bootstrap-password"),
             role="admin",
             access_level="admin",
             entity_id=entity.id,
@@ -90,7 +91,7 @@ def test_seed_system_updates_stale_admin_password(monkeypatch) -> None:
         session.refresh(admin)
 
         assert verify_password("FreshAdminPass2026!", admin.password_hash) is True
-        assert verify_password("Admin@EGS2025!", admin.password_hash) is False
+        assert verify_password("test-only-previous-bootstrap-password", admin.password_hash) is False
 
 
 def test_seed_system_keeps_custom_admin_password(monkeypatch) -> None:

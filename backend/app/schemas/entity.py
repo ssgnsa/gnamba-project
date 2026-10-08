@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_serializer, field_validator
 from typing import Optional, Dict, Any, List
 from datetime import date
 import re
@@ -167,6 +167,17 @@ class EntityResponse(EntityBase):
 
     class Config:
         from_attributes = True
+
+    @field_serializer(
+        "id_document_type",
+        "id_document_number",
+        "id_document_date",
+        "id_document_place",
+        check_fields=False,
+    )
+    def mask_identity_document(self, value: Any) -> None:
+        """CNI fields stay masked until a step-up reveal route exists."""
+        return None
 
 
 class EntitySearchParams(BaseModel):

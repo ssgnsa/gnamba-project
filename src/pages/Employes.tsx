@@ -18,6 +18,7 @@ import Modal from "../components/ui/Modal";
 import Badge from "../components/ui/Badge";
 import { useSettings } from "../context/SettingsContext";
 import MediaPicker from "../components/media/MediaPicker";
+import StorageImage from "../components/media/StorageImage";
 import MobileCard from "../components/ui/MobileCard";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -306,7 +307,7 @@ export default function Employes() {
                     subtitle={e.poste || "Employé"}
                     icon={
                       e.photo_url ? (
-                        <img
+                        <StorageImage
                           src={e.photo_url}
                           alt={`${e.prenom} ${e.nom}`}
                           crossOrigin="anonymous"
@@ -405,7 +406,7 @@ export default function Employes() {
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
                             {e.photo_url ? (
-                              <img
+                              <StorageImage
                                 src={e.photo_url}
                                 alt={`${e.prenom} ${e.nom}`}
                                 crossOrigin="anonymous"
@@ -504,7 +505,7 @@ export default function Employes() {
             <div className="flex items-center gap-3">
               {form.photo_url ? (
                 <div className="relative">
-                  <img
+                  <StorageImage
                     src={form.photo_url}
                     alt="Photo"
                     crossOrigin="anonymous"

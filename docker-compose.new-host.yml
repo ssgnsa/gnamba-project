@@ -1,0 +1,140 @@
+services:
+  egs-postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: egs_local
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      EGS_DB_APP_PASSWORD: ${EGS_DB_APP_PASSWORD:?EGS_DB_APP_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres-init/10-create-application-role.sh:/docker-entrypoint-initdb.d/10-create-application-role.sh:ro
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d egs_local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  egs-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  egs-api:
+    image: egs-new-host-api:${EGS_RELEASE_SHA:?EGS_RELEASE_SHA is required}
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      egs-postgres:
+        condition: service_healthy
+      egs-redis:
+        condition: service_healthy
+    env_file:
+      - ${EGS_API_ENV_FILE:?EGS_API_ENV_FILE is required}
+    environment:
+      APP_NAME: ${APP_NAME:-EGS API}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
+      LOCAL_AUTH_SECRET: ${LOCAL_AUTH_SECRET:?LOCAL_AUTH_SECRET is required}
+      LOCAL_STORAGE_ROOT: /app/backend/storage/uploads
+      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:-}
+      AUTO_RESET_DEFAULT_ADMIN_PASSWORD: "false"
+      AUTH_COOKIE_SECURE: "true"
+      AUTH_COOKIE_SAMESITE: lax
+      AUTH_REQUIRE_HTTPS: "true"
+      AUTH_LOGIN_RATE_LIMIT: ${AUTH_LOGIN_RATE_LIMIT:-10}
+      AUTH_RESET_RATE_LIMIT: ${AUTH_RESET_RATE_LIMIT:-5}
+      AUTH_RATE_LIMIT_WINDOW_SECONDS: ${AUTH_RATE_LIMIT_WINDOW_SECONDS:-900}
+      PASSWORD_RESET_TTL_SECONDS: ${PASSWORD_RESET_TTL_SECONDS:-1800}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:?PUBLIC_APP_URL is required}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SQL_ECHO: "false"
+      CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS is required}
+    volumes:
+      - backend_uploads:/app/backend/storage/uploads
+    ports:
+      - "127.0.0.1:${API_PORT:-18000}:8000"
+    networks:
+      - backend
+      - ingress
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready')"
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  egs-web:
+    image: egs-new-host-web:${EGS_RELEASE_SHA:?EGS_RELEASE_SHA is required}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      egs-api:
+        condition: service_healthy
+    environment:
+      VITE_API_MODE: local
+      VITE_API_URL: ${VITE_API_URL:?VITE_API_URL is required}
+      VITE_LOCAL_API_URL: ${VITE_LOCAL_API_URL:?VITE_LOCAL_API_URL is required}
+      VITE_STORAGE_BASE_URL: ${VITE_STORAGE_BASE_URL:?VITE_STORAGE_BASE_URL is required}
+    tmpfs:
+      - /run/egs-runtime:rw,noexec,nosuid,size=16m
+    ports:
+      - "127.0.0.1:${WEB_PORT:-18080}:80"
+    networks:
+      - ingress
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  filebrowser:
+    image: filebrowser/filebrowser:v2.32.0
+    restart: unless-stopped
+    environment:
+      FB_DATABASE: /database/filebrowser.db
+      FB_PASSWORD: ${FB_ADMIN_PASSWORD:?FB_ADMIN_PASSWORD is required}
+    volumes:
+      - filebrowser_db:/database
+      - filebrowser_files:/srv
+    networks:
+      - ingress
+    healthcheck:
+      test: ["CMD", "filebrowser", "users", "ls"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  backend_uploads:
+  filebrowser_db:
+  filebrowser_files:
+
+networks:
+  backend:
+    internal: true
+  ingress:

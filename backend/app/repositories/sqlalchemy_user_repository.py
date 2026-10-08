@@ -7,7 +7,7 @@ from typing import Any
 import time
 import enum
 from sqlalchemy.orm import Session
-from app.core.security import hash_password, verify_password
+from app.core.security import hash_password, validate_password, verify_password
 from app.models.entity import Entity
 from app.models.user import User, RoleEnum, AccessLevelEnum
 
@@ -50,10 +50,18 @@ class UserRepository:
             self.db.refresh(entity)
 
         admin = self.db.query(User).filter(User.id == ADMIN_USER_ID).first()
-        admin_password = os.getenv("INITIAL_ADMIN_PASSWORD", "Admin@EGS2025!")
-        desired_hash = hash_password(admin_password)
+        admin_password = os.getenv("INITIAL_ADMIN_PASSWORD")
+        repair_flag = os.getenv("AUTO_RESET_DEFAULT_ADMIN_PASSWORD", "false").strip().lower() == "true"
+        if admin is None and not admin_password:
+            raise RuntimeError("INITIAL_ADMIN_PASSWORD is required to create the initial administrator")
+        if repair_flag and not admin_password:
+            raise RuntimeError("INITIAL_ADMIN_PASSWORD is required when administrator password reset is enabled")
+        if admin_password and (admin is None or repair_flag):
+            validate_password(admin_password)
+        desired_hash = hash_password(admin_password) if admin_password else None
 
         if admin is None:
+            assert desired_hash is not None
             admin = User(
                 id=ADMIN_USER_ID,
                 email=ADMIN_EMAIL,
@@ -73,7 +81,7 @@ class UserRepository:
             admin.role = RoleEnum.ADMIN.value
         if admin.access_level != AccessLevelEnum.ADMIN.value:
             admin.access_level = AccessLevelEnum.ADMIN.value
-        if not verify_password(admin_password, admin.password_hash):
+        if repair_flag and admin_password and not verify_password(admin_password, admin.password_hash):
             admin.password_hash = desired_hash
 
         self.db.commit()
@@ -224,11 +232,18 @@ def seed_system(db: Session) -> None:
         db.refresh(entity)
 
     admin = db.query(User).filter(User.id == ADMIN_USER_ID).first()
-    admin_password = os.getenv("INITIAL_ADMIN_PASSWORD", "Admin@EGS2025!")
-    desired_hash = hash_password(admin_password)
+    admin_password = os.getenv("INITIAL_ADMIN_PASSWORD")
     repair_flag = os.getenv("AUTO_RESET_DEFAULT_ADMIN_PASSWORD", "false").strip().lower() == "true"
+    if admin is None and not admin_password:
+        raise RuntimeError("INITIAL_ADMIN_PASSWORD is required to create the initial administrator")
+    if repair_flag and not admin_password:
+        raise RuntimeError("INITIAL_ADMIN_PASSWORD is required when administrator password reset is enabled")
+    if admin_password and (admin is None or repair_flag):
+        validate_password(admin_password)
+    desired_hash = hash_password(admin_password) if admin_password else None
 
     if admin is None:
+        assert desired_hash is not None
         admin = User(
             id=ADMIN_USER_ID,
             password_hash=desired_hash,

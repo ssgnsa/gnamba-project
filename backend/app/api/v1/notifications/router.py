@@ -10,7 +10,7 @@ import logging
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_admin_user
 
 logger = logging.getLogger("notifications")
 
@@ -23,7 +23,11 @@ def build_session_with_retries(total=3, backoff_factor=0.5, status_forcelist=(50
     session.mount("http://", adapter)
     return session
 
-router = APIRouter(prefix="/api/v1/notifications/whatsapp", tags=["notifications"])
+router = APIRouter(
+    prefix="/api/v1/notifications/whatsapp",
+    tags=["notifications"],
+    dependencies=[Depends(require_admin_user)],
+)
 
 
 class WhatsAppPayload(BaseModel):

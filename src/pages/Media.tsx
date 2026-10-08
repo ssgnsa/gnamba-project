@@ -23,6 +23,7 @@ import dbClient from '../lib/dbClient.service';
 import { logMediaAction } from "../lib/mediaUtils";
 import { useAuth } from "../context/AuthContext";
 import type { MediaFile } from "../types";
+import StorageImage from "../components/media/StorageImage";
 import { useBranding } from "../hooks/useBranding";
 import MediaCard from "../components/media/MediaCard";
 import MediaUploader from "../components/media/MediaUploader";
@@ -721,7 +722,7 @@ export default function Media() {
                       onClick={() => setDetail(file)}
                       className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors group cursor-pointer"
                     >
-                      <img
+                      <StorageImage
                         src={file.thumbnail_url || file.url}
                         alt={file.original_name}
                         crossOrigin="anonymous"
@@ -828,7 +829,7 @@ export default function Media() {
                     key={file.id}
                     className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 border border-gray-100"
                   >
-                    <img
+                    <StorageImage
                       src={file.thumbnail_url || file.url}
                       alt={file.original_name}
                       crossOrigin="anonymous"

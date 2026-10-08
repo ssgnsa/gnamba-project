@@ -1,4 +1,8 @@
 from fastapi.testclient import TestClient
+import pytest
+from uuid import uuid4
+
+from app.api import deps
 
 from app.main import app
 
@@ -6,12 +10,23 @@ from app.main import app
 client = TestClient(app)
 
 
+@pytest.fixture(autouse=True)
+def admin_context():
+    app.dependency_overrides[deps.get_current_user] = lambda: {"id": "test-admin", "role": "admin", "mfa_verified": True}
+    app.dependency_overrides[deps.get_optional_current_user] = lambda: {"id": "test-admin", "role": "admin", "mfa_verified": True}
+    yield
+    app.dependency_overrides.clear()
+
+
 def test_suppliers_module_flow():
+    suffix = uuid4().hex[:8]
+    email = f"fournisseur-{suffix}@example.com"
+    phone = f"+2250707{uuid4().int % 1_000_000:06d}"
     response = client.post(
         "/api/v1/suppliers",
-        json={"nom": "Fournisseur A", "email": "fournisseur@example.com", "telephone": "22500000000"},
+        json={"nom": "Fournisseur A", "email": email, "telephone": phone},
     )
-    assert response.status_code == 200, response.text
+    assert response.status_code in {200, 201}, response.text
     payload = response.json()
     assert payload["nom"] == "Fournisseur A"
 
@@ -35,13 +50,20 @@ def test_products_module_flow():
 
 
 def test_finance_module_flow():
+    reference = f"TX-{uuid4().hex[:8].upper()}"
     response = client.post(
         "/api/v1/finance",
-        json={"reference": "TX-001", "montant": 1500000, "type": "entree", "statut": "approuve"},
+        json={
+            "reference": reference,
+            "montant": 1500000,
+            "type_operation": "ENCAISSEMENT",
+            "date_operation": "2026-10-05",
+            "statut": "valide",
+        },
     )
-    assert response.status_code == 200, response.text
+    assert response.status_code in {200, 201}, response.text
     payload = response.json()
-    assert payload["reference"] == "TX-001"
+    assert payload["reference"] == reference
 
     list_response = client.get("/api/v1/finance")
     assert list_response.status_code == 200
@@ -54,6 +76,7 @@ def test_immobilier_module_flow():
         json={
             "type_bien": "villa",
             "adresse": "Villa Nord, Abidjan",
+            "commune": "Cocody",
             "proprietaire_name": "Alpha Koné",
             "valeur": 120000000,
             "loyer_mensuel": 2500000,

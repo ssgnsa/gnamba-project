@@ -17,6 +17,7 @@ import Badge from "../components/ui/Badge";
 import SelectWithCreate from "../components/ui/SelectWithCreate";
 import { useSettings } from "../context/SettingsContext";
 import MediaPicker from "../components/media/MediaPicker";
+import StorageImage from "../components/media/StorageImage";
 import MobileCard from "../components/ui/MobileCard";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -313,7 +314,7 @@ export default function Projets() {
                     subtitle={p.localisation || "Projet BTP"}
                     icon={
                       p.cover_image_url ? (
-                        <img
+                        <StorageImage
                           src={p.cover_image_url}
                           alt={p.nom}
                           crossOrigin="anonymous"
@@ -403,7 +404,7 @@ export default function Projets() {
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
                             {p.cover_image_url ? (
-                              <img
+                              <StorageImage
                                 src={p.cover_image_url}
                                 alt={p.nom}
                                 crossOrigin="anonymous"
@@ -493,7 +494,7 @@ export default function Projets() {
             <div className="flex items-center gap-3">
               {form.cover_image_url ? (
                 <div className="relative">
-                  <img
+                  <StorageImage
                     src={form.cover_image_url}
                     alt="Projet"
                     crossOrigin="anonymous"

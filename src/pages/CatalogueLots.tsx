@@ -20,6 +20,7 @@ import { OFFICIAL_CONTACT } from "../lib/officialContact";
 import { formatMontant, generateReference, generateUUID } from "../utils/reference";
 import type { VitrineLot } from "../types";
 import MediaPicker from "../components/media/MediaPicker";
+import StorageImage from "../components/media/StorageImage";
 
 const LOTS_CACHE_KEY = "egs.catalogue_lots.local_cache.v1";
 
@@ -935,7 +936,7 @@ export default function CatalogueLots() {
               />
               {form.image_url && (
                 <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
-                  <img
+                  <StorageImage
                     src={form.image_url}
                     alt={form.image_alt || form.titre || "Aperçu image lot"}
                     className="h-48 w-full object-cover"
@@ -1123,7 +1124,7 @@ export default function CatalogueLots() {
                     <div className="flex gap-4">
                       <div className="h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-slate-200 flex items-center justify-center">
                         {lot.image_url ? (
-                          <img
+                          <StorageImage
                             src={lot.image_url}
                             alt={lot.image_alt || lot.titre}
                             className="h-full w-full object-cover"

@@ -7,6 +7,7 @@ from uuid import UUID
 from typing import List, Dict, Any
 
 from app.core.database import get_db
+from app.api.deps import require_admin_user
 from app.services.lead.automation_engine import AutomationEngine, get_automation_engine
 from app.services.entity_service import get_entity_service
 
@@ -16,7 +17,7 @@ def get_automation_engine_dep(db: Session = Depends(get_db)) -> AutomationEngine
     return get_automation_engine(db)
 
 
-router = APIRouter(tags=["leads-automation"])
+router = APIRouter(tags=["leads-automation"], dependencies=[Depends(require_admin_user)])
 
 
 @router.post("/{lead_id}/evaluate-automation")

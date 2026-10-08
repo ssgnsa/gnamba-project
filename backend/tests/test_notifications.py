@@ -6,14 +6,15 @@ from fastapi.testclient import TestClient
 from app.main import app
 
 
-def override_get_current_user():
-    return {"id": "test", "role": "admin"}
-
-
 @pytest.fixture(autouse=True)
-def _override_deps(monkeypatch):
-    from app.api.deps import get_current_user
-    monkeypatch.setattr(get_current_user, "__call__", lambda: override_get_current_user())
+def _isolate_dependency_overrides():
+    """Restore FastAPI's global overrides after each notification test."""
+    previous_overrides = app.dependency_overrides.copy()
+    try:
+        yield
+    finally:
+        app.dependency_overrides.clear()
+        app.dependency_overrides.update(previous_overrides)
 
 
 class DummyResp:
@@ -26,7 +27,11 @@ class DummyResp:
 def test_callmebot_send(monkeypatch):
     # Override auth dependency to simulate an authenticated admin
     from app.api import deps
-    app.dependency_overrides[deps.get_current_user] = lambda: {"id": "test", "role": "admin"}
+    app.dependency_overrides[deps.get_current_user] = lambda: {
+        "id": "test",
+        "role": "admin",
+        "mfa_verified": True,
+    }
     client = TestClient(app)
 
     def fake_get(self, url, params=None, timeout=None):
@@ -45,7 +50,11 @@ def test_callmebot_send(monkeypatch):
 def test_twilio_send(monkeypatch):
     # Override auth dependency to simulate an authenticated admin
     from app.api import deps
-    app.dependency_overrides[deps.get_current_user] = lambda: {"id": "test", "role": "admin"}
+    app.dependency_overrides[deps.get_current_user] = lambda: {
+        "id": "test",
+        "role": "admin",
+        "mfa_verified": True,
+    }
     client = TestClient(app)
 
     def fake_post(self, url, data=None, auth=None, timeout=None):

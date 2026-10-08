@@ -45,7 +45,7 @@ class UserProfile(Base):
     __tablename__ = "user_profiles"
 
     id = Column(UUID(as_uuid=False), primary_key=True, default=gen_uuid)
-    user_id = Column(UUID(as_uuid=False), ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False)
     avatar_media_id = Column(UUID(as_uuid=False), ForeignKey("media_files.id", ondelete="SET NULL"), nullable=True)
     theme = Column(String(20), nullable=False, default="light")
     language = Column(String(10), nullable=False, default="fr")

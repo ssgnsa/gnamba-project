@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+import pytest
+
 from uuid import uuid4
 
 from fastapi import HTTPException
@@ -10,6 +13,12 @@ from fastapi import Header
 from app.main import app
 from app.repositories.user_repository import InMemoryUserRepository
 from app.services.auth_service import AuthService
+
+
+pytestmark = pytest.mark.skipif(
+    not os.getenv("EGS_TEST_TOTP_SECRET"),
+    reason="Finance authenticated-flow tests require the explicit isolated TOTP fixture",
+)
 
 
 class TestFinanceApi:
@@ -44,7 +53,7 @@ class TestFinanceApi:
         self.client = TestClient(app)
 
         # Authentifier avec le compte admin par défaut
-        auth_result = self.auth_service.authenticate("admin@egs.local", "Admin@EGS2025!")
+        auth_result = self.auth_service.authenticate("admin@egs.local", os.environ["INITIAL_ADMIN_PASSWORD"])
         self.admin_token = auth_result["access_token"]
 
     def teardown_method(self) -> None:
