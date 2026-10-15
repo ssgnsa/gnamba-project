@@ -1,4 +1,4 @@
-import { useEffect, useState, type ComponentType } from "react";
+import { useEffect, useState, useMemo, type ComponentType } from "react";
 import {
   HardHat,
   Building2,
@@ -12,6 +12,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import dbClient from "../../data/tableClient";
+import type { SiteRealisationRow } from "../../types/api.generated/siteRealisationRow";
 
 // Premium UI Components
 import {
@@ -40,6 +41,28 @@ interface Realisation {
   image_url?: string;
 }
 
+const normalizeRealisation = (
+  row: SiteRealisationRow,
+  index: number,
+): Realisation => {
+  const firstPhoto = row.photos?.find(
+    (photo): photo is string => typeof photo === "string" && photo.trim() !== "",
+  );
+  const date = row.date_debut ?? row.created_at;
+  const year = date ? Number(date.slice(0, 4)) : 0;
+
+  return {
+    id: row.id || row.reference || `realisation-${index}`,
+    title: row.titre?.trim() || "Réalisation sans titre",
+    description: row.description_courte?.trim() || row.description?.trim() || "",
+    category: row.type_realisation?.trim().toLocaleLowerCase("fr-FR") || "btp",
+    year: Number.isFinite(year) ? year : 0,
+    location: row.localisation?.trim() || row.ville?.trim() || "",
+    featured: false,
+    image_url: firstPhoto,
+  };
+};
+
 const categories = [
   { id: "all", label: "Tous les projets" },
   { id: "btp", label: "BTP" },
@@ -48,6 +71,7 @@ const categories = [
   { id: "fournitures", label: "Fournitures" },
 ];
 
+// Memoized category icons to prevent object creation on every render
 const categoryIcons: Record<
   string,
   ComponentType<{ size?: number | string; className?: string }>
@@ -66,39 +90,58 @@ export default function PublicRealisations() {
 
   useEffect(() => {
     setLoading(true);
+    let cancelled = false;
+
     void (async () => {
       try {
+        // Select only the fields we need to reduce payload size
         const { data, error } = await dbClient
           .from("site_realisations")
-          .select("*")
+          .select("id, reference, titre, description_courte, description, type_realisation, date_debut, created_at, localisation, ville, photos, featured, sort_order")
           .order("featured", { ascending: false })
           .order("sort_order");
 
-        if (data) setRealisations(data);
-        if (error) setRealisations([]);
+        if (!error && Array.isArray(data) && !cancelled) {
+          setRealisations(
+            (data as SiteRealisationRow[]).map(normalizeRealisation),
+          );
+        } else if (!cancelled) {
+          setRealisations([]);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const filtered = realisations.filter((r) => {
-    const matchCat = activeCategory === "all" || r.category === activeCategory;
-    const matchSearch =
-      !search ||
-      r.title.toLowerCase().includes(search.toLowerCase()) ||
-      r.location.toLowerCase().includes(search.toLowerCase());
-    return matchCat && matchSearch;
-  });
+  // Optimize filtering with useMemo to prevent unnecessary recalculations
+  const filtered = useMemo(() => {
+    return realisations.filter((r) => {
+      const matchCat = activeCategory === "all" || r.category === activeCategory;
+      const matchSearch =
+        !search ||
+        r.title.toLowerCase().includes(search.toLowerCase()) ||
+        r.location.toLowerCase().includes(search.toLowerCase());
+      return matchCat && matchSearch;
+    });
+  }, [realisations, activeCategory, search]);
+
+  // Memoized category styles to prevent object creation on every render
+  const categoryStyles = {
+    btp: { bg: 'bg-primary-100', text: 'text-primary-700', light: 'bg-primary-50', icon: 'text-primary-600' },
+    immobilier: { bg: 'bg-sky-100', text: 'text-sky-700', light: 'bg-sky-50', icon: 'text-sky-600' },
+    foncier: { bg: 'bg-emerald-100', text: 'text-emerald-700', light: 'bg-emerald-50', icon: 'text-emerald-600' },
+    fournitures: { bg: 'bg-amber-100', text: 'text-amber-700', light: 'bg-amber-50', icon: 'text-amber-600' },
+  };
 
   const getCategoryStyles = (category: string) => {
-    const styles: Record<string, { bg: string; text: string; light: string; icon: string }> = {
-      btp: { bg: 'bg-primary-100', text: 'text-primary-700', light: 'bg-primary-50', icon: 'text-primary-600' },
-      immobilier: { bg: 'bg-sky-100', text: 'text-sky-700', light: 'bg-sky-50', icon: 'text-sky-600' },
-      foncier: { bg: 'bg-emerald-100', text: 'text-emerald-700', light: 'bg-emerald-50', icon: 'text-emerald-600' },
-      fournitures: { bg: 'bg-amber-100', text: 'text-amber-700', light: 'bg-amber-50', icon: 'text-amber-600' },
-    };
-    return styles[category] || styles.btp;
+    return categoryStyles[category] || categoryStyles.btp;
   };
 
   return (
