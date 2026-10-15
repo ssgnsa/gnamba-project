@@ -32,8 +32,19 @@ export function resolveApiBaseUrl(
   const isLocalFrontend = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
   const isLocalApi = /^https?:\/\/localhost:8000\/api\/v1$/.test(normalized) || /^http:\/\/127\.0\.0\.1:8000\/api\/v1$/.test(normalized);
 
+  // Only return relative URL if frontend and API are on the SAME port
+  // If they're on different ports (even both on localhost), we need the full URL
   if (isLocalFrontend && isLocalApi) {
-    return '/api/v1';
+    // Extract ports from origin and normalized URL to check if they match
+    const frontendUrl = new URL(origin);
+    const apiUrl = new URL(normalized, 'http://placeholder.com'); // Use dummy origin for parsing
+
+    const frontendPort = frontendUrl.port || (frontendUrl.protocol === 'https:' ? '443' : '80');
+    const apiPort = apiUrl.port || (apiUrl.protocol === 'https:' ? '443' : '80');
+
+    if (frontendPort === apiPort) {
+      return '/api/v1';
+    }
   }
 
   return normalized;
