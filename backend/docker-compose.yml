@@ -1,7 +1,16 @@
+# ⚠️  COMPOSE DE DEVELOPPEMENT LOCAL — NE PAS LANCER DEPUIS CE DOSSIER
+# ⚠️  Utiliser /home/soma/gnamba-project/docker-compose.yml à la RACINE.
+# ⚠️  Ce fichier utilise un volume différent (backend_postgres_data, vide).
+# ⚠️  Lancé après la racine, il recrée egs-postgres sur un volume VIDE et
+#     rend la prod invisible (incident 2026-10-30).
+#
+# Les container_name sont suffixés -dev pour éviter toute collision avec
+# le compose racine.
+
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: egs-postgres
+    container_name: egs-postgres-dev
     environment:
       POSTGRES_DB: egs_local
       POSTGRES_USER: postgres
@@ -18,7 +27,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: egs-redis
+    container_name: egs-redis-dev
     ports:
       - "6379:6379"
 
@@ -26,7 +35,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: egs-backend
+    container_name: egs-backend-dev
     environment:
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
       LOCAL_AUTH_SECRET: ${LOCAL_AUTH_SECRET:?LOCAL_AUTH_SECRET is required}
