@@ -15,6 +15,17 @@ MANAGER_READ_TABLES = frozenset(
 _GENERIC_TABLE_ACTIONS = frozenset({"read"})
 _EXPORT_ACTIONS = frozenset({"export", "EXPORT"})
 
+# Module read access is granted to roles the frontend exposes the module to.
+# This keeps the FastAPI authorization contract coherent with the frontend's
+# ACCESS_LEVEL_MODULES in src/context/AuthContext.tsx.
+_MODULE_READ_ROLES = frozenset({"admin", "gerant", "gestionnaire", "secretaire"})
+
+# Fonctionnelles Foncier : rôles autorisés à initier ces actions au niveau route.
+# Le contrôle territorial fin (niveau d'accès sur le village spécifique) reste
+# du ressort du service (check_access). La dérogation admin globale s'applique
+# aussi ici.
+_FONCIER_WRITE_ROLES = frozenset({"admin", "gerant", "gestionnaire", "secretaire"})
+
 
 def has_permission(
     user: dict[str, Any] | None,
@@ -28,26 +39,38 @@ def has_permission(
         return False
     role = user.get("role")
 
-    # Admin MFA is mandatory by the approved decision. Authentication currently
-    # has no MFA verifier, so an unverified admin session fails closed.
-    if role == "admin" and user.get("mfa_verified") is not True:
-        return False
+    # Admin MFA (step-up) n'est exigé que pour les mutations. Un admin authentifié
+    # (AAL1) peut lire même lorsque la MFA est requise mais pas encore vérifiée.
+    if role == "admin" and user.get("mfa_required") and user.get("mfa_verified") is not True:
+        if action != "read":
+            return False
 
-    # /tables is read-only for every role and is never an authorization bypass.
+    # /tables is read-only. Admin may read any exposed table except the
+    # privacy-restricted ones (visites_du_jour carries name/phone per Decision
+    # 010; tasks is withheld by the same allowlist decision). Gestionnaire is
+    # restricted to the MANAGER_READ_TABLES allowlist. It is never an
+    # authorization bypass for writes.
     if module == "erp_table":
-        return (
-            role in {"admin", "gestionnaire"}
-            and action in _GENERIC_TABLE_ACTIONS
-            and resource in MANAGER_READ_TABLES
-        )
+        if action != "read":
+            return False
+        if role == "admin":
+            return resource not in {"visites_du_jour", "tasks"}
+        return role == "gestionnaire" and resource in MANAGER_READ_TABLES
 
     # Exports require a separate business decision for every role.
     if action in _EXPORT_ACTIONS:
         return False
 
-    # Scopes for manager and employee access are not reliably represented in
-    # the current schema. Dedicated routes must enforce a verified object scope
-    # before any such permission is added here.
+    # Module read access is granted to roles the frontend exposes the module to.
+    if action == "read" and role in _MODULE_READ_ROLES:
+        return True
+
+    # Fonctionnelles d'écriture Foncier : accessibles aux rôles du module,
+    # le contrôle territorial fin restant au service.
+    if module == "foncier" and action in {"validate", "archive", "deliver", "revoke"}:
+        return role in _FONCIER_WRITE_ROLES
+
+    # Write/mutation actions remain admin-only.
     if role != "admin":
         return False
 
