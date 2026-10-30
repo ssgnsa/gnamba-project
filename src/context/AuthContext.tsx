@@ -209,6 +209,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const init = async () => {
       try {
+        const pathname = typeof window !== "undefined" ? window.location.pathname : "";
+        const isPasswordRecoveryRoute =
+          pathname === "/forgot-password" ||
+          pathname === "/reset-password" ||
+          (typeof window !== "undefined" && window.location.hash.includes("type=recovery"));
+
+        if (isPasswordRecoveryRoute) {
+          if (!cancelled) setLoading(false);
+          return;
+        }
+
         if (isSelfHostedMode()) {
           const refreshed = await refreshLocalSession();
           if (!refreshed) {
@@ -225,9 +236,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
 
           const payload = result.data;
+          const refreshedUser = payload.user as Record<string, any>;
           if (cancelled) return;
           setSession(null);
-          setUser(mapLocalUser(payload.user as Record<string, any>));
+          setUser(mapLocalUser(refreshedUser));
           setProfile(payload.user as UserProfile);
           return;
         }

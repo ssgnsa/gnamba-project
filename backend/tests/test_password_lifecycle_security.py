@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
 import os
+import struct
+import time
 import uuid
 from urllib.parse import parse_qs, urlsplit
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from fastapi import Request
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -54,6 +60,14 @@ def login(client: TestClient, password: str | None = None):
     )
     assert response.status_code == 200, response.text
     return response
+
+
+def current_totp(secret: str) -> str:
+    key = base64.b32decode(secret + "=" * ((8 - len(secret) % 8) % 8))
+    digest = hmac.new(key, struct.pack(">Q", int(time.time()) // 30), hashlib.sha1).digest()
+    offset = digest[-1] & 15
+    value = (int.from_bytes(digest[offset : offset + 4], "big") & 0x7FFFFFFF) % 1_000_000
+    return f"{value:06d}"
 
 
 def test_login_keeps_refresh_token_out_of_json_and_sets_httponly_cookie(auth_api):
@@ -116,6 +130,62 @@ def test_logout_revokes_access_and_refresh_session(auth_api):
         headers={"Authorization": f"Bearer {access}"},
     ).status_code == 401
     assert client.post("/api/v1/auth/refresh").status_code == 401
+
+
+def test_admin_mfa_pending_session_cannot_change_password_or_be_promoted_by_refresh(auth_api, monkeypatch):
+    client, _, _ = auth_api
+    monkeypatch.setattr(settings, "ADMIN_TOTP_SECRET", "JBSWY3DPEHPK3PXP")
+    monkeypatch.setattr(settings, "ADMIN_TOTP_USER_ID", "")
+    monkeypatch.setattr(settings, "TEST_TOTP_SECRET", "")
+
+    login_response = login(client)
+    assert login_response.json()["mfa_challenge_required"] is True
+    access = login_response.json()["access_token"]
+
+    blocked = client.post(
+        "/api/v1/auth/change-password",
+        headers={"Authorization": f"Bearer {access}"},
+        json={
+            "current_password": os.environ["INITIAL_ADMIN_PASSWORD"],
+            "new_password": "NouvellePhraseSolide2026!",
+        },
+    )
+    assert blocked.status_code == 403
+
+    refreshed = client.post("/api/v1/auth/refresh")
+    assert refreshed.status_code == 200
+    refreshed_access = refreshed.json()["access_token"]
+    me = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {refreshed_access}"},
+    )
+    assert me.status_code == 200
+    assert me.json()["user"].get("mfa_verified") is not True
+
+
+def test_admin_mfa_verification_survives_refresh(auth_api, monkeypatch):
+    client, _, _ = auth_api
+    monkeypatch.setattr(settings, "ADMIN_TOTP_SECRET", "JBSWY3DPEHPK3PXP")
+    monkeypatch.setattr(settings, "ADMIN_TOTP_USER_ID", "")
+    monkeypatch.setattr(settings, "TEST_TOTP_SECRET", "")
+
+    access = login(client).json()["access_token"]
+    verified = client.post(
+        "/api/v1/auth/mfa/verify",
+        headers={"Authorization": f"Bearer {access}"},
+        json={"code": current_totp("JBSWY3DPEHPK3PXP")},
+    )
+    assert verified.status_code == 200, verified.text
+    verified_access = verified.json()["access_token"]
+
+    refreshed = client.post("/api/v1/auth/refresh")
+    assert refreshed.status_code == 200
+    me = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {refreshed.json()['access_token']}"},
+    )
+    assert me.status_code == 200
+    assert me.json()["user"]["mfa_verified"] is True
 
 
 def test_forgot_password_response_does_not_disclose_account_existence(auth_api):
@@ -204,6 +274,51 @@ def test_password_change_attempts_are_rate_limited(auth_api, monkeypatch):
     assert limited.status_code == 429
 
 
+def test_require_admin_user_does_not_lock_out_admin_without_mfa_configured(
+    monkeypatch,
+):
+    """An admin without a configured TOTP secret must not be blocked by require_admin_user."""
+    monkeypatch.setattr(settings, "ADMIN_TOTP_SECRET", "")
+    monkeypatch.setattr(settings, "TEST_TOTP_SECRET", "")
+    repository = InMemoryUserRepository()
+    auth_service = AuthService(repository)
+    current_user = {"id": "admin-1", "role": "admin", "mfa_verified": False}
+    request = Request({"type": "http", "method": "GET"})
+
+    result = deps.require_admin_user(request, current_user, auth_service)
+    assert result == current_user
+
+
+def test_require_admin_user_blocks_admin_with_mfa_required_and_unverified(
+    monkeypatch,
+):
+    """An admin for whom MFA is configured but not verified stays blocked."""
+    monkeypatch.setattr(settings, "ADMIN_TOTP_SECRET", "JBSWY3DPEHPK3PXP")
+    monkeypatch.setattr(settings, "ADMIN_TOTP_USER_ID", "")
+    monkeypatch.setattr(settings, "TEST_TOTP_SECRET", "")
+    repository = InMemoryUserRepository()
+    auth_service = AuthService(repository)
+    current_user = {"id": "admin-1", "role": "admin", "mfa_verified": False}
+    request = Request({"type": "http", "method": "POST"})
+
+    with pytest.raises(Exception) as exc:
+        deps.require_admin_user(request, current_user, auth_service)
+    assert exc.value.status_code == 403
+
+
+def test_require_admin_user_allows_mfa_verified_admin(monkeypatch):
+    monkeypatch.setattr(settings, "ADMIN_TOTP_SECRET", "JBSWY3DPEHPK3PXP")
+    monkeypatch.setattr(settings, "ADMIN_TOTP_USER_ID", "")
+    monkeypatch.setattr(settings, "TEST_TOTP_SECRET", "")
+    repository = InMemoryUserRepository()
+    auth_service = AuthService(repository)
+    current_user = {"id": "admin-1", "role": "admin", "mfa_verified": True}
+    request = Request({"type": "http", "method": "POST"})
+
+    result = deps.require_admin_user(request, current_user, auth_service)
+    assert result == current_user
+
+
 def test_server_password_policy_rejects_short_and_bcrypt_oversized_passwords():
     with pytest.raises(AuthenticationError):
         validate_password("short")
@@ -230,12 +345,47 @@ def test_login_rate_limit_is_enforced_on_server(auth_api, monkeypatch):
 
 def test_production_auth_transport_rejects_plain_http(monkeypatch):
     monkeypatch.setattr(settings, "AUTH_REQUIRE_HTTPS", True)
+    monkeypatch.setattr(settings, "AUTH_ALLOW_PRIVATE_NETWORK_HTTP", True)
     client = TestClient(app, base_url="http://public.example")
     response = client.post(
         "/api/v1/auth/login",
         json={"email": "admin@egs.local", "password": "not-a-real-password"},
     )
     assert response.status_code == 426
+
+
+def test_private_lan_auth_transport_allows_plain_http(monkeypatch):
+    monkeypatch.setattr(settings, "AUTH_REQUIRE_HTTPS", True)
+    monkeypatch.setattr(settings, "AUTH_ALLOW_PRIVATE_NETWORK_HTTP", True)
+    class FakeAuthService:
+        def authenticate(self, *args, **kwargs):
+            return {
+                "access_token": "access-token",
+                "refresh_token": "refresh-token",
+                "user": {
+                    "id": "user-1",
+                    "entity_id": "entity-1",
+                    "email": "admin@egs.local",
+                    "full_name": "Test User",
+                    "role": "employe",
+                    "access_level": "employe",
+                },
+            }
+
+        def requires_mfa(self, _user):
+            return False
+
+    app.dependency_overrides[deps.get_auth_service] = lambda: FakeAuthService()
+    client = TestClient(app, base_url="http://192.168.1.58")
+    try:
+        response = client.post(
+            "/api/v1/auth/login",
+            json={"email": "admin@egs.local", "password": "not-a-real-password"},
+        )
+        assert response.status_code == 200
+        assert "Secure" not in response.headers.get("set-cookie", "")
+    finally:
+        app.dependency_overrides.pop(deps.get_auth_service, None)
 
 
 def test_sql_auth_state_persists_rotation_revocation_reset_and_rate_limits():

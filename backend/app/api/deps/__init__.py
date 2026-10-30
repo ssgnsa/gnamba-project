@@ -1,7 +1,7 @@
 """Dependencies for API routes."""
 from typing import Any
 
-from fastapi import Depends, Header, HTTPException
+from fastapi import Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -51,12 +51,25 @@ def get_optional_current_user(
 
 
 def require_admin_user(
+    request: Request,
     current_user: dict[str, Any] = Depends(get_current_user),
+    auth_service: AuthService = Depends(get_auth_service),
 ) -> dict[str, Any]:
-    """Require an authenticated administrator for administrative mutations."""
+    """Require an authenticated administrator for administrative routes.
+
+    MFA (step-up) n'est exigé que pour les mutations (POST/PATCH/DELETE). Un
+    admin authentifié (AAL1) peut lire (GET/HEAD/OPTIONS) même lorsque la MFA
+    est requise mais pas encore vérifiée, afin de ne pas verrouiller l'interface
+    en attendant la vérification MFA.
+    """
     if current_user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Accès refusé")
-    if current_user.get("mfa_verified") is not True:
+    is_safe_method = request.method.upper() in {"GET", "HEAD", "OPTIONS"}
+    if (
+        not is_safe_method
+        and auth_service.requires_mfa(current_user)
+        and current_user.get("mfa_verified") is not True
+    ):
         raise HTTPException(status_code=403, detail="Vérification MFA requise pour le rôle Admin")
     return current_user
 
