@@ -1,13 +1,14 @@
 # Foncier API Routes - FastAPI
 # Endpoints REST pour le module Foncier
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, status
+from fastapi import APIRouter, Request, Response, Depends, File, Form, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 
 from app.core.database import get_db, SessionLocal
 from app.api.deps import get_current_user, require_permission
@@ -21,8 +22,9 @@ from app.schemas.foncier import (
     LotissementCreate, LotissementUpdate, LotissementResponse,
     IlotCreate, IlotUpdate, IlotResponse,
     LotCreate, LotUpdate, LotResponse, LotSearchParams, LotArchiveRequest,
-    AttestationCreate, AttestationUpdate, AttestationResponse, AttestationRevokeRequest,
+    AttestationCreate, AttestationUpdate, AttestationResponse, AttestationRevokeRequest, AttestationSignRequest,
     AttestationSubmitRequest, AttestationValidateRequest, AttestationScanRequest,
+    AttestationPrintRequest, AttestationDeliverRequest,
     TemoinCreate, TemoinResponse, DuplicateCheckParams,
     AttestationVerificationResponse, PaginatedResponse, PaginatedAttestationResponse,
     ActivityLogResponse, AuditSearchParams, TimelineResponse,
@@ -36,6 +38,13 @@ router = APIRouter(
     prefix="/api/v1/foncier",
     tags=["foncier"],
     dependencies=[Depends(require_permission("foncier", "read"))],
+)
+
+# Route volontairement séparée : la vérification par référence est publique,
+# tandis que toutes les opérations de gestion restent protégées.
+public_router = APIRouter(
+    prefix="/api/v1/foncier",
+    tags=["foncier-public"],
 )
 
 # ============================================
@@ -89,7 +98,7 @@ def list_villages_with_stats(db: Session = Depends(get_db)):
     service = get_village_service(db)
     return service.get_all_with_stats()
 
-@router.get("/villages/{village_id}", response_model=VillageResponse)
+@router.get("/villages/{village_id:uuid}", response_model=VillageResponse)
 def get_village(village_id: UUID, db: Session = Depends(get_db)):
     """Récupère un village par ID"""
     service = get_village_service(db)
@@ -284,6 +293,8 @@ def create_lot(
     try:
         lot = service.create(ilot_id, data, user_id, device_id)
         return lot
+    except IntegrityError:
+        raise HTTPException(status_code=409, detail="Ce numéro de lot existe déjà dans cet îlot")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -296,7 +307,8 @@ def list_lots_by_ilot(
 ):
     """Liste les lots d'un îlot avec pagination"""
     service = get_lot_service(db)
-    params = LotSearchParams(ilot_id=ilot_id, limit=page_size, offset=(page - 1) * page_size)
+    effective_page_size = page_size
+    params = LotSearchParams(ilot_id=ilot_id, limit=effective_page_size, offset=(page - 1) * effective_page_size)
     items, total = service.search(params)
     # Convert SQLAlchemy models to Pydantic models
     from app.schemas.foncier import LotResponse
@@ -305,31 +317,43 @@ def list_lots_by_ilot(
         items=items_pydantic,
         total=total,
         page=page,
-        page_size=page_size,
-        total_pages=(total + page_size - 1) // page_size
+        page_size=effective_page_size,
+        total_pages=(total + effective_page_size - 1) // effective_page_size
     )
 
 @router.get("/lots", response_model=PaginatedResponse)
 def search_lots(
     search: Optional[str] = None,
     statut: Optional[str] = None,
+    village: Optional[str] = None,
+    lotissement: Optional[str] = None,
     village_id: Optional[UUID] = None,
     lotissement_id: Optional[UUID] = None,
     ilot_id: Optional[UUID] = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
+    limit: Optional[int] = Query(None, ge=1, le=200),
+    include_archived: bool = False,
+    sort: str = "created_at",
+    dir: str = "desc",
     db: Session = Depends(get_db)
 ):
-    """Recherche avancée de lots"""
+    """Recherche avancée de lots; accepte les alias historiques du frontend."""
     service = get_lot_service(db)
+    effective_page_size = limit or page_size
     params = LotSearchParams(
         search=search,
         statut=statut,
+        village=village,
+        lotissement=lotissement,
+        sort=sort,
+        dir=dir,
+        include_archived=include_archived,
         village_id=village_id,
         lotissement_id=lotissement_id,
         ilot_id=ilot_id,
-        limit=page_size,
-        offset=(page - 1) * page_size
+        limit=effective_page_size,
+        offset=(page - 1) * effective_page_size
     )
     items, total = service.search(params)
     # Convert SQLAlchemy models to Pydantic models
@@ -343,7 +367,7 @@ def search_lots(
         total_pages=(total + page_size - 1) // page_size
     )
 
-@router.get("/lots/{lot_id}", response_model=LotResponse)
+@router.get("/lots/{lot_id:uuid}", response_model=LotResponse)
 def get_lot(lot_id: UUID, db: Session = Depends(get_db)):
     """Récupère un lot par ID avec hiérarchie"""
     service = get_lot_service(db)
@@ -367,6 +391,8 @@ def update_lot(
         if not lot:
             raise HTTPException(status_code=404, detail="Lot introuvable")
         return lot
+    except IntegrityError:
+        raise HTTPException(status_code=409, detail="Ce numéro de lot existe déjà dans cet îlot")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -418,21 +444,21 @@ def check_lot_exists(
     db: Session = Depends(get_db)
 ):
     """Vérifie si un lot existe (par référence, numéro ou îlot)"""
-    with SessionLocal() as session:
-        query = "SELECT id, reference, numero_lot, ilot_id FROM foncier_lots WHERE deleted_at IS NULL"
-        params = {}
-        conditions = []
-        if reference:
-            conditions.append("reference = :reference")
-            params["reference"] = reference
-        if numero_lot:
-            conditions.append("numero_lot = :numero_lot AND ilot_id = :ilot_id")
-            params["numero_lot"] = numero_lot
-        if ilot_id:
-            params["ilot_id"] = ilot_id
-        if conditions:
-            query += " AND " + " AND ".join(conditions)
-        row = session.execute(text(query), params).fetchone()
+    query = "SELECT id, reference, numero_lot, ilot_id FROM foncier_lots WHERE deleted_at IS NULL"
+    params = {}
+    conditions = []
+    if reference:
+        conditions.append("reference = :reference")
+        params["reference"] = reference
+    if numero_lot:
+        conditions.append("numero_lot = :numero_lot")
+        params["numero_lot"] = numero_lot
+    if ilot_id:
+        conditions.append("ilot_id = :ilot_id")
+        params["ilot_id"] = str(ilot_id)
+    if conditions:
+        query += " AND " + " AND ".join(conditions)
+    row = db.execute(text(query), params).fetchone()
     if row:
         return {"exists": True, "lot_id": str(row[0]), "reference": row[1], "numero_lot": row[2]}
     return {"exists": False}
@@ -479,6 +505,8 @@ def create_attestation(
     try:
         attestation = service.create(lot_id, data, user_id, device_id)
         return attestation
+    except IntegrityError:
+        raise HTTPException(status_code=409, detail="Une attestation active existe déjà pour cette version du lot")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -494,11 +522,19 @@ def search_attestations(
     statut: Optional[str] = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
-    db: Session = Depends(get_db)
+    include_revoked: bool = False,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ):
-    """Recherche d'attestations"""
+    """Recherche d'attestations. Les révoquées sont exclues par défaut."""
     service = get_attestation_service(db)
-    items, total = service.search(lot_id=lot_id, statut=statut, limit=page_size, offset=(page - 1) * page_size)
+    items, total = service.search(
+        lot_id=lot_id,
+        statut=statut,
+        limit=page_size,
+        offset=(page - 1) * page_size,
+        exclude_revoked=not include_revoked,
+    )
     return PaginatedAttestationResponse(
         items=[AttestationResponse.model_validate(item, from_attributes=True) for item in items],
         total=total,
@@ -525,8 +561,13 @@ def update_attestation(
 ):
     """Met à jour une attestation (mode brouillon seulement)"""
     service = get_attestation_service(db)
-    # TODO: implémenter update dans le service
-    raise HTTPException(status_code=501, detail="Non implémenté")
+    try:
+        attestation = service.update_draft(attestation_id, data, user_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not attestation:
+        raise HTTPException(status_code=409, detail="Seules les attestations brouillon peuvent être modifiées")
+    return attestation
 
 @router.post("/attestations/{attestation_id}/submit", response_model=AttestationResponse)
 def submit_attestation(
@@ -550,7 +591,11 @@ def submit_attestation(
         raise HTTPException(status_code=400, detail="Attestation introuvable ou ne peut pas être soumise")
     return attestation
 
-@router.post("/attestations/{attestation_id}/validate", response_model=AttestationResponse)
+@router.post(
+    "/attestations/{attestation_id}/validate",
+    response_model=AttestationResponse,
+    dependencies=[Depends(require_permission("foncier", "validate"))],
+)
 def validate_attestation(
     attestation_id: UUID,
     data: AttestationValidateRequest,
@@ -567,35 +612,100 @@ def validate_attestation(
         attestation_id,
         data.model_copy(update={"chef_nom": actor_name}),
         user_id,
+        user_role=current_user.get("role"),
     )
     if not attestation:
         raise HTTPException(status_code=400, detail="Attestation introuvable ou ne peut pas être validée")
     return attestation
 
-@router.post("/attestations/{attestation_id}/scan", response_model=AttestationResponse)
+@router.post(
+    "/attestations/{attestation_id}/scan",
+    response_model=AttestationResponse,
+    dependencies=[Depends(require_permission("foncier", "archive"))],
+)
 def scan_attestation(
     attestation_id: UUID,
     data: AttestationScanRequest,
     db: Session = Depends(get_db),
-    user_id: UUID = Depends(get_user_id)
+    user_id: UUID = Depends(get_user_id),
+    current_user: dict = Depends(get_current_user),
 ):
     """Archive le PDF scanné (valide -> archive)"""
     service = get_attestation_service(db)
-    attestation = service.scan(attestation_id, data, user_id)
+    attestation = service.scan(attestation_id, data, user_id,
+                               user_role=current_user.get("role"))
     if not attestation:
         raise HTTPException(status_code=400, detail="Attestation introuvable ou ne peut pas être archivée")
     return attestation
 
-@router.post("/attestations/{attestation_id}/revoke", response_model=AttestationResponse)
+@router.post("/attestations/{attestation_id}/print")
+def print_attestation(
+    attestation_id: UUID,
+    data: AttestationPrintRequest = None,
+    db: Session = Depends(get_db),
+    user_id: UUID = Depends(get_user_id)
+):
+    """Imprime physiquement l'attestation (préparation avant signature du chef).
+
+    Exige un statut "valide" (déjà validé par le chef). Incrémente le compteur
+    d'impression et enregistre qui a imprimé. Ceci ne délivre pas l'attestation :
+    la délivrance finale nécessite le dépôt du scan signé.
+    """
+    if data is None:
+        data = AttestationPrintRequest()
+    service = get_attestation_service(db)
+    attestation = service.print(attestation_id, data.raison, user_id)
+    if not attestation:
+        raise HTTPException(status_code=409, detail="L'attestation doit être validée avant impression")
+    return attestation
+
+
+@router.post(
+    "/attestations/{attestation_id}/deliver",
+    dependencies=[Depends(require_permission("foncier", "deliver"))],
+)
+def deliver_attestation(
+    attestation_id: UUID,
+    data: AttestationDeliverRequest = None,
+    db: Session = Depends(get_db),
+    user_id: UUID = Depends(get_user_id),
+    current_user: dict = Depends(get_current_user),
+):
+    """Confirme la délivrance finale d'une attestation.
+
+    Refusée si aucun scan signé n'a été déposé (pdf_media_id absent). Contrôle
+    de concordance : la délivrance n'est confirmée que si le scan signé est joint.
+    Enregistre un événement d'audit de délivrance.
+    """
+    if data is None:
+        data = AttestationDeliverRequest()
+    service = get_attestation_service(db)
+    attestation = service.deliver(attestation_id, data.raison, user_id,
+                                  user_role=current_user.get("role"))
+    if not attestation:
+        raise HTTPException(
+            status_code=409,
+            detail="Délivrance refusée: scan signé manquant ou attestation non archivée",
+        )
+    return attestation
+
+
+@router.post(
+    "/attestations/{attestation_id}/revoke",
+    response_model=AttestationResponse,
+    dependencies=[Depends(require_permission("foncier", "revoke"))],
+)
 def revoke_attestation(
     attestation_id: UUID,
     data: AttestationRevokeRequest,
     db: Session = Depends(get_db),
-    user_id: UUID = Depends(get_user_id)
+    user_id: UUID = Depends(get_user_id),
+    current_user: dict = Depends(get_current_user),
 ):
     """Révoque une attestation"""
     service = get_attestation_service(db)
-    attestation = service.revoke(attestation_id, data.reason.strip(), user_id)
+    attestation = service.revoke(attestation_id, data.reason.strip(), user_id,
+                                 user_role=current_user.get("role"))
     if not attestation:
         raise HTTPException(status_code=400, detail="Attestation introuvable ou ne peut pas être révoquée")
     return attestation
@@ -610,30 +720,71 @@ def generate_attestation_pdf(
     # TODO: Implement PDF generation
     raise HTTPException(status_code=501, detail="Génération PDF non implémentée")
 
-@router.get("/attestations/{attestation_id}/pdf")
+@router.get("/attestations/{attestation_id:uuid}/pdf")
 def download_attestation_pdf(
     attestation_id: UUID,
+    request: Request,
     db: Session = Depends(get_db)
 ):
     """Télécharge le PDF d'une attestation"""
-    # TODO: Implement PDF download
-    raise HTTPException(status_code=501, detail="Téléchargement PDF non implémenté")
+    from app.services.attestation_pdf import render_attestation_pdf
+    from app.models.foncier import (
+        FoncierAttestation, FoncierLot, FoncierIlot,
+        FoncierLotissement, FoncierVillage, FoncierAttestationTemoin,
+    )
+    attestation = db.query(FoncierAttestation).filter_by(id=attestation_id).first()
+    if not attestation:
+        raise HTTPException(404, "Attestation introuvable")
+    lot = db.query(FoncierLot).filter_by(id=attestation.lot_id).first()
+    if not lot:
+        raise HTTPException(500, "Lot associé introuvable")
+    ilot = db.query(FoncierIlot).filter_by(id=lot.ilot_id).first() if lot.ilot_id else None
+    lotissement = db.query(FoncierLotissement).filter_by(id=ilot.lotissement_id).first() if ilot and ilot.lotissement_id else None
+    village = db.query(FoncierVillage).filter_by(id=lotissement.village_id).first() if lotissement else None
+    temoins = db.query(FoncierAttestationTemoin).filter_by(attestation_id=attestation.id).all()
+    if not village:
+        raise HTTPException(500, "Village associé introuvable")
+
+    verify_url = str(request.base_url).rstrip("/") + f"/api/v1/foncier/attestations/verify/{attestation.reference}"
+    pdf_bytes = render_attestation_pdf(attestation, lot, ilot, lotissement, village, temoins, verify_url)
+    
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="attestation-{attestation.reference}.pdf"'},
+    )
 
 # ============================================
 # VÉRIFICATION PUBLIQUE
 # ============================================
 
-@router.get("/attestations/verify/{reference}", response_model=AttestationVerificationResponse)
+@public_router.get("/attestations/verify/{reference}", response_model=AttestationVerificationResponse)
 def verify_attestation(reference: str, db: Session = Depends(get_db)):
     """Vérification publique d'une attestation par référence"""
     service = get_attestation_service(db)
     result = service.verify(reference)
     if not result:
         raise HTTPException(status_code=404, detail="Attestation introuvable")
-    
+
+    statut = result["statut"]
+    expiration = result.get("date_expiration")
+    if isinstance(expiration, str):
+        expiration = datetime.fromisoformat(expiration)
+    if expiration and expiration.tzinfo is None:
+        expiration = expiration.replace(tzinfo=timezone.utc)
+    maintenant = datetime.now(timezone.utc)
+    # Un document n'est authentique publiquement que s'il a été délivré.
+    # Une attestation merely "valide" (approuvée, imprimable), "archive"
+    # (scannée non délivrée), "brouillon", "soumis" n'est pas délivrée.
+    authentique = (
+        statut == "delivre"
+        and expiration is not None
+        and expiration > maintenant
+    )
+
     return AttestationVerificationResponse(
         reference=result["reference"],
-        statut=result["statut"],
+        statut=statut,
         date_etablissement=result.get("date_etablissement"),
         date_expiration=result.get("date_expiration"),
         lot={
@@ -645,14 +796,12 @@ def verify_attestation(reference: str, db: Session = Depends(get_db)):
             "nom": result["village_nom"],
             "code": result["village_code"],
         },
-        proprietaire={
-            "nom": result.get("proprietaire_nom"),
-            "prenom": result.get("proprietaire_prenom"),
-            "telephone": result.get("proprietaire_telephone"),
-            "email": result.get("proprietaire_email"),
-        },
-        verifie_le=datetime.utcnow(),
-        authentique=result["statut"] in ["valide", "archive"]
+        # La vérification publique n'expose aucune donnée personnelle du
+        # propriétaire (nom, prénom, coordonnées) : seul un résultat minimal
+        # est retourné, vérifié côté serveur.
+        proprietaire={},
+        verifie_le=maintenant,
+        authentique=authentique
     )
 
 # ============================================
@@ -737,15 +886,16 @@ def grant_village_access(
     village_id: UUID,
     access_level: str,
     db: Session = Depends(get_db),
-    current_user_id: UUID = Depends(get_user_id)
+    user_id_from_token: UUID = Depends(get_user_id),
+    current_user: dict = Depends(get_current_user),
 ):
-    """Accorde un accès village à un utilisateur"""
+    """Accorde un accès village à un utilisateur (réservé à l'administrateur)."""
+    # Seuls les administrateurs peuvent gérer les accès village (foncier.access.manage).
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Accès réservé à l'administrateur")
+
     service = get_user_access_service(db)
-    # Vérifier que l'utilisateur actuel a droit de gestion
-    if not service.check_access(current_user_id, village_id, "gestionnaire"):
-        raise HTTPException(status_code=403, detail="Accès refusé")
-    
-    access = service.grant_access(user_id, village_id, access_level, current_user_id)
+    access = service.grant_access(user_id, village_id, access_level, user_id_from_token)
     return {"status": "ok", "access": access}
 
 @router.delete("/access/{user_id}/villages/{village_id}")
@@ -753,13 +903,14 @@ def revoke_village_access(
     user_id: UUID,
     village_id: UUID,
     db: Session = Depends(get_db),
-    current_user_id: UUID = Depends(get_user_id)
+    user_id_from_token: UUID = Depends(get_user_id),
+    current_user: dict = Depends(get_current_user),
 ):
-    """Révoque un accès village"""
+    """Révoque un accès village (réservé à l'administrateur)."""
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Accès réservé à l'administrateur")
+
     service = get_user_access_service(db)
-    if not service.check_access(current_user_id, village_id, "gestionnaire"):
-        raise HTTPException(status_code=403, detail="Accès refusé")
-    
     service.revoke_access(user_id, village_id)
     return {"status": "ok"}
 
@@ -851,58 +1002,121 @@ def cleanup_sync(
 def get_dashboard_stats(
     village_id: Optional[UUID] = None,
     db: Session = Depends(get_db),
-    user_id: UUID = Depends(get_user_id)
+    user_id: UUID = Depends(get_user_id),
+    current_user: dict = Depends(get_current_user),
 ):
-    """Statistiques pour le dashboard"""
+    """Statistiques pour le dashboard, restreintes au périmètre territorial de l'utilisateur."""
     service = get_village_service(db)
-    if village_id:
-        # Vérifier accès
-        access_service = get_user_access_service(db)
-        if not access_service.check_access(user_id, village_id, "lecteur"):
-            raise HTTPException(status_code=403, detail="Accès refusé")
-        return service.get_stats(village_id)
-    else:
-        # Les statistiques par village agrègent les tables séparément; sommer
-        # ces résultats évite de multiplier les lots par leurs attestations.
-        village_stats = service.get_all_with_stats()
-        result = {
-            "total_villages": len(village_stats),
-            "total_lotissements": 0,
-            "total_ilots": 0,
-            "total_lots": 0,
-            "lots_actifs": 0,
-            "lots_vendus": 0,
-            "lots_litiges": 0,
-            "lots_reserves": 0,
-            "superficie_totale": 0,
-            "total_attestations": 0,
-            "attestations_validees": 0,
-        }
-        aggregate_fields = {
-            "total_lots": "total_lots",
-            "lots_actifs": "lots_actifs",
-            "lots_vendus": "lots_vendus",
-            "lots_litiges": "lots_litiges",
-            "lots_reserves": "lots_reserves",
-            "superficie_totale": "superficie_totale",
-            "nb_attestations": "total_attestations",
-            "nb_attestations_validees": "attestations_validees",
-        }
-        for stats in village_stats:
-            for source, target in aggregate_fields.items():
-                result[target] += stats.get(source) or 0
+    access_service = get_user_access_service(db)
+    user_role = current_user.get("role")
 
-        counts = db.execute(text("""
-            SELECT COUNT(DISTINCT ls.id) AS total_lotissements,
-                   COUNT(DISTINCT i.id) AS total_ilots
-            FROM foncier_villages v
-            LEFT JOIN foncier_lotissements ls ON ls.village_id = v.id
-            LEFT JOIN foncier_ilots i ON i.lotissement_id = ls.id
-            WHERE v.actif = true
-        """)).one()
-        result["total_lotissements"] = counts.total_lotissements
-        result["total_ilots"] = counts.total_ilots
-        return result
+    if village_id:
+        # Statistiques d'un village spécifique : vérifier l'accès territorial.
+        if not access_service.check_access(user_id, village_id, "lecteur", user_role=user_role):
+            raise HTTPException(status_code=403, detail="Accès refusé")
+        stats = service.get_stats(village_id)
+        if not stats:
+            raise HTTPException(status_code=404, detail="Village introuvable")
+        return {
+            "total_villages": 1,
+            "village_id": stats.get("village_id"),
+            "village_nom": stats.get("village_nom"),
+            "village_code": stats.get("village_code"),
+            "total_lots": stats.get("total_lots") or 0,
+            "lots_actifs": stats.get("lots_actifs") or 0,
+            "lots_vendus": stats.get("lots_vendus") or 0,
+            "lots_litiges": stats.get("lots_litiges") or 0,
+            "lots_reserves": stats.get("lots_reserves") or 0,
+            "lots_archives": stats.get("lots_archives") or 0,
+            "superficie_totale": float(stats.get("superficie_totale") or 0),
+            "superficie_vendue": float(stats.get("superficie_vendue") or 0),
+            "ca_total": float(stats.get("ca_total") or 0),
+            # Attestations : distinguer historique, actives, délivrées, révoquées.
+            "total_attestations": stats.get("nb_attestations") or 0,
+            "attestations_actives": (stats.get("nb_attestations") or 0)
+                                    - (stats.get("nb_attestations_delivrees") or 0)
+                                    - (stats.get("nb_attestations_revoquees") or 0),
+            "attestations_validees": stats.get("nb_attestations_validees") or 0,
+            "attestations_delivrees": stats.get("nb_attestations_delivrees") or 0,
+            "attestations_revoquees": stats.get("nb_attestations_revoquees") or 0,
+        }
+
+    # Statistiques globales : réservées à l'administrateur.
+    if user_role != "admin":
+        # Non-admin : ne retourner que les villages accessibles.
+        accessible = access_service.get_user_villages(user_id)
+        village_ids = [a.village_id for a in accessible]
+        if not village_ids:
+            return {
+                "total_villages": 0,
+                "total_lotissements": 0,
+                "total_ilots": 0,
+                "total_lots": 0,
+                "lots_actifs": 0,
+                "lots_vendus": 0,
+                "lots_litiges": 0,
+                "lots_reserves": 0,
+                "superficie_totale": 0,
+                "total_attestations": 0,
+                "attestations_actives": 0,
+                "attestations_validees": 0,
+                "attestations_delivrees": 0,
+                "attestations_revoquees": 0,
+            }
+        all_stats = service.get_all_with_stats()
+        village_stats = [s for s in all_stats if s.get("village_id") in village_ids]
+    else:
+        village_stats = service.get_all_with_stats()
+
+    result = {
+        "total_villages": len(village_stats),
+        "total_lotissements": 0,
+        "total_ilots": 0,
+        "total_lots": 0,
+        "lots_actifs": 0,
+        "lots_vendus": 0,
+        "lots_litiges": 0,
+        "lots_reserves": 0,
+        "superficie_totale": 0,
+        "total_attestations": 0,
+        "attestations_actives": 0,
+        "attestations_validees": 0,
+        "attestations_delivrees": 0,
+        "attestations_revoquees": 0,
+    }
+    aggregate_fields = {
+        "total_lots": "total_lots",
+        "lots_actifs": "lots_actifs",
+        "lots_vendus": "lots_vendus",
+        "lots_litiges": "lots_litiges",
+        "lots_reserves": "lots_reserves",
+        "superficie_totale": "superficie_totale",
+        "nb_attestations": "total_attestations",
+        "nb_attestations_validees": "attestations_validees",
+        "nb_attestations_delivrees": "attestations_delivrees",
+        "nb_attestations_revoquees": "attestations_revoquees",
+    }
+    for stats in village_stats:
+        for source, target in aggregate_fields.items():
+            result[target] += stats.get(source) or 0
+
+    result["attestations_actives"] = (
+        result["total_attestations"]
+        - result["attestations_delivrees"]
+        - result["attestations_revoquees"]
+    )
+
+    counts = db.execute(text("""
+        SELECT COUNT(DISTINCT ls.id) AS total_lotissements,
+               COUNT(DISTINCT i.id) AS total_ilots
+        FROM foncier_villages v
+        LEFT JOIN foncier_lotissements ls ON ls.village_id = v.id
+        LEFT JOIN foncier_ilots i ON i.lotissement_id = ls.id
+        WHERE v.actif = true
+    """)).one()
+    result["total_lotissements"] = counts.total_lotissements
+    result["total_ilots"] = counts.total_ilots
+    return result
 
 
 # ============================================
@@ -1079,36 +1293,13 @@ def get_village_names(db: Session = Depends(get_db)):
 @router.post("/attestations/{attestation_id}/sign")
 def sign_attestation(
     attestation_id: UUID,
-    payload: dict,
+    data: AttestationSignRequest,
     db: Session = Depends(get_db),
     user_id: UUID = Depends(get_user_id)
 ):
-    """Signe une attestation (ajoute signature numérique)"""
-    signature = payload.get("signature", "")
-    if not signature:
-        raise HTTPException(status_code=400, detail="Signature requise")
-    
-    with SessionLocal() as session:
-        # Check attestation exists
-        row = session.execute(
-            text("SELECT id FROM foncier_attestations WHERE id = :id AND deleted_at IS NULL"),
-            {"id": attestation_id},
-        ).fetchone()
-        if not row:
-            raise HTTPException(status_code=404, detail="Attestation introuvable")
-        
-        # Update with signature
-        session.execute(
-            text("""
-                UPDATE foncier_attestations
-                SET signature_numerique = :signature,
-                    updated_at = NOW(),
-                    updated_by = :user_id
-                WHERE id = :id
-            """
-            ),
-            {"id": attestation_id, "signature": signature, "user_id": user_id},
-        )
-        session.commit()
-    
-    return {"status": "ok", "attestation_id": str(attestation_id), "signed_at": datetime.utcnow().isoformat()}
+    """Enregistre une signature uniquement après soumission ou validation."""
+    service = get_attestation_service(db)
+    attestation = service.sign(attestation_id, data.signature, user_id)
+    if not attestation:
+        raise HTTPException(status_code=409, detail="L’attestation doit être soumise ou validée avant signature")
+    return attestation

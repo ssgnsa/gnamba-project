@@ -58,6 +58,9 @@ def _to_domain(user: SqlAlchemyUser) -> DomainUser:
         role=user.role,
         access_level=user.access_level,
         is_active=bool(user.is_active),
+        mfa_secret=user.mfa_secret,
+        mfa_enabled=bool(user.mfa_enabled) if user.mfa_enabled is not None else False,
+        mfa_confirmed_at=user.mfa_confirmed_at,
         **identity,
     )
 
@@ -172,6 +175,14 @@ class SqlAlchemyUserRepository(UserRepositoryPort):
         if "password_hash" in payload and payload["password_hash"]:
             user.password_hash = payload["password_hash"]
 
+        # MFA fields — accept None explicitly (disable path)
+        if "mfa_secret" in payload:
+            user.mfa_secret = payload["mfa_secret"]
+        if "mfa_enabled" in payload:
+            user.mfa_enabled = bool(payload["mfa_enabled"])
+        if "mfa_confirmed_at" in payload:
+            user.mfa_confirmed_at = payload["mfa_confirmed_at"]
+
         # Identity fields are written to the linked Entity (single source of truth).
         if user.entity and payload:
             self._apply_entity_update(user.entity, payload)
@@ -204,6 +215,14 @@ class SqlAlchemyUserRepository(UserRepositoryPort):
         if not user:
             return False
         self.db.delete(user)
+        self.db.commit()
+        return True
+
+    def deactivate(self, user_id: str) -> bool:
+        user = self.db.query(SqlAlchemyUser).filter(SqlAlchemyUser.id == user_id).first()
+        if not user:
+            return False
+        user.is_active = False
         self.db.commit()
         return True
 

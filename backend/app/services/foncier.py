@@ -1,7 +1,8 @@
 # Foncier Service - Couche métier
 # Logique métier pour le module Foncier
 
-from datetime import date, datetime
+from fastapi.encoders import jsonable_encoder
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any, Tuple
 from uuid import UUID, uuid4
 import hashlib
@@ -20,7 +21,7 @@ from app.schemas.foncier import (
     AttestationCreate, AttestationUpdate, AttestationSubmitRequest,
     AttestationValidateRequest, AttestationScanRequest,
     TemoinCreate, DuplicateCheckParams, AuditSearchParams,
-    VillageStats, TimelineResponse
+    VillageStats, TimelineResponse, ActivityLogCreate
 )
 from app.models.foncier import FoncierVillage, FoncierLotissement, FoncierIlot, FoncierLot, FoncierAttestation, ActivityLog, UserVillageAccess
 
@@ -243,48 +244,49 @@ class LotService:
         self.audit_repo = get_audit_repo(db)
     
     def create(self, ilot_id: UUID, data: LotCreate, user_id: UUID, device_id: str = None) -> FoncierLot:
-        # Vérifier îlot existe
-        ilot = self.ilot_repo.get(ilot_id)
-        if not ilot:
-            raise ValueError("Îlot introuvable")
+        try:
+            ilot = self.ilot_repo.get(ilot_id)
+            if not ilot:
+                raise ValueError("Îlot introuvable")
 
-        # Vérifier doublon
-        duplicates = self.repo.check_duplicate(
-            ilot.lotissement.village_id,
-            ilot.lotissement_id,
-            ilot_id,
-            data.numero_lot
-        )
-        if duplicates:
-            raise ValueError(f"Un lot numéro '{data.numero_lot}' existe déjà dans cet îlot")
-        
-        # Récupérer la hiérarchie pour générer la référence
-        village = self.village_repo.get(ilot.lotissement.village_id)
-        lotissement = self.lotissement_repo.get(ilot.lotissement_id)
-        
-        reference = generate_reference(
-            "LOT", village.code,
-            lotissement.code, ilot.numero, data.numero_lot
-        )
-        
-        lot_data = data.model_dump()
-        lot_data["ilot_id"] = ilot_id
-        lot_data["reference"] = reference
-        lot_data["created_by"] = user_id
-        lot_data["updated_by"] = user_id
-        lot_data["client_updated_at"] = datetime.utcnow()
-        lot_data["last_modified_device_id"] = device_id
-        
-        lot = self.repo.create(lot_data)
-        
-        # Audit
-        self._log_audit("foncier_lot", lot.id, lot.reference, "create", None, lot_data, 
-                       list(lot_data.keys()), user_id)
-        
-        return lot
+            duplicates = self.repo.check_duplicate(
+                ilot.lotissement.village_id,
+                ilot.lotissement_id,
+                ilot_id,
+                data.numero_lot
+            )
+            if duplicates:
+                raise ValueError(f"Un lot numéro '{data.numero_lot}' existe déjà dans cet îlot")
+
+            village = self.village_repo.get(ilot.lotissement.village_id)
+            lotissement = self.lotissement_repo.get(ilot.lotissement_id)
+            reference = generate_reference(
+                "LOT", village.code,
+                lotissement.code, ilot.numero, data.numero_lot
+            )
+
+            lot_data = data.model_dump()
+            lot_data["ilot_id"] = ilot_id
+            lot_data["reference"] = reference
+            import uuid
+            lot_data["code_barre"] = f"BC-{uuid.uuid4().hex[:12].upper()}"
+            lot_data["created_by"] = user_id
+            lot_data["updated_by"] = user_id
+            lot_data["client_updated_at"] = datetime.utcnow()
+            lot_data["last_modified_device_id"] = device_id
+
+            lot = self.repo.create(lot_data, commit=False)
+            self._log_audit("foncier_lot", lot.id, lot.reference, "create", None, lot_data,
+                            list(lot_data.keys()), user_id, commit=False)
+            self.db.commit()
+            self.db.refresh(lot)
+            return lot
+        except Exception:
+            self.db.rollback()
+            raise
     
     def update(self, lot_id: UUID, data: LotUpdate, user_id: UUID, device_id: str = None) -> Optional[FoncierLot]:
-        lot = self.repo.get(lot_id)
+        lot = self.repo.get_by_id(lot_id)
         if not lot:
             return None
         
@@ -292,7 +294,7 @@ class LotService:
         if data.numero_lot and data.numero_lot != lot.numero_lot:
             ilot = self.ilot_repo.get(lot.ilot_id)
             duplicates = self.repo.check_duplicate(
-                lot_numero=data.numero_lot,
+                numero_lot=data.numero_lot,
                 village_id=ilot.lotissement.village_id,
                 lotissement_id=ilot.lotissement_id,
                 ilot_id=lot.ilot_id,
@@ -308,29 +310,44 @@ class LotService:
         update_data["last_modified_device_id"] = device_id
         update_data["row_version"] = lot.row_version + 1
         
-        updated_lot = self.repo.update(lot_id, update_data)
-        
-        # Audit
-        self._log_audit("foncier_lot", lot.id, lot.reference, "update", old_values, update_data,
-                       list(update_data.keys()), user_id)
-        
-        return updated_lot
+        try:
+            updated_lot = self.repo.update(lot_id, update_data, commit=False)
+            self._log_audit("foncier_lot", lot.id, lot.reference, "update", old_values, update_data,
+                            list(update_data.keys()), user_id, commit=False)
+            self.db.commit()
+            self.db.refresh(updated_lot)
+            return updated_lot
+        except Exception:
+            self.db.rollback()
+            raise
     
     def archive(self, lot_id: UUID, reason: str, user_id: UUID) -> Optional[FoncierLot]:
-        lot = self.repo.archive(lot_id, reason, user_id)
-        if lot:
-            self._log_audit("foncier_lot", lot.id, lot.reference, "archive", 
-                           {"deleted_at": None}, {"deleted_at": lot.deleted_at, "deleted_reason": reason},
-                           ["deleted_at", "deleted_reason"], user_id)
-        return lot
+        try:
+            lot = self.repo.archive(lot_id, reason, user_id, commit=False)
+            if lot:
+                self._log_audit("foncier_lot", lot.id, lot.reference, "archive",
+                                {"deleted_at": None}, {"deleted_at": lot.deleted_at, "deleted_reason": reason},
+                                ["deleted_at", "deleted_reason"], user_id, commit=False)
+                self.db.commit()
+                self.db.refresh(lot)
+            return lot
+        except Exception:
+            self.db.rollback()
+            raise
     
     def restore(self, lot_id: UUID, user_id: UUID) -> Optional[FoncierLot]:
-        lot = self.repo.restore(lot_id, user_id)
-        if lot:
-            self._log_audit("foncier_lot", lot.id, lot.reference, "restore",
-                           {"deleted_at": lot.deleted_at}, {"deleted_at": None},
-                           ["deleted_at"], user_id)
-        return lot
+        try:
+            lot = self.repo.restore(lot_id, user_id, commit=False)
+            if lot:
+                self._log_audit("foncier_lot", lot.id, lot.reference, "restore",
+                                {"deleted_at": lot.deleted_at}, {"deleted_at": None},
+                                ["deleted_at"], user_id, commit=False)
+                self.db.commit()
+                self.db.refresh(lot)
+            return lot
+        except Exception:
+            self.db.rollback()
+            raise
     
     def get_with_hierarchy(self, lot_id: UUID) -> Optional[Dict]:
         return self.repo.get_with_hierarchy(lot_id)
@@ -346,21 +363,23 @@ class LotService:
     
     def _log_audit(self, entity_type: str, entity_id: UUID, entity_ref: str,
                    action: str, old_values: dict, new_values: dict,
-                   changed_fields: List[str], user_id: UUID):
+                   changed_fields: List[str], user_id: UUID,
+                   user_role: Optional[str] = None, user_name: Optional[str] = None,
+                   commit: bool = True):
         log = ActivityLogCreate(
             entity_type=entity_type,
-            entity_id=entity_id,
+            entity_id=str(entity_id),
             entity_reference=entity_ref,
             action=action,
             action_category="data",
-            old_values=old_values,
-            new_values=new_values,
+            old_values=jsonable_encoder(old_values),
+            new_values=jsonable_encoder(new_values),
             changed_fields=changed_fields,
-            user_id=user_id,
-            user_role="admin",  # TODO: récupérer depuis auth
-            user_name=str(user_id),
+            user_id=str(user_id),
+            user_role=user_role,
+            user_name=user_name,
         )
-        self.audit_repo.log(log)
+        self.audit_repo.log(log, commit=commit)
 
 
 # ============================================
@@ -373,120 +392,312 @@ class AttestationService:
         self.repo = get_attestation_repo(db)
         self.lot_repo = get_lot_repo(db)
         self.village_repo = get_village_repo(db)
+        self.lotissement_repo = get_lotissement_repo(db)
+        self.ilot_repo = get_ilot_repo(db)
         self.audit_repo = get_audit_repo(db)
+        self.access_service = get_user_access_service(db)
     
     def create(self, lot_id: UUID, data: AttestationCreate, user_id: UUID, 
                device_id: str = None) -> FoncierAttestation:
-        # Vérifier lot existe
-        lot = self.lot_repo.get(lot_id)
-        if not lot:
-            raise ValueError("Lot introuvable")
-        
-        # Récupérer la hiérarchie
-        lot_hierarchy = self.lot_repo.get_with_hierarchy(lot_id)
-        village = self.village_repo.get(lot_hierarchy["village_id"])
-        lotissement = self.lotissement_repo.get(lot_hierarchy["lotissement_id"])
-        ilot = self.ilot_repo.get(lot_hierarchy["ilot_id"])
-        
-        # Version
-        version = self.repo.get_next_version(lot_id)
-        
-        # Référence
-        reference = generate_attestation_reference(
-            village.code, lotissement.code, ilot.numero, lot.numero_lot, version
-        )
-        
-        # Numéro d'enregistrement
-        numero_enregistrement = data.numero_enregistrement or reference
-        
-        # Contrôle
-        control_number = generate_control_number()
-        signature_nonce = hashlib.sha256(f"{reference}{datetime.utcnow().isoformat()}".encode()).hexdigest()
-        
-        # Dates
-        date_etablissement = data.date_etablissement or date.today()
-        date_expiration = data.date_expiration or datetime.now().replace(year=datetime.now().year + 1)
-        
-        attestation_data = data.model_dump(exclude={"temoins"})
-        attestation_data.update({
-            "lot_id": lot_id,
-            "reference": reference,
-            "version": version,
-            "numero_enregistrement": numero_enregistrement,
-            "control_number": control_number,
-            "signature_nonce": signature_nonce,
-            "signature_issued_at": datetime.utcnow(),
-            "created_by": user_id,
-            "last_modified_device_id": device_id,
-            "client_updated_at": datetime.utcnow(),
-        })
-        
-        # Témoins
-        temoins = [t.model_dump() for t in data.temoins]
-        
-        attestation = self.repo.create_with_temoins(attestation_data, temoins, user_id, device_id)
-        
-        # Hash et QR
-        proprietor = None
-        if lot_hierarchy.get("proprietaire_nom"):
-            proprietor = {
-                "nom": lot_hierarchy["proprietaire_nom"],
-                "prenom": lot_hierarchy["proprietaire_prenom"],
+        try:
+            lot = self.lot_repo.get_by_id(lot_id)
+            if not lot:
+                raise ValueError("Lot introuvable")
+
+            lot_hierarchy = self.lot_repo.get_with_hierarchy(lot_id)
+            if not lot_hierarchy:
+                raise ValueError("Hiérarchie du lot introuvable")
+            village = self.village_repo.get(lot_hierarchy["village_id"])
+            lotissement = self.lotissement_repo.get(lot_hierarchy["lotissement_id"])
+            ilot = self.ilot_repo.get(lot_hierarchy["ilot_id"])
+
+            # Version
+            version = self.repo.get_next_version(lot_id)
+
+            # Référence
+            reference = generate_attestation_reference(
+                village.code, lotissement.code, ilot.numero, lot.numero_lot, version
+            )
+
+            # Numéro d'enregistrement
+            numero_enregistrement = data.numero_enregistrement or reference
+
+            # Contrôle
+            control_number = generate_control_number()
+            signature_nonce = hashlib.sha256(f"{reference}{datetime.utcnow().isoformat()}".encode()).hexdigest()
+
+            # Dates
+            date_etablissement = data.date_etablissement or date.today()
+            date_expiration = data.date_expiration or (datetime.now(timezone.utc) + timedelta(days=365))
+
+            attestation_data = data.model_dump(exclude={"temoins"})
+            attestation_data.update({
+                "lot_id": lot_id,
+                "reference": reference,
+                "version": version,
+                "date_etablissement": date_etablissement,
+                "date_expiration": date_expiration,
+                "numero_enregistrement": numero_enregistrement,
+                "control_number": control_number,
+                "signature_nonce": signature_nonce,
+                "signature_issued_at": datetime.utcnow(),
+                "created_by": user_id,
+                "last_modified_device_id": device_id,
+                "client_updated_at": datetime.utcnow(),
+            })
+
+            # Témoins
+            temoins = [t.model_dump() for t in data.temoins]
+
+            attestation = self.repo.create_with_temoins(attestation_data, temoins, user_id, device_id, commit=False)
+
+            # Hash et QR
+            proprietor = None
+            if lot_hierarchy.get("proprietaire_nom"):
+                proprietor = {
+                    "nom": lot_hierarchy["proprietaire_nom"],
+                    "prenom": lot_hierarchy["proprietaire_prenom"],
+                }
+
+            hash_data = {
+                **attestation_data,
+                "temoins": temoins,
+                "lot_reference": lot.reference,
+                "lot_village": village.nom,
             }
-        
-        hash_data = {
-            **attestation_data,
-            "temoins": temoins,
-            "lot_reference": lot.reference,
-            "lot_village": village.nom,
-        }
-        attestation.hash_sha256 = calculate_hash(hash_data)
-        attestation.qr_payload = get_qr_payload(attestation, lot, village, proprietor)
-        
-        self.db.commit()
-        self.db.refresh(attestation)
-        
-        # Audit
-        self._log_audit("foncier_attestation", attestation.id, attestation.reference, 
-                       "create", None, attestation_data, list(attestation_data.keys()), user_id)
-        
-        return attestation
-    
+            attestation.hash_sha256 = calculate_hash(hash_data)
+            attestation.qr_payload = get_qr_payload(attestation, lot, village, proprietor)
+
+            self.db.flush()
+
+            self._log_audit("foncier_attestation", attestation.id, attestation.reference,
+                            "create", None, attestation_data, list(attestation_data.keys()), user_id,
+                            commit=False)
+            self.db.commit()
+            return attestation
+        except Exception:
+            self.db.rollback()
+            raise
+
+    def update_draft(self, attestation_id: UUID, data: AttestationUpdate, user_id: UUID) -> Optional[FoncierAttestation]:
+        try:
+            attestation = self.repo.get_by_id(attestation_id)
+            if not attestation or attestation.statut != "brouillon":
+                return None
+            update_data = data.model_dump(exclude_unset=True, exclude={"temoins"})
+            if data.date_etablissement and data.date_expiration and data.date_expiration.date() <= data.date_etablissement:
+                raise ValueError("La date d’expiration doit être postérieure à la date d’établissement")
+            old_values = {key: getattr(attestation, key) for key in update_data}
+            temoins = None if data.temoins is None else [item.model_dump() for item in data.temoins]
+            updated = self.repo.update_draft(attestation_id, update_data, temoins, user_id, commit=False)
+            if not updated:
+                return None
+            self._log_audit("foncier_attestation", updated.id, updated.reference, "update", old_values, update_data, list(update_data), user_id, commit=False)
+            self.db.commit()
+            self.db.refresh(updated)
+            return updated
+        except Exception:
+            self.db.rollback()
+            raise
+
+    def sign(self, attestation_id: UUID, signature: str, user_id: UUID) -> Optional[FoncierAttestation]:
+        try:
+            attestation = self.repo.sign(attestation_id, signature, user_id, commit=False)
+            if not attestation:
+                return None
+            self._log_audit("foncier_attestation", attestation.id, attestation.reference, "sign", {"signature_numerique": None}, {"signature_numerique": "[présente]"}, ["signature_numerique"], user_id, commit=False)
+            self.db.commit()
+            return attestation
+        except Exception:
+            self.db.rollback()
+            raise
+
     def submit(self, attestation_id: UUID, data: AttestationSubmitRequest, 
                user_id: UUID) -> Optional[FoncierAttestation]:
-        attestation = self.repo.submit(attestation_id, data.agent_nom, user_id)
-        if attestation:
-            self._log_audit("foncier_attestation", attestation.id, attestation.reference,
-                           "submit", {"statut": "brouillon"}, {"statut": "soumis"},
-                           ["statut", "validation_agent_nom", "validation_agent_id", "validation_agent_date"], user_id)
-        return attestation
+        try:
+            attestation = self.repo.submit(attestation_id, data.agent_nom, user_id, commit=False)
+            if attestation:
+                self._log_audit("foncier_attestation", attestation.id, attestation.reference,
+                                "submit", {"statut": "brouillon"}, {"statut": "soumis"},
+                                ["statut", "validation_agent_nom", "validation_agent_id", "validation_agent_date"],
+                                user_id, commit=False)
+                self.db.commit()
+                self.db.refresh(attestation)
+            return attestation
+        except Exception:
+            self.db.rollback()
+            raise
     
     def validate(self, attestation_id: UUID, data: AttestationValidateRequest,
-                 user_id: UUID) -> Optional[FoncierAttestation]:
-        attestation = self.repo.validate(attestation_id, data.chef_nom,
-                                        data.signature_media_id, data.empreinte_media_id, user_id)
-        if attestation:
-            self._log_audit("foncier_attestation", attestation.id, attestation.reference,
-                           "validate", {"statut": "soumis"}, {"statut": "valide"},
-                           ["statut", "validation_chef_nom", "validation_chef_id", "validation_chef_date"], user_id)
-        return attestation
+                 user_id: UUID, user_role: str | None = None) -> Optional[FoncierAttestation]:
+        try:
+            # Verrouillage transactionnel de l'attestation pour écriture.
+            attestation = self.repo.get_for_update(attestation_id)
+            if not attestation or attestation.statut != "soumis":
+                return None
+            # Seul le chef du village (niveau validateur sur le village de l'attestation)
+            # peut valider une attestation de son village.
+            lot_hierarchy = self.lot_repo.get_with_hierarchy(attestation.lot_id)
+            village_id = lot_hierarchy.get("village_id") if lot_hierarchy else None
+            if not village_id or not self.access_service.check_access(user_id, village_id, "validateur", user_role=user_role, exact=True):
+                return None
+            attestation = self.repo.validate(attestation_id, data.chef_nom,
+                                             data.signature_media_id, data.empreinte_media_id,
+                                             user_id, commit=False)
+            if attestation:
+                # Re-vérifier l'accès territorial juste avant le commit pour éviter
+                # qu'une révocation d'accès entre-temps ne soit contournée.
+                if not village_id or not self.access_service.check_access(user_id, village_id, "validateur", user_role=user_role, exact=True):
+                    self.db.rollback()
+                    return None
+                self._log_audit("foncier_attestation", attestation.id, attestation.reference,
+                                "validate", {"statut": "soumis"}, {"statut": "valide"},
+                                ["statut", "validation_chef_nom", "validation_chef_id", "validation_chef_date"],
+                                user_id, commit=False)
+                self.db.commit()
+                self.db.refresh(attestation)
+            return attestation
+        except Exception:
+            self.db.rollback()
+            raise
     
     def scan(self, attestation_id: UUID, data: AttestationScanRequest,
-             user_id: UUID) -> Optional[FoncierAttestation]:
-        attestation = self.repo.scan_archive(attestation_id, data.media_id, user_id)
-        if attestation:
-            self._log_audit("foncier_attestation", attestation.id, attestation.reference,
-                           "archive", {"statut": "valide"}, {"statut": "archive"},
-                           ["statut", "pdf_media_id", "pdf_generated_at", "printed_by"], user_id)
-        return attestation
-    
-    def revoke(self, attestation_id: UUID, reason: str, user_id: UUID) -> Optional[FoncierAttestation]:
-        attestation = self.repo.revoke(attestation_id, reason, user_id)
-        if attestation:
-            self._log_audit("foncier_attestation", attestation.id, attestation.reference,
-                           "revoke", {"statut": attestation.statut}, {"statut": "revoque"},
-                           ["statut", "revoke_reason", "revoked_at", "revoked_by"], user_id)
-        return attestation
+             user_id: UUID, user_role: str | None = None) -> Optional[FoncierAttestation]:
+        try:
+            # Verrouillage transactionnel de l'attestation pour écriture.
+            attestation = self.repo.get_for_update(attestation_id)
+            if not attestation or attestation.statut != "valide":
+                return None
+            # Seul l'agent foncier (niveau agent sur le village de l'attestation)
+            # peut archiver une attestation de son village.
+            lot_hierarchy = self.lot_repo.get_with_hierarchy(attestation.lot_id)
+            village_id = lot_hierarchy.get("village_id") if lot_hierarchy else None
+            if not village_id or not self.access_service.check_access(user_id, village_id, "agent", user_role=user_role):
+                return None
+            attestation = self.repo.scan_archive(attestation_id, data.media_id, user_id, commit=False)
+            if attestation:
+                # Re-vérifier l'accès territorial juste avant le commit.
+                if not village_id or not self.access_service.check_access(user_id, village_id, "agent", user_role=user_role):
+                    self.db.rollback()
+                    return None
+                self._log_audit("foncier_attestation", attestation.id, attestation.reference,
+                                "archive", {"statut": "valide"}, {"statut": "archive"},
+                                ["statut", "pdf_media_id", "pdf_generated_at", "printed_by"],
+                                user_id, commit=False)
+                self.db.commit()
+                self.db.refresh(attestation)
+            return attestation
+        except Exception:
+            self.db.rollback()
+            raise
+
+    def print(self, attestation_id: UUID, reason: Optional[str], user_id: UUID) -> Optional[FoncierAttestation]:
+        """Imprime physiquement l'attestation (préparation avant signature du chef).
+
+        Exige un statut "valide". Incrémente le compteur d'impression et
+        enregistre qui a imprimé. Ne délivre pas l'attestation.
+        """
+        try:
+            attestation = self.repo.get_by_id(attestation_id)
+            if not attestation or attestation.statut != "valide":
+                return None
+            attestation.print_count = (attestation.print_count or 0) + 1
+            attestation.printed_by = user_id
+            attestation.printed_at = datetime.utcnow()
+            attestation.row_version += 1
+            self._log_audit("foncier_attestation", attestation_id, attestation.reference,
+                            "print", {"print_count": attestation.print_count - 1},
+                            {"print_count": attestation.print_count},
+                            ["print_count", "printed_by", "printed_at"], user_id, commit=False)
+            self.db.commit()
+            return attestation
+        except Exception:
+            self.db.rollback()
+            raise
+
+    def deliver(self, attestation_id: UUID, reason: Optional[str], user_id: UUID,
+                user_role: str | None = None) -> Optional[FoncierAttestation]:
+        """Confirme la délivrance finale après contrôle de concordance du scan signé.
+
+        Refuse si aucun scan signé n'a été déposé (pdf_media_id absent).
+        L'attestation doit être archivée (scan signé déjà déposé via scan()).
+        L'état de délivrance est écrit de manière transactionnelle avec l'audit.
+        Une attestation déjà délivrée est rejetée (idempotence négative).
+        Le contrôle de périmètre village est obligatoire : l'utilisateur doit
+        posséder un accès au village auquel appartient le lot de l'attestation.
+        """
+        try:
+            # Verrouillage transactionnel de l'attestation pour écriture.
+            attestation = self.repo.get_for_update(attestation_id)
+            if not attestation:
+                return None
+            # Contrôle de concordance : pas de scan signé = pas de délivrance.
+            if attestation.statut != "archive" or not attestation.pdf_media_id:
+                return None
+            # Idempotence : une attestation déjà délivrée ne peut pas être re-délivrée.
+            if attestation.delivre:
+                return None
+            # Contrôle de périmètre : l'utilisateur doit avoir un accès gestionnaire
+            # sur le village du lot concerné. Un rattachement manquant ou incohérent
+            # entraîne un refus. Le rôle général ne remplace jamais l'autorisation
+            # territoriale, sauf pour l'administrateur global (dérogation server-side).
+            lot_hierarchy = self.lot_repo.get_with_hierarchy(attestation.lot_id)
+            village_id = lot_hierarchy.get("village_id") if lot_hierarchy else None
+            if not village_id or not self.access_service.check_access(user_id, village_id, "gestionnaire", user_role=user_role):
+                return None
+            # Écriture transactionnelle : état métier + audit dans la même transaction.
+            attestation.delivre = True
+            attestation.delivre_par = user_id
+            attestation.delivre_le = datetime.utcnow()
+            self._log_audit("foncier_attestation", attestation_id, attestation.reference,
+                            "deliver", {"statut": "archive", "delivre": False},
+                            {"statut": "archive", "delivre": True},
+                            ["delivre", "delivre_par", "delivre_le"], user_id, commit=False)
+            # Re-vérifier l'accès territorial juste avant le commit.
+            if not village_id or not self.access_service.check_access(user_id, village_id, "gestionnaire", user_role=user_role):
+                self.db.rollback()
+                return None
+            self.db.commit()
+            return attestation
+        except Exception:
+            self.db.rollback()
+            raise
+
+    def revoke(self, attestation_id: UUID, reason: str, user_id: UUID,
+               user_role: str | None = None) -> Optional[FoncierAttestation]:
+        try:
+            # Verrouillage transactionnel de l'attestation pour écriture.
+            attestation = self.repo.get_for_update(attestation_id)
+            if not attestation:
+                return None
+            old_status = attestation.statut
+            was_delivre = attestation.delivre
+            # Seul le chef du village (niveau validateur sur le village de l'attestation)
+            # peut révoquer une attestation de son village.
+            lot_hierarchy = self.lot_repo.get_with_hierarchy(attestation.lot_id)
+            village_id = lot_hierarchy.get("village_id") if lot_hierarchy else None
+            if not village_id or not self.access_service.check_access(user_id, village_id, "validateur", user_role=user_role, exact=True):
+                return None
+            attestation = self.repo.revoke(attestation_id, reason, user_id, commit=False)
+            if attestation:
+                # Re-vérifier l'accès territorial juste avant le commit.
+                if not village_id or not self.access_service.check_access(user_id, village_id, "validateur", user_role=user_role, exact=True):
+                    self.db.rollback()
+                    return None
+                # Une attestation révoquée n'est plus délivrée, même si elle l'était.
+                if was_delivre:
+                    attestation.delivre = False
+                self._log_audit("foncier_attestation", attestation_id, attestation.reference,
+                                "revoke", {"statut": old_status, "delivre": was_delivre},
+                                {"statut": "revoque", "delivre": False},
+                                ["statut", "delivre", "revoke_reason", "revoked_at", "revoked_by"],
+                                user_id, commit=False)
+                self.db.commit()
+                self.db.refresh(attestation)
+            return attestation
+        except Exception:
+            self.db.rollback()
+            raise
     
     def verify(self, reference: str) -> Optional[Dict]:
         return self.repo.verify(reference)
@@ -498,26 +709,28 @@ class AttestationService:
         return self.repo.get_by_lot(lot_id)
     
     def search(self, lot_id: Optional[UUID] = None, statut: Optional[str] = None,
-               limit: int = 50, offset: int = 0) -> Tuple[List[FoncierAttestation], int]:
-        return self.repo.search(lot_id, statut, limit, offset)
+               limit: int = 50, offset: int = 0, exclude_revoked: bool = True) -> Tuple[List[FoncierAttestation], int]:
+        return self.repo.search(lot_id, statut, limit, offset, exclude_revoked=exclude_revoked)
     
     def _log_audit(self, entity_type: str, entity_id: UUID, entity_ref: str,
                    action: str, old_values: dict, new_values: dict,
-                   changed_fields: List[str], user_id: UUID):
-        log = {
-            "entity_type": entity_type,
-            "entity_id": entity_id,
-            "entity_reference": entity_ref,
-            "action": action,
-            "action_category": "workflow",
-            "old_values": old_values,
-            "new_values": new_values,
-            "changed_fields": changed_fields,
-            "user_id": user_id,
-            "user_role": "admin",
-            "user_name": str(user_id),
-        }
-        self.audit_repo.log(log)
+                   changed_fields: List[str], user_id: UUID,
+                   user_role: Optional[str] = None, user_name: Optional[str] = None,
+                   commit: bool = True):
+        log = ActivityLogCreate(
+            entity_type=entity_type,
+            entity_id=str(entity_id),
+            entity_reference=entity_ref,
+            action=action,
+            action_category="workflow",
+            old_values=jsonable_encoder(old_values),
+            new_values=jsonable_encoder(new_values),
+            changed_fields=changed_fields,
+            user_id=str(user_id),
+            user_role=user_role,
+            user_name=user_name,
+        )
+        self.audit_repo.log(log, commit=commit)
 
 
 # ============================================
@@ -596,7 +809,24 @@ class UserAccessService:
     def get_village_users(self, village_id: UUID) -> List[UserVillageAccess]:
         return self.repo.get_village_users(village_id)
     
-    def check_access(self, user_id: UUID, village_id: UUID, required_level: str = None) -> bool:
+    def check_access(
+        self,
+        user_id: UUID,
+        village_id: UUID,
+        required_level: str = None,
+        user_role: str | None = None,
+        exact: bool = False,
+    ) -> bool:
+        # L'administrateur global dispose d'une dérogation territoriale sur tous les villages,
+        # sans inscription individuelle dans UserVillageAccess. Le rôle est vérifié côté serveur
+        # depuis le contexte authentifié, jamais accepté depuis le client.
+        if user_role == "admin":
+            return True
+        if exact:
+            # Correspondance exacte du niveau : seul le niveau requis est accepté,
+            # pas les niveaux supérieurs (ex: un gestionnaire n'est pas un validateur).
+            access = self.repo.get_access_level(user_id, village_id)
+            return access == required_level
         return self.repo.has_access(user_id, village_id, required_level)
 
 

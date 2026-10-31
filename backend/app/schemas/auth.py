@@ -43,8 +43,6 @@ class UpdateUserRequest(BaseModel):
     department: str | None = None
     phone: str | None = None
     avatar_url: str | None = None
-
-
 class UserResponse(BaseModel):
     id: str
     entity_id: str
@@ -56,6 +54,17 @@ class UserResponse(BaseModel):
     department: str | None = None
     phone: str | None = None
     avatar_url: str | None = None
+    mfa_enabled: bool = False
+class MfaSetupResponse(BaseModel):
+    secret: str
+    otpauth_uri: str
+    qr_code_png_base64: str
+
+class MfaConfirmRequest(BaseModel):
+    code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
+
+class MfaDisableRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=128)
     aal: str | None = None
     mfa_verified: bool | None = None
 

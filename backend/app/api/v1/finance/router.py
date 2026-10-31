@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.api.deps import get_current_user, get_optional_current_user, require_admin_user
+from app.api.deps import get_current_user, get_optional_current_user, RequireAdminUser, require_admin_user
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from app.repositories.generic_table_repository import GenericTableRepository
@@ -17,7 +17,7 @@ from app.repositories.generic_table_repository import GenericTableRepository
 router = APIRouter(
     prefix="/api/v1/finance",
     tags=["finance"],
-    dependencies=[Depends(require_admin_user)],
+    dependencies=[Depends(RequireAdminUser)],
 )
 
 
@@ -246,7 +246,17 @@ def _response(entry: dict[str, Any]) -> FinanceResponse:
     value["type_transaction"] = {
         "ENCAISSEMENT": "recette", "DECAISSEMENT": "depense"
     }.get(value.get("type_operation"))
-    value["date_transaction"] = value.get("date_operation")
+    # date_operation is a datetime.date from SQLAlchemy; FinanceResponse.date_transaction
+    # is typed str. Convert to ISO string so Pydantic v2 doesn't raise ValidationError
+    # (which would surface as a 500 without CORS headers → misleading browser error).
+    date_val = value.get("date_operation")
+    if date_val is not None and not isinstance(date_val, str):
+        try:
+            value["date_transaction"] = date_val.isoformat()
+        except AttributeError:
+            value["date_transaction"] = str(date_val)
+    else:
+        value["date_transaction"] = date_val
     value["client_id"] = value.get("tiers_id")
     value["project_id"] = value.get("projet_id")
     return FinanceResponse(**value)

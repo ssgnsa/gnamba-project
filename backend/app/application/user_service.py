@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 import secrets
 import uuid
+import pyotp
+import qrcode
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import urlsplit
@@ -52,16 +54,24 @@ class UserApplicationService:
                 setattr(user_repository, "_auth_state_repository", auth_state_repository)
         self.auth_state = auth_state_repository
 
-    def _new_tokens(self, user: User, session_id: str) -> tuple[str, str]:
+    def _new_tokens(
+        self,
+        user: User,
+        session_id: str,
+        *,
+        access_aal: int | None = None,
+    ) -> tuple[str, str]:
         payload = user.to_payload()
         return (
-            issue_token(payload, "access", session_id),
+            issue_token(payload, "access", session_id, aal=access_aal),
             issue_token(payload, "refresh", session_id),
         )
 
     def _totp_secret_for(self, user: User) -> str:
-        if user.role != "admin":
-            return ""
+        if getattr(user, 'mfa_secret', None):
+            return user.mfa_secret
+        if user.role != 'admin':
+            return ''
         if settings.ADMIN_TOTP_SECRET and (
             not settings.ADMIN_TOTP_USER_ID or str(user.id) == settings.ADMIN_TOTP_USER_ID
         ):
@@ -70,11 +80,22 @@ class UserApplicationService:
             not settings.TEST_TOTP_USER_ID or str(user.id) == settings.TEST_TOTP_USER_ID
         ):
             return settings.TEST_TOTP_SECRET
-        return ""
+        return ''
 
     def requires_mfa(self, user: dict[str, Any]) -> bool:
-        return user.get("role") == "admin" and bool(
-            settings.ADMIN_TOTP_SECRET or settings.TEST_TOTP_SECRET
+        # MFA activée en base pour cet utilisateur (priorité)
+        if user.get("mfa_enabled"):
+            return True
+        # Fallback env pour admin seedé (backward compat)
+        if user.get("role") != "admin":
+            return False
+        user_id = str(user.get("id") or "")
+        return bool(
+            settings.ADMIN_TOTP_SECRET
+            and (not settings.ADMIN_TOTP_USER_ID or user_id == settings.ADMIN_TOTP_USER_ID)
+        ) or bool(
+            settings.TEST_TOTP_SECRET
+            and (not settings.TEST_TOTP_USER_ID or user_id == settings.TEST_TOTP_USER_ID)
         )
 
     def _consume_rate_limit(self, event_type: str, identifiers: list[str], max_events: int) -> bool:
@@ -145,7 +166,12 @@ class UserApplicationService:
 
         now = _now()
         session_id = payload["sid"]
-        access_token, next_refresh_token = self._new_tokens(user, session_id)
+        session_mfa_verified = self.auth_state.session_mfa_verified(session_id, user.id, now)
+        access_token, next_refresh_token = self._new_tokens(
+            user,
+            session_id,
+            access_aal=2 if session_mfa_verified else None,
+        )
         rotated = self.auth_state.rotate_session(
             session_id,
             hash_opaque_token(refresh_token),
@@ -174,10 +200,19 @@ class UserApplicationService:
         if not self.auth_state.session_is_active(payload["sid"], user.id, _now()):
             raise AuthorizationError("Session révoquée ou expirée")
         current = get_user_payload(user.to_payload())
-        aal2 = bool(payload.get("aal") == 2 and self._totp_secret_for(user))
+        aal2 = bool(
+            payload.get("aal") == 2
+            and self._totp_secret_for(user)
+            and self.auth_state.session_mfa_verified(payload["sid"], user.id, _now())
+        )
         current["aal"] = "AAL2" if aal2 else "AAL1"
         if aal2:
             current["mfa_verified"] = True
+        # L'indicateur mfa_required vient d'abord du domaine utilisateur (colonne DB),
+        # puis de la configuration globale (variable d'environnement) comme fallback.
+        current["mfa_required"] = bool(
+            user.mfa_required or self.requires_mfa(current)
+        )
         return current
 
     def verify_mfa(
@@ -203,6 +238,8 @@ class UserApplicationService:
         secret = self._totp_secret_for(user)
         if not secret or not verify_totp(secret, code):
             raise AuthenticationError("Code MFA invalide")
+        if not self.auth_state.mark_mfa_verified(payload["sid"], user.id, _now()):
+            raise AuthorizationError("Session MFA invalide ou expirée")
         for value in identifiers:
             if value:
                 self.auth_state.clear_rate_limit_events("mfa_attempt", _rate_identifier(value))
@@ -289,6 +326,11 @@ class UserApplicationService:
         if not self.user_repository.delete(user_id):
             raise AuthorizationError("Utilisateur introuvable")
 
+    def deactivate_user(self, user_id: str, reason: str) -> None:
+        if not self.user_repository.deactivate(user_id):
+            raise AuthorizationError("Utilisateur introuvable")
+        self.auth_state.revoke_user_sessions(user_id, "deactivated", _now())
+
     def change_password(self, user_id: str, current_password: str, new_password: str) -> None:
         if not self._consume_rate_limit(
             "password_change",
@@ -312,3 +354,63 @@ class UserApplicationService:
             _rate_identifier(f"user:{user_id}"),
         )
         self.auth_state.revoke_user_sessions(user_id, "password_changed", _now())
+    def setup_mfa(self, user: User) -> dict[str, Any]:
+        """Génère un secret TOTP, le stocke, et retourne les détails de setup."""
+        import base64
+        from io import BytesIO
+
+        secret = pyotp.random_base32()
+        otpauth_uri = pyotp.TOTP(secret).provisioning_uri(
+            name=user.email, issuer_name="EGS Gnamba Services"
+        )
+
+        qr = qrcode.QRCode(version=1, box_size=10, border=2)
+        qr.add_data(otpauth_uri)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        buffered = BytesIO()
+        img.save(buffered, format="PNG")
+        qr_code_png_base64 = base64.b64encode(buffered.getvalue()).decode("ascii")
+
+        user.mfa_secret = secret
+        user.mfa_enabled = False
+        user.mfa_confirmed_at = None
+        self.user_repository.update(
+            user.id,
+            {"mfa_secret": secret, "mfa_enabled": False, "mfa_confirmed_at": None},
+        )
+
+        return {
+            "secret": secret,
+            "otpauth_uri": otpauth_uri,
+            "qr_code_png_base64": qr_code_png_base64,
+        }
+
+    def confirm_mfa(self, user: User, code: str) -> None:
+        """Vérifie un code TOTP et active la MFA si valide."""
+        if not user.mfa_secret:
+            raise AuthenticationError("Secret MFA non configuré pour cet utilisateur.")
+
+        if not pyotp.TOTP(user.mfa_secret).verify(code, valid_window=1):
+            raise AuthenticationError("Code MFA invalide.")
+
+        now = _now()
+        user.mfa_enabled = True
+        user.mfa_confirmed_at = now
+        self.user_repository.update(
+            user.id, {"mfa_enabled": True, "mfa_confirmed_at": now}
+        )
+
+    def disable_mfa(self, user: User, password: str) -> None:
+        """Désactive la MFA après vérification du mot de passe."""
+        if not verify_password(password, user.password_hash):
+            raise AuthenticationError("Mot de passe incorrect.")
+
+        user.mfa_secret = None
+        user.mfa_enabled = False
+        user.mfa_confirmed_at = None
+        self.user_repository.update(
+            user.id,
+            {"mfa_secret": None, "mfa_enabled": False, "mfa_confirmed_at": None},
+        )
+

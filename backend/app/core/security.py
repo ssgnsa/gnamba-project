@@ -112,6 +112,8 @@ def get_user_payload(user: dict[str, Any]) -> dict[str, Any]:
         "full_name": user.get("full_name") or "",
         "role": user.get("role", "employe"),
         "access_level": user.get("access_level", "employe"),
+        "mfa_required": bool(user.get("mfa_required", False)),
+        "mfa_enabled": bool(user.get("mfa_enabled", False)),
         "poste": user.get("poste"),
         "department": user.get("department"),
         "phone": user.get("phone"),

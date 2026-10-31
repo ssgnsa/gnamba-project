@@ -9,3 +9,7 @@ python-multipart==0.0.9
 passlib==1.7.4
 jsonschema==4.21.1
 requests>=2.31.0
+qrcode[pil]>=7.4.2
+pyotp>=2.8.0
+weasyprint>=60.0
+jinja2>=3.1

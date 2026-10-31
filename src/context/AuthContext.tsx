@@ -276,10 +276,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const access_token = result.data!.access_token!;
         const user = result.data!.user;
-        persistLocalAuthToken(access_token);
         if (result.data?.mfa_challenge_required) {
+          apiClient.setAccessTokenInMemory(access_token);
           return { error: null, code: "mfa_required" };
         }
+        persistLocalAuthToken(access_token);
         setUser(mapLocalUser(user as Record<string, any>));
         setSession(null);
         setProfile(user as UserProfile);

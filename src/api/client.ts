@@ -20,6 +20,8 @@ interface AuthResult {
   aal?: string;
 }
 
+import { getLocalApiBaseUrl } from "../lib/selfHosted";
+
 export function resolveApiBaseUrl(
   configuredBase = '/api/v1',
   origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173',
@@ -30,24 +32,55 @@ export function resolveApiBaseUrl(
     : `${trimmed}/api/v1`;
 
   const isLocalFrontend = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
-  const isLocalApi = /^https?:\/\/localhost:8000\/api\/v1$/.test(normalized) || /^http:\/\/127\.0\.0\.1:8000\/api\/v1$/.test(normalized);
+  const parsedApi = new URL(normalized, "http://placeholder.com");
+  const isLocalApi = (parsedApi.hostname === "localhost" || parsedApi.hostname === "127.0.0.1") && parsedApi.port === "8000" && parsedApi.pathname === "/api/v1";
 
-  // Only return relative URL if frontend and API are on the SAME port
-  // If they're on different ports (even both on localhost), we need the full URL
+  // Page servée depuis une IP privée/LAN en HTTP (ex. http://192.168.1.58) :
+  // le reverse-proxy du même hôte expose l'API sur le port 80, donc une URL
+  // relative suffit. Cela évite le CORS et l'URL publique (injoignable depuis
+  // le réseau local). Détection faite à l'exécution sur l'origine de la page,
+  // jamais via une URL en dur dans le bundle de production.
+  if (origin.startsWith("http:") && isLocalPageOrigin(origin)) {
+    return '/api/v1';
+  }
+
+  // A production page served over HTTPS must never issue an HTTP API request.
+  // Falling back to the same-origin proxy also makes stale build-time values
+  // such as a LAN development address harmless after deployment.
+  if (origin.startsWith("https:") && normalized.startsWith("http:")) {
+    return "/api/v1";
+  }
+
+  // When both the frontend and the API are local, use a relative URL so the
+  // dev proxy (Vite) or the nginx reverse proxy (Docker) forwards to the API,
+  // regardless of which port each runs on.
   if (isLocalFrontend && isLocalApi) {
-    // Extract ports from origin and normalized URL to check if they match
-    const frontendUrl = new URL(origin);
-    const apiUrl = new URL(normalized, 'http://placeholder.com'); // Use dummy origin for parsing
-
-    const frontendPort = frontendUrl.port || (frontendUrl.protocol === 'https:' ? '443' : '80');
-    const apiPort = apiUrl.port || (apiUrl.protocol === 'https:' ? '443' : '80');
-
-    if (frontendPort === apiPort) {
-      return '/api/v1';
-    }
+    return '/api/v1';
   }
 
   return normalized;
+}
+
+// Détection à l'exécution d'une origine LAN (IP privée) servie en HTTP. La
+// boucle locale (localhost/127.0.0.1) est gérée par la logique existante et
+// n'entre pas dans ce cas : une page en localhost conserve l'URL API
+// configurée. Aucune URL en dur ; seule l'origine courante de la page est
+// inspectée. IPv6 non couvert (usage marginal ici), ajouter si nécessaire.
+function isLocalPageOrigin(origin: string): boolean {
+  try {
+    const host = new URL(origin, "http://placeholder.com").hostname;
+    const m = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(host);
+    if (!m) return false;
+    const a = Number(m[1]);
+    const b = Number(m[2]);
+    return (
+      a === 10 ||
+      (a === 192 && b === 168) ||
+      (a === 172 && b >= 16 && b <= 31)
+    );
+  } catch {
+    return false;
+  }
 }
 
 // Core API client class
@@ -75,8 +108,7 @@ class ApiClient {
   }
 
   constructor() {
-    const configuredBase = import.meta.env.VITE_API_URL || '/api/v1';
-    this.baseUrl = resolveApiBaseUrl(configuredBase);
+    this.baseUrl = resolveApiBaseUrl(getLocalApiBaseUrl());
     this.defaultHeaders = {
       'Content-Type': 'application/json',
     };
@@ -110,8 +142,12 @@ class ApiClient {
   private assertSecureCredentialTransport(endpoint: string): void {
     if (typeof window === 'undefined' || (!this.accessToken && !/^\/auth\//.test(endpoint))) return;
     const localHost = /^(localhost|127\.0\.0\.1|\[::1\])$/i.test(window.location.hostname);
+    // Une origine LAN privée (ex. 192.168.1.58) est servie en HTTP et l'API est
+    // jointe sur la même origine via le reverse-proxy : pas d'exigence HTTPS,
+    // comme pour la boucle locale. Les origines publiques doivent rester en HTTPS.
+    const lanOrigin = isLocalPageOrigin(window.location.origin);
     const apiUrl = new URL(this.baseUrl, window.location.origin);
-    if (!localHost && (window.location.protocol !== 'https:' || apiUrl.protocol !== 'https:')) {
+    if (!localHost && !lanOrigin && (window.location.protocol !== 'https:' || apiUrl.protocol !== 'https:')) {
       throw new Error('La connexion sécurisée HTTPS est obligatoire pour l’authentification.');
     }
   }
@@ -119,9 +155,10 @@ class ApiClient {
   async request<T = any>(endpoint: string, options: RequestInit = {}, retryWithSession = true): Promise<ApiResult<T>> {
     const doFetch = async (withAuth = true): Promise<Response> => {
       this.assertSecureCredentialTransport(endpoint);
+      const isAuthBootstrap = endpoint === '/auth/refresh' || endpoint === '/auth/login';
       const headers = {
         ...this.defaultHeaders,
-        ...(withAuth ? this.getAuthHeaders() : {}),
+        ...((withAuth && !isAuthBootstrap) ? this.getAuthHeaders() : {}),
         ...options.headers,
       };
 
@@ -233,16 +270,35 @@ class ApiClient {
   // Named exports for backward compatibility
   async clearStoredLocalAuthToken() {
     this.accessToken = null;
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('egs:local_auth_token');
+      localStorage.removeItem('egs:local_refresh_token');
+    }
     return { data: null, error: null, count: 1, status: 200 };
   }
 
   async persistLocalAuthToken(accessToken: string) {
     this.accessToken = accessToken;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('egs:local_auth_token', accessToken);
+    }
     return { data: { access_token: accessToken }, error: null, count: 1, status: 200 };
   }
 
   getStoredLocalAuthToken(): string | null {
+    if (!this.accessToken && typeof window !== 'undefined') {
+      this.accessToken = localStorage.getItem('egs:local_auth_token');
+    }
     return this.accessToken;
+  }
+
+  /**
+   * Store an AAL1 token in memory only (no localStorage).
+   * Used between /auth/login (mfa_challenge_required) and /auth/mfa/verify.
+   * Never persisted — replaced by the AAL2 token after MFA verification.
+   */
+  setAccessTokenInMemory(accessToken: string): void {
+    this.accessToken = accessToken;
   }
 
   // Settings module

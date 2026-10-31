@@ -51,10 +51,20 @@ def has_permission(
     # restricted to the MANAGER_READ_TABLES allowlist. It is never an
     # authorization bypass for writes.
     if module == "erp_table":
+        if role == "admin":
+            # Admin can read and write operational tables, but writes
+            # require MFA step-up (AAL2) — enforced by checking mfa_verified
+            # in current_user (populated by get_current_user when the
+            # session is marked mfa_verified in DB). Privacy-restricted
+            # tables stay read-excluded for everyone.
+            if resource in {"visites_du_jour", "tasks"}:
+                return action == "read" and False
+            if action == "read":
+                return True
+            # Write (create/update/delete): admin needs MFA verified
+            return user.get("mfa_verified") is True
         if action != "read":
             return False
-        if role == "admin":
-            return resource not in {"visites_du_jour", "tasks"}
         return role == "gestionnaire" and resource in MANAGER_READ_TABLES
 
     # Exports require a separate business decision for every role.

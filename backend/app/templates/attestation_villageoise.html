@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @page {
+    size: A4;
+    margin: 2cm;
+    border: 2px solid {{ village.primary_color|default('#1e3a5f') }};
+    padding: 1.5cm;
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" opacity="0.05"><text x="50" y="50" font-size="20" font-family="serif" transform="rotate(-45 50 50)" text-anchor="middle">RÉPUBLIQUE DE CÔTE D'IVOIRE</text></svg>');
+    background-repeat: repeat;
+  }
+  body { 
+    font-family: 'Times New Roman', Times, serif; 
+    font-size: 13px; 
+    color: #000; 
+    line-height: 1.6;
+  }
+  .header { 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: flex-start;
+    margin-bottom: 30px; 
+  }
+  .header-left { 
+    font-weight: bold; 
+    text-transform: uppercase; 
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  .header-right { 
+    text-align: right; 
+    font-style: italic; 
+    font-size: 11px;
+  }
+  .logo-placeholder {
+    display: inline-block;
+    padding: 10px;
+    border: 1px dashed #ccc;
+    border-radius: 50%;
+    font-weight: bold;
+    font-size: 18px;
+    color: {{ village.primary_color|default('#1e3a5f') }};
+    margin-bottom: 10px;
+  }
+  .title-box { 
+    text-align: center; 
+    margin: 30px 0; 
+  }
+  .title { 
+    display: inline-block; 
+    border: 2px solid {{ village.secondary_color|default('#d4a843') }}; 
+    padding: 10px 30px; 
+    font-size: 20px; 
+    font-weight: bold; 
+    background: {{ village.primary_color|default('#1e3a5f') }}; 
+    color: white; 
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .reference {
+    text-align: right;
+    font-weight: bold;
+    margin-bottom: 20px;
+    font-size: 14px;
+  }
+  .body-text { 
+    text-align: justify; 
+    margin-bottom: 15px; 
+  }
+  .info-row { 
+    margin: 8px 0 8px 30px; 
+    display: flex;
+  }
+  .label { 
+    font-weight: bold; 
+    width: 160px; 
+    display: inline-block;
+  }
+  .value {
+    border-bottom: 1px dotted #000;
+    flex-grow: 1;
+    min-width: 200px;
+  }
+  .footer { 
+    margin-top: 60px; 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: flex-end; 
+  }
+  .qr-code { 
+    width: 110px; 
+    height: 110px; 
+  }
+  .signature { 
+    text-align: center; 
+    font-weight: bold; 
+    width: 250px;
+  }
+  .mention { 
+    position: fixed; 
+    bottom: 2cm; 
+    font-size: 10px; 
+    color: #333; 
+    width: 100%; 
+    border-top: 1px solid #999; 
+    padding-top: 10px;
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-left">
+      RÉPUBLIQUE DE CÔTE D'IVOIRE<br>
+      <span style="font-weight: normal; font-size: 10px;">Union — Discipline — Travail</span><br>
+      DÉPARTEMENT DE {{ village.departement or '.....................' }}<br>
+      COMMUNE DE {{ village.commune or '.....................' }}<br>
+      VILLAGE DE {{ village.nom or '.....................' }}
+    </div>
+    <div class="header-right">
+      {% if village.logo_media_id %}
+        <img src="http://egs-api:8000/api/v1/media/files/{{ village.logo_media_id }}" height="80" alt="Logo">
+      {% else %}
+        <div class="logo-placeholder">{{ village.nom[:3]|upper }}</div>
+      {% endif %}
+      <br>Tél: {{ village.chef_telephone or '.....................' }}
+    </div>
+  </div>
+
+  <div class="reference">
+    N° {{ attestation.reference }}
+  </div>
+
+  <div class="title-box">
+    <div class="title">Attestation d'Attribution Villageoise</div>
+  </div>
+
+  <div class="body-text">
+    La Chefferie de <strong>{{ village.nom or '.....................' }}</strong>, représentée par son Chef <strong>{{ village.nom_signataire or '.....................' }}</strong> atteste que :
+  </div>
+
+  <div class="info-row"><span class="label">M./Mme :</span> <span class="value">{{ attestation.proprietaire_client_id or '..........................................' }}</span></div>
+  <div class="info-row"><span class="label">Domicile :</span> <span class="value">{{ attestation.domicile or '..........................................' }}</span></div>
+  <div class="info-row"><span class="label">Pièce d'identité :</span> <span class="value">{{ attestation.proprietaire_cni or '..........................................' }}</span></div>
+
+  <div class="body-text" style="margin-top: 25px;">
+    Selon l'arrêté N° <strong>{{ village.arrete_prefectoral or '.....................' }}</strong> du <strong>{{ village.arrete_date or '.....................' }}</strong>, devient attributaire du lot N° <strong>{{ lot.numero_lot }}</strong>{% if ilot %}, îlot N° <strong>{{ ilot.numero }}</strong>{% endif %} du lotissement de {{ lotissement.nom|default(village.nom) }}, Commune de {{ village.commune or '.....................' }}, qui lui a été cédé par :
+  </div>
+
+  <div class="info-row"><span class="label">M./Mme :</span> <span class="value">{{ attestation.cedant_prenom }} {{ attestation.cedant_nom }}</span></div>
+  <div class="info-row"><span class="label">CNI N° :</span> <span class="value">{{ attestation.cedant_cni_numero or '..........................................' }}</span></div>
+  <div class="info-row"><span class="label">Adresse :</span> <span class="value">{{ attestation.cedant_domicile or '..........................................' }}</span></div>
+  <div class="info-row"><span class="label">Tél :</span> <span class="value">{{ attestation.cedant_telephone or '..........................................' }}</span></div>
+
+  {% if attestation.limites_nord or attestation.limites_sud %}
+  <div class="body-text" style="margin-top: 25px;">
+    <strong>Limites :</strong> Nord: {{ attestation.limites_nord or '-' }}, Sud: {{ attestation.limites_sud or '-' }}, Est: {{ attestation.limites_est or '-' }}, Ouest: {{ attestation.limites_ouest or '-' }}.
+  </div>
+  {% endif %}
+
+  <div class="body-text" style="margin-top: 30px;">
+    En foi de quoi cette attestation lui est délivrée pour servir et valoir ce que de droit.
+  </div>
+
+  <div class="footer">
+    <div>
+      <img src="{{ qr_data_uri }}" class="qr-code">
+      <div style="font-size: 10px; margin-top: 5px;">Code: {{ attestation.control_number|default('') }}</div>
+    </div>
+    <div class="signature">
+      Fait à {{ village.lieu_signature|default(village.commune or '....................') }}, le {{ attestation.date_etablissement or '...' }}<br><br><br><br><br>
+      <strong>{{ village.nom_signataire or '.....................' }}</strong><br>
+      Chef de Village
+    </div>
+  </div>
+
+  <div class="mention">
+    <strong>NR :</strong> Toute personne qui, au moyen de faux documents, de fausses déclarations ou manœuvres, se serait fait attribuer cette prestation s'expose à des sanctions.
+  </div>
+</body>
+</html>

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Optional
 
 
@@ -12,6 +13,7 @@ class User:
     role: str = "guest"
     access_level: str = "guest"
     is_active: bool = True
+    mfa_required: bool = False
     # Identity fields (moved to the linked Entity). Populated by the repository
     # via user -> entity_id -> Entity. Kept for the API contract (UserResponse).
     email: str | None = None
@@ -19,6 +21,9 @@ class User:
     poste: str | None = None
     department: str | None = None
     phone: str | None = None
+    mfa_secret: str | None = None
+    mfa_enabled: bool = False
+    mfa_confirmed_at: datetime | None = None
 
     def to_payload(self) -> dict[str, object]:
         return {
@@ -28,6 +33,8 @@ class User:
             "role": self.role,
             "access_level": self.access_level,
             "is_active": self.is_active,
+            "mfa_required": self.mfa_required,
+            "mfa_enabled": self.mfa_enabled,
             "email": self.email or "",
             "full_name": self.full_name or "",
             "poste": self.poste,
