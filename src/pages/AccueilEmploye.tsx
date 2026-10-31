@@ -190,7 +190,14 @@ export default function AccueilEmploye() {
         : [];
       if (userId && targetEmployees.includes(userId)) return true;
       if (department && targetServices.includes(department)) return true;
-      return false;
+      // Legacy rows (pre-targeting schema, or PATCH-only updates) have all
+      // three targeting fields null/empty. Treat them as broadcast — otherwise
+      // statut='PUBLIE' messages become invisible.
+      const isLegacyBroadcast =
+        msg.cibles_tous_employes == null &&
+        targetEmployees.length === 0 &&
+        targetServices.length === 0;
+      return isLegacyBroadcast;
     },
     [profile],
   );
@@ -204,14 +211,16 @@ export default function AccueilEmploye() {
     };
 
     try {
-      const nowIso = new Date().toISOString();
       setDataError(null);
 
       const { data: messages, error: messagesError } = await dbClient
         .from("messages_direction")
         .select("*")
         .eq("statut", "PUBLIE")
-        .lte("date_publication", nowIso)
+        // date_publication is null for "publish now" messages (the common case).
+        // SQL comparisons with NULL exclude them, so we filter only on statut="PUBLIE".
+        // Future scheduling, if needed, must use an explicit OR clause:
+        //   .or(`date_publication.is.null,date_publication.lte.${new Date().toISOString()}`)
         .order("date_publication", { ascending: false })
         .limit(50);
 
