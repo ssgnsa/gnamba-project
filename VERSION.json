@@ -1,12 +1,12 @@
 {
   "application": "EGS ERP",
-  "git_commit": "6f6e5bd84e49729e508503d973a925a1e488517e",
+  "git_commit": "13267a728f6ba8cc7b274d0b43a33afcd008b05e",
   "branch": "fix/foncier-ecarts-dossier",
   "git_ref": "refs/heads/fix/foncier-ecarts-dossier",
-  "build_date": "2026-10-31T17:18:20Z",
-  "build_hash": "b58f96aa898c2ce7dc64abf6edb9c4ccec7619919f0ed7eb078590724235e635",
+  "build_date": "2026-11-02T19:16:57Z",
+  "build_hash": "57be1416d8f95fe86b8ff6d5cbe64001f2884301fb1c3f9d218cdf187e9d2e49",
   "environment": "production",
   "workspace_dirty": true,
-  "workspace_hash": "124d5625e8e855609f673a822afd9dbbb5c436cbae3e2b4573f8ed6fdf96c76e",
-  "artifact_hash": "d05ce92ec44f7568f7dcf1fb5c86f9a8d723e5a06020614c7d2f71ce6597d6f0"
+  "workspace_hash": "fce12c9ade8a5f7a4a65a60e7ac38af709dbeb85e40be3c8f7374dd2e78c045b",
+  "artifact_hash": "bce9e9c422947cafbee60a79586a6ee28c5041987c3b86229945792df7189cb8"
 }

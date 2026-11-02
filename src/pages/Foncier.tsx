@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Settings2,
   History,
@@ -123,6 +123,54 @@ export default function Foncier() {
   const [selectedLotissement, setSelectedLotissement] = useState<string | null>(null);
   const [selectedIlot, setSelectedIlot] = useState<string | null>(null);
 
+  // Données pour les selects en cascade du formulaire de création de lot
+  const [lotVillages, setLotVillages] = useState<{ id: string; nom: string }[]>([]);
+  const [lotLotissements, setLotLotissements] = useState<{
+    id: string;
+    nom: string;
+    village_id: string;
+  }[]>([]);
+  const [lotIlots, setLotIlots] = useState<{ id: string; nom: string; lotissement_id: string }[]>([]);
+  const [lotHierarchyLoading, setLotHierarchyLoading] = useState(false);
+
+  const loadLotHierarchy = useCallback(async () => {
+    setLotHierarchyLoading(true);
+    try {
+      const villagesResult = await foncierRepository.getVillagesList();
+      if (villagesResult.error) throw villagesResult.error;
+      const villages = (villagesResult.data ?? []).map((v) => ({
+        id: v.id,
+        nom: v.nom,
+      }));
+      setLotVillages(villages);
+
+      const [lotissementsResult, ilotsResult] = await Promise.all([
+        foncierRepository.getLotissements(),
+        foncierRepository.getIlots(),
+      ]);
+      if (lotissementsResult.error) throw lotissementsResult.error;
+      if (ilotsResult.error) throw ilotsResult.error;
+      setLotLotissements(
+        (lotissementsResult.data ?? []).map((l) => ({
+          id: l.id,
+          nom: l.nom,
+          village_id: l.village_id,
+        })),
+      );
+      setLotIlots(
+        (ilotsResult.data ?? []).map((i) => ({
+          id: i.id,
+          nom: i.nom,
+          lotissement_id: i.lotissement_id,
+        })),
+      );
+    } catch (err) {
+      console.error("Error loading lot hierarchy:", err);
+    } finally {
+      setLotHierarchyLoading(false);
+    }
+  }, []);
+
   // Options de lotissements et îlots dérivées des lots chargés (filtrage côté client,
   // searchLots ne supportant pas le filtrage par lotissement_id / ilot_id côté serveur).
   const lotissementOptions = useMemo(() => {
@@ -228,6 +276,7 @@ export default function Foncier() {
     void loadCachedLots();
     void refreshQueueCount();
     void fetchData();
+    void loadLotHierarchy();
   }, [fetchData, loadCachedLots, refreshQueueCount]);
 
   // Online/offline handlers (sync hook handles its own, but we need to trigger data refresh)
@@ -585,6 +634,12 @@ export default function Foncier() {
           onSuccess={fetchData}
           initialData={editingId ? form : undefined}
           isLoading={saving}
+          villages={lotVillages}
+          lotissements={lotLotissements}
+          ilots={lotIlots}
+          selectedVillage={selectedVillage || undefined}
+          selectedLotissement={selectedLotissement || undefined}
+          selectedIlot={selectedIlot || undefined}
         />
 
         {/* Attestation Modal */}

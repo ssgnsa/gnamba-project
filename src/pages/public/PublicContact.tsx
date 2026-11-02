@@ -22,6 +22,7 @@ import {
   buildGoogleMapsEmbedUrl,
   buildWhatsAppUrl,
 } from "../../lib/officialContact";
+import { PUBLIC_PAGE_PATHS } from "../../lib/publicRoutes";
 
 // Premium UI Components
 import {
@@ -508,7 +509,14 @@ export default function PublicContact() {
                         />
                         <span>
                           J’accepte que mes coordonnées et mon message soient utilisés
-                          pour répondre à ma demande.
+                          pour répondre à ma demande, conformément à notre{" "}
+                          <a
+                            href={PUBLIC_PAGE_PATHS.confidentialite}
+                            className="text-primary-600 hover:text-primary-700 underline"
+                          >
+                            politique de confidentialité
+                          </a>
+                          .
                         </span>
                       </label>
 

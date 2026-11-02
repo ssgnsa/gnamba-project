@@ -1,7 +1,7 @@
 import { FC, useState, useMemo, useEffect } from 'react';
 import { foncierRepository } from '../lib/dbClient.service';
 import type { FoncierLot } from '../types';
-import { FoncierLotForm } from './foncier/FoncierLotForm';
+import { LotFormModal } from './foncier/parts/LotFormModal';
 
 export const FoncierContainer: FC = () => {
   const [lots, setLots] = useState<FoncierLot[]>([]);
@@ -156,7 +156,8 @@ export const FoncierContainer: FC = () => {
       )}
 
       {showForm && (
-        <FoncierLotForm
+        <LotFormModal
+          isOpen={showForm}
           onClose={handleCloseForm}
           onSuccess={handleFormSubmit}
           initialData={
@@ -169,6 +170,10 @@ export const FoncierContainer: FC = () => {
               commune: editingLot.commune,
               departement: editingLot.departement,
               region: editingLot.region,
+              ilot_id: editingLot.ilot_id,
+              village_id: editingLot.village_id,
+              lotissement_id: editingLot.lotissement_id,
+              proprietaire_client_id: editingLot.proprietaire_client_id,
               superficie: editingLot.superficie, // Keep as number, don't convert to string
               proprietaire_nom: editingLot.proprietaire_nom || '',
               proprietaire_prenom: editingLot.proprietaire_prenom,

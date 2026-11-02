@@ -74,7 +74,8 @@ export const ConfigModal: FC<ConfigModalProps> = ({
     setPickerOpen(false);
     setLogoLoading(true);
     try {
-      const entityId = selectedVillage.replace(/^(VILLAGE\s+DE\s+|VILLAGE\s+)/i, "").trim();
+      const safeVillage = typeof selectedVillage === "object" && selectedVillage !== null ? (selectedVillage as any).nom : selectedVillage;
+      const entityId = String(safeVillage || "").replace(/^(VILLAGE\s+DE\s+|VILLAGE\s+)/i, "").trim();
       const { error } = await assignMedia(
         file.id,
         "foncier_village",

@@ -179,7 +179,10 @@ class ApiClient {
       if (retryWithSession && response.status === 401 && typeof window !== 'undefined' && this.shouldRefreshAfterUnauthorized(endpoint)) {
         const refreshResult = await this.refreshSession();
         if (!refreshResult.error && refreshResult.data?.access_token) {
-          this.persistLocalAuthToken(refreshResult.data.access_token);
+          // Refresh transparent : le token reste memory-only, aucune persistance
+          // dans localStorage n'est requise pour la requête en cours. La
+          // persistance de session est gérée par AuthContext (refreshLocalSession).
+          this.accessToken = refreshResult.data.access_token;
           response = await doFetch();
         } else {
           this.clearStoredLocalAuthToken();
@@ -231,7 +234,7 @@ class ApiClient {
     if (response.status === 401) {
       const refreshResult = await this.refreshSession();
       if (!refreshResult.error && refreshResult.data?.access_token) {
-        this.persistLocalAuthToken(refreshResult.data.access_token);
+        this.accessToken = refreshResult.data.access_token;
         response = await fetchFile();
       }
     }

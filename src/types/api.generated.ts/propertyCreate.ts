@@ -9,7 +9,9 @@ export interface PropertyCreate {
   /** @pattern ^(studio|chambre|chambre-salon|appartement|terrain|magasin|bureau|villa)$ */
   type_bien: string;
   adresse?: string | null;
-  proprietaire_name?: string | null;
+  ville?: string | null;
+  commune?: string | null;
+  proprietaire_entity_id?: string | null;
   valeur?: number | null;
   loyer_mensuel?: number | null;
   charges_mensuelles?: number | null;

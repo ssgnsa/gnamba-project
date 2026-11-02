@@ -30,7 +30,9 @@ export function VillageLogoUploader({
   const [previewUrl, setPreviewUrl] = useState<string | undefined>(currentLogoUrl);
   const [assigning, setAssigning] = useState(false);
 
-  const entityId = (villageId ?? villageName ?? "").replace(/^(VILLAGE\s+DE\s+|VILLAGE\s+)/i, '').trim();
+  const rawVillage = villageId ?? villageName ?? "";
+  const safeVillage = typeof rawVillage === "object" && rawVillage !== null ? (rawVillage as any).nom : rawVillage;
+  const entityId = String(safeVillage || "").replace(/^(VILLAGE\s+DE\s+|VILLAGE\s+)/i, '').trim();
 
   const handleSelect = useCallback(
     async (file: MediaFile) => {
@@ -152,7 +154,9 @@ export function VillageLogoDisplay({
 }: VillageLogoDisplayProps) {
   const [resolvedUrl, setResolvedUrl] = useState<string | null>(logoUrl ?? null);
 
-  const entityId = (villageId ?? villageName ?? "").replace(/^(VILLAGE\s+DE\s+|VILLAGE\s+)/i, '').trim();
+  const rawVillage = villageId ?? villageName ?? "";
+  const safeVillage = typeof rawVillage === "object" && rawVillage !== null ? (rawVillage as any).nom : rawVillage;
+  const entityId = String(safeVillage || "").replace(/^(VILLAGE\s+DE\s+|VILLAGE\s+)/i, '').trim();
 
   useEffect(() => {
     let cancelled = false;

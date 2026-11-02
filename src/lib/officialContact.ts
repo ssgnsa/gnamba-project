@@ -11,7 +11,6 @@ export const OFFICIAL_CONTACT = {
   quoteEmail: "devis@gnambaservices.ci",
   phone: "+225 07 77 96 01 49",
   phoneIntl: "+2250777960149",
-  fixedPhone1: "+225 27 34 75 91 99",
   fixedPhone2: "+225 27 34 75 92 88",
   address: "BP 235 Sikensi, Région Agnéby-Tiassa, Côte d'Ivoire",
   physicalAddress:

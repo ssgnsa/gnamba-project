@@ -144,11 +144,14 @@ export default function Immobilier() {
         }),
       ) as RentPayment[];
 
+      const normalizedProperties = ((propRes.data || []) as any[]).map(
+        (property) => ({
+          ...property,
+          proprietaire_id: property.proprietaire_id ?? property.proprietaire_entity_id ?? null,
+        }),
+      ) as Property[];
       const propertiesById = new Map(
-        ((propRes.data || []) as Property[]).map((property) => [
-          property.id,
-          property,
-        ]),
+        normalizedProperties.map((property) => [property.id, property]),
       );
       const tenantsById = new Map(
         (tenantsData || []).map((tenant) => [tenant.id, tenant]),
@@ -193,11 +196,11 @@ export default function Immobilier() {
             : undefined,
       })) as RentPayment[];
 
-      setProperties(propRes.data || []);
+      setProperties(normalizedProperties);
       setTenants(tenantsData || []);
       setContracts(enrichedContracts);
       setPayments(enrichedPayments);
-      writeManualCache(PROPERTIES_CACHE_KEY, propRes.data || []);
+      writeManualCache(PROPERTIES_CACHE_KEY, normalizedProperties);
       writeManualCache(TENANTS_CACHE_KEY, tenantsData || []);
       writeManualCache(CONTRACTS_CACHE_KEY, enrichedContracts);
       writeManualCache(PAYMENTS_CACHE_KEY, enrichedPayments);
@@ -342,7 +345,7 @@ export default function Immobilier() {
           adresse: item.adresse,
           commune: item.commune || null,
           ville: item.ville || null,
-          proprietaire_entity_id: item.proprietaire_entity_id || null,
+          proprietaire_entity_id: item.proprietaire_id || null,
           valeur: item.valeur ?? null,
           loyer_mensuel: item.loyer_mensuel ?? 0,
           charges_mensuelles: item.charges_mensuelles ?? 0,

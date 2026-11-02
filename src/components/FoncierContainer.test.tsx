@@ -7,7 +7,9 @@ const { mockSearchLots } = vi.hoisted(() => ({ mockSearchLots: vi.fn() }));
 vi.mock('../lib/dbClient.service', () => ({
   foncierRepository: { searchLots: mockSearchLots },
 }));
-vi.mock('./foncier/FoncierLotForm', () => ({ FoncierLotForm: () => null }));
+vi.mock('./foncier/parts/LotFormModal', () => ({
+  LotFormModal: () => null,
+}));
 
 import { FoncierContainer } from './FoncierContainer';
 describe('FoncierContainer', () => {

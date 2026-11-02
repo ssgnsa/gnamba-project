@@ -267,6 +267,11 @@ export default function PublicFooter({ onNavigate }: PublicFooterProps) {
                   href: PUBLIC_PAGE_PATHS["mentions-legales"],
                 },
                 {
+                  label: "Politique de confidentialité",
+                  page: "confidentialite" as PublicPage,
+                  href: PUBLIC_PAGE_PATHS.confidentialite,
+                },
+                {
                   label: "Connexion",
                   page: "login" as PublicPage,
                   href: PUBLIC_PAGE_PATHS.login,

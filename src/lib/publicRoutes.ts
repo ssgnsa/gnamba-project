@@ -12,6 +12,7 @@ export type PublicPage =
   | "contact"
   | "faq"
   | "mentions-legales"
+  | "confidentialite"
   | "login"
   | "verification"
   | "lots";
@@ -30,6 +31,7 @@ export const PUBLIC_PAGE_PATHS: Record<PublicPage, string> = {
   contact: "/contact",
   faq: "/faq",
   "mentions-legales": "/mentions-legales",
+  "confidentialite": "/confidentialite",
   login: "/login",
   verification: "/verification-attestation",
   lots: "/lots-disponibles",

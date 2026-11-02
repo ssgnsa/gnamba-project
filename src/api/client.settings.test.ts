@@ -5,6 +5,7 @@ describe("apiClient settings", () => {
     vi.resetModules();
     vi.stubEnv("VITE_SELFHOSTED_MODE", "true");
     vi.stubEnv("VITE_API_URL", "https://api.gnambaservices.ci");
+    window.localStorage.clear();
   });
 
   afterEach(() => {

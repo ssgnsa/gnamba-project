@@ -131,25 +131,6 @@ export function LotTable({
     );
   }
 
-  if (displayedLots.length === 0 && !debouncedSearch && !filterStatut && !filterVillage) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-        <FileText size={48} className="mb-2 opacity-50" />
-        <p className="text-sm">Aucun lot foncier trouvé.</p>
-        <p className="text-xs mt-1">Commencez par créer un village dans l'onglet <strong>Configuration</strong>.</p>
-      </div>
-    );
-  }
-
-  if (displayedLots.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-        <Search size={48} className="mb-2 opacity-50" />
-        <p className="text-sm">Aucun lot ne correspond à vos critères de recherche.</p>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
       {/* Breadcrumb hiérarchique (cliquable pour remonter d'un niveau) */}

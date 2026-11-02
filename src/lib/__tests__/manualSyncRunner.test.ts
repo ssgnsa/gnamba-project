@@ -32,16 +32,24 @@ describe('manualSyncRunner', () => {
       return [];
     });
 
-    (apiClient.request as any).mockImplementation(async (endpoint: string) => {
+    (apiClient.request as any).mockImplementation(async (endpoint: string, options?: any) => {
       if (endpoint.startsWith('/clients?')) return { data: [] };
       if (endpoint.startsWith('/immobilier/contracts?reference=')) return { data: [] };
       if (endpoint.startsWith('/immobilier/contracts?property_id=')) return { data: [] };
       if (endpoint.startsWith('/tenants?entity_id=')) return { data: [] };
+      if (endpoint === '/immobilier/contracts' && options?.method === 'POST') {
+        const body = JSON.parse(options.body);
+        expect(body.locataire_id).toBe('serverClient1');
+        expect(body.locataire_entity_id).toBeUndefined();
+        return { data: { id: 'serverContract1' } };
+      }
+      if (endpoint === '/tenants' && options?.method === 'POST') {
+        return { data: { id: 'serverTenant1' } };
+      }
       return { data: null };
     });
 
     (apiClient.clients.create as any).mockResolvedValue({ data: { id: 'serverClient1' } });
-    (apiClient.request as any).mockResolvedValue({ data: { id: 'serverContract1' } });
 
     const res = await syncPendingImmobilier();
 

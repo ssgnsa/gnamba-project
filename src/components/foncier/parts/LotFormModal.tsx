@@ -9,6 +9,15 @@ interface LotFormModalProps {
   onSuccess: () => void;
   initialData?: Partial<FoncierLotFormInput>;
   isLoading?: boolean;
+  villages?: { id: string; nom: string }[];
+  lotissements?: { id: string; nom: string; village_id: string }[];
+  ilots?: { id: string; nom: string; lotissement_id: string }[];
+  selectedVillage?: string | null;
+  selectedLotissement?: string | null;
+  selectedIlot?: string | null;
+  onVillageChange?: (id: string | null) => void;
+  onLotissementChange?: (id: string | null) => void;
+  onIlotChange?: (id: string | null) => void;
 }
 
 export const LotFormModal: FC<LotFormModalProps> = ({
@@ -17,6 +26,15 @@ export const LotFormModal: FC<LotFormModalProps> = ({
   onSuccess,
   initialData,
   isLoading = false,
+  villages = [],
+  lotissements = [],
+  ilots = [],
+  selectedVillage = null,
+  selectedLotissement = null,
+  selectedIlot = null,
+  onVillageChange,
+  onLotissementChange,
+  onIlotChange,
 }) => {
   type FormState = z.input<typeof foncierLotFormSchema>;
 
@@ -25,6 +43,7 @@ export const LotFormModal: FC<LotFormModalProps> = ({
     numero_ilot: "",
     nom_lotissement: "",
     village: "",
+    ilot_id: undefined,
     quartier: undefined,
     commune: undefined,
     departement: undefined,
@@ -83,6 +102,9 @@ export const LotFormModal: FC<LotFormModalProps> = ({
       numero_ilot: data.numero_ilot ?? "",
       nom_lotissement: data.nom_lotissement ?? "",
       village: data.village ?? "",
+      ilot_id: data.ilot_id ?? undefined,
+      village_id: data.village_id ?? undefined,
+      lotissement_id: data.lotissement_id ?? undefined,
       quartier: data.quartier ?? undefined,
       commune: data.commune ?? undefined,
       departement: data.departement ?? undefined,
@@ -97,7 +119,7 @@ export const LotFormModal: FC<LotFormModalProps> = ({
       proprietaire_cni_lieu: data.proprietaire_cni_lieu ?? undefined,
       proprietaire_profession: data.proprietaire_profession ?? undefined,
       proprietaire_telephone: data.proprietaire_telephone ?? undefined,
-      proprietaire_client_id: (data as any).proprietaire_client_id ?? undefined,
+      proprietaire_client_id: data.proprietaire_client_id ?? undefined,
       chef_village: data.chef_village ?? undefined,
       arrete_prefectoral: data.arrete_prefectoral ?? undefined,
       arrete_date: toDateString(data.arrete_date),
@@ -128,14 +150,52 @@ export const LotFormModal: FC<LotFormModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Sélections en cascade (Village → Lotissement → Îlot)
+  const [selectedVillageId, setSelectedVillageId] = useState<string | undefined>(undefined);
+  const [selectedLotissementId, setSelectedLotissementId] = useState<string | undefined>(undefined);
+  const [selectedIlotId, setSelectedIlotId] = useState<string | undefined>(undefined);
+
+  const filteredLotissements = useMemo(
+    () => lotissements.filter((l) => !selectedVillageId || l.village_id === selectedVillageId),
+    [lotissements, selectedVillageId],
+  );
+  const filteredIlots = useMemo(
+    () => ilots.filter((i) => !selectedLotissementId || i.lotissement_id === selectedLotissementId),
+    [ilots, selectedLotissementId],
+  );
+
+  // Pré-remplir la cascade depuis les props (barre d'outils) ou initialData (édition)
   useEffect(() => {
+    if (!isOpen) return;
     if (initialData) {
       setFormData(convertOutputToInput(initialData));
+      const id = initialData.ilot_id || initialData.village_id || null;
+      setSelectedIlotId(id ? String(id) : undefined);
+      setSelectedLotissementId(initialData.lotissement_id ? String(initialData.lotissement_id) : undefined);
+      setSelectedVillageId(initialData.village_id ? String(initialData.village_id) : undefined);
     } else {
       setFormData(emptyFormState);
+      setSelectedVillageId(selectedVillage ? String(selectedVillage) : undefined);
+      setSelectedLotissementId(selectedLotissement ? String(selectedLotissement) : undefined);
+      setSelectedIlotId(selectedIlot ? String(selectedIlot) : undefined);
     }
     setError(null);
-  }, [convertOutputToInput, emptyFormState, initialData, isOpen]);
+  }, [convertOutputToInput, emptyFormState, initialData, isOpen, selectedVillage, selectedLotissement, selectedIlot]);
+
+  // Cascade : réinitialiser les enfants quand un parent change
+  useEffect(() => {
+    setSelectedLotissementId(undefined);
+    setSelectedIlotId(undefined);
+    setFormData((prev) => ({ ...prev, nom_lotissement: "", numero_ilot: "", village: "", ilot_id: undefined }));
+    onLotissementChange?.(null);
+    onIlotChange?.(null);
+  }, [selectedVillageId, onLotissementChange, onIlotChange]);
+
+  useEffect(() => {
+    setSelectedIlotId(undefined);
+    setFormData((prev) => ({ ...prev, numero_ilot: "", ilot_id: undefined }));
+    onIlotChange?.(null);
+  }, [selectedLotissementId, onIlotChange]);
 
   const handleChange = <K extends keyof FormState>(field: K, value: FormState[K]) => {
     setFormData((prev: FormState) => ({
@@ -165,7 +225,11 @@ export const LotFormModal: FC<LotFormModalProps> = ({
       const saveData = {
         ...parsedData,
         statut: parsedData.statut || "actif",
+        ilot_id: selectedIlotId ?? parsedData.ilot_id,
       };
+      // Le backend résout la hiérarchie via ilot_id ; village/nom_lotissement ne sont pas attendus.
+      delete saveData.village;
+      delete saveData.nom_lotissement;
 
       const result = await foncierRepository.saveLot(saveData, false);
       if (result.error) throw result.error;
@@ -204,49 +268,96 @@ export const LotFormModal: FC<LotFormModalProps> = ({
               {/* Lot Information */}
               <div>
                 <h4 className="font-medium text-gray-700 mb-2">Informations du lot</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Numéro de lot *</label>
-                    <input
-                      type="text"
-                      value={formData.numero_lot ?? ""}
-                      onChange={(e) => handleChange("numero_lot", e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Ex: LOT001"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Numéro d'ilot *</label>
-                    <input
-                      type="text"
-                      value={formData.numero_ilot ?? ""}
-                      onChange={(e) => handleChange("numero_ilot", e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Ex: ILOT01"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Village *</label>
+                  <select
+                    value={selectedVillageId ?? ""}
+                    onChange={(e) => {
+                      const id = e.target.value || undefined;
+                      setSelectedVillageId(id);
+                      onVillageChange?.(id ?? null);
+                      const village = villages.find((v) => v.id === id);
+                      handleChange("village", village ? village.nom : "");
+                      handleChange("nom_lotissement", "");
+                      handleChange("numero_ilot", "");
+                      handleChange("ilot_id", undefined);
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Sélectionner un village</option>
+                    {villages.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.nom}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Nom du lotissement *</label>
-                    <input
-                      type="text"
-                      value={formData.nom_lotissement ?? ""}
-                      onChange={(e) => handleChange("nom_lotissement", e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Ex: Villa Serena"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Village *</label>
-                    <input
-                      type="text"
-                      value={formData.village ?? ""}
-                      onChange={(e) => handleChange("village", e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Ex: Akoupé"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Lotissement *</label>
+                  <select
+                    value={selectedLotissementId ?? ""}
+                    disabled={!selectedVillageId}
+                    onChange={(e) => {
+                      const id = e.target.value || undefined;
+                      setSelectedLotissementId(id);
+                      onLotissementChange?.(id ?? null);
+                      const lotissement = lotissements.find((l) => l.id === id);
+                      handleChange("nom_lotissement", lotissement ? lotissement.nom : "");
+                      handleChange("numero_ilot", "");
+                      handleChange("ilot_id", undefined);
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Sélectionner un village d'abord</option>
+                    {filteredLotissements.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.nom}
+                      </option>
+                    ))}
+                  </select>
+                  {!selectedVillageId && filteredLotissements.length === 0 && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Sélectionnez un village pour voir les lotissements.
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Îlot *</label>
+                  <select
+                    value={selectedIlotId ?? ""}
+                    disabled={!selectedLotissementId}
+                    onChange={(e) => {
+                      const id = e.target.value || undefined;
+                      setSelectedIlotId(id);
+                      onIlotChange?.(id ?? null);
+                      const ilot = ilots.find((i) => i.id === id);
+                      handleChange("numero_ilot", ilot ? ilot.nom : "");
+                      handleChange("ilot_id", id ?? undefined);
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Sélectionner un lotissement d'abord</option>
+                    {filteredIlots.map((i) => (
+                      <option key={i.id} value={i.id}>
+                        {i.nom}
+                      </option>
+                    ))}
+                  </select>
+                  {!selectedLotissementId && filteredIlots.length === 0 && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Sélectionnez un lotissement pour voir les îlots.
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Numéro de lot *</label>
+                  <input
+                    type="text"
+                    value={formData.numero_lot ?? ""}
+                    onChange={(e) => handleChange("numero_lot", e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Ex: LOT001"
+                  />
                 </div>
               </div>
 
@@ -516,7 +627,11 @@ export const LotFormModal: FC<LotFormModalProps> = ({
             <div className="pt-4 border-t border-gray-200">
               <button
                 type="submit"
-                disabled={loading || isLoading}
+                disabled={
+                  loading ||
+                  isLoading ||
+                  (villages.length > 0 && !selectedIlotId)
+                }
                 className="w-full px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
               >
                 {loading ? "Enregistrement..." : "Enregistrer le lot"}

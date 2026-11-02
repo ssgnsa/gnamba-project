@@ -77,6 +77,9 @@ const PublicBlog = lazy(() => import("./pages/public/PublicBlog"));
 const PublicContact = lazy(() => import("./pages/public/PublicContact"));
 const PublicFAQ = lazy(() => import("./pages/public/PublicFAQ"));
 const PublicLegal = lazy(() => import("./pages/public/PublicLegal"));
+const PublicConfidentiality = lazy(
+  () => import("./pages/public/PublicConfidentiality"),
+);
 const LoginPage = lazy(() => import("./pages/public/LoginPage"));
 const ForgotPasswordPage = lazy(
   () => import("./pages/public/ForgotPasswordPage"),
@@ -160,6 +163,9 @@ const PublicFAQPage: ComponentType<{
 const PublicLegalPage: ComponentType<{
   onNavigate: (page: PublicPage) => void;
 }> = (_props) => <PublicLegal />;
+const PublicConfidentialityPage: ComponentType<{
+  onNavigate: (page: PublicPage) => void;
+}> = (_props) => <PublicConfidentiality />;
 
 const publicPages: Record<string, PublicPageComponent> = {
   home: PublicHome,
@@ -175,6 +181,7 @@ const publicPages: Record<string, PublicPageComponent> = {
   contact: PublicContactPage,
   faq: PublicFAQPage,
   "mentions-legales": PublicLegalPage,
+  "confidentialite": PublicConfidentialityPage,
   verification: PublicVerification,
   lots: PublicLots,
 };
@@ -432,6 +439,12 @@ const PUBLIC_SEO_CONFIG: Partial<Record<PublicPage, SeoConfig>> = {
       "Consultez les informations légales officielles de GNAMBA SERVICES, ainsi que nos coordonnées et références administratives.",
     keywords: "mentions légales, GNAMBA SERVICES, RCCM, NCC, Côte d'Ivoire",
   },
+  "confidentialite": {
+    title: "Politique de confidentialité | GNAMBA SERVICES",
+    description:
+      "Découvrez comment GNAMBA SERVICES collecte, utilise et protège vos données personnelles.",
+    keywords: "politique de confidentialité, GNAMBA SERVICES, données personnelles, RGPD, Côte d'Ivoire",
+  },
   lots: {
     title: "Lots à Vendre Sikensi, Bingerville, Grand-Bassam | GNAMBA SERVICES",
     description:
@@ -635,6 +648,7 @@ function AppContent() {
         contact: "Contact",
         faq: "FAQ",
         "mentions-legales": "Mentions légales",
+        "confidentialite": "Confidentialité",
         login: "Connexion",
         verification: "Vérification",
         lots: "Lots à vendre",

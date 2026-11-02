@@ -132,6 +132,9 @@ export const foncierLotFormSchema = z
     departement: optionalString,
     region: optionalString,
     ilot: optionalString, // Code court îlot
+    ilot_id: optionalString, // UUID de l'îlot sélectionné (cascade Village → Lotissement → Îlot)
+    village_id: optionalString, // UUID du village (pré-remplissage édition)
+    lotissement_id: optionalString, // UUID du lotissement (pré-remplissage édition)
 
     // Section: Caractéristiques (OBLIGATOIRE)
     superficie: superficieSchema,

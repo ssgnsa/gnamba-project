@@ -73,7 +73,7 @@ export async function syncPendingImmobilier() {
 
         const contractPayload = {
           property_id: lc.property_id,
-          locataire_entity_id: createdClient.id,
+          locataire_id: createdClient.id,
           date_debut: lc.date_debut,
           date_fin: lc.date_fin || null,
           loyer_mensuel: lc.loyer_mensuel || 0,
@@ -104,7 +104,7 @@ export async function syncPendingImmobilier() {
 
           // Check existing contracts on server to avoid duplicates (same property + overlapping dates)
           const contractsListRes = await apiClient.request(
-            `/immobilier/contracts?property_id=${encodeURIComponent(lc.property_id)}&locataire_entity_id=${encodeURIComponent(createdClient.id)}&limit=50`,
+            `/immobilier/contracts?property_id=${encodeURIComponent(lc.property_id)}&locataire_id=${encodeURIComponent(createdClient.id)}&limit=50`,
           );
           const serverContracts = !contractsListRes.error && contractsListRes.data ? (Array.isArray(contractsListRes.data) ? contractsListRes.data : (contractsListRes.data.data || [])) : [];
           const hasOverlap = serverContracts.some((sc: any) => {

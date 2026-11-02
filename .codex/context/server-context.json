@@ -3,23 +3,13 @@
     "host": "",
     "sshPort": 2222,
     "user": "soma",
-    "lastUpdate": "2026-10-29T12:56:30.348Z"
+    "lastUpdate": "2026-11-02T19:47:55.212Z"
   },
   "docker": {
     "containers": [
       {
-        "name": "egs-api",
-        "status": "Up 29 minutes (healthy)",
-        "ports": "0.0.0.0:8000->8000/tcp",
-        "image": "egs-api:latest",
-        "running": true,
-        "portsList": [
-          "8000->8000/tcp"
-        ]
-      },
-      {
         "name": "egs-web",
-        "status": "Up 33 minutes (healthy)",
+        "status": "Up 2 hours (healthy)",
         "ports": "0.0.0.0:8080->80/tcp",
         "image": "egs-web:latest",
         "running": true,
@@ -28,8 +18,18 @@
         ]
       },
       {
+        "name": "egs-api",
+        "status": "Up 3 hours (healthy)",
+        "ports": "0.0.0.0:8000->8000/tcp",
+        "image": "egs-api:latest",
+        "running": true,
+        "portsList": [
+          "8000->8000/tcp"
+        ]
+      },
+      {
         "name": "egs-postgres",
-        "status": "Up 20 hours (healthy)",
+        "status": "Up 4 hours (healthy)",
         "ports": "5432/tcp",
         "image": "postgres:16-alpine",
         "running": true,
@@ -39,7 +39,7 @@
       },
       {
         "name": "egs-redis",
-        "status": "Up 20 hours",
+        "status": "Up 8 hours",
         "ports": "6379/tcp",
         "image": "redis:7-alpine",
         "running": true,
@@ -49,57 +49,33 @@
       },
       {
         "name": "filebrowser",
-        "status": "Up 21 hours (healthy)",
+        "status": "Up 8 hours (healthy)",
         "ports": "0.0.0.0:8081->80/tcp",
-        "image": "filebrowser/filebrowser:latest",
+        "image": "filebrowser/filebrowser:v2.32.0",
         "running": true,
         "portsList": [
           "8081->80/tcp"
-        ]
-      },
-      {
-        "name": "egs-web-api-fix-test",
-        "status": "Exited (255) 10 days ago",
-        "ports": "127.0.0.1:18080->80/tcp",
-        "image": "egs-web:api-fix-test",
-        "running": false,
-        "portsList": [
-          "18080->80/tcp"
-        ]
-      },
-      {
-        "name": "egs-rc-test-pg",
-        "status": "Exited (255) 3 weeks ago",
-        "ports": "127.0.0.1:55499->5432/tcp",
-        "image": "postgres:16",
-        "running": false,
-        "portsList": [
-          "55499->5432/tcp"
-        ]
-      },
-      {
-        "name": "egs-api-security-test",
-        "status": "Exited (255) 3 weeks ago",
-        "ports": "8000/tcp",
-        "image": "egs-api-security-test:local",
-        "running": false,
-        "portsList": [
-          "8000/tcp"
         ]
       }
     ],
     "images": [
       {
-        "id": "sha256:77672526bb2817c06543132695de75b2f74de9362b550e96a33d42de2e74332d",
-        "repository": "egs-api",
-        "tag": "latest",
-        "size": "310MB"
-      },
-      {
-        "id": "sha256:b099b2d1e2bd7da0f458ca90eb40e8dd8220b3eb708c4dec146c4d7a70159f9d",
+        "id": "sha256:2d8afd4a99df89fb34e6368774a6edf32200cbbcdf82028c8afacec05178fded",
         "repository": "egs-web",
         "tag": "latest",
         "size": "91MB"
+      },
+      {
+        "id": "sha256:d783da63c4d1c5be0d520abd42b8e8a85bce58e4102d8be5f124874eab78257c",
+        "repository": "egs-api",
+        "tag": "latest",
+        "size": "449MB"
+      },
+      {
+        "id": "sha256:675b1fba3aeb5ec189463bb3a49f5ceb4052e6b378f41f8d8836e80f3dc5cae8",
+        "repository": "backend-backend",
+        "tag": "latest",
+        "size": "310MB"
       },
       {
         "id": "sha256:68c3eced590f2dbe855ded151adb18aaeab3418c320090f1d73a4d3a34182338",
@@ -260,39 +236,9 @@
     ],
     "volumes": [
       {
-        "name": "d9eca4c304bacf176e0bf0afef9caeebca9c762a4b3fa63b64562edd7313e92e",
+        "name": "gnamba-project_postgres_data",
         "driver": "local",
-        "mountpoint": "/mnt/data/docker-volumes/volumes/d9eca4c304bacf176e0bf0afef9caeebca9c762a4b3fa63b64562edd7313e92e/_data"
-      },
-      {
-        "name": "a9e7439f435fabaf6f47507b4a535b7a9cb91ac25f45df28ac1c031bffe635ee",
-        "driver": "local",
-        "mountpoint": "/mnt/data/docker-volumes/volumes/a9e7439f435fabaf6f47507b4a535b7a9cb91ac25f45df28ac1c031bffe635ee/_data"
-      },
-      {
-        "name": "2b90172ed1f341994e49b716c50b09954e533cfd353893052cca5fd87b55c5e4",
-        "driver": "local",
-        "mountpoint": "/mnt/data/docker-volumes/volumes/2b90172ed1f341994e49b716c50b09954e533cfd353893052cca5fd87b55c5e4/_data"
-      },
-      {
-        "name": "2c1dfe71eecf2be3be2bdd9c6e8ebe475ec8e76031bbea49c34a138e5f48d25c",
-        "driver": "local",
-        "mountpoint": "/mnt/data/docker-volumes/volumes/2c1dfe71eecf2be3be2bdd9c6e8ebe475ec8e76031bbea49c34a138e5f48d25c/_data"
-      },
-      {
-        "name": "2efd9dc6e739193e292392bc5e464387f81fda699f36e9c1cd9d65c70f2c1a1c",
-        "driver": "local",
-        "mountpoint": "/mnt/data/docker-volumes/volumes/2efd9dc6e739193e292392bc5e464387f81fda699f36e9c1cd9d65c70f2c1a1c/_data"
-      },
-      {
-        "name": "3c96d9e8fd609e2f9dfc70322275ec19256e29535ae387368d496715e2519909",
-        "driver": "local",
-        "mountpoint": "/mnt/data/docker-volumes/volumes/3c96d9e8fd609e2f9dfc70322275ec19256e29535ae387368d496715e2519909/_data"
-      },
-      {
-        "name": "422b6c9dad2450e59b98cbcb0a52dba59130227de27ff2d2031c1bf78bdd60e7",
-        "driver": "local",
-        "mountpoint": "/mnt/data/docker-volumes/volumes/422b6c9dad2450e59b98cbcb0a52dba59130227de27ff2d2031c1bf78bdd60e7/_data"
+        "mountpoint": "/mnt/data/docker-volumes/volumes/gnamba-project_postgres_data/_data"
       },
       {
         "name": "gnamba-project_filebrowser_db",
@@ -300,70 +246,25 @@
         "mountpoint": "/mnt/data/docker-volumes/volumes/gnamba-project_filebrowser_db/_data"
       },
       {
-        "name": "726761565a2c1728d530e434224d00f8542b020dbc0eff5de81ff2540eaed5c6",
+        "name": "3cb3ac4bc205883b9e1f225c21da5eae6c9a1d64af7e883f9447f64fb69509a8",
         "driver": "local",
-        "mountpoint": "/mnt/data/docker-volumes/volumes/726761565a2c1728d530e434224d00f8542b020dbc0eff5de81ff2540eaed5c6/_data"
+        "mountpoint": "/mnt/data/docker-volumes/volumes/3cb3ac4bc205883b9e1f225c21da5eae6c9a1d64af7e883f9447f64fb69509a8/_data"
       },
       {
-        "name": "aeb0e3273e4144e9218e46d0796f6f96dd2f5eecc55432bca6210445a1634441",
+        "name": "0be59f4f1681c1abf26635b957154b296cbdedf45c03077998e4e52d56e45af7",
         "driver": "local",
-        "mountpoint": "/mnt/data/docker-volumes/volumes/aeb0e3273e4144e9218e46d0796f6f96dd2f5eecc55432bca6210445a1634441/_data"
+        "mountpoint": "/mnt/data/docker-volumes/volumes/0be59f4f1681c1abf26635b957154b296cbdedf45c03077998e4e52d56e45af7/_data"
       },
       {
-        "name": "b67549d48ea0cb411774f537fd000e2a0a8aa824f86f6acf8eb91f9f85bdbb3c",
+        "name": "6be111d6f5694a2aa44e98565cca527a089d79b59a2c6a2c15c29e97fb22d69d",
         "driver": "local",
-        "mountpoint": "/mnt/data/docker-volumes/volumes/b67549d48ea0cb411774f537fd000e2a0a8aa824f86f6acf8eb91f9f85bdbb3c/_data"
-      },
-      {
-        "name": "be08c0a7c0d0396081d6e6454031fe7f073fc918eee81e7480ff7a6c2f7e01c6",
-        "driver": "local",
-        "mountpoint": "/mnt/data/docker-volumes/volumes/be08c0a7c0d0396081d6e6454031fe7f073fc918eee81e7480ff7a6c2f7e01c6/_data"
-      },
-      {
-        "name": "c7dc8d9702db56506c230ddf72b690fa6c82317b19f363009993f20512f4e126",
-        "driver": "local",
-        "mountpoint": "/mnt/data/docker-volumes/volumes/c7dc8d9702db56506c230ddf72b690fa6c82317b19f363009993f20512f4e126/_data"
-      },
-      {
-        "name": "f58104a9c40e1026dc5871428f2a5906675d8b454a3514bd10bba61049fe8691",
-        "driver": "local",
-        "mountpoint": "/mnt/data/docker-volumes/volumes/f58104a9c40e1026dc5871428f2a5906675d8b454a3514bd10bba61049fe8691/_data"
-      },
-      {
-        "name": "80858f58bf880789187ae8b5c2ff05a01cc41f3966a72c50cb36431c808f0fda",
-        "driver": "local",
-        "mountpoint": "/mnt/data/docker-volumes/volumes/80858f58bf880789187ae8b5c2ff05a01cc41f3966a72c50cb36431c808f0fda/_data"
-      },
-      {
-        "name": "e17a59506bfaf267b031f850b23a72faddf9ee65d1cc04f9adebbe3e2321e81c",
-        "driver": "local",
-        "mountpoint": "/mnt/data/docker-volumes/volumes/e17a59506bfaf267b031f850b23a72faddf9ee65d1cc04f9adebbe3e2321e81c/_data"
-      },
-      {
-        "name": "gnamba-project_postgres_data",
-        "driver": "local",
-        "mountpoint": "/mnt/data/docker-volumes/volumes/gnamba-project_postgres_data/_data"
-      },
-      {
-        "name": "3cb65ac488e6ff40c699f5d1b2465e7e8566244493be8a8b6b97b815a3ec01ca",
-        "driver": "local",
-        "mountpoint": "/mnt/data/docker-volumes/volumes/3cb65ac488e6ff40c699f5d1b2465e7e8566244493be8a8b6b97b815a3ec01ca/_data"
-      },
-      {
-        "name": "5da33eb12ed76f406a4f711c4f8846a81b232797b1b600a40c034ddf20185f5f",
-        "driver": "local",
-        "mountpoint": "/mnt/data/docker-volumes/volumes/5da33eb12ed76f406a4f711c4f8846a81b232797b1b600a40c034ddf20185f5f/_data"
+        "mountpoint": "/mnt/data/docker-volumes/volumes/6be111d6f5694a2aa44e98565cca527a089d79b59a2c6a2c15c29e97fb22d69d/_data"
       }
     ],
     "networks": [
       {
-        "name": "bridge",
+        "name": "egs-network",
         "driver": "bridge",
-        "scope": "local"
-      },
-      {
-        "name": "none",
-        "driver": "null",
         "scope": "local"
       },
       {
@@ -372,17 +273,17 @@
         "scope": "local"
       },
       {
-        "name": "gnamba-network",
+        "name": "none",
+        "driver": "null",
+        "scope": "local"
+      },
+      {
+        "name": "bridge",
         "driver": "bridge",
         "scope": "local"
       },
       {
         "name": "filebrowser",
-        "driver": "bridge",
-        "scope": "local"
-      },
-      {
-        "name": "egs-network",
         "driver": "bridge",
         "scope": "local"
       }
@@ -391,32 +292,32 @@
   "resources": {
     "ram": {
       "total": 7846,
-      "used": 3278,
-      "available": 4569
+      "used": 4507,
+      "available": 3340
     },
     "cpu": {
       "cores": 4,
-      "usage": 60
+      "usage": 76
     },
     "disk": {
-      "total": "916G",
-      "used": "2,7G",
-      "available": "867G",
-      "usePercent": "1%"
+      "total": "98G",
+      "used": "88G",
+      "available": "5,2G",
+      "usePercent": "95%"
     },
     "ramMb": {
       "total": 7846,
-      "used": 3278,
-      "available": 4569
+      "used": 4507,
+      "available": 3340
     },
     "cpuLegacy": {
       "cores": 4,
-      "usagePercent": 60
+      "usagePercent": 76
     },
     "diskGb": {
-      "total": 916,
-      "used": 2,
-      "available": 867
+      "total": 98,
+      "used": 88,
+      "available": 5
     }
   },
   "services": {
@@ -426,35 +327,35 @@
         "port": 54322,
         "status": "running",
         "healthy": true,
-        "lastCheck": "2026-10-29T12:56:30.347Z"
+        "lastCheck": "2026-11-02T19:47:55.212Z"
       },
       "postgrest": {
         "container": "egs-postgrest",
         "port": 3001,
         "status": "running",
         "healthy": true,
-        "lastCheck": "2026-10-29T12:56:30.348Z"
+        "lastCheck": "2026-11-02T19:47:55.212Z"
       },
       "keycloak": {
         "container": "egs-keycloak",
         "port": 8080,
         "status": "running",
         "healthy": true,
-        "lastCheck": "2026-10-29T12:56:30.348Z"
+        "lastCheck": "2026-11-02T19:47:55.212Z"
       },
       "studio": {
         "container": "egs-dbClient-studio",
         "port": 3000,
         "status": "unhealthy",
         "healthy": false,
-        "lastCheck": "2026-10-29T12:56:30.348Z"
+        "lastCheck": "2026-11-02T19:47:55.212Z"
       },
       "adminer": {
         "container": "egs-adminer",
         "port": 8081,
         "status": "running",
         "healthy": true,
-        "lastCheck": "2026-10-29T12:56:30.348Z"
+        "lastCheck": "2026-11-02T19:47:55.212Z"
       }
     },
     "coreStack": {
@@ -463,49 +364,49 @@
         "port": 5432,
         "status": "stopped",
         "healthy": false,
-        "lastCheck": "2026-10-29T12:56:30.348Z"
+        "lastCheck": "2026-11-02T19:47:55.212Z"
       },
       "kong": {
         "container": "dbClient-core-kong",
         "port": 8000,
         "status": "stopped",
         "healthy": false,
-        "lastCheck": "2026-10-29T12:56:30.348Z"
+        "lastCheck": "2026-11-02T19:47:55.212Z"
       },
       "auth": {
         "container": "dbClient-core-auth",
         "port": 9999,
         "status": "stopped",
         "healthy": false,
-        "lastCheck": "2026-10-29T12:56:30.348Z"
+        "lastCheck": "2026-11-02T19:47:55.212Z"
       },
       "storage": {
         "container": "dbClient-core-storage",
         "port": 5000,
         "status": "stopped",
         "healthy": false,
-        "lastCheck": "2026-10-29T12:56:30.348Z"
+        "lastCheck": "2026-11-02T19:47:55.212Z"
       },
       "realtime": {
         "container": "dbClient-core-realtime",
         "port": 4000,
         "status": "stopped",
         "healthy": false,
-        "lastCheck": "2026-10-29T12:56:30.348Z"
+        "lastCheck": "2026-11-02T19:47:55.212Z"
       },
       "studio": {
         "container": "dbClient-core-studio",
         "port": 3000,
         "status": "stopped",
         "healthy": false,
-        "lastCheck": "2026-10-29T12:56:30.348Z"
+        "lastCheck": "2026-11-02T19:47:55.212Z"
       },
       "meta": {
         "container": "dbClient-core-meta",
         "port": 8080,
         "status": "stopped",
         "healthy": false,
-        "lastCheck": "2026-10-29T12:56:30.348Z"
+        "lastCheck": "2026-11-02T19:47:55.212Z"
       }
     }
   },
@@ -522,35 +423,35 @@
         "port": 54322,
         "status": "running",
         "healthy": true,
-        "lastCheck": "2026-10-29T12:56:30.347Z"
+        "lastCheck": "2026-11-02T19:47:55.212Z"
       },
       "postgrest": {
         "container": "egs-postgrest",
         "port": 3001,
         "status": "running",
         "healthy": true,
-        "lastCheck": "2026-10-29T12:56:30.348Z"
+        "lastCheck": "2026-11-02T19:47:55.212Z"
       },
       "keycloak": {
         "container": "egs-keycloak",
         "port": 8080,
         "status": "running",
         "healthy": true,
-        "lastCheck": "2026-10-29T12:56:30.348Z"
+        "lastCheck": "2026-11-02T19:47:55.212Z"
       },
       "studio": {
         "container": "egs-dbClient-studio",
         "port": 3000,
         "status": "unhealthy",
         "healthy": false,
-        "lastCheck": "2026-10-29T12:56:30.348Z"
+        "lastCheck": "2026-11-02T19:47:55.212Z"
       },
       "adminer": {
         "container": "egs-adminer",
         "port": 8081,
         "status": "running",
         "healthy": true,
-        "lastCheck": "2026-10-29T12:56:30.348Z"
+        "lastCheck": "2026-11-02T19:47:55.212Z"
       }
     },
     "coreStack": {
@@ -559,49 +460,49 @@
         "port": 5432,
         "status": "stopped",
         "healthy": false,
-        "lastCheck": "2026-10-29T12:56:30.348Z"
+        "lastCheck": "2026-11-02T19:47:55.212Z"
       },
       "kong": {
         "container": "dbClient-core-kong",
         "port": 8000,
         "status": "stopped",
         "healthy": false,
-        "lastCheck": "2026-10-29T12:56:30.348Z"
+        "lastCheck": "2026-11-02T19:47:55.212Z"
       },
       "auth": {
         "container": "dbClient-core-auth",
         "port": 9999,
         "status": "stopped",
         "healthy": false,
-        "lastCheck": "2026-10-29T12:56:30.348Z"
+        "lastCheck": "2026-11-02T19:47:55.212Z"
       },
       "storage": {
         "container": "dbClient-core-storage",
         "port": 5000,
         "status": "stopped",
         "healthy": false,
-        "lastCheck": "2026-10-29T12:56:30.348Z"
+        "lastCheck": "2026-11-02T19:47:55.212Z"
       },
       "realtime": {
         "container": "dbClient-core-realtime",
         "port": 4000,
         "status": "stopped",
         "healthy": false,
-        "lastCheck": "2026-10-29T12:56:30.348Z"
+        "lastCheck": "2026-11-02T19:47:55.212Z"
       },
       "studio": {
         "container": "dbClient-core-studio",
         "port": 3000,
         "status": "stopped",
         "healthy": false,
-        "lastCheck": "2026-10-29T12:56:30.348Z"
+        "lastCheck": "2026-11-02T19:47:55.212Z"
       },
       "meta": {
         "container": "dbClient-core-meta",
         "port": 8080,
         "status": "stopped",
         "healthy": false,
-        "lastCheck": "2026-10-29T12:56:30.348Z"
+        "lastCheck": "2026-11-02T19:47:55.212Z"
       }
     }
   }

@@ -910,7 +910,7 @@ export default function ContractsTab({
                     adresse: payload.adresse,
                     commune: data.commune?.trim() || null,
                     ville: data.ville?.trim() || null,
-                    proprietaire_entity_id: payload.proprietaire_id || undefined,
+                    proprietaire_entity_id: payload.proprietaire_id || null,
                     loyer_mensuel: payload.loyer_mensuel,
                     charges_mensuelles: payload.charges,
                     statut: "disponible",
@@ -1028,7 +1028,7 @@ export default function ContractsTab({
                       if (form.property_id && form.date_debut) {
                         const contractPayload = {
                           property_id: form.property_id,
-                          locataire_entity_id: createdClient.id,
+                          locataire_id: createdClient.id,
                           date_debut: form.date_debut,
                           date_fin: form.date_fin || null,
                           loyer_mensuel: parseFloat(form.loyer_mensuel) || parseFloat(data.loyer) || 0,
