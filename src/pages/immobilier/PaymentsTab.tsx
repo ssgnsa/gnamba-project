@@ -33,6 +33,7 @@ import {
   formatMontantImmo,
   getPaymentStatusConfig,
 } from "../../lib/immobilier";
+import { printQuittance } from "../../lib/report-generator";
 
 const emptyForm = {
   contract_id: "",
@@ -220,7 +221,6 @@ export default function PaymentsTab({
     }
 
     const locataireId =
-      contract.locataire_entity_id ||
       contract.locataire_id ||
       form.locataire_id ||
       null;
@@ -245,7 +245,7 @@ export default function PaymentsTab({
       const existing = cached.find((payment) => payment.id === editingId);
 
       const payload = {
-        locataire_entity_id: locataireId,
+        locataire_id: locataireId,
         property_id: contract.property_id || "",
         contract_id: form.contract_id,
         montant: parseFloat(form.montant) || 0,
@@ -372,6 +372,45 @@ export default function PaymentsTab({
       showToast("error","Erreur",`Erreur lors du changement de statut: ${err.message}`);
     }
   };
+
+  // Ouvre l'impression de quittance avec les données du paiement
+  function openQuittancePrint(payment: RentPayment) {
+    // Récupérer le nom complet du locataire depuis le contrat + locataires
+    const contract = contracts.find((c) => c.id === payment.contract_id);
+    const locataireId = contract?.locataire_id;
+    const tenant = tenants.find((t) => t.id === locataireId);
+    const client = tenant?.client;
+    const locatairePrenom = client ? client.prenom : getTenantName(tenant);
+    const locataireNom = client ? client.nom : (tenant ? `${tenant.prenom} ${tenant.nom}` : "");
+    const bienAdresse = contract?.property_id
+      ? properties.find((p) => p.id === contract.property_id)?.adresse || ""
+      : "";
+    const reference = payment.reference;
+    const montant = payment.montant;
+    const datePaiement = payment.date_paiement ? new Date(payment.date_paiement).toLocaleDateString("fr-FR") : "";
+    const moisConcerne = payment.mois_concerne || "";
+    const modePaiement = payment.mode_paiement;
+    const appName = settings?.primary_color ? settings.primary_color : ""; // fallback, on utilisera le vrai nom depuis settings
+    const appCompany = "EGS GNAMBA"; // à remplacer par les settings si dispo
+
+    // Construire les données pour printQuittance
+    const quittanceData = {
+      reference,
+      locataire_nom: locataireNom,
+      locataire_prenom: locatairePrenom,
+      bien_adresse: bienAdresse,
+      montant,
+      date_paiement: datePaiement,
+      mode_paiement: modePaiement,
+      appName,
+      appCompany,
+      logoUrl: settings?.primary_color ? undefined : undefined, // logo géré par les settings
+      mois_concerne: moisConcerne,
+    };
+
+    // Ouvrir la fenêtre d'impression
+    printQuittance(quittanceData);
+  }
 
   // Get active contracts for dropdown
   const activeContracts = contracts
@@ -652,7 +691,9 @@ export default function PaymentsTab({
                                   </button>
                                   {p.statut === "paye" && (
                                     <button
-                                      onClick={() => window.print()}
+                                      onClick={() =>
+                                        openQuittancePrint(p)
+                                      }
                                       className="p-1.5 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors"
                                       title="Imprimer la quittance"
                                     >

@@ -7,7 +7,7 @@ from typing import Any, Optional
 from uuid import UUID
 from datetime import date, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy import select, func, or_
 from sqlalchemy.orm import Session
 
@@ -291,6 +291,37 @@ def delete_payment(
 ) -> dict[str, str]:
     """Payments must be corrected with a reversal or credit note."""
     raise HTTPException(status_code=403, detail="Corrigez le paiement par écriture inverse ou avoir")
+
+
+@router.post("/{payment_id}/deliver-document", response_model=RentPaymentResponse)
+def deliver_document(
+    payment_id: UUID,
+    document_type: str = Body(...),  # "quittance" | "recu"
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(require_admin_user),
+) -> RentPaymentResponse:
+    """Marque qu'un document (quittance/reçu) a été délivré pour ce paiement"""
+    payment = db.execute(
+        select(RentPayment)
+        .where(RentPayment.id == payment_id)
+        .where(RentPayment.deleted_at.is_(None))
+    ).scalar_one_or_none()
+
+    if not payment:
+        raise HTTPException(status_code=404, detail="Paiement introuvable")
+
+    if document_type not in ("quittance", "recu"):
+        raise HTTPException(status_code=400, detail="Type de document invalide. Doit être 'quittance' ou 'recu'.")
+
+    now = datetime.utcnow()
+    payment.last_document_type = document_type
+    payment.last_document_at = now
+    payment.last_document_by = current_user.get("id")  # dict, not object attr
+    payment.updated_at = now
+    db.commit()
+    db.refresh(payment)
+
+    return _payment_to_response(payment)
 
 
 @router.post("/{payment_id}/restore", response_model=RentPaymentResponse)
