@@ -1,6 +1,7 @@
 // Foncier component parts barrel export
 export { LotTable } from "./LotTable";
 export { LotFormModal } from "./LotFormModal";
+export { LotissementFormModal } from "./LotissementFormModal";
 export { AttestationModal } from "./AttestationModal";
 export { AttestationHistoryModal } from "./AttestationHistoryModal";
 export { ConfigModal } from "./ConfigModal";

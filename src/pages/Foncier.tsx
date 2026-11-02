@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   Settings2,
   History,
@@ -7,14 +7,18 @@ import {
   CheckCircle,
   Files,
   Printer,
+  Plus,
 } from "lucide-react";
 import { apiClient } from "../api/client";
 import { useSettings } from "../context/SettingsContext";
 import { useAuth, resolveAccessLevel } from "../context/AuthContext";
 import { useFoncierState } from "../hooks/foncier";
+import { foncierRepository } from "@/data/foncier.repository";
+import type { FoncierLot } from "@/types";
 import {
   LotTable,
   LotFormModal,
+  LotissementFormModal,
   AttestationModal,
   AttestationHistoryModal,
   ConfigModal,
@@ -110,6 +114,32 @@ export default function Foncier() {
     handlePrintAttestation,
     handlePrintAttestationAnnex,
   } = state;
+
+  // Villages (objets) pour le select de création de lotissement (value = id, label = nom)
+  const [lotissements, setLotissements] = useState<{ id: string; nom: string; code?: string }[]>([]);
+  const [lotissementModalOpen, setLotissementModalOpen] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const loadVillages = async () => {
+      try {
+        const result = await foncierRepository.getVillages();
+        if (!active) return;
+        if (result.error) throw result.error;
+        setLotissements((result.data ?? []).map((v) => ({
+          id: v.id,
+          nom: v.nom,
+          code: v.code,
+        })));
+      } catch (err) {
+        console.error("Error loading villages for lotissement modal:", err);
+      }
+    };
+    void loadVillages();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handlePrintAttestationPdf = async (lot: FoncierLot) => {
     const token = apiClient.getStoredLocalAuthToken();
@@ -256,6 +286,18 @@ export default function Foncier() {
 
         {/* Tab: Lots */}
         {activeTab === "lots" && (
+          <>
+          <div className="flex items-center gap-2 mb-3">
+            <button
+              onClick={() => setLotissementModalOpen(true)}
+              disabled={!canManage || !isOnline}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium text-white shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ backgroundColor: settings.primary_color || "#1e3a5f" }}
+              title={!canManage ? "Droits insuffisants" : !isOnline ? "Hors ligne : création indisponible" : undefined}
+            >
+              <Plus size={16} /> Nouveau Lotissement
+            </button>
+          </div>
           <LotTable
             lots={lots}
             loading={loading}
@@ -291,8 +333,8 @@ export default function Foncier() {
             onHandleRestore={handleRestore}
             searchInputRef={searchInputRef}
           />
+          </>
         )}
-
         {/* Tab: Attestations */}
         {activeTab === "attestations" && (
           <div className="space-y-4">
@@ -564,6 +606,18 @@ export default function Foncier() {
           accessLevel={accessLevel}
           profile={profile}
           canManage={canManage}
+        />
+
+        {/* Lotissement creation modal */}
+        <LotissementFormModal
+          isOpen={lotissementModalOpen}
+          onClose={() => setLotissementModalOpen(false)}
+          onSuccess={() => {
+            setLotissementModalOpen(false);
+            void fetchData();
+          }}
+          villages={lotissements}
+          isLoading={loading}
         />
       </main>
     </div>
