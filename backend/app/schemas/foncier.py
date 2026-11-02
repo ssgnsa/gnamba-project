@@ -37,8 +37,8 @@ class VillageBase(FoncierBase):
     arrete_date: Optional[date] = None
     lieu_signature: Optional[str] = None
     nom_signataire: Optional[str] = None
-    primary_color: str = Field(default="#1e3a5f", pattern=r"^#[0-9a-fA-F]{6}$")
-    secondary_color: str = Field(default="#d4a843", pattern=r"^#[0-9a-fA-F]{6}$")
+    primary_color: Optional[str] = Field(default="#1e3a5f", pattern=r"^#[0-9a-fA-F]{6}$")
+    secondary_color: Optional[str] = Field(default="#d4a843", pattern=r"^#[0-9a-fA-F]{6}$")
     layout_preference: str = Field(default="standard", pattern=r"^(standard|compact|detailed)$")
     config_jsonb: Dict[str, Any] = Field(default_factory=dict)
     actif: bool = True

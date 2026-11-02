@@ -104,10 +104,7 @@ export const ConfigModal: FC<ConfigModalProps> = ({
       setError("Droits insuffisants pour modifier la configuration du village.");
       return;
     }
-    if (!selectedVillage) {
-      setError("Sélectionnez d'abord un village dans le menu déroulant.");
-      return;
-    }
+    // Le village peut être sélectionné OU saisi manuellement pour création.
     if (!config.village?.trim()) {
       setError("Le nom du village est obligatoire");
       return;
@@ -116,14 +113,37 @@ export const ConfigModal: FC<ConfigModalProps> = ({
     setSaving(true);
     setError(null);
 
+    const villageName = config.village.trim();
+
+    // Génère un code village à partir du nom: supprime accents, espaces,
+    // passe en majuscules, ne garde que [A-Z0-9], limité à 10 caractères.
+    const generateVillageCode = (name: string): string =>
+      name
+        .normalize("NFD")
+        .replace(/\p{Mn}/gu, "")
+        .replace(/[^A-Za-z0-9]/g, "")
+        .toUpperCase()
+        .slice(0, 10);
+
     try {
       const villageResult = await foncierRepository.getVillages() as {
-        data?: Array<{ id?: string; nom?: string }> | null;
+        data?: Array<{ id?: string; nom?: string; code?: string }> | null;
         error?: unknown;
       };
       if (villageResult.error) throw villageResult.error;
-      const village = villageResult.data?.find((item) => item.nom === selectedVillage);
-      if (!village?.id) throw new Error("Village introuvable pour enregistrer sa configuration");
+
+      let village = villageResult.data?.find((item) => item.nom === villageName);
+
+      if (!village?.id) {
+        const code = generateVillageCode(villageName);
+        const created = await foncierRepository.createVillage({
+          nom: villageName,
+          code,
+        } as any);
+        if (created.error) throw created.error;
+        village = { id: (created.data as { id?: string } | undefined)?.id, nom: villageName, code };
+        if (!village.id) throw new Error("Le village créé n'a pas retourné d'identifiant");
+      }
 
       const result = await foncierRepository.updateVillage(village.id, {
         config_jsonb: config,
