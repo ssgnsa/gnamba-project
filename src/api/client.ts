@@ -35,7 +35,7 @@ export function resolveApiBaseUrl(
   const parsedApi = new URL(normalized, "http://placeholder.com");
   const isLocalApi = (parsedApi.hostname === "localhost" || parsedApi.hostname === "127.0.0.1") && parsedApi.port === "8000" && parsedApi.pathname === "/api/v1";
 
-  // Page servée depuis une IP privée/LAN en HTTP (ex. http://192.168.1.58) :
+  // Page servée depuis une IP privée/LAN en HTTP (ex. http://<adresse-privée>) :
   // le reverse-proxy du même hôte expose l'API sur le port 80, donc une URL
   // relative suffit. Cela évite le CORS et l'URL publique (injoignable depuis
   // le réseau local). Détection faite à l'exécution sur l'origine de la page,
@@ -142,9 +142,9 @@ class ApiClient {
   private assertSecureCredentialTransport(endpoint: string): void {
     if (typeof window === 'undefined' || (!this.accessToken && !/^\/auth\//.test(endpoint))) return;
     const localHost = /^(localhost|127\.0\.0\.1|\[::1\])$/i.test(window.location.hostname);
-    // Une origine LAN privée (ex. 192.168.1.58) est servie en HTTP et l'API est
-    // jointe sur la même origine via le reverse-proxy : pas d'exigence HTTPS,
-    // comme pour la boucle locale. Les origines publiques doivent rester en HTTPS.
+    // Une origine LAN privée est servie en HTTP et l'API est jointe sur la même
+    // origine via le reverse-proxy : pas d'exigence HTTPS, comme pour la boucle
+    // locale. Les origines publiques doivent rester en HTTPS.
     const lanOrigin = isLocalPageOrigin(window.location.origin);
     const apiUrl = new URL(this.baseUrl, window.location.origin);
     if (!localHost && !lanOrigin && (window.location.protocol !== 'https:' || apiUrl.protocol !== 'https:')) {
