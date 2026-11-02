@@ -139,6 +139,7 @@ vi.mock("../hooks/foncier", () => ({
 vi.mock("../components/foncier/parts", () => ({
   LotTable: () => null,
   LotFormModal: () => null,
+  LotissementFormModal: () => null,
   AttestationModal: () => null,
   AttestationHistoryModal: () => null,
   ConfigModal: () => null,

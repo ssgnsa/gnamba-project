@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Settings2,
   History,
@@ -41,7 +41,6 @@ export default function Foncier() {
   // Extract everything from state for easier access
   const {
     lots,
-    totalCount,
     villageStats,
     villageOptions,
     page,
@@ -118,28 +117,83 @@ export default function Foncier() {
   // Villages (objets) pour le select de création de lotissement (value = id, label = nom)
   const [lotissements, setLotissements] = useState<{ id: string; nom: string; code?: string }[]>([]);
   const [lotissementModalOpen, setLotissementModalOpen] = useState(false);
+  const [loadingLotissements, setLoadingLotissements] = useState(false);
+
+  // Hiérarchie Village → Lotissement → Îlot → Lot
+  const [selectedLotissement, setSelectedLotissement] = useState<string | null>(null);
+  const [selectedIlot, setSelectedIlot] = useState<string | null>(null);
+
+  // Options de lotissements et îlots dérivées des lots chargés (filtrage côté client,
+  // searchLots ne supportant pas le filtrage par lotissement_id / ilot_id côté serveur).
+  const lotissementOptions = useMemo(() => {
+    if (!selectedVillage) return [];
+    const set = new Set<string>();
+    lots.forEach((lot) => {
+      if (lot.village === selectedVillage && lot.nom_lotissement) set.add(lot.nom_lotissement);
+    });
+    return Array.from(set).sort().map((nom) => ({ nom, id: nom }));
+  }, [lots, selectedVillage]);
+
+  const ilotOptions = useMemo(() => {
+    if (!selectedVillage || !selectedLotissement) return [];
+    const set = new Set<string>();
+    lots.forEach((lot) => {
+      if (
+        lot.village === selectedVillage &&
+        lot.nom_lotissement === selectedLotissement &&
+        lot.numero_ilot
+      ) {
+        set.add(lot.numero_ilot);
+      }
+    });
+    return Array.from(set).sort().map((numero) => ({ nom: `Îlot ${numero}`, id: numero }));
+  }, [lots, selectedVillage, selectedLotissement]);
+
+  // Reset les enfants quand un parent change (cascade)
+  useEffect(() => {
+    setSelectedLotissement(null);
+    setSelectedIlot(null);
+  }, [selectedVillage]);
 
   useEffect(() => {
-    let active = true;
-    const loadVillages = async () => {
-      try {
-        const result = await foncierRepository.getVillages();
-        if (!active) return;
-        if (result.error) throw result.error;
-        setLotissements((result.data ?? []).map((v) => ({
-          id: v.id,
-          nom: v.nom,
-          code: v.code,
-        })));
-      } catch (err) {
-        console.error("Error loading villages for lotissement modal:", err);
-      }
-    };
-    void loadVillages();
-    return () => {
-      active = false;
-    };
+    setSelectedIlot(null);
+  }, [selectedLotissement]);
+
+  const reloadVillages = async () => {
+    setLoadingLotissements(true);
+    try {
+      const result = await foncierRepository.getVillages();
+      if (result.error) throw result.error;
+      setLotissements((result.data ?? []).map((v) => ({
+        id: v.id,
+        nom: v.nom,
+        code: v.code,
+      })));
+    } catch (err) {
+      console.error("Error loading villages for lotissement modal:", err);
+    } finally {
+      setLoadingLotissements(false);
+    }
+  };
+
+  useEffect(() => {
+    void reloadVillages();
   }, []);
+
+  // Lots filtrés par la hiérarchie Village → Lotissement → Îlot (côté client)
+  const filteredLots = useMemo(() => {
+    let filtered = lots;
+    if (selectedVillage) {
+      filtered = filtered.filter((lot) => lot.village === selectedVillage);
+    }
+    if (selectedLotissement) {
+      filtered = filtered.filter((lot) => lot.nom_lotissement === selectedLotissement);
+    }
+    if (selectedIlot) {
+      filtered = filtered.filter((lot) => lot.numero_ilot === selectedIlot);
+    }
+    return filtered;
+  }, [lots, selectedVillage, selectedLotissement, selectedIlot]);
 
   const handlePrintAttestationPdf = async (lot: FoncierLot) => {
     const token = apiClient.getStoredLocalAuthToken();
@@ -157,7 +211,13 @@ export default function Foncier() {
       }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
-      window.open(url, "_blank");
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `attestation-${lot.reference || lot.id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     } catch (err) {
       console.error("Print PDF error:", err);
       alert("Impossible d'imprimer le PDF de l'attestation.");
@@ -289,8 +349,8 @@ export default function Foncier() {
           <>
           <div className="flex items-center gap-2 mb-3">
             <button
-              onClick={() => setLotissementModalOpen(true)}
-              disabled={!canManage || !isOnline}
+              onClick={() => { void reloadVillages(); setLotissementModalOpen(true); }}
+              disabled={!canManage || !isOnline || !selectedVillage}
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium text-white shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ backgroundColor: settings.primary_color || "#1e3a5f" }}
               title={!canManage ? "Droits insuffisants" : !isOnline ? "Hors ligne : création indisponible" : undefined}
@@ -298,10 +358,11 @@ export default function Foncier() {
               <Plus size={16} /> Nouveau Lotissement
             </button>
           </div>
+          {/* Filtrage hiérarchique Village → Lotissement → Îlot (côté client) */}
           <LotTable
-            lots={lots}
+            lots={filteredLots}
             loading={loading}
-            totalCount={totalCount}
+            totalCount={filteredLots.length}
             page={page}
             pageSize={pageSize}
             totalPages={totalPages}
@@ -332,6 +393,13 @@ export default function Foncier() {
             onHandleArchive={handleArchive}
             onHandleRestore={handleRestore}
             searchInputRef={searchInputRef}
+            selectedVillage={selectedVillage}
+            selectedLotissement={selectedLotissement}
+            setSelectedLotissement={setSelectedLotissement}
+            selectedIlot={selectedIlot}
+            setSelectedIlot={setSelectedIlot}
+            lotissementOptions={lotissementOptions}
+            ilotOptions={ilotOptions}
           />
           </>
         )}
@@ -617,7 +685,7 @@ export default function Foncier() {
             void fetchData();
           }}
           villages={lotissements}
-          isLoading={loading}
+          isLoading={loading || loadingLotissements}
         />
       </main>
     </div>

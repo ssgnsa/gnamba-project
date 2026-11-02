@@ -232,6 +232,7 @@ export const AttestationModal: FC<AttestationModalProps> = ({
       });
 
       onSuccess();
+      onClose();
       setSaving(false);
     } catch (err: any) {
       console.error("Error generating attestation:", err);

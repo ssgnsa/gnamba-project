@@ -9,7 +9,8 @@ import {
   RotateCcw,
   CheckCircle,
   Files,
-  Edit
+  Edit,
+  ChevronRight,
 } from "lucide-react";
 import Badge from "@/components/ui/Badge";
 import { FoncierLot } from "@/types";
@@ -49,6 +50,15 @@ interface LotTableProps {
   searchInputRef: React.RefObject<HTMLInputElement>;
   profile?: { role?: string; access_level?: string | number | null } | null;
   accessLevel?: string;
+
+  // Hiérarchie Village → Lotissement → Îlot
+  selectedVillage: string;
+  selectedLotissement: string | null;
+  setSelectedLotissement: (lotissement: string | null) => void;
+  selectedIlot: string | null;
+  setSelectedIlot: (ilot: string | null) => void;
+  lotissementOptions: { id: string; nom: string }[];
+  ilotOptions: { id: string; nom: string }[];
 }
 
 const disabledButtonClass = "disabled:opacity-50 disabled:cursor-not-allowed";
@@ -84,6 +94,14 @@ export function LotTable({
   onHandleArchive,
   onHandleRestore,
   searchInputRef,
+  // Hiérarchie
+  selectedVillage,
+  selectedLotissement,
+  setSelectedLotissement,
+  selectedIlot,
+  setSelectedIlot,
+  lotissementOptions,
+  ilotOptions,
 }: LotTableProps) {
   const statutConfig = {
     actif: { label: "Actif", color: "green" as const },
@@ -134,6 +152,45 @@ export function LotTable({
 
   return (
     <div className="space-y-4">
+      {/* Breadcrumb hiérarchique (cliquable pour remonter d'un niveau) */}
+      <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
+        <span className="text-gray-400">Filtrer par :</span>
+        {selectedVillage ? (
+          <>
+            <button
+              onClick={() => {
+                setSelectedLotissement(null);
+                setSelectedIlot(null);
+              }}
+              className="font-medium text-blue-600 hover:underline hover:text-blue-800"
+            >
+              {selectedVillage}
+            </button>
+            <ChevronRight size={14} className="text-gray-400" />
+            {selectedLotissement ? (
+              <>
+                <button
+                  onClick={() => setSelectedIlot(null)}
+                  className="font-medium text-blue-600 hover:underline hover:text-blue-800"
+                >
+                  {selectedLotissement}
+                </button>
+                <ChevronRight size={14} className="text-gray-400" />
+                {selectedIlot ? (
+                  <span className="font-medium text-gray-900">Îlot {selectedIlot}</span>
+                ) : (
+                  <span className="text-gray-400">Îlot…</span>
+                )}
+              </>
+            ) : (
+              <span className="text-gray-400">Lotissement…</span>
+            )}
+          </>
+        ) : (
+          <span className="text-gray-400">Village…</span>
+        )}
+      </div>
+
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div className="flex flex-wrap items-center gap-2">
@@ -180,6 +237,34 @@ export function LotTable({
             {villageOptions.map((v) => (
               <option key={v} value={v}>
                 {v} ({villageStats[v]?.count || 0})
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={selectedLotissement ?? ""}
+            onChange={(e) => setSelectedLotissement(e.target.value || null)}
+            disabled={!selectedVillage}
+            className="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <option value="">Lotissement…</option>
+            {lotissementOptions.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.nom}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={selectedIlot ?? ""}
+            onChange={(e) => setSelectedIlot(e.target.value || null)}
+            disabled={!selectedLotissement}
+            className="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <option value="">Îlot…</option>
+            {ilotOptions.map((i) => (
+              <option key={i.id} value={i.id}>
+                {i.nom}
               </option>
             ))}
           </select>
