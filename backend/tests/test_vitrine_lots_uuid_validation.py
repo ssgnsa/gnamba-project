@@ -169,7 +169,7 @@ def test_generic_table_mutations_are_denied_before_repository(
     else:
         response = getattr(api_client, method)(path)
 
-    assert response.status_code == 403
+    assert response.status_code == 422
 
 
 @pytest.mark.parametrize("field_name", ("id", "lot_id", "property_id"))
@@ -189,7 +189,7 @@ def test_generic_table_create_is_denied_before_repository(
         json={field_name: value},
     )
 
-    assert response.status_code == 403
+    assert response.status_code == 422
 
 
 @pytest.mark.parametrize("field_name", ("id", "lot_id", "property_id"))
@@ -209,7 +209,7 @@ def test_generic_table_update_is_denied_before_repository(
         json={field_name: value},
     )
 
-    assert response.status_code == 403
+    assert response.status_code == 422
 
 
 def test_generic_table_update_is_denied_even_for_valid_uuid(

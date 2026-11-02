@@ -186,7 +186,7 @@ def health() -> dict[str, str]:
 def readiness() -> dict[str, str]:
     with SessionLocal() as db:
         current_revision = db.execute(text("SELECT version_num FROM alembic_version LIMIT 1")).scalar_one()
-    expected_revision = "037_add_mfa_to_users"
+    expected_revision = "038_fix_foncier_schema_drift"
     if current_revision != expected_revision:
         return JSONResponse(
             status_code=503,

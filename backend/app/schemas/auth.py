@@ -55,6 +55,8 @@ class UserResponse(BaseModel):
     phone: str | None = None
     avatar_url: str | None = None
     mfa_enabled: bool = False
+    aal: str | None = None
+    mfa_verified: bool | None = None
 class MfaSetupResponse(BaseModel):
     secret: str
     otpauth_uri: str

@@ -61,6 +61,10 @@ def has_permission(
                 return action == "read" and False
             if action == "read":
                 return True
+            # stats_journalieres est un grand-livre append-only : lecture autorisée,
+            # écriture/suppression refusée pour tout le monde (même admin).
+            if resource == "stats_journalieres":
+                return False
             # Write (create/update/delete): admin needs MFA verified
             return user.get("mfa_verified") is True
         if action != "read":

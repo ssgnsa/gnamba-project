@@ -6,7 +6,7 @@ from app.core import migration_runner
 
 class _Result:
     def scalar_one(self):
-        return "036_foncier_activity_logs_json"
+        return "038_fix_foncier_schema_drift"
 
 
 class _DatabaseSession:

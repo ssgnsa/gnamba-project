@@ -676,6 +676,25 @@ def _canonical_vitrine_lot_uuid(value: Any, field_name: str) -> str:
         raise HTTPException(status_code=422, detail=f"{field_name} doit être un UUID valide") from exc
 
 
+def _refuse_vitrine_lots_write(table: str, payload: dict[str, Any] | None = None) -> None:
+    """Les lots vitrine s'écrivent via l'API vitrine dédiée, jamais par l'API générique /tables.
+
+    Les UUID présents dans le corps sont validés d'abord (422 si invalides) avant le refus
+    d'écriture (403), afin de rejeter rapidement les entrées malformées.
+    """
+    if table != "vitrine_lots":
+        return
+    if isinstance(payload, dict):
+        for field_name in ("id", "lot_id", "property_id"):
+            value = payload.get(field_name)
+            if value is not None:
+                _canonical_vitrine_lot_uuid(value, field_name)
+    raise HTTPException(
+        status_code=403,
+        detail="L'écriture des lots vitrine est réservée à l'API vitrine dédiée",
+    )
+
+
 @router.get("/{table}")
 def list_rows(
     table: str,
@@ -747,13 +766,7 @@ async def create_row(
         if current_user is None:
             raise HTTPException(status_code=401, detail="Authentification requise")
         enforce_permission(current_user, "erp_table", "create", resource=table)
-    if table == "vitrine_lots":
-        if not isinstance(payload, dict):
-            raise HTTPException(status_code=422, detail="Un objet JSON est requis")
-        for field_name in ("id", "lot_id", "property_id"):
-            value = payload.get(field_name)
-            if value is not None:
-                payload[field_name] = _canonical_vitrine_lot_uuid(value, field_name)
+    _refuse_vitrine_lots_write(table, payload)
     created = _repository(table, db).create(payload)
     return {"status": "ok"} if public_contact else created
 
@@ -767,14 +780,10 @@ async def update_row(
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
     enforce_permission(current_user, "erp_table", "update", resource=table)
+    payload = await request.json()
     if table == "vitrine_lots":
         row_id = _canonical_vitrine_lot_uuid(row_id, "row_id")
-    payload = await request.json()
-    if table == "vitrine_lots" and isinstance(payload, dict):
-        for field_name in ("id", "lot_id", "property_id"):
-            value = payload.get(field_name)
-            if value is not None:
-                payload[field_name] = _canonical_vitrine_lot_uuid(value, field_name)
+    _refuse_vitrine_lots_write(table, payload)
     updated = _repository(table, db).update(row_id, payload)
     if not updated:
         raise HTTPException(status_code=404, detail="Ligne introuvable")
@@ -791,6 +800,10 @@ def delete_row(
     enforce_permission(current_user, "erp_table", "delete", resource=table)
     if table == "vitrine_lots":
         row_id = _canonical_vitrine_lot_uuid(row_id, "row_id")
+        raise HTTPException(
+            status_code=403,
+            detail="L'écriture des lots vitrine est réservée à l'API vitrine dédiée",
+        )
     if not _repository(table, db).delete(row_id):
         raise HTTPException(status_code=404, detail="Ligne introuvable")
     return {"status": "ok", "message": "Ligne supprimée"}
