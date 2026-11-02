@@ -30,6 +30,13 @@ configure_production_build_env() {
   export VITE_LOCAL_API_URL="${VITE_LOCAL_API_URL:-$VITE_API_URL}"
   export VITE_SELFHOSTED_MODE="true"
 
+  if [[ "$VITE_API_URL" =~ ^http:// ]]; then
+    fail "VITE_API_URL doit utiliser HTTPS en production; adresse HTTP refusée: $VITE_API_URL"
+  fi
+  if [[ "$VITE_LOCAL_API_URL" =~ ^http:// ]]; then
+    fail "VITE_LOCAL_API_URL doit utiliser HTTPS en production; adresse HTTP refusée: $VITE_LOCAL_API_URL"
+  fi
+
   if [[ "$VITE_API_URL" =~ ^https?://(localhost|127\.0\.0\.1|\[::1\])(:[0-9]+)?(/|$) ]]; then
     fail "VITE_API_URL ne doit pas pointer vers une adresse loopback en production"
   fi

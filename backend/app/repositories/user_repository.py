@@ -31,6 +31,11 @@ class UserRepositoryPort(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def deactivate(self, user_id: str) -> bool:
+        """Désactive un compte (is_active=false) sans le supprimer."""
+        raise NotImplementedError
+
+    @abstractmethod
     def create(self, payload: dict[str, Any]) -> User:
         raise NotImplementedError
 
@@ -87,6 +92,13 @@ class InMemoryUserRepository(UserRepositoryPort):
         if not user:
             return False
         self._users_by_email.pop(user.email, None)
+        return True
+
+    def deactivate(self, user_id: str) -> bool:
+        user = self._users_by_id.get(user_id)
+        if not user:
+            return False
+        user.is_active = False
         return True
 
     def create(self, payload: dict[str, Any]) -> User:

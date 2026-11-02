@@ -74,6 +74,27 @@ def require_admin_user(
     return current_user
 
 
+class RequireAdminUser:
+    """Dépendance de routeur pour exiger un admin.
+
+    Utilisée dans `dependencies=[Depends(RequireAdminUser)]` au niveau de
+    l'APIRouter. FastAPI injecte automatiquement `Request` dans le
+    constructeur, ce qui évite l'erreur "Request is not a valid Pydantic
+    field type" survenue quand `request: Request` est un paramètre direct
+    d'une fonction utilisée comme dépendance de routeur.
+    """
+
+    def __init__(self, request: Request):
+        self.request = request
+
+    def __call__(
+        self,
+        current_user: dict[str, Any] = Depends(get_current_user),
+        auth_service: AuthService = Depends(get_auth_service),
+    ) -> dict[str, Any]:
+        return require_admin_user(self.request, current_user, auth_service)
+
+
 def require_permission(
     module: str,
     action: str,

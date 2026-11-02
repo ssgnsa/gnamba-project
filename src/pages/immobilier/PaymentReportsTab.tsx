@@ -306,7 +306,7 @@ export default function PaymentReportsTab({
             >
               <option value="all">Toutes les propriétés</option>
               {properties
-                .filter((p) => p.statut === "louee")
+                .filter((p) => p.statut === "louee" || p.statut === "loue")
                 .map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.adresse}

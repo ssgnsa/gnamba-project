@@ -47,7 +47,7 @@ def install_search_service(monkeypatch, attestations):
     calls = []
 
     class FakeAttestationService:
-        def search(self, lot_id=None, statut=None, limit=50, offset=0):
+        def search(self, lot_id=None, statut=None, limit=50, offset=0, exclude_revoked=None):
             calls.append((lot_id, statut, limit, offset))
             filtered = attestations
             if lot_id is not None:
@@ -124,7 +124,7 @@ def test_revoke_attestation_accepts_json_reason(test_client, monkeypatch):
     calls = []
 
     class FakeAttestationService:
-        def revoke(self, attestation_id, reason, user_id):
+        def revoke(self, attestation_id, reason, user_id, user_role=None):
             calls.append((attestation_id, reason, user_id))
             return None
 

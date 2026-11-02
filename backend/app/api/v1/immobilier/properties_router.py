@@ -81,13 +81,20 @@ def create_property(
 ) -> PropertyResponse:
     """Crée un nouveau bien immobilier"""
     set_immobilier_audit_context(db, current_user)
+    if payload.proprietaire_entity_id is not None:
+        owner = db.execute(
+            select(Entity).where(Entity.id == payload.proprietaire_entity_id).where(Entity.deleted_at.is_(None))
+        ).scalar_one_or_none()
+        if not owner:
+            raise HTTPException(status_code=404, detail="Propriétaire introuvable")
+
     prop = Property(
         id=str(payload.id) if payload.id else None,
         type_bien=payload.type_bien,
         adresse=payload.adresse,
         ville=payload.ville,
         commune=payload.commune,
-        proprietaire=payload.proprietaire_name if hasattr(payload, 'proprietaire_name') else None,
+        proprietaire_entity_id=payload.proprietaire_entity_id,
         valeur=payload.valeur,
         loyer_mensuel=payload.loyer_mensuel,
         charges_mensuelles=payload.charges_mensuelles or 0,
@@ -95,7 +102,7 @@ def create_property(
         description=payload.description,
         cover_image_url=payload.cover_image_url,
     )
-    
+
     db.add(prop)
     try:
         db.commit()
@@ -103,7 +110,7 @@ def create_property(
     except Exception:
         db.rollback()
         raise
-    
+
     return _property_to_response(prop)
 
 
@@ -212,38 +219,39 @@ def list_properties(
 @router.get("/stats", response_model=PropertyStatsResponse)
 def get_properties_stats(db: Session = Depends(get_db)) -> PropertyStatsResponse:
     """Statistiques des biens immobiliers"""
-    # Total
-    total = db.execute(select(func.count(Property.id)).where(Property.deleted_at.is_(None))).scalar() or 0
-    
-    # Par statut
-    stats_query = (
-        select(Property.statut, func.count(Property.id))
-        .where(Property.deleted_at.is_(None))
-        .group_by(Property.statut)
-    )
-    stat_results = db.execute(stats_query).all()
-    stat_dict = {statut: count for statut, count in stat_results}
-    
-    # Total monthly rent
-    rent_sum = db.execute(
-        select(func.sum(Property.loyer_mensuel))
-        .where(Property.deleted_at.is_(None))
-        .where(Property.statut.in_(("loue", "louee")))
-    ).scalar() or 0
+    stats = db.execute(
+        select(
+            func.count(Property.id).label("total"),
+            func.count(Property.id).filter(Property.statut == "disponible").label("disponible"),
+            func.count(Property.id).filter(Property.statut == "loue").label("loue"),
+            func.count(Property.id).filter(Property.statut == "louee").label("louee"),
+            func.count(Property.id).filter(Property.statut == "en_vente").label("en_vente"),
+            func.count(Property.id).filter(Property.statut == "vendue").label("vendue"),
+            func.count(Property.id).filter(Property.statut == "en_travaux").label("en_travaux"),
+            func.count(Property.id).filter(Property.statut.in_(("vendue", "archivee"))).label("inactive"),
+            func.coalesce(
+                func.sum(Property.loyer_mensuel).filter(Property.statut.in_(("loue", "louee"))),
+                0,
+            ).label("rent_sum"),
+        ).where(Property.deleted_at.is_(None))
+    ).one()
 
-    disponible = stat_dict.get("disponible", 0)
-    loue = stat_dict.get("louee", 0) + stat_dict.get("loue", 0)
-    total_active = total - stat_dict.get("vendue", 0) - stat_dict.get("archivee", 0)
-    occupancy_rate = (loue / total_active * 100) if total_active > 0 else 0
-    
+    total = stats.total or 0
+    disponible = stats.disponible or 0
+    loue = stats.loue or 0
+    louee = stats.louee or 0
+    total_active = total - (stats.inactive or 0)
+    occupancy_rate = ((loue + louee) / total_active * 100) if total_active > 0 else 0
+
     return PropertyStatsResponse(
         total_properties=total,
-        disponible=stat_dict.get("disponible", 0),
+        disponible=disponible,
         loue=loue,
-        en_vente=stat_dict.get("en_vente", 0),
-        vendu=stat_dict.get("vendue", 0),
-        en_travaux=stat_dict.get("en_travaux", 0),
-        total_monthly_rent=float(rent_sum),
+        louee=louee,
+        en_vente=stats.en_vente or 0,
+        vendu=stats.vendue or 0,
+        en_travaux=stats.en_travaux or 0,
+        total_monthly_rent=float(stats.rent_sum or 0),
         occupancy_rate=round(occupancy_rate, 2),
     )
 
@@ -282,12 +290,19 @@ def update_property(
     
     update_data = payload.model_dump(exclude_unset=True)
     editable_fields = {
-        "type_bien", "adresse", "ville", "commune", "proprietaire_name",
+        "type_bien", "adresse", "ville", "commune", "proprietaire_entity_id",
         "valeur", "loyer_mensuel", "charges_mensuelles", "description",
         "cover_image_url",
     }
     # Keep the API-to-ORM boundary explicit even if the request schema changes.
     update_data = {key: update_data[key] for key in editable_fields if key in update_data}
+
+    if "proprietaire_entity_id" in update_data:
+        owner = db.execute(
+            select(Entity).where(Entity.id == update_data["proprietaire_entity_id"]).where(Entity.deleted_at.is_(None))
+        ).scalar_one_or_none()
+        if not owner:
+            raise HTTPException(status_code=404, detail="Propriétaire introuvable")
 
     if prop.titre_fige_le and any(
         update_data.get(field, getattr(prop, field)) != getattr(prop, field)
@@ -300,12 +315,8 @@ def update_property(
 
     set_immobilier_audit_context(db, current_user)
     for key, value in update_data.items():
-        if key == "properitaire_entity_id" and hasattr(payload, "proprietaire_name"):
-            # Handle the rename for backward compatibility
-            setattr(prop, "proprietaire", value)
-        else:
-            setattr(prop, key, value)
-    
+        setattr(prop, key, value)
+
     prop.updated_at = datetime.utcnow()
 
     try:

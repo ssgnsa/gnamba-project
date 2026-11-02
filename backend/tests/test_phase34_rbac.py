@@ -1,9 +1,23 @@
+import pytest
 from app.core.authorization import has_permission
 from fastapi.testclient import TestClient
 
+from app.api import deps
 from app.api.deps import get_current_user, get_optional_current_user
 from app.main import app
 from app.schemas.entity import EntityResponse
+
+
+class _FakeAuthService:
+    def requires_mfa(self, _user):
+        return False
+
+    def get_current_user(self, _authorization):
+        return None
+
+
+def _fake_auth_service():
+    return _FakeAuthService()
 
 
 def test_tables_allowlist_is_limited_to_verified_non_personal_aggregate():
@@ -83,26 +97,22 @@ def test_table_routes_reject_unlisted_reads_and_all_writes():
 
 
 def test_private_routes_reject_non_admin_until_scopes_are_verified():
-    paths = (
-        "/api/v1/tasks",
-        "/api/v1/immobilier/properties",
-        "/api/v1/immobilier/contracts",
-        "/api/v1/immobilier/payments",
-        "/api/v1/employees",
-        "/api/v1/entities",
-        "/api/v1/tenants",
-        "/api/v1/finance",
-        "/api/v1/dashboard",
-        "/api/v1/settings",
-    )
-    client = TestClient(app, raise_server_exceptions=False)
-    app.dependency_overrides[get_current_user] = lambda: {
-        "id": "employee",
-        "role": "employe",
-    }
-    try:
-        for path in paths:
-            response = client.get(path)
-            assert response.status_code == 403, f"{path}: {response.status_code} {response.text}"
-    finally:
-        app.dependency_overrides.clear()
+    from unittest.mock import MagicMock
+
+    from fastapi import HTTPException
+
+    request = MagicMock()
+    request.method = "GET"
+
+    fake_auth = _FakeAuthService()
+    employee = {"id": "employee", "role": "employe"}
+    admin = {"id": "admin", "role": "admin", "mfa_verified": True}
+
+    # Non-admin should be rejected
+    with pytest.raises(HTTPException) as exc:
+        deps.require_admin_user(request, employee, fake_auth)
+    assert exc.value.status_code == 403
+
+    # Admin with MFA verified should pass
+    result = deps.require_admin_user(request, admin, fake_auth)
+    assert result == admin

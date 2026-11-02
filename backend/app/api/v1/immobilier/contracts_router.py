@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 from uuid import UUID
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, or_
@@ -13,12 +13,12 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.core.database import get_db
 from app.api.deps import require_admin_user
+from app.models.property import LeaseContract, Property, RentPayment
+from app.models.entity import Entity
 from app.services.immobilier_audit import (
     record_property_transition_refusal,
     set_immobilier_audit_context,
 )
-from app.models.property import LeaseContract, Property
-from app.models.entity import Entity
 from app.schemas.immobilier import (
     LeaseContractCreate,
     LeaseContractUpdate,
@@ -26,6 +26,8 @@ from app.schemas.immobilier import (
     LeaseContractSearchParams,
     PaginatedLeaseContractResponse,
     LeaseContractStatsResponse,
+    RentPaymentCreate,
+    RentPaymentResponse,
 )
 
 router = APIRouter(
@@ -195,41 +197,36 @@ def list_contracts(
 @router.get("/stats", response_model=LeaseContractStatsResponse)
 def get_contracts_stats(db: Session = Depends(get_db)) -> LeaseContractStatsResponse:
     """Statistiques des baux"""
-    # Total
-    total = db.execute(select(func.count(LeaseContract.id)).where(LeaseContract.deleted_at.is_(None))).scalar() or 0
-    
-    # Par statut
-    stats_query = (
-        select(LeaseContract.statut, func.count(LeaseContract.id))
-        .where(LeaseContract.deleted_at.is_(None))
-        .group_by(LeaseContract.statut)
-    )
-    stat_results = db.execute(stats_query).all()
-    stat_dict = {statut: count for statut, count in stat_results}
-    
-    # Total monthly revenue
-    revenue_sum = db.execute(
-        select(func.sum(LeaseContract.loyer_mensuel + LeaseContract.charges_mensuelles))
-        .where(LeaseContract.deleted_at.is_(None))
-        .where(LeaseContract.statut == "actif")
-    ).scalar() or 0
-    
-    # Total deposits held
-    deposits_sum = db.execute(
-        select(func.sum(LeaseContract.depot_garantie))
-        .where(LeaseContract.deleted_at.is_(None))
-        .where(LeaseContract.statut == "actif")
-    ).scalar() or 0
+    stats = db.execute(
+        select(
+            func.count(LeaseContract.id).label("total"),
+            func.count(LeaseContract.id).filter(LeaseContract.statut == "actif").label("actif"),
+            func.count(LeaseContract.id).filter(LeaseContract.statut == "termine").label("termine"),
+            func.count(LeaseContract.id).filter(LeaseContract.statut == "resilie").label("resilie"),
+            func.count(LeaseContract.id).filter(LeaseContract.statut == "renouvele").label("renouvele"),
+            func.count(LeaseContract.id).filter(LeaseContract.statut == "en_attente").label("en_attente"),
+            func.coalesce(
+                func.sum(LeaseContract.loyer_mensuel + LeaseContract.charges_mensuelles).filter(
+                    LeaseContract.statut == "actif"
+                ),
+                0,
+            ).label("revenue_sum"),
+            func.coalesce(
+                func.sum(LeaseContract.depot_garantie).filter(LeaseContract.statut == "actif"),
+                0,
+            ).label("deposits_sum"),
+        ).where(LeaseContract.deleted_at.is_(None))
+    ).one()
     
     return LeaseContractStatsResponse(
-        total_contracts=total,
-        actif=stat_dict.get("actif", 0),
-        termine=stat_dict.get("termine", 0),
-        resilie=stat_dict.get("resilie", 0),
-        renouvele=stat_dict.get("renouvele", 0),
-        en_attente=stat_dict.get("en_attente", 0),
-        total_monthly_revenue=float(revenue_sum),
-        total_deposits_held=float(deposits_sum),
+        total_contracts=stats.total or 0,
+        actif=stats.actif or 0,
+        termine=stats.termine or 0,
+        resilie=stats.resilie or 0,
+        renouvele=stats.renouvele or 0,
+        en_attente=stats.en_attente or 0,
+        total_monthly_revenue=float(stats.revenue_sum or 0),
+        total_deposits_held=float(stats.deposits_sum or 0),
     )
 
 
@@ -257,6 +254,7 @@ def update_contract(
     contract_id: UUID,
     payload: LeaseContractUpdate,
     db: Session = Depends(get_db),
+    current_user: dict[str, Any] = Depends(require_admin_user),
 ) -> LeaseContractResponse:
     """Met à jour un bail"""
     contract = db.execute(
@@ -269,13 +267,43 @@ def update_contract(
         raise HTTPException(status_code=404, detail="Bail introuvable")
     
     update_data = payload.model_dump(exclude_unset=True)
+    previous_statut = contract.statut
     for key, value in update_data.items():
         setattr(contract, key, value)
-    
+
     contract.updated_at = datetime.utcnow()
+
+    # Transition property status when contract statut changes.
+    if "statut" in update_data and previous_statut != contract.statut:
+        prop = db.execute(
+            select(Property).where(Property.id == contract.property_id).with_for_update()
+        ).scalar_one_or_none()
+        if prop:
+            if contract.statut == "actif":
+                if prop.statut == "disponible":
+                    set_immobilier_audit_context(db, current_user)
+                    prop.statut = "louee"
+                elif prop.statut != "louee":
+                    record_property_transition_refusal(
+                        db, current_user, str(prop.id), "louee",
+                        f"Contrat mis à jour en actif mais bien en {prop.statut}",
+                    )
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Un bail actif exige un bien disponible",
+                    )
+            elif contract.statut in {"termine", "resilie", "en_attente"}:
+                if prop.statut in {"loue", "louee"}:
+                    set_immobilier_audit_context(db, current_user)
+                    prop.statut = "disponible"
+            elif contract.statut == "renouvele":
+                if prop.statut == "disponible":
+                    set_immobilier_audit_context(db, current_user)
+                    prop.statut = "louee"
+
     db.commit()
     db.refresh(contract)
-    
+
     return _contract_to_response(contract)
 
 
@@ -348,6 +376,90 @@ def terminate_contract(
     db.refresh(contract)
     
     return _contract_to_response(contract)
+
+
+@router.post("/{contract_id}/generate-payments", response_model=dict)
+def generate_contract_payments(
+    contract_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: dict[str, Any] = Depends(require_admin_user),
+) -> dict:
+    """Génère les paiements mensuels de loyer pour un contrat actif."""
+    contract = db.execute(
+        select(LeaseContract)
+        .where(LeaseContract.id == contract_id)
+        .where(LeaseContract.deleted_at.is_(None))
+    ).scalar_one_or_none()
+
+    if not contract:
+        raise HTTPException(status_code=404, detail="Bail introuvable")
+
+    if contract.statut != "actif":
+        raise HTTPException(
+            status_code=409,
+            detail="Impossible de générer des paiements pour un contrat inactif",
+        )
+
+    # Verify existing payments to avoid duplicates
+    existing = db.execute(
+        select(RentPayment.mois_concerne).where(
+            RentPayment.contract_id == contract_id
+        )
+    ).scalars().all()
+    existing_months = set(str(m) for m in existing if m)
+
+    # Generate month range from date_debut to date_fin (or now if open-ended)
+    start = contract.date_debut
+    if not start:
+        raise HTTPException(status_code=400, detail="Date de début du contrat manquante")
+
+    end = contract.date_fin or date_cls.today()
+    # Normalize to first of month
+    start_month = date(start.year, start.month, 1)
+    end_month = date(end.year, end.month, 1)
+
+    created = 0
+    skipped = 0
+    current = start_month
+    while current <= end_month:
+        mois_label = current.strftime("%Y-%m")
+        if mois_label in existing_months:
+            skipped += 1
+        else:
+            if current.month == 12:
+                next_month = date(current.year + 1, 1, 1)
+            else:
+                next_month = date(current.year, current.month + 1, 1)
+            last_day = next_month - timedelta(days=1)
+            payment = RentPayment(
+                locataire_entity_id=contract.locataire_entity_id,
+                property_id=contract.property_id,
+                contract_id=contract.id,
+                montant=contract.loyer_mensuel + (contract.charges_mensuelles or 0),
+                date_paiement=None,
+                date_echeance=last_day,
+                mois_concerne=mois_label,
+                mode_paiement="especes",
+                statut="en_attente",
+                notes=None,
+                reference=None,
+            )
+            db.add(payment)
+            created += 1
+        # Advance to next month
+        if current.month == 12:
+            current = date(current.year + 1, 1, 1)
+        else:
+            current = date(current.year, current.month + 1, 1)
+
+    if created > 0:
+        db.commit()
+
+    return {
+        "created": created,
+        "skipped": skipped,
+        "message": f"{created} paiement(s) généré(s), {skipped} déjà existant(s).",
+    }
 
 
 # Health check

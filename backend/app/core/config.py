@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 import logging
+import re
 
 from dotenv import load_dotenv
 
@@ -43,6 +44,11 @@ class Settings:
     REFRESH_TOKEN_TTL_SECONDS = int(os.getenv("LOCAL_AUTH_REFRESH_TOKEN_TTL_SECONDS", "604800"))
     AUTH_REFRESH_COOKIE_NAME = os.getenv("AUTH_REFRESH_COOKIE_NAME", "egs_refresh")
     AUTH_REQUIRE_HTTPS = os.getenv("AUTH_REQUIRE_HTTPS", "true").strip().lower() == "true"
+    # A self-hosted deployment may be opened directly from a private LAN over
+    # HTTP. Public hosts remain subject to AUTH_REQUIRE_HTTPS.
+    AUTH_ALLOW_PRIVATE_NETWORK_HTTP = os.getenv(
+        "AUTH_ALLOW_PRIVATE_NETWORK_HTTP", "true"
+    ).strip().lower() == "true"
     AUTH_COOKIE_SECURE = os.getenv("AUTH_COOKIE_SECURE", "true").strip().lower() == "true"
     AUTH_COOKIE_SAMESITE = os.getenv("AUTH_COOKIE_SAMESITE", "lax").strip().lower()
     AUTH_LOGIN_RATE_LIMIT = int(os.getenv("AUTH_LOGIN_RATE_LIMIT", "10"))
@@ -67,6 +73,18 @@ class Settings:
         "https://www.gnambaservices.ci",
         "https://api.gnambaservices.ci",
     ]
+
+    # Private/LAN IP origins matched by regex: the frontend and the API share a
+    # host but expose different ports, which is cross-origin for the browser.
+    # Listing every possible LAN IP statically is not feasible, so private IP
+    # origins (127.x, 10.x, 192.168.x, 172.16-31.x) are matched dynamically.
+    # Only http:// is matched, so production HTTPS origins are unaffected.
+    CORS_ORIGIN_REGEX = (
+        r"http://(localhost|127\.\d{1,3}\.\d{1,3}\.\d{1,3}"
+        r"|10\.\d{1,3}\.\d{1,3}\.\d{1,3}"
+        r"|192\.168\.\d{1,3}\.\d{1,3}"
+        r"|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3})(?::\d+)?"
+    )
 
     def cors_origins(self) -> list[str]:
         """Return a cleaned list of CORS origins from attribute or env var.
@@ -95,6 +113,14 @@ class Settings:
             if origin and origin not in merged:
                 merged.append(origin)
         return merged
+
+    def cors_origin_regex(self) -> re.Pattern[str]:
+        """Regex matching private/LAN IP origins allowed to call the API.
+
+        Used alongside cors_origins() so devices on the same trusted LAN can
+        reach the API directly when frontend and API run on different ports.
+        """
+        return re.compile(self.CORS_ORIGIN_REGEX)
 
 
 settings = Settings()

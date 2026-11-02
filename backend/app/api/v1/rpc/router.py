@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 
-from app.api.deps import enforce_permission, get_current_user, require_admin_user
+from app.api.deps import enforce_permission, get_current_user, RequireAdminUser, require_admin_user
 from app.core.database import get_db
 from app.models.foncier import ActivityLog
 from app.repositories.generic_table_repository import GenericTableRepository
@@ -19,7 +19,7 @@ from app.repositories.generic_table_repository import GenericTableRepository
 router = APIRouter(
     prefix="/api/v1/rpc",
     tags=["rpc"],
-    dependencies=[Depends(require_admin_user)],
+    dependencies=[Depends(RequireAdminUser)],
 )
 
 

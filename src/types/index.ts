@@ -166,7 +166,7 @@ export interface RentPayment {
   mois_concerne: string;
   mois_concerne_date?: string | null;
   mode_paiement: "virement" | "especes" | "mobile_money" | "cheque";
-  statut: "paye" | "en_attente" | "retard" | "partiel";
+  statut: "paye" | "en_attente" | "retard" | "partiel" | "annule";
   notes: string | null;
   reference: string;
   last_document_type?: "quittance" | "recu" | null;
@@ -184,12 +184,13 @@ export interface LeaseContract {
   reference: string | null;
   property_id: string;
   locataire_id: string;
+  locataire_entity_id?: string | null;
   date_debut: string;
   date_fin: string | null;
   loyer_mensuel: number;
   charges: number;
   depot_garantie: number;
-  statut: "actif" | "termine" | "resilie" | "renouvele";
+  statut: "actif" | "termine" | "resilie" | "renouvele" | "en_attente";
   notes: string | null;
   created_at: string;
   updated_at: string;

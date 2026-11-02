@@ -6,7 +6,9 @@ import {
   RefreshCw,
   CheckCircle,
   Files,
+  Printer,
 } from "lucide-react";
+import { apiClient } from "../api/client";
 import { useSettings } from "../context/SettingsContext";
 import { useAuth, resolveAccessLevel } from "../context/AuthContext";
 import { useFoncierState } from "../hooks/foncier";
@@ -108,6 +110,29 @@ export default function Foncier() {
     handlePrintAttestation,
     handlePrintAttestationAnnex,
   } = state;
+
+  const handlePrintAttestationPdf = async (lot: FoncierLot) => {
+    const token = apiClient.getStoredLocalAuthToken();
+    if (!token) {
+      alert("Vous devez être connecté pour imprimer le PDF.");
+      return;
+    }
+    try {
+      const res = await fetch(
+        `/api/v1/foncier/attestations/${lot.id}/pdf`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      if (!res.ok) {
+        throw new Error(`Échec de l'impression (${res.status})`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+    } catch (err) {
+      console.error("Print PDF error:", err);
+      alert("Impossible d'imprimer le PDF de l'attestation.");
+    }
+  };
 
   useEffect(() => {
     void loadCachedLots();
@@ -315,6 +340,13 @@ export default function Foncier() {
                         >
                           Imprimer
                         </button>
+                        <button
+                          onClick={() => handlePrintAttestationPdf(lot)}
+                          className="px-3 py-2 text-sm rounded-lg border border-gray-200 text-gray-700 hover:bg-white"
+                          aria-label="Imprimer le PDF"
+                        >
+                          <Printer size={14} /> PDF
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -393,12 +425,23 @@ export default function Foncier() {
                   )}
                 </div>
                 <button
-                  onClick={() => !selectedVillage ? openConfig("") : openConfig(selectedVillage)}
+                  onClick={() => {
+                    if (villageOptions.length === 0) {
+                      openConfig("");
+                      return;
+                    }
+                    openConfig(selectedVillage || villageOptions[0]);
+                  }}
                   disabled={!canManage}
                   className="px-4 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
                 >
                   <Settings2 size={16} /> Configurer
                 </button>
+                {villageOptions.length === 0 && (
+                  <p className="mt-2 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-3 py-1.5">
+                    Aucun village enregistré. Créez un village d'abord.
+                  </p>
+                )}
               </div>
             </div>
 

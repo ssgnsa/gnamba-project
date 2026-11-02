@@ -14,6 +14,8 @@ from app.models.user import AuthPasswordResetToken, AuthRateLimitEvent, AuthSess
 class AuthStateRepository(Protocol):
     def create_session(self, session_id: str, user_id: str, refresh_hash: str, expires_at: datetime, ip_address: str | None, user_agent: str | None) -> None: ...
     def session_is_active(self, session_id: str, user_id: str, now: datetime) -> bool: ...
+    def session_mfa_verified(self, session_id: str, user_id: str, now: datetime) -> bool: ...
+    def mark_mfa_verified(self, session_id: str, user_id: str, now: datetime) -> bool: ...
     def rotate_session(self, session_id: str, expected_hash: str, new_hash: str, expires_at: datetime, now: datetime) -> bool: ...
     def revoke_session(self, session_id: str, reason: str, now: datetime) -> None: ...
     def revoke_refresh_hash(self, refresh_hash: str, reason: str, now: datetime) -> None: ...
@@ -46,6 +48,25 @@ class SqlAlchemyAuthStateRepository:
             AuthSession.revoked_at.is_(None),
             AuthSession.expires_at > now,
         ).first() is not None
+
+    def session_mfa_verified(self, session_id: str, user_id: str, now: datetime) -> bool:
+        return self.db.query(AuthSession.id).filter(
+            AuthSession.id == session_id,
+            AuthSession.user_id == user_id,
+            AuthSession.revoked_at.is_(None),
+            AuthSession.expires_at > now,
+            AuthSession.mfa_verified_at.is_not(None),
+        ).first() is not None
+
+    def mark_mfa_verified(self, session_id: str, user_id: str, now: datetime) -> bool:
+        result = self.db.query(AuthSession).filter(
+            AuthSession.id == session_id,
+            AuthSession.user_id == user_id,
+            AuthSession.revoked_at.is_(None),
+            AuthSession.expires_at > now,
+        ).update({"mfa_verified_at": now, "last_seen_at": now}, synchronize_session=False)
+        self.db.commit()
+        return result == 1
 
     def rotate_session(self, session_id: str, expected_hash: str, new_hash: str, expires_at: datetime, now: datetime) -> bool:
         session = self.db.query(AuthSession).filter(AuthSession.id == session_id).first()
@@ -159,6 +180,7 @@ class _MemorySession:
     refresh_hash: str
     expires_at: datetime
     revoked_at: datetime | None = None
+    mfa_verified_at: datetime | None = None
 
 
 @dataclass
@@ -184,6 +206,25 @@ class InMemoryAuthStateRepository:
         with self._lock:
             row = self.sessions.get(session_id)
             return bool(row and row.user_id == user_id and row.revoked_at is None and row.expires_at > now)
+
+    def session_mfa_verified(self, session_id: str, user_id: str, now: datetime) -> bool:
+        with self._lock:
+            row = self.sessions.get(session_id)
+            return bool(
+                row
+                and row.user_id == user_id
+                and row.revoked_at is None
+                and row.expires_at > now
+                and row.mfa_verified_at is not None
+            )
+
+    def mark_mfa_verified(self, session_id: str, user_id: str, now: datetime) -> bool:
+        with self._lock:
+            row = self.sessions.get(session_id)
+            if not row or row.user_id != user_id or row.revoked_at is not None or row.expires_at <= now:
+                return False
+            row.mfa_verified_at = now
+            return True
 
     def rotate_session(self, session_id: str, expected_hash: str, new_hash: str, expires_at: datetime, now: datetime) -> bool:
         with self._lock:

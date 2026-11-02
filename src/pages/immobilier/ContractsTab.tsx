@@ -910,7 +910,7 @@ export default function ContractsTab({
                     adresse: payload.adresse,
                     commune: data.commune?.trim() || null,
                     ville: data.ville?.trim() || null,
-                    proprietaire_name: payload.proprietaire_id,
+                    proprietaire_entity_id: payload.proprietaire_id || undefined,
                     loyer_mensuel: payload.loyer_mensuel,
                     charges_mensuelles: payload.charges,
                     statut: "disponible",

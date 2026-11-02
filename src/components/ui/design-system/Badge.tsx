@@ -91,6 +91,7 @@ export const StatusBadge = ({
     // Property statuses
     disponible: { variant: "success", label: "Disponible" },
     loue: { variant: "primary", label: "Loué" },
+    louee: { variant: "primary", label: "Loué" },
     en_vente: { variant: "info", label: "En vente" },
     vendu: { variant: "secondary", label: "Vendu" },
     // Foncier lot statuses

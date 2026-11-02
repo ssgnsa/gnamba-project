@@ -77,7 +77,6 @@ def test_immobilier_module_flow():
             "type_bien": "villa",
             "adresse": "Villa Nord, Abidjan",
             "commune": "Cocody",
-            "proprietaire_name": "Alpha Koné",
             "valeur": 120000000,
             "loyer_mensuel": 2500000,
             "charges_mensuelles": 150000,

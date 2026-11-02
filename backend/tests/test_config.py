@@ -41,6 +41,23 @@ def test_cors_origins_merge_env_values_with_default_local_dev_ports() -> None:
     assert "http://127.0.0.1:5173" in origins
 
 
+def test_cors_origin_regex_matches_private_lan_origins() -> None:
+    settings = Settings()
+
+    assert settings.cors_origin_regex().match("http://192.168.1.58:8000")
+    assert settings.cors_origin_regex().match("http://10.0.0.5:8000")
+    assert settings.cors_origin_regex().match("http://172.20.1.10:8000")
+    assert settings.cors_origin_regex().match("http://localhost:8000")
+    assert settings.cors_origin_regex().match("http://127.0.0.1:5173")
+
+    # Production HTTPS origins must not match the private IP regex.
+    assert not settings.cors_origin_regex().match("https://gnambaservices.ci")
+    assert not settings.cors_origin_regex().match("https://api.gnambaservices.ci")
+
+    # Public non-private IPs must not match.
+    assert not settings.cors_origin_regex().match("http://203.0.113.42:8000")
+
+
 def test_database_requires_explicit_database_url() -> None:
     environment = os.environ.copy()
     environment["DATABASE_URL"] = ""

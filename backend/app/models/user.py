@@ -1,6 +1,6 @@
 """SQLAlchemy models for EGS."""
 from datetime import datetime
-from sqlalchemy import Column, String, DateTime, Enum, Integer, Text, ForeignKey, Index
+from sqlalchemy import Column, String, DateTime, Enum, Integer, Text, ForeignKey, Index, Boolean
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
@@ -32,6 +32,9 @@ class User(Base):
     password_hash = Column(String, nullable=False)
     role = Column(String, default=RoleEnum.GUEST.value, nullable=False)
     access_level = Column(String, default=AccessLevelEnum.GUEST.value, nullable=False)
+    mfa_secret = Column(String(64), nullable=True)
+    mfa_enabled = Column(Boolean(), default=False, nullable=False)
+    mfa_confirmed_at = Column(DateTime(timezone=True), nullable=True)
     poste = Column(String, nullable=True)
     department = Column(String, nullable=True)
     phone = Column(String, nullable=True)
@@ -88,6 +91,9 @@ class AuthSession(Base):
     revoked_at = Column(DateTime(timezone=True), nullable=True)
     revoked_reason = Column(String, nullable=True)
     compromised_at = Column(DateTime(timezone=True), nullable=True)
+    # Server-side MFA state. JWT claims alone are insufficient because refresh
+    # tokens must not be able to promote an AAL1 session back to AAL2.
+    mfa_verified_at = Column(DateTime(timezone=True), nullable=True)
 
     def to_dict(self):
         """Convert model to dictionary."""
@@ -103,6 +109,7 @@ class AuthSession(Base):
             "revoked_at": self.revoked_at.isoformat() if self.revoked_at else None,
             "revoked_reason": self.revoked_reason,
             "compromised_at": self.compromised_at.isoformat() if self.compromised_at else None,
+            "mfa_verified_at": self.mfa_verified_at.isoformat() if self.mfa_verified_at else None,
         }
 
 

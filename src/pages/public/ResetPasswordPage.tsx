@@ -47,6 +47,11 @@ export default function ResetPasswordPage({ onSuccess }: Props) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (resetToken.length < 32) {
+      setError("Ce lien de réinitialisation est incomplet ou invalide. Demandez un nouveau lien.");
+      return;
+    }
+
     if (!password || !confirmPassword) {
       setError("Veuillez remplir tous les champs.");
       return;
@@ -216,7 +221,7 @@ export default function ResetPasswordPage({ onSuccess }: Props) {
 
             <button
               type="submit"
-              disabled={saving || !password || !confirmPassword}
+              disabled={saving || resetToken.length < 32 || !password || !confirmPassword}
               className="w-full flex items-center justify-center gap-2 py-3.5 bg-blue-700 hover:bg-blue-800 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl font-semibold transition-all shadow-sm text-sm mt-2"
             >
               {saving ? (

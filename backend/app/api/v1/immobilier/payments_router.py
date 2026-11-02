@@ -208,47 +208,34 @@ def get_payments_stats(
     db: Session = Depends(get_db),
 ) -> RentPaymentStatsResponse:
     """Statistiques des paiements de loyer"""
-    base_query = select(RentPayment).where(RentPayment.deleted_at.is_(None))
-    
+    filters = [RentPayment.deleted_at.is_(None)]
     if property_id:
-        base_query = base_query.where(RentPayment.property_id == property_id)
+        filters.append(RentPayment.property_id == property_id)
     if contract_id:
-        base_query = base_query.where(RentPayment.contract_id == contract_id)
-    
-    # Total
-    total = db.execute(select(func.count()).select_from(base_query.subquery())).scalar() or 0
-    
-    # Par statut
-    stats_query = (
-        select(RentPayment.statut, func.count(RentPayment.id))
-        .select_from(base_query.subquery())
-        .group_by(RentPayment.statut)
-    )
-    stat_results = db.execute(stats_query).all()
-    stat_dict = {statut: count for statut, count in stat_results}
-    
-    # Montants
-    amount_query = (
-        select(RentPayment.statut, func.sum(RentPayment.montant))
-        .select_from(base_query.subquery())
-        .group_by(RentPayment.statut)
-    )
-    amount_results = db.execute(amount_query).all()
-    amount_dict = {statut: float(amount) if amount else 0 for statut, amount in amount_results}
-    
-    total_collected = amount_dict.get("paye", 0)
-    total_pending = amount_dict.get("en_attente", 0)
-    total_late = amount_dict.get("retard", 0)
+        filters.append(RentPayment.contract_id == contract_id)
+
+    stats = db.execute(
+        select(
+            func.count(RentPayment.id).label("total"),
+            func.count(RentPayment.id).filter(RentPayment.statut == "paye").label("paye"),
+            func.count(RentPayment.id).filter(RentPayment.statut == "en_attente").label("en_attente"),
+            func.count(RentPayment.id).filter(RentPayment.statut == "retard").label("retard"),
+            func.count(RentPayment.id).filter(RentPayment.statut == "partiel").label("partiel"),
+            func.coalesce(func.sum(RentPayment.montant).filter(RentPayment.statut == "paye"), 0).label("total_collected"),
+            func.coalesce(func.sum(RentPayment.montant).filter(RentPayment.statut == "en_attente"), 0).label("total_pending"),
+            func.coalesce(func.sum(RentPayment.montant).filter(RentPayment.statut == "retard"), 0).label("total_late"),
+        ).where(*filters)
+    ).one()
     
     return RentPaymentStatsResponse(
-        total_payments=total,
-        paye=stat_dict.get("paye", 0),
-        en_attente=stat_dict.get("en_attente", 0),
-        retard=stat_dict.get("retard", 0),
-        partiel=stat_dict.get("partiel", 0),
-        total_amount_collected=total_collected,
-        total_amount_pending=total_pending,
-        total_amount_late=total_late,
+        total_payments=stats.total or 0,
+        paye=stats.paye or 0,
+        en_attente=stats.en_attente or 0,
+        retard=stats.retard or 0,
+        partiel=stats.partiel or 0,
+        total_amount_collected=float(stats.total_collected or 0),
+        total_amount_pending=float(stats.total_pending or 0),
+        total_amount_late=float(stats.total_late or 0),
     )
 
 

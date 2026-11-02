@@ -55,6 +55,12 @@ def test_central_permission_policy_fails_closed_for_unverified_scopes():
     assert not has_permission(employee, "clients", "read_private")
     assert not has_permission(employee, "erp_table", "read", resource="tasks")
     assert has_permission(admin, "media", "purge")
-    assert not has_permission({"id": "admin", "role": "admin"}, "media", "read_private")
+    # MFA is only enforced when configured (mfa_required). An admin without a
+    # configured TOTP secret is not locked out.
+    assert has_permission({"id": "admin", "role": "admin"}, "media", "read_private")
+    assert not has_permission(
+        {"id": "admin", "role": "admin", "mfa_required": True},
+        "media", "read_private",
+    )
     assert not has_permission(admin, "erp_table", "delete", resource="stats_journalieres")
     assert not has_permission(admin, "erp_table", "export", resource="stats_journalieres")

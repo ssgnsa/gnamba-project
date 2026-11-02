@@ -24,7 +24,7 @@ class PropertyBase(ImmobilierBase):
     adresse: Optional[str] = None
     ville: Optional[str] = Field(None, max_length=100)
     commune: Optional[str] = Field(None, max_length=100)
-    proprietaire_name: Optional[str] = None  # Current model uses String, will migrate to UUID FK
+    proprietaire_entity_id: Optional[UUID] = None  # UUID FK vers entities.id (identité métier unifiée)
     valeur: Optional[float] = Field(None, ge=0)
     loyer_mensuel: Optional[float] = Field(None, ge=0)
     charges_mensuelles: Optional[float] = Field(default=0, ge=0)
@@ -40,6 +40,7 @@ class PropertyCreate(PropertyBase):
     type_bien: str = Field(..., pattern=r"^(studio|chambre|chambre-salon|appartement|terrain|magasin|bureau|villa|maison|duplex|triplex|loft|local_commercial|entrepot|garage|parking|autre)$")
     adresse: str = Field(..., min_length=1, max_length=2000)
     statut: str = Field("disponible", pattern=r"^(disponible|en_travaux)$")
+    proprietaire_entity_id: Optional[UUID] = None  # UUID FK vers entities.id
 
     @model_validator(mode="after")
     def require_structured_locality(self):
@@ -73,7 +74,7 @@ class PropertyUpdate(BaseModel):
     adresse: Optional[str] = None
     ville: Optional[str] = Field(None, max_length=100)
     commune: Optional[str] = Field(None, max_length=100)
-    proprietaire_name: Optional[str] = None
+    proprietaire_entity_id: Optional[UUID] = None
     valeur: Optional[float] = Field(None, ge=0)
     loyer_mensuel: Optional[float] = Field(None, ge=0)
     charges_mensuelles: Optional[float] = Field(None, ge=0)
@@ -83,7 +84,7 @@ class PropertyUpdate(BaseModel):
 
 class PropertyTransition(BaseModel):
     model_config = {"extra": "forbid"}
-    statut: str = Field(..., pattern=r"^(disponible|en_vente|louee|vendue|en_travaux|retiree|archivee)$")
+    statut: str = Field(..., pattern=r"^(disponible|en_vente|loue|louee|vendue|en_travaux|retiree|archivee)$")
 
 
 class PropertyResponse(PropertyBase):
@@ -111,7 +112,7 @@ class PropertyResponse(PropertyBase):
 
 class LeaseContractBase(ImmobilierBase):
     property_id: Optional[UUID] = None
-    locataire_id: Optional[str] = None  # Current model uses String, will migrate to UUID FK to Entity
+    locataire_entity_id: Optional[UUID] = None  # UUID FK vers entities.id (identité métier unifiée)
     date_debut: Optional[date] = None
     date_fin: Optional[date] = None
     loyer_mensuel: Optional[float] = Field(None, ge=0)
@@ -127,14 +128,14 @@ class LeaseContractBase(ImmobilierBase):
 
 class LeaseContractCreate(LeaseContractBase):
     property_id: UUID
-    locataire_id: str
+    locataire_entity_id: UUID
     date_debut: date
     loyer_mensuel: float = Field(..., ge=0)
 
 
 class LeaseContractUpdate(BaseModel):
     property_id: Optional[UUID] = None
-    locataire_id: Optional[str] = None
+    locataire_entity_id: Optional[UUID] = None
     date_debut: Optional[date] = None
     date_fin: Optional[date] = None
     loyer_mensuel: Optional[float] = Field(None, ge=0)
@@ -163,7 +164,7 @@ class LeaseContractResponse(LeaseContractBase):
 # ============================================
 
 class RentPaymentBase(ImmobilierBase):
-    locataire_id: Optional[str] = None  # Current model uses String
+    locataire_entity_id: Optional[UUID] = None  # UUID FK vers entities.id (identité métier unifiée)
     property_id: Optional[UUID] = None
     contract_id: Optional[UUID] = None
     montant: Optional[float] = Field(None, ge=0)
@@ -180,7 +181,7 @@ class RentPaymentBase(ImmobilierBase):
 
 
 class RentPaymentCreate(RentPaymentBase):
-    locataire_id: str
+    locataire_entity_id: UUID
     property_id: UUID
     contract_id: UUID
     montant: float = Field(..., ge=0)
@@ -190,7 +191,7 @@ class RentPaymentCreate(RentPaymentBase):
 
 
 class RentPaymentUpdate(BaseModel):
-    locataire_id: Optional[str] = None
+    locataire_entity_id: Optional[UUID] = None
     property_id: Optional[UUID] = None
     contract_id: Optional[UUID] = None
     montant: Optional[float] = Field(None, ge=0)
@@ -291,6 +292,7 @@ class PropertyStatsResponse(BaseModel):
     total_properties: int
     disponible: int
     loue: int
+    louee: int
     en_vente: int
     vendu: int
     en_travaux: int

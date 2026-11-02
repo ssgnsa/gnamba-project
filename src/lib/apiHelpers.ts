@@ -1,8 +1,10 @@
 import type { ApiResult } from "../data/result";
+import { resolveApiBaseUrl } from "../api/client";
 
-const base = import.meta.env.VITE_SELFHOSTED_MODE === "true"
-  ? import.meta.env.VITE_LOCAL_API_URL || "http://localhost:8000"
-  : import.meta.env.VITE_API_URL || "/api";
+const configuredBase = import.meta.env.VITE_SELFHOSTED_MODE === "true"
+  ? import.meta.env.VITE_LOCAL_API_URL || import.meta.env.VITE_API_URL || "/api/v1"
+  : import.meta.env.VITE_API_URL || "/api/v1";
+const base = resolveApiBaseUrl(configuredBase);
 
 async function fetchJson<T>(path: string, init: RequestInit): Promise<ApiResult<T>> {
   const url = `${base}${path}`;

@@ -4,8 +4,8 @@
 from datetime import date, datetime
 from typing import Optional, List, Dict, Any, Tuple
 from uuid import UUID, uuid4
-from sqlalchemy import select, func, and_, or_, desc, asc, text, delete, update
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import select, func, and_, or_, desc, asc, text, delete, update, cast, String
+from sqlalchemy.orm import Session, joinedload, defer
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
 from app.models.foncier import (
@@ -28,11 +28,13 @@ class BaseRepository:
         self.db = db
         self.model = model
     
-    def create(self, data: dict) -> Any:
+    def create(self, data: dict, commit: bool = True) -> Any:
         obj = self.model(**data)
         self.db.add(obj)
-        self.db.commit()
-        self.db.refresh(obj)
+        self.db.flush()
+        if commit:
+            self.db.commit()
+            self.db.refresh(obj)
         return obj
     
     def get(self, id: UUID) -> Any:
@@ -72,28 +74,34 @@ class BaseRepository:
                     query = query.filter(getattr(self.model, key) == value)
         return query.scalar()
     
-    def update(self, id: UUID, data: dict) -> Any:
+    def update(self, id: UUID, data: dict, commit: bool = True) -> Any:
         obj = self.get(id)
         if not obj:
             return None
         for key, value in data.items():
             if hasattr(obj, key):
                 setattr(obj, key, value)
-        self.db.commit()
-        self.db.refresh(obj)
+        self.db.flush()
+        if commit:
+            self.db.commit()
+            self.db.refresh(obj)
         return obj
     
-    def delete(self, id: UUID, soft: bool = True) -> bool:
+    def delete(self, id: UUID, soft: bool = True, commit: bool = True) -> bool:
         obj = self.get(id)
         if not obj:
             return False
         if soft and hasattr(self.model, 'deleted_at'):
             obj.deleted_at = datetime.utcnow()
-            self.db.commit()
+            self.db.flush()
+            if commit:
+                self.db.commit()
             return True
         else:
             self.db.delete(obj)
-            self.db.commit()
+            self.db.flush()
+            if commit:
+                self.db.commit()
             return True
 
 
@@ -162,7 +170,9 @@ class VillageRepository(BaseRepository):
             ), attestation_stats AS (
                 SELECT v.id AS village_id,
                        COUNT(a.id) AS nb_attestations,
-                       COUNT(*) FILTER (WHERE a.statut = 'valide') AS nb_attestations_validees
+                       COUNT(*) FILTER (WHERE a.statut = 'valide') AS nb_attestations_validees,
+                       COUNT(*) FILTER (WHERE a.delivre = true) AS nb_attestations_delivrees,
+                       COUNT(*) FILTER (WHERE a.statut = 'revoque') AS nb_attestations_revoquees
                 FROM foncier_villages v
                 LEFT JOIN foncier_lotissements ls ON ls.village_id = v.id
                 LEFT JOIN foncier_ilots i ON i.lotissement_id = ls.id
@@ -175,7 +185,8 @@ class VillageRepository(BaseRepository):
                    ls.total_lots, ls.lots_actifs, ls.lots_vendus, ls.lots_litiges,
                    ls.lots_reserves, ls.lots_archives, ls.superficie_totale,
                    ls.superficie_vendue, ats.nb_attestations,
-                   ats.nb_attestations_validees, ls.ca_total
+                   ats.nb_attestations_validees, ats.nb_attestations_delivrees,
+                   ats.nb_attestations_revoquees, ls.ca_total
             FROM foncier_villages v
             JOIN lot_stats ls ON ls.village_id = v.id
             JOIN attestation_stats ats ON ats.village_id = v.id
@@ -207,7 +218,9 @@ class VillageRepository(BaseRepository):
             ), attestation_stats AS (
                 SELECT v.id AS village_id,
                        COUNT(a.id) AS nb_attestations,
-                       COUNT(*) FILTER (WHERE a.statut = 'valide') AS nb_attestations_validees
+                       COUNT(*) FILTER (WHERE a.statut = 'valide') AS nb_attestations_validees,
+                       COUNT(*) FILTER (WHERE a.delivre = true) AS nb_attestations_delivrees,
+                       COUNT(*) FILTER (WHERE a.statut = 'revoque') AS nb_attestations_revoquees
                 FROM foncier_villages v
                 LEFT JOIN foncier_lotissements ls ON ls.village_id = v.id
                 LEFT JOIN foncier_ilots i ON i.lotissement_id = ls.id
@@ -220,7 +233,8 @@ class VillageRepository(BaseRepository):
                    ls.total_lots, ls.lots_actifs, ls.lots_vendus, ls.lots_litiges,
                    ls.lots_reserves, ls.lots_archives, ls.superficie_totale,
                    ls.superficie_vendue, ats.nb_attestations,
-                   ats.nb_attestations_validees, ls.ca_total
+                   ats.nb_attestations_validees, ats.nb_attestations_delivrees,
+                   ats.nb_attestations_revoquees, ls.ca_total
             FROM foncier_villages v
             JOIN lot_stats ls ON ls.village_id = v.id
             JOIN attestation_stats ats ON ats.village_id = v.id
@@ -327,33 +341,44 @@ class LotRepository(BaseRepository):
         return None
     
     def search(self, params: LotSearchParams) -> Tuple[List[FoncierLot], int]:
-        query = self.db.query(FoncierLot).filter(FoncierLot.deleted_at.is_(None))
-        
-        # Join pour filtrer par village/lotissement/îlot
-        if params.village_id or params.lotissement_id:
-            query = query.join(FoncierIlot).join(FoncierLotissement)
+        query = self.db.query(FoncierLot)
+        if not params.include_archived:
+            query = query.filter(FoncierLot.deleted_at.is_(None))
+
+        if params.village_id or params.lotissement_id or params.village or params.lotissement:
+            query = query.join(FoncierIlot).join(FoncierLotissement).join(FoncierVillage)
             if params.village_id:
                 query = query.filter(FoncierLotissement.village_id == params.village_id)
             if params.lotissement_id:
                 query = query.filter(FoncierIlot.lotissement_id == params.lotissement_id)
-        
+            if params.village:
+                query = query.filter(func.lower(FoncierVillage.nom) == params.village.lower())
+            if params.lotissement:
+                query = query.filter(func.lower(FoncierLotissement.nom) == params.lotissement.lower())
+
         if params.ilot_id:
             query = query.filter(FoncierLot.ilot_id == params.ilot_id)
-        
         if params.statut:
             query = query.filter(FoncierLot.statut == params.statut)
-        
         if params.search:
             search_term = f"%{params.search.lower()}%"
-            query = query.filter(
-                or_(
-                    func.lower(FoncierLot.reference).like(search_term),
-                    func.lower(FoncierLot.numero_lot).like(search_term),
-                    func.lower(FoncierLot.proprietaire_nom).like(search_term),
-                    func.lower(FoncierLot.proprietaire_prenom).like(search_term),
-                )
-            )
-        
+            query = query.filter(or_(
+                func.lower(FoncierLot.reference).like(search_term),
+                func.lower(FoncierLot.numero_lot).like(search_term),
+                func.lower(FoncierLot.proprietaire_nom).like(search_term),
+                func.lower(FoncierLot.proprietaire_prenom).like(search_term),
+                func.lower(FoncierVillage.nom).like(search_term),
+                func.lower(FoncierLotissement.nom).like(search_term),
+            ))
+
+        sort_columns = {
+            "created_at": FoncierLot.created_at,
+            "updated_at": FoncierLot.updated_at,
+            "reference": FoncierLot.reference,
+            "numero_lot": FoncierLot.numero_lot,
+        }
+        sort_column = sort_columns.get(params.sort, FoncierLot.created_at)
+        query = query.order_by(asc(sort_column) if params.dir.lower() == "asc" else desc(sort_column))
         total = query.count()
         items = query.offset(params.offset).limit(params.limit).all()
         return items, total
@@ -380,7 +405,7 @@ class LotRepository(BaseRepository):
             query = query.filter(FoncierLot.deleted_at.is_(None))
         return query.order_by(FoncierLot.numero_lot).all()
     
-    def archive(self, lot_id: UUID, reason: str, user_id: UUID) -> Optional[FoncierLot]:
+    def archive(self, lot_id: UUID, reason: str, user_id: UUID, commit: bool = True) -> Optional[FoncierLot]:
         obj = self.get(lot_id)
         if not obj or obj.deleted_at:
             return None
@@ -388,11 +413,13 @@ class LotRepository(BaseRepository):
         obj.deleted_by = user_id
         obj.deleted_reason = reason
         obj.row_version += 1
-        self.db.commit()
-        self.db.refresh(obj)
+        self.db.flush()
+        if commit:
+            self.db.commit()
+            self.db.refresh(obj)
         return obj
     
-    def restore(self, lot_id: UUID, user_id: UUID) -> Optional[FoncierLot]:
+    def restore(self, lot_id: UUID, user_id: UUID, commit: bool = True) -> Optional[FoncierLot]:
         obj = self.db.query(FoncierLot).filter(FoncierLot.id == lot_id).first()
         if not obj or not obj.deleted_at:
             return None
@@ -400,8 +427,10 @@ class LotRepository(BaseRepository):
         obj.deleted_by = None
         obj.deleted_reason = None
         obj.row_version += 1
-        self.db.commit()
-        self.db.refresh(obj)
+        self.db.flush()
+        if commit:
+            self.db.commit()
+            self.db.refresh(obj)
         return obj
 
 
@@ -418,6 +447,15 @@ class AttestationRepository(BaseRepository):
             FoncierAttestation.reference == reference,
             FoncierAttestation.deleted_at.is_(None)
         ).first()
+
+    def get_for_update(self, attestation_id: UUID) -> Optional[FoncierAttestation]:
+        """Verrouille la ligne d'attestation pour écriture (SELECT ... FOR UPDATE)."""
+        return (
+            self.db.query(FoncierAttestation)
+            .filter(FoncierAttestation.id == attestation_id)
+            .with_for_update()
+            .first()
+        )
     
     def get_with_relations(self, attestation_id: UUID) -> Optional[Dict]:
         result = self.db.execute(text("""
@@ -463,8 +501,9 @@ class AttestationRepository(BaseRepository):
         latest = self.get_latest_by_lot(lot_id)
         return (latest.version + 1) if latest else 1
     
-    def create_with_temoins(self, attestation_data: dict, temoins: List[dict], 
-                            user_id: UUID, device_id: str) -> FoncierAttestation:
+    def create_with_temoins(self, attestation_data: dict, temoins: List[dict],
+                            user_id: UUID, device_id: str,
+                            commit: bool = True) -> FoncierAttestation:
         attestation = FoncierAttestation(**attestation_data)
         attestation.created_by = user_id
         attestation.last_modified_device_id = device_id
@@ -475,12 +514,45 @@ class AttestationRepository(BaseRepository):
             temoin = FoncierAttestationTemoin(**temoin_data, attestation_id=attestation.id)
             self.db.add(temoin)
         
-        self.db.commit()
-        self.db.refresh(attestation)
+        self.db.flush()
+        if commit:
+            self.db.commit()
+            self.db.refresh(attestation)
         return attestation
     
-    def submit(self, attestation_id: UUID, agent_nom: str, user_id: UUID) -> Optional[FoncierAttestation]:
-        attestation = self.get(attestation_id)
+    def update_draft(self, attestation_id: UUID, data: dict, temoins: Optional[List[dict]], user_id: UUID, commit: bool = True) -> Optional[FoncierAttestation]:
+        attestation = self.get_by_id(attestation_id)
+        if not attestation or attestation.statut != "brouillon":
+            return None
+        for key, value in data.items():
+            if hasattr(attestation, key):
+                setattr(attestation, key, value)
+        if temoins is not None:
+            attestation.temoins.clear()
+            for temoin_data in temoins:
+                attestation.temoins.append(FoncierAttestationTemoin(**temoin_data))
+        attestation.row_version += 1
+        self.db.flush()
+        if commit:
+            self.db.commit()
+            self.db.refresh(attestation)
+        return attestation
+
+    def sign(self, attestation_id: UUID, signature: str, user_id: UUID, commit: bool = True) -> Optional[FoncierAttestation]:
+        attestation = self.get_by_id(attestation_id)
+        if not attestation or attestation.statut not in {"soumis", "valide"}:
+            return None
+        attestation.signature_numerique = signature.strip()
+        attestation.row_version += 1
+        self.db.flush()
+        if commit:
+            self.db.commit()
+            self.db.refresh(attestation)
+        return attestation
+
+    def submit(self, attestation_id: UUID, agent_nom: str, user_id: UUID,
+               commit: bool = True) -> Optional[FoncierAttestation]:
+        attestation = self.get_by_id(attestation_id)
         if not attestation or attestation.statut != "brouillon":
             return None
         attestation.statut = "soumis"
@@ -488,13 +560,16 @@ class AttestationRepository(BaseRepository):
         attestation.validation_agent_id = user_id
         attestation.validation_agent_date = datetime.utcnow()
         attestation.row_version += 1
-        self.db.commit()
-        self.db.refresh(attestation)
+        self.db.flush()
+        if commit:
+            self.db.commit()
+            self.db.refresh(attestation)
         return attestation
     
     def validate(self, attestation_id: UUID, chef_nom: str, signature_media_id: Optional[UUID],
-                 empreinte_media_id: Optional[UUID], user_id: UUID) -> Optional[FoncierAttestation]:
-        attestation = self.get(attestation_id)
+                 empreinte_media_id: Optional[UUID], user_id: UUID,
+                 commit: bool = True) -> Optional[FoncierAttestation]:
+        attestation = self.get_by_id(attestation_id)
         if not attestation or attestation.statut != "soumis":
             return None
         attestation.statut = "valide"
@@ -504,12 +579,15 @@ class AttestationRepository(BaseRepository):
         attestation.chef_signature_media_id = signature_media_id
         attestation.chef_empreinte_media_id = empreinte_media_id
         attestation.row_version += 1
-        self.db.commit()
-        self.db.refresh(attestation)
+        self.db.flush()
+        if commit:
+            self.db.commit()
+            self.db.refresh(attestation)
         return attestation
     
-    def scan_archive(self, attestation_id: UUID, media_id: UUID, user_id: UUID) -> Optional[FoncierAttestation]:
-        attestation = self.get(attestation_id)
+    def scan_archive(self, attestation_id: UUID, media_id: UUID, user_id: UUID,
+                     commit: bool = True) -> Optional[FoncierAttestation]:
+        attestation = self.get_by_id(attestation_id)
         if not attestation:
             return None
         # L'attestation doit être validée avant archivage
@@ -520,21 +598,26 @@ class AttestationRepository(BaseRepository):
         attestation.pdf_generated_at = datetime.utcnow()
         attestation.printed_by = user_id
         attestation.row_version += 1
-        self.db.commit()
-        self.db.refresh(attestation)
+        self.db.flush()
+        if commit:
+            self.db.commit()
+            self.db.refresh(attestation)
         return attestation
     
-    def revoke(self, attestation_id: UUID, reason: str, user_id: UUID) -> Optional[FoncierAttestation]:
-        attestation = self.get(attestation_id)
-        if not attestation or attestation.statut in ["archive", "revoque", "expire"]:
+    def revoke(self, attestation_id: UUID, reason: str, user_id: UUID,
+               commit: bool = True) -> Optional[FoncierAttestation]:
+        attestation = self.get_by_id(attestation_id)
+        if not attestation or attestation.statut in ["revoque", "expire"]:
             return None
         attestation.statut = "revoque"
         attestation.revoke_reason = reason
         attestation.revoked_at = datetime.utcnow()
         attestation.revoked_by = user_id
         attestation.row_version += 1
-        self.db.commit()
-        self.db.refresh(attestation)
+        self.db.flush()
+        if commit:
+            self.db.commit()
+            self.db.refresh(attestation)
         return attestation
     
     def verify(self, reference: str) -> Optional[Dict]:
@@ -569,14 +652,17 @@ class AttestationRepository(BaseRepository):
         return None
     
     def search(self, lot_id: Optional[UUID] = None, statut: Optional[str] = None,
-               limit: int = 50, offset: int = 0) -> Tuple[List[FoncierAttestation], int]:
+               limit: int = 50, offset: int = 0,
+               exclude_revoked: bool = True) -> Tuple[List[FoncierAttestation], int]:
         query = self.db.query(FoncierAttestation).filter(FoncierAttestation.deleted_at.is_(None))
-        
+
+        if exclude_revoked:
+            query = query.filter(FoncierAttestation.statut != "revoque")
         if lot_id:
             query = query.filter(FoncierAttestation.lot_id == lot_id)
         if statut:
             query = query.filter(FoncierAttestation.statut == statut)
-        
+
         total = query.count()
         items = query.order_by(desc(FoncierAttestation.created_at)).offset(offset).limit(limit).all()
         return items, total
@@ -590,11 +676,13 @@ class AuditRepository(BaseRepository):
     def __init__(self, db: Session):
         super().__init__(db, ActivityLog)
     
-    def log(self, log_data: ActivityLogCreate) -> ActivityLog:
+    def log(self, log_data: ActivityLogCreate, commit: bool = True) -> ActivityLog:
         log = ActivityLog(**log_data.model_dump())
         self.db.add(log)
-        self.db.commit()
-        self.db.refresh(log)
+        self.db.flush()
+        if commit:
+            self.db.commit()
+            self.db.refresh(log)
         return log
     
     def get_timeline(self, entity_type: str, entity_id: UUID, 

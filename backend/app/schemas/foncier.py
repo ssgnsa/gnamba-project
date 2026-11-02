@@ -3,7 +3,7 @@
 
 from datetime import date, datetime
 from typing import Optional, List, Dict, Any, Union
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from uuid import UUID
 
 # ============================================
@@ -89,6 +89,8 @@ class VillageStats(BaseModel):
     superficie_vendue: float
     nb_attestations: int
     nb_attestations_validees: int
+    nb_attestations_delivrees: int
+    nb_attestations_revoquees: int
     ca_total: float
 
 # ============================================
@@ -156,7 +158,7 @@ class IlotResponse(IlotBase):
 class LotBase(FoncierBase):
     numero_lot: str = Field(..., min_length=1, max_length=50)
     superficie: float = Field(..., gt=0)
-    prix: Optional[float] = None
+    prix: Optional[float] = Field(None, ge=0)
     statut: str = Field(default="actif", pattern=r"^(actif|vendu|litige|reserve|annule|archive)$")
     
     # Propriétaire client (FK parties)
@@ -175,9 +177,9 @@ class LotBase(FoncierBase):
     proprietaire_email: Optional[str] = None
     
     # GPS Centre
-    gps_lat: Optional[float] = None
-    gps_lng: Optional[float] = None
-    gps_precision: Optional[float] = None
+    gps_lat: Optional[float] = Field(None, ge=-90, le=90)
+    gps_lng: Optional[float] = Field(None, ge=-180, le=180)
+    gps_precision: Optional[float] = Field(None, ge=0)
     
     # GPS Bornage
     gps_bornage: Dict[str, Dict[str, float]] = Field(default_factory=dict)
@@ -190,7 +192,7 @@ class LotBase(FoncierBase):
     # Transaction
     publier_sur_vitrine: bool = False
     date_cession: Optional[date] = None
-    prix_cession: Optional[float] = None
+    prix_cession: Optional[float] = Field(None, ge=0)
     notes: Optional[str] = None
 
 class LotCreate(LotBase):
@@ -199,7 +201,7 @@ class LotCreate(LotBase):
 class LotUpdate(BaseModel):
     numero_lot: Optional[str] = Field(None, min_length=1, max_length=50)
     superficie: Optional[float] = Field(None, gt=0)
-    prix: Optional[float] = None
+    prix: Optional[float] = Field(None, ge=0)
     statut: Optional[str] = Field(None, pattern=r"^(actif|vendu|litige|reserve|annule|archive)$")
     proprietaire_client_id: Optional[UUID] = None
     proprietaire_nom: Optional[str] = None
@@ -212,16 +214,16 @@ class LotUpdate(BaseModel):
     proprietaire_profession: Optional[str] = None
     proprietaire_telephone: Optional[str] = None
     proprietaire_email: Optional[str] = None
-    gps_lat: Optional[float] = None
-    gps_lng: Optional[float] = None
-    gps_precision: Optional[float] = None
+    gps_lat: Optional[float] = Field(None, ge=-90, le=90)
+    gps_lng: Optional[float] = Field(None, ge=-180, le=180)
+    gps_precision: Optional[float] = Field(None, ge=0)
     gps_bornage: Optional[Dict[str, Dict[str, float]]] = None
     chef_village: Optional[str] = None
     arrete_prefectoral: Optional[str] = None
     arrete_date: Optional[date] = None
     publier_sur_vitrine: Optional[bool] = None
     date_cession: Optional[date] = None
-    prix_cession: Optional[float] = None
+    prix_cession: Optional[float] = Field(None, ge=0)
     notes: Optional[str] = None
 
 class LotResponse(LotBase):
@@ -259,6 +261,11 @@ LotResponse.model_rebuild()
 class LotSearchParams(BaseModel):
     search: Optional[str] = None
     statut: Optional[str] = None
+    village: Optional[str] = None
+    lotissement: Optional[str] = None
+    sort: str = "created_at"
+    dir: str = "desc"
+    include_archived: bool = False
     village_id: Optional[UUID] = None
     lotissement_id: Optional[UUID] = None
     ilot_id: Optional[UUID] = None
@@ -301,7 +308,6 @@ class TemoinResponse(BaseModel):
 
 class AttestationBase(FoncierBase):
     type: str = Field(default="standard", pattern=r"^(standard|cession|succession|mutation)$")
-    statut: str = Field(default="brouillon", pattern=r"^(brouillon|soumis|valide|archive|revoque|expire|annule)$")
     
     date_etablissement: Optional[date] = None
     date_expiration: Optional[datetime] = None
@@ -324,9 +330,9 @@ class AttestationBase(FoncierBase):
     limites_ouest: Optional[str] = None
     
     # GPS
-    gps_lat: Optional[float] = None
-    gps_lng: Optional[float] = None
-    gps_precision: Optional[float] = None
+    gps_lat: Optional[float] = Field(None, ge=-90, le=90)
+    gps_lng: Optional[float] = Field(None, ge=-180, le=180)
+    gps_precision: Optional[float] = Field(None, ge=0)
     gps_points: Optional[Dict[str, Any]] = None
     
     # Enregistrement
@@ -336,8 +342,6 @@ class AttestationBase(FoncierBase):
     numero_enregistrement: Optional[str] = None
     
     # Workflow
-    validation_agent_nom: Optional[str] = None
-    validation_chef_nom: Optional[str] = None
     
     # Témoins
     temoins: List[TemoinCreate] = Field(default_factory=list)
@@ -346,9 +350,16 @@ class AttestationCreate(AttestationBase):
     lot_id: UUID
     proprietaire_client_id: Optional[UUID] = None
 
+    @model_validator(mode="after")
+    def validate_dates(self):
+        if self.date_etablissement and self.date_expiration:
+            expiration = self.date_expiration.date()
+            if expiration <= self.date_etablissement:
+                raise ValueError("La date d’expiration doit être postérieure à la date d’établissement")
+        return self
+
 class AttestationUpdate(BaseModel):
     type: Optional[str] = Field(None, pattern=r"^(standard|cession|succession|mutation)$")
-    statut: Optional[str] = Field(None, pattern=r"^(brouillon|soumis|valide|archive|revoque|expire|annule)$")
     date_etablissement: Optional[date] = None
     date_expiration: Optional[datetime] = None
     mode_acquisition: Optional[str] = None
@@ -363,16 +374,14 @@ class AttestationUpdate(BaseModel):
     limites_sud: Optional[str] = None
     limites_est: Optional[str] = None
     limites_ouest: Optional[str] = None
-    gps_lat: Optional[float] = None
-    gps_lng: Optional[float] = None
-    gps_precision: Optional[float] = None
+    gps_lat: Optional[float] = Field(None, ge=-90, le=90)
+    gps_lng: Optional[float] = Field(None, ge=-180, le=180)
+    gps_precision: Optional[float] = Field(None, ge=0)
     gps_points: Optional[Dict[str, Any]] = None
     registre_volume: Optional[str] = None
     registre_page: Optional[int] = None
     registre_ligne: Optional[int] = None
     numero_enregistrement: Optional[str] = None
-    validation_agent_nom: Optional[str] = None
-    validation_chef_nom: Optional[str] = None
     temoins: Optional[List[TemoinCreate]] = None
 
 class AttestationSubmitRequest(BaseModel):
@@ -390,6 +399,19 @@ class AttestationScanRequest(BaseModel):
 class AttestationRevokeRequest(BaseModel):
     reason: str = Field(..., min_length=1, max_length=2000)
 
+
+class AttestationPrintRequest(BaseModel):
+    """Demande d'impression physique d'une attestation (préparation avant signature du chef)."""
+    raison: Optional[str] = Field(None, max_length=2000)
+
+
+class AttestationDeliverRequest(BaseModel):
+    """Confirmation de délivrance d'une attestation après contrôle de concordance du scan signé."""
+    raison: Optional[str] = Field(None, max_length=2000)
+
+class AttestationSignRequest(BaseModel):
+    signature: str = Field(..., min_length=32, max_length=8192)
+
 class AttestationResponse(AttestationBase):
     # Les données historiques de GPS peuvent être un tableau vide.
     gps_points: Optional[Union[Dict[str, Any], List[Any]]] = None
@@ -397,6 +419,8 @@ class AttestationResponse(AttestationBase):
     lot_id: UUID
     reference: str
     version: int
+    statut: str
+    row_version: int = 1
     proprietaire_client_id: Optional[UUID] = None
     
     # Sécurité
@@ -432,6 +456,10 @@ class AttestationResponse(AttestationBase):
     printed_by: Optional[UUID] = None
     printed_at: Optional[datetime] = None
     print_count: int = 0
+    # État de délivrance explicite
+    delivre: bool = False
+    delivre_par: Optional[UUID] = None
+    delivre_le: Optional[datetime] = None
     
     # Témoins
     temoins: List[TemoinResponse] = Field(default_factory=list)

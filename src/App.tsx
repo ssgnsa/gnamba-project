@@ -29,10 +29,7 @@ import { apiClient } from "./api/client";
 import { startManualSyncService } from "./lib/manualSyncService";
 import { useContentVersion } from "./hooks/useContentVersion";
 import type { PageSection } from "./components/page-builder/types";
-import PublicPageLayoutRenderer from "./components/public/PublicPageLayoutRenderer";
-import PublicSocialWall from "./components/public/PublicSocialWall";
 import { OFFICIAL_CONTACT } from "./lib/officialContact";
-import OneSignal from "react-onesignal";
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Clients = lazy(() => import("./pages/Clients"));
@@ -91,6 +88,12 @@ const PublicVerification = lazy(
   () => import("./pages/public/PublicVerification"),
 );
 const PublicLots = lazy(() => import("./pages/public/PublicLots"));
+const PublicPageLayoutRenderer = lazy(
+  () => import("./components/public/PublicPageLayoutRenderer"),
+);
+const PublicSocialWall = lazy(
+  () => import("./components/public/PublicSocialWall"),
+);
 
 type EmptyProps = Record<string, never>;
 type LazyComponent<TProps extends object = EmptyProps> = LazyExoticComponent<
@@ -828,6 +831,7 @@ function AppContent() {
       }
 
       try {
+        const { default: OneSignal } = await import("react-onesignal");
         await OneSignal.init({
           appId,
           allowLocalhostAsSecureOrigin: true,
@@ -1232,6 +1236,14 @@ function AppContent() {
     syncRootPath("replace");
   };
 
+  const handlePasswordResetSuccess = () => {
+    setView("public");
+    setPublicPage("login");
+    setShowForgotPassword(false);
+    setShowAccueil(false);
+    syncPublicPath("login", "replace");
+  };
+
   const handleDashNav = (page: Page) => {
     const targetPage = resolveDashboardTarget(page);
     syncDashboardPath(targetPage);
@@ -1373,7 +1385,8 @@ function AppContent() {
   // Page de réinitialisation du mot de passe (depuis email)
   if (
     typeof window !== "undefined" &&
-    window.location.hash.includes("type=recovery")
+    (window.location.pathname === "/reset-password" ||
+      window.location.hash.includes("type=recovery"))
   ) {
     return (
       <>
@@ -1385,7 +1398,7 @@ function AppContent() {
         )}
         <style>{themeCss}</style>
         <Suspense fallback={<PageLoader label="Chargement..." />}>
-          <ResetPasswordPage onSuccess={handleLoginSuccess} />
+          <ResetPasswordPage onSuccess={handlePasswordResetSuccess} />
         </Suspense>
       </>
     );
@@ -1486,13 +1499,19 @@ function AppContent() {
               </div>
             </div>
           ) : hasPublishedLayout ? (
-            <>
+            <Suspense
+              fallback={
+                <div className="min-h-[50vh] flex items-center justify-center bg-gray-50">
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-700" />
+                </div>
+              }
+            >
               <PublicPageLayoutRenderer
                 sections={publishedLayoutSections}
                 onNavigate={handlePublicNav}
               />
               {publicPage === "home" && <PublicSocialWall />}
-            </>
+            </Suspense>
           ) : (
             <Suspense
               fallback={<PageLoader label="Chargement du site public..." />}

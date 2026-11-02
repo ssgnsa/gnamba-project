@@ -16,6 +16,7 @@ import SelectWithCreate from "../../components/ui/SelectWithCreate";
 import { useSettings } from "../../context/SettingsContext";
 import { useAuth } from "../../context/AuthContext";
 import { useNotifications } from "../../context/NotificationContext";
+import apiClient from "../../api/client";
 import {
   getDemoBlockMessage,
   shouldBlockDestructiveAction,
@@ -212,6 +213,22 @@ export default function PaymentsTab({
       return;
     }
 
+    const contract = contracts.find((c) => c.id === form.contract_id);
+    if (!contract) {
+      setError("Contrat introuvable");
+      return;
+    }
+
+    const locataireId =
+      contract.locataire_entity_id ||
+      contract.locataire_id ||
+      form.locataire_id ||
+      null;
+    if (!locataireId) {
+      setError("Le contrat n'a pas de locataire associé");
+      return;
+    }
+
     setSaving(true);
     setError(null);
 
@@ -226,30 +243,65 @@ export default function PaymentsTab({
         }),
       );
       const existing = cached.find((payment) => payment.id === editingId);
-      const localPayment: LocalRentPayment = {
-        ...(existing ?? {}),
-        id: existing?.id ?? generateUUID(),
-        reference: existing?.reference ?? generateReference("QTT"),
+
+      const payload = {
+        locataire_entity_id: locataireId,
+        property_id: contract.property_id || "",
         contract_id: form.contract_id,
-        property_id: existing?.property_id ?? "",
         montant: parseFloat(form.montant) || 0,
         date_paiement: form.date_paiement || "",
-        date_echeance: form.date_echeance || null,
+        date_echeance: form.date_echeance || undefined,
         mois_concerne: form.mois_concerne || "",
         mode_paiement: form.mode_paiement,
         statut: form.statut,
         notes: form.notes.trim() || null,
-        locataire_id: form.locataire_id || null,
-        sync_status: "pending",
+        reference: existing?.reference ?? generateReference("QTT"),
+      };
+
+      let result: any = null;
+      if (editingId && existing) {
+        result = await apiClient.immobilier.payments.update(editingId, {
+          montant: payload.montant,
+          date_paiement: payload.date_paiement,
+          date_echeance: payload.date_echeance,
+          mois_concerne: payload.mois_concerne,
+          mode_paiement: payload.mode_paiement,
+          statut: payload.statut,
+          notes: payload.notes,
+        });
+      } else {
+        result = await apiClient.immobilier.payments.create(payload);
+      }
+
+      if (result.error) {
+        setError(result.error || "Erreur lors de l'enregistrement");
+        return;
+      }
+
+      const saved: LocalRentPayment = {
+        ...(existing ?? {}),
+        id: result.data?.id ?? existing?.id ?? generateUUID(),
+        reference: result.data?.reference ?? payload.reference,
+        contract_id: form.contract_id,
+        property_id: contract.property_id || "",
+        montant: payload.montant,
+        date_paiement: payload.date_paiement,
+        date_echeance: payload.date_echeance ?? null,
+        mois_concerne: payload.mois_concerne,
+        mode_paiement: payload.mode_paiement,
+        statut: payload.statut,
+        notes: payload.notes,
+        locataire_id: locataireId,
+        sync_status: "synced",
         sync_error: null,
         deleted_at: null,
         date_paiement_effectif: null,
-        created_at: existing?.created_at ?? now,
-        updated_at: now,
+        created_at: result.data?.created_at ?? existing?.created_at ?? now,
+        updated_at: result.data?.updated_at ?? now,
       };
 
       const next = sortPayments(
-        cached.filter((payment) => payment.id !== localPayment.id).concat(localPayment),
+        cached.filter((payment) => payment.id !== saved.id).concat(saved),
       );
       writeManualCache(PAYMENTS_CACHE_KEY, next);
       setModalOpen(false);
@@ -413,7 +465,7 @@ export default function PaymentsTab({
             <option value="all">Tous les statuts</option>
             <option value="en_attente">En attente</option>
             <option value="paye">Payé</option>
-            <option value="en_retard">En retard</option>
+            <option value="retard">En retard</option>
             <option value="annule">Annulé</option>
           </select>
         </div>
@@ -598,6 +650,15 @@ export default function PaymentsTab({
                                   >
                                     <Edit size={15} />
                                   </button>
+                                  {p.statut === "paye" && (
+                                    <button
+                                      onClick={() => window.print()}
+                                      className="p-1.5 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors"
+                                      title="Imprimer la quittance"
+                                    >
+                                      <FileText size={15} />
+                                    </button>
+                                  )}
                                   <button
                                     onClick={() => handleDelete(p.id)}
                                     className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
@@ -794,7 +855,6 @@ export default function PaymentsTab({
                 <option value="especes">Espèces</option>
                 <option value="virement">Virement</option>
                 <option value="mobile_money">Mobile Money</option>
-                <option value="carte">Carte</option>
                 <option value="cheque">Chèque</option>
               </select>
             </div>
@@ -814,7 +874,7 @@ export default function PaymentsTab({
               >
                 <option value="en_attente">En attente</option>
                 <option value="paye">Payé</option>
-                <option value="en_retard">En retard</option>
+                <option value="retard">En retard</option>
                 <option value="annule">Annulé</option>
               </select>
             </div>

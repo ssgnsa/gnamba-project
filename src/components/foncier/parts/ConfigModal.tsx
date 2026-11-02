@@ -96,8 +96,16 @@ export const ConfigModal: FC<ConfigModalProps> = ({
   }, [selectedVillage]);
 
   const handleSave = async () => {
-    if (!selectedVillage || !canManage || !isOnline) {
-      setError("Connexion et droits requis");
+    if (!isOnline) {
+      setError("Vous êtes hors ligne. Vérifiez votre connexion.");
+      return;
+    }
+    if (!canManage) {
+      setError("Droits insuffisants pour modifier la configuration du village.");
+      return;
+    }
+    if (!selectedVillage) {
+      setError("Sélectionnez d'abord un village dans le menu déroulant.");
       return;
     }
     if (!config.village?.trim()) {

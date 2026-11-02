@@ -6,7 +6,7 @@ from app.core import migration_runner
 
 class _Result:
     def scalar_one(self):
-        return "032_immobilier_v2_contract"
+        return "036_foncier_activity_logs_json"
 
 
 class _DatabaseSession:

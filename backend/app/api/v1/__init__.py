@@ -3,10 +3,12 @@ from app.api.v1.auth.router import router as v1_auth_router
 from app.api.v1.users.router import router as users_router
 from app.api.v1.employees.router import router as employees_router
 from app.api.v1.finance.router import router as finance_router
+from app.api.v1.foncier.router import public_router as foncier_public_router
 from app.api.v1.foncier.router import router as foncier_router
 from app.api.v1.immobilier import immobilier_router
 from app.api.v1.leads.router import router as leads_router
 from app.api.v1.media.router import router as v1_media_router
+from app.api.v1.messages_direction.router import router as messages_direction_router
 from app.api.v1.products.router import router as products_router
 from app.api.v1.projects.router import router as projects_router
 from app.api.v1.rpc.router import router as rpc_router
@@ -37,8 +39,10 @@ router.include_router(suppliers_router)
 router.include_router(products_router)
 router.include_router(finance_router)
 router.include_router(immobilier_router)
+router.include_router(foncier_public_router)
 router.include_router(foncier_router)
 router.include_router(leads_router)
+router.include_router(messages_direction_router)
 router.include_router(rpc_router)
 router.include_router(tables_router)
 router.include_router(dashboard_router)

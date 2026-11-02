@@ -223,7 +223,7 @@ export default function Immobilier() {
 
   const totalProperties = properties.length;
   const occupiedProperties = properties.filter(
-    (p) => p.statut === "louee",
+    (p) => p.statut === "louee" || p.statut === "loue",
   ).length;
   const availableProperties = properties.filter(
     (p) => p.statut === "disponible",
@@ -342,10 +342,10 @@ export default function Immobilier() {
           adresse: item.adresse,
           commune: item.commune || null,
           ville: item.ville || null,
-          proprietaire_name: item.proprietaire || null,
+          proprietaire_entity_id: item.proprietaire_entity_id || null,
           valeur: item.valeur ?? null,
           loyer_mensuel: item.loyer_mensuel ?? 0,
-          charges_mensuelles: item.charges ?? 0,
+          charges_mensuelles: item.charges_mensuelles ?? 0,
           statut: item.statut === "loue" ? "louee" : item.statut === "vendu" ? "vendue" : item.statut,
           description: item.description || null,
           cover_image_url: item.cover_image_url || null,

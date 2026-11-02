@@ -6,6 +6,7 @@ from pathlib import Path
 import os
 import json
 import logging
+import ipaddress
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api import v1_router
@@ -53,6 +54,7 @@ cors_origins = settings.cors_origins()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
+    allow_origin_regex=settings.cors_origin_regex().pattern,
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS", "PUT", "PATCH", "DELETE"],
     allow_headers=["*"],
@@ -66,13 +68,19 @@ class AuthTransportSecurityMiddleware(BaseHTTPMiddleware):
         if auth_path and settings.AUTH_REQUIRE_HTTPS:
             host = (request.url.hostname or "").lower()
             local = host in {"localhost", "127.0.0.1", "::1", "testserver"}
+            private_network = False
+            try:
+                private_network = ipaddress.ip_address(host).is_private
+            except ValueError:
+                pass
             forwarded_proto = request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip().lower()
             if forwarded_proto != "https":
                 try:
                     forwarded_proto = json.loads(request.headers.get("cf-visitor", "{}")).get("scheme", "").lower()
                 except (TypeError, json.JSONDecodeError):
                     forwarded_proto = ""
-            if not local and request.url.scheme != "https" and forwarded_proto != "https":
+            lan_http_allowed = private_network and settings.AUTH_ALLOW_PRIVATE_NETWORK_HTTP
+            if not local and not lan_http_allowed and request.url.scheme != "https" and forwarded_proto != "https":
                 return JSONResponse(
                     status_code=426,
                     content={"detail": "HTTPS est obligatoire pour les parcours d’authentification."},
@@ -178,7 +186,7 @@ def health() -> dict[str, str]:
 def readiness() -> dict[str, str]:
     with SessionLocal() as db:
         current_revision = db.execute(text("SELECT version_num FROM alembic_version LIMIT 1")).scalar_one()
-    expected_revision = "032_immobilier_v2_contract"
+    expected_revision = "037_add_mfa_to_users"
     if current_revision != expected_revision:
         return JSONResponse(
             status_code=503,

@@ -1,7 +1,8 @@
 """
 Campaign Processor API Routes
 """
-from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from uuid import UUID
 from typing import Dict, Any, Optional
@@ -43,7 +44,7 @@ class CampaignUpdateRequest(BaseModel):
 
 
 @router.post("/campaigns", status_code=201)
-async def create_campaign(
+def create_campaign(
     payload: CampaignCreateRequest,
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
@@ -103,9 +104,11 @@ async def create_campaign(
 
 
 @router.get("/campaigns")
-async def list_campaigns(
+def list_campaigns(
     statut: Optional[str] = None,
     type_campagne: Optional[str] = None,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """List all lead campaigns"""
@@ -124,7 +127,9 @@ async def list_campaigns(
             query += " AND type_campagne = :type_campagne"
             params["type_campagne"] = type_campagne
 
-        query += " ORDER BY created_at DESC"
+        query += " ORDER BY created_at DESC, id DESC LIMIT :limit OFFSET :offset"
+        params["limit"] = limit
+        params["offset"] = offset
 
         result = db.execute(text(query), params).fetchall()
 
@@ -155,7 +160,7 @@ async def list_campaigns(
 
 
 @router.get("/campaigns/{campaign_id}")
-async def get_campaign(
+def get_campaign(
     campaign_id: UUID,
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
@@ -200,7 +205,7 @@ async def get_campaign(
 
 
 @router.patch("/campaigns/{campaign_id}")
-async def update_campaign(
+def update_campaign(
     campaign_id: UUID,
     payload: CampaignUpdateRequest,
     db: Session = Depends(get_db)
@@ -276,7 +281,7 @@ async def update_campaign(
 
 
 @router.delete("/campaigns/{campaign_id}")
-async def delete_campaign(
+def delete_campaign(
     campaign_id: UUID,
     db: Session = Depends(get_db)
 ) -> Dict[str, str]:
@@ -301,7 +306,7 @@ async def delete_campaign(
 
 
 @router.post("/campaigns/{campaign_id}/process")
-async def process_campaign(
+def process_campaign(
     campaign_id: UUID,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
@@ -347,7 +352,7 @@ async def _process_campaign_background(campaign_id: UUID):
 
 
 @router.get("/campaigns/{campaign_id}/stats")
-async def get_campaign_stats(
+def get_campaign_stats(
     campaign_id: UUID,
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
