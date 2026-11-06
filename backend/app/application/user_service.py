@@ -314,7 +314,11 @@ class UserApplicationService:
         return get_user_payload(user.to_payload())
 
     def list_users(self) -> list[dict[str, Any]]:
-        return [user.to_payload() for user in self.user_repository.get_all()]
+        return [
+            user.to_payload()
+            for user in self.user_repository.get_all()
+            if user.is_active
+        ]
 
     def update_user(self, user_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         user = self.user_repository.update(user_id, payload)
