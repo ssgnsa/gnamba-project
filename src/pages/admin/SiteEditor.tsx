@@ -433,7 +433,7 @@ export default function SiteEditor() {
                 }`}
               >
                 <Icon size={15} />
-                {tab.label}
+                {tab?.label ?? 'Sans titre'}
                 {tab.id === "messages" && newMessages > 0 && (
                   <span className="bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
                     {newMessages}
@@ -474,7 +474,7 @@ export default function SiteEditor() {
                 >
                   {PAGE_SLUGS.map((p) => (
                     <option key={p.slug} value={p.slug}>
-                      {p.label}
+                      {p?.label ?? 'Sans titre'}
                     </option>
                   ))}
                 </select>
@@ -521,15 +521,19 @@ export default function SiteEditor() {
             <div className="space-y-6">
               {(() => {
                 // Group sections by type, get unique types from layout
-                const sectionTypes = Array.from(
-                  new Set(pageLayoutSections.map((s) => s.type))
-                );
-                return sectionTypes.map((sectionType) => {
-                  const sectionsOfType = pageLayoutSections.filter(
-                    (s) => s.type === sectionType
-                  );
-                  const label =
-                    SECTION_TYPE_LABELS[sectionType] || sectionType;
+                // Filter layouts to remove null/undefined entries before mapping
+const safeLayout = (pageLayoutSections ?? []).filter(
+  (s): s is Section => Boolean(s && typeof s === 'object' && typeof s.label !== 'undefined')
+);
+const sectionTypes = Array.from(
+  new Set(safeLayout.map((s) => s.type))
+);
+return sectionTypes.map((sectionType) => {
+  const sectionsOfType = safeLayout.filter(
+    (s) => s.type === sectionType
+  );
+  const label =
+    SECTION_TYPE_LABELS[sectionType] || sectionType || 'Sans titre';
                   const meta = SECTION_META[sectionType as keyof typeof SECTION_META];
 
                   // Get all props keys used by sections of this type
