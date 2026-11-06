@@ -52,9 +52,19 @@ export function SiteContentProvider({ children }: { children: ReactNode }) {
     };
   }, [contentVersion]); // Re-fetch when content version changes
 
+  // Build a Map for O(1) lookups when rows are available
+  const rowMap = rows.reduce(
+    (map, row) => {
+      if (!map.has(row.section)) map.set(row.section, new Map());
+      map.get(row.section)!.set(row.key, row.value);
+      return map;
+    },
+    new Map<string, Map<string, string>>(),
+  );
+
   const get = (section: string, key: string, fallback = ""): string => {
-    const row = rows.find((r) => r.section === section && r.key === key);
-    return row?.value || fallback;
+    const sectionMap = rowMap.get(section);
+    return sectionMap?.get(key) || fallback;
   };
 
   return (

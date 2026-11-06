@@ -150,11 +150,31 @@ export default function Employes() {
       setModalOpen(false);
       fetchEmployees();
     } catch (error) {
-      setFormError(
-        error instanceof Error
-          ? error.message
-          : "Impossible d’enregistrer cet employé.",
-      );
+      const errorMsg =
+        error instanceof Error ? error.message : String(error);
+      // Handle 409 Conflict - duplicate employee (same email or phone)
+      if (errorMsg.includes("employé avec ces identifiants existe déjà")) {
+        // Show specific message based on which field was provided
+        if (form.email && form.email.trim()) {
+          setFormError(
+            "Un employé avec cet email existe déjà. Veuillez utiliser un email différent.",
+          );
+        } else if (form.telephone && form.telephone.trim()) {
+          setFormError(
+            "Un employé avec ce téléphone existe déjà. Veuillez utiliser un numéro de téléphone différent.",
+          );
+        } else {
+          setFormError(
+            "Un employé avec ces identifiants existe déjà. Veuillez en créer un autre.",
+          );
+        }
+      } else {
+        setFormError(
+          error instanceof Error
+            ? error.message
+            : "Impossible d’enregistrer cet employé.",
+        );
+      }
     } finally {
       setSaving(false);
     }
