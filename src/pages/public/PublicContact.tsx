@@ -22,6 +22,7 @@ import {
   buildGoogleMapsEmbedUrl,
   buildWhatsAppUrl,
 } from "../../lib/officialContact";
+import LeafletMap from "../../components/public/LeafletMap";
 import { PUBLIC_PAGE_PATHS } from "../../lib/publicRoutes";
 
 // Premium UI Components
@@ -382,25 +383,24 @@ export default function PublicContact() {
 
               <Card variant="elevated" padding="lg" className="overflow-hidden">
                 <CardTitle className="font-bold text-neutral-900 mb-4">Localisation</CardTitle>
-                <div className="overflow-hidden rounded-xl border border-neutral-200">
-                  <iframe
-                    title="Google Maps GNAMBA SERVICES"
-                    src={mapsSrc}
-                    className="h-64 w-full border-0"
-                    loading="lazy"
-                    referrerPolicy="strict-origin-when-cross-origin"
-                    allowFullScreen
-                  />
-                </div>
-                <Flex wrap gap="3" className="mt-4">
+                <LeafletMap
+                  latitude={5.6625}
+                  longitude={-4.5731}
+                  name="GNAMBA SERVICES"
+                  address={OFFICIAL_CONTACT.address}
+                  phone={OFFICIAL_CONTACT.phone}
+                  directionsUrl={buildGoogleMapsDirectionsUrl(OFFICIAL_CONTACT.address)}
+                  className="mb-6"
+                />
+                <div className="flex-wrap gap-3">
                   <a
-                    href={mapsDirectionsUrl}
+                    href={buildGoogleMapsDirectionsUrl(OFFICIAL_CONTACT.address)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-700 min-h-[44px]"
                   >
                     <MapPin size={16} />
-                    Ouvrir Google Maps
+                    Itinéraire
                   </a>
                   <a
                     href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(OFFICIAL_CONTACT.address)}`}
@@ -408,9 +408,9 @@ export default function PublicContact() {
                     rel="noopener noreferrer"
                     className="inline-flex items-center justify-center gap-2 rounded-xl border border-neutral-200 px-4 py-2.5 text-sm font-semibold text-neutral-700 transition hover:border-primary-300 hover:text-primary-600 min-h-[44px]"
                   >
-                    Itinéraire
+                    Ouvrir Google Maps
                   </a>
-                </Flex>
+                </div>
               </Card>
             </div>
 
