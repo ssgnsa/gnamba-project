@@ -1,14 +1,12 @@
-# ⚠️  COMPOSE DE DEVELOPPEMENT LOCAL — NE PAS LANCER DEPUIS CE DOSSIER
-# ⚠️  Utiliser /home/soma/gnamba-project/docker-compose.yml à la RACINE.
-# ⚠️  Ce fichier utilise un volume différent (backend_postgres_data, vide).
-# ⚠️  Lancé après la racine, il recrée egs-postgres sur un volume VIDE et
-#     rend la prod invisible (incident 2026-10-30).
-#
-# Les container_name sont suffixés -dev pour éviter toute collision avec
-# le compose racine.
+# ⚠️  COMPOSE DE DEVELOPPEMENT LOCAL
+# ⚠️  Lancé UNIQUEMENT avec --profile dev
+# ⚠️  Pour la prod, utiliser /home/soma/gnamba-project/docker-compose.yml
+
+name: egs-dev
 
 services:
   postgres:
+    profiles: ["dev"]
     image: postgres:16-alpine
     container_name: egs-postgres-dev
     environment:
@@ -16,7 +14,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -26,12 +24,14 @@ services:
       retries: 5
 
   redis:
+    profiles: ["dev"]
     image: redis:7-alpine
     container_name: egs-redis-dev
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6380:6379"
 
   backend:
+    profiles: ["dev"]
     build:
       context: .
       dockerfile: Dockerfile
@@ -41,16 +41,18 @@ services:
       LOCAL_AUTH_SECRET: ${LOCAL_AUTH_SECRET:?LOCAL_AUTH_SECRET is required}
       INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:-}
       AUTO_RESET_DEFAULT_ADMIN_PASSWORD: "false"
-      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-true}
-      AUTH_REQUIRE_HTTPS: ${AUTH_REQUIRE_HTTPS:-true}
-      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-https://gnambaservices.ci}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      AUTH_REQUIRE_HTTPS: ${AUTH_REQUIRE_HTTPS:-false}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:8001}
+      PYTHONDONTWRITEBYTECODE: "1"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_started
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:8001:8000"
 
 volumes:
   postgres_data:
+    name: egs-dev-postgres-data
