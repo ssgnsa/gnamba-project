@@ -16,7 +16,7 @@ from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.security import AuthenticationError, AuthorizationError, RateLimitError
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
+ROOT_DIR = Path(__file__).resolve().parent.parent
 VERSION_FILE_PATHS = [ROOT_DIR / "VERSION.json", ROOT_DIR / "dist" / "VERSION.json"]
 
 
@@ -36,6 +36,16 @@ def read_release_info() -> dict[str, object]:
         "build_hash": "unknown",
         "environment": "local",
     }
+
+
+def _get_alembic_head() -> str:
+    """Retourne la tête Alembic définie par les fichiers de migration du repo."""
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+
+    cfg = Config(str(ROOT_DIR / "alembic.ini"))
+    script = ScriptDirectory.from_config(cfg)
+    return script.get_current_head()
 
 
 app = FastAPI(title=settings.APP_NAME, version="0.2.0")
@@ -186,7 +196,7 @@ def health() -> dict[str, str]:
 def readiness() -> dict[str, str]:
     with SessionLocal() as db:
         current_revision = db.execute(text("SELECT version_num FROM alembic_version LIMIT 1")).scalar_one()
-    expected_revision = "038_fix_foncier_schema_drift"
+    expected_revision = _get_alembic_head()
     if current_revision != expected_revision:
         return JSONResponse(
             status_code=503,
