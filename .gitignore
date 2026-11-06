@@ -119,3 +119,7 @@ TYPECHECK-RESULT-PHASE3.3.txt
 .claude/sessions/
 .claude/history/
 quarantine/
+review.sql
+VERSION.json
+*.bak
+*.bak.*
