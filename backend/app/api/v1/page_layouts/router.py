@@ -257,31 +257,50 @@ def publish_page_layout(
 ) -> PageLayoutRow:
     try:
         with SessionLocal() as session:
+            # 1. Dépublier toutes les versions existantes pour ce slug
+            session.execute(
+                text(
+                    """
+                    UPDATE page_layouts
+                    SET is_published = false
+                    WHERE COALESCE(page_slug, page_key) = :page_slug
+                    """
+                ),
+                {"page_slug": page_slug},
+            )
+            # 2. Publier la version la plus récente
             session.execute(
                 text(
                     """
                     UPDATE page_layouts
                     SET is_published = true, published_at = NOW(), updated_by = :user_id
-                    WHERE page_key = :page_slug
+                    WHERE id = (
+                        SELECT id FROM page_layouts
+                        WHERE COALESCE(page_slug, page_key) = :page_slug
+                        ORDER BY updated_at DESC NULLS LAST
+                        LIMIT 1
+                    )
                     """
                 ),
                 {"page_slug": page_slug, "user_id": current_user.get("id")},
             )
             session.commit()
 
-            # Return the updated layout
+            # 3. Retourner la ligne maintenant publiée
             row = session.execute(
                 text("""
                     SELECT page_key, page, layout_json, is_published,
                            seo_title, seo_description, seo_keywords, og_image_media_id
-                    FROM page_layouts WHERE page_key = :page_slug
+                    FROM page_layouts
+                    WHERE COALESCE(page_slug, page_key) = :page_slug AND is_published = true
+                    LIMIT 1
                 """),
                 {"page_slug": page_slug},
             ).fetchone()
 
         if row:
             return PageLayoutRow(
-                page_slug=row[0] or "",
+                page_slug=row[0] or page_slug,
                 page_name=row[1],
                 layout_json=row[2] or [],
                 is_published=bool(row[3]),
@@ -292,6 +311,8 @@ def publish_page_layout(
             )
         raise HTTPException(status_code=404, detail="Page layout not found after publish")
     except AuthorizationError as exc:
-        raise get_http_exception_for_error(exc) from exc
+        raise HTTPException(status_code=403, detail=str(exc))
     except Exception as exc:
-        raise get_http_exception_for_error(Exception(str(exc))) from exc
+        import logging
+        logging.error(f"Publish error: {exc}")
+        raise HTTPException(status_code=500, detail="Erreur interne lors de la publication")
