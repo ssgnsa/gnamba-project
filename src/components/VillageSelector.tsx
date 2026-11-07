@@ -3,12 +3,12 @@ import { foncierRepository } from '@/data/foncier.repository';
 import { withBackoff } from '@/lib/retry';
 import { getCachedLots } from '@/lib/foncierOffline';
 
-interface FoncierVillageManagerProps {
+interface VillageSelectorProps {
   initialVillage?: string;
   onVillageChange?: (village: string) => void;
 }
 
-export const FoncierVillageManager: React.FC<FoncierVillageManagerProps> = ({
+export const VillageSelector: React.FC<VillageSelectorProps> = ({
   initialVillage,
   onVillageChange,
 }) => {
