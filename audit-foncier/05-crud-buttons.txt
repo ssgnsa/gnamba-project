@@ -1,0 +1,50 @@
+=== BOUTONS CRÉER ===
+src/pages/Foncier.tsx:410:              <Plus size={16} /> Nouveau Lotissement
+src/pages/Foncier.tsx:494:                          Nouvelle attestation
+src/components/foncier/parts/IlotFormModal.tsx:56:          <h2 className="text-lg font-bold">Nouvel îlot</h2>
+src/components/foncier/parts/IlotFormModal.tsx:106:              {loading ? "Création…" : "Créer l'îlot"}
+src/components/foncier/parts/LotFormModal.tsx:259:              {initialData ? "Modifier le lot" : "Nouveau lot foncier"}
+src/components/foncier/parts/LotFormModal.tsx:357:      title={!selectedLotissementId ? "Sélectionnez d'abord un lotissement" : "Créer un nouvel îlot"}
+src/components/foncier/parts/LotTable.tsx:184:            <Plus size={16} /> Nouveau Lot
+src/components/foncier/parts/LotissementFormModal.tsx:92:              Nouveau lotissement
+src/components/foncier/parts/LotissementFormModal.tsx:242:                {loading ? "Création..." : "Créer le lotissement"}
+src/components/foncier/parts/AttestationModal.tsx:434:                  <button type="button" onClick={addTemoin} disabled={temoins.length >= 4} className="px-2 py-1 text-xs text-blue-600 border border-blue-600 rounded hover:bg-blue-50 disabled:opacity-50">+ Ajouter</button>
+src/components/foncier/WorkflowValidation.tsx:478:          title="Ajouter le scan original"
+src/components/foncier/VillageFormModal.tsx:97:            {isEdit ? `Éditer "${village.nom}"` : "Nouveau village"}
+src/components/foncier/VillageFormModal.tsx:228:              {saving ? "Enregistrement…" : isEdit ? "Mettre à jour" : "Créer"}
+
+=== BOUTONS ÉDITER ===
+src/pages/Foncier.tsx:107:    openEdit,
+src/pages/Foncier.tsx:289:      if (tag === "input" || tag === "textarea" || target?.isContentEditable) return;
+src/pages/Foncier.tsx:444:            onOpenEdit={openEdit}
+src/components/foncier/parts/LotFormModal.tsx:259:              {initialData ? "Modifier le lot" : "Nouveau lot foncier"}
+src/components/foncier/parts/LotTable.tsx:12:  Edit,
+src/components/foncier/parts/LotTable.tsx:47:  onOpenEdit: (lot: FoncierLot) => void;
+src/components/foncier/parts/LotTable.tsx:93:  onOpenEdit,
+src/components/foncier/parts/LotTable.tsx:408:                        onClick={() => onOpenEdit(lot)}
+src/components/foncier/parts/LotTable.tsx:415:                              : "Modifier"
+src/components/foncier/parts/LotTable.tsx:422:                              : "Modifier"
+src/components/foncier/parts/LotTable.tsx:426:                        <Edit size={15} />
+src/components/foncier/VillageFormModal.tsx:32:  const isEdit = !!village;
+src/components/foncier/VillageFormModal.tsx:75:    const { error: err } = isEdit
+src/components/foncier/VillageFormModal.tsx:97:            {isEdit ? `Éditer "${village.nom}"` : "Nouveau village"}
+src/components/foncier/VillageFormModal.tsx:228:              {saving ? "Enregistrement…" : isEdit ? "Mettre à jour" : "Créer"}
+
+=== BOUTONS SUPPRIMER/DÉSACTIVER ===
+src/components/foncier/parts/LotFormModal.tsx:235:      delete saveData.village;
+src/components/foncier/parts/LotFormModal.tsx:236:      delete saveData.nom_lotissement;
+src/components/foncier/parts/LotTable.tsx:297:              const isArchived = !!lot.deleted_at;
+src/components/foncier/parts/LotTable.tsx:442:                          title={!canManage ? "Accès réservé" : "Archiver"}
+src/components/foncier/parts/LotTable.tsx:443:                          aria-label={!canManage ? "Accès réservé" : "Archiver"}
+src/components/foncier/parts/AttestationHistoryModal.tsx:21:    deleted_at?: string | null;
+
+=== CONFIRMATIONS (confirm/alert) ===
+src/pages/Foncier.tsx:251:      alert("Vous devez être connecté pour imprimer le PDF.");
+src/pages/Foncier.tsx:273:      alert("Impossible d'imprimer le PDF de l'attestation.");
+src/components/foncier/WorkflowValidation.tsx:161:      alert("Connexion requise pour soumettre.");
+src/components/foncier/WorkflowValidation.tsx:164:    if (!confirm("Soumettre l’attestation au Chef du village ?")) return;
+src/components/foncier/WorkflowValidation.tsx:169:      alert("Erreur : " + result.error);
+src/components/foncier/WorkflowValidation.tsx:180:      alert("Connexion requise pour valider.");
+src/components/foncier/WorkflowValidation.tsx:183:    if (!confirm("Valider l’attestation (signature physique du Chef) ?"))
+src/components/foncier/WorkflowValidation.tsx:193:      alert("Erreur : " + result.error);
+src/components/foncier/WorkflowValidation.tsx:212:      alert(`Erreur : ${error}`);

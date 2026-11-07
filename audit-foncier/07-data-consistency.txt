@@ -1,0 +1,44 @@
+=== TAILLES ET TYPES DES COLONNES CLÉS ===
+      table_name      |    column_name    | data_type | character_maximum_length | is_nullable 
+----------------------+-------------------+-----------+--------------------------+-------------
+ foncier_attestations | reference         | text      |                          | NO
+ foncier_attestations | statut            | text      |                          | NO
+ foncier_ilots        | numero            | text      |                          | NO
+ foncier_ilots        | superficie_totale | numeric   |                          | YES
+ foncier_lotissements | nom               | text      |                          | NO
+ foncier_lotissements | code              | text      |                          | YES
+ foncier_lotissements | superficie_totale | numeric   |                          | YES
+ foncier_lots         | numero_lot        | text      |                          | NO
+ foncier_lots         | reference         | text      |                          | NO
+ foncier_lots         | superficie        | numeric   |                          | NO
+ foncier_lots         | statut            | text      |                          | NO
+ foncier_villages     | nom               | text      |                          | NO
+ foncier_villages     | code              | text      |                          | NO
+ foncier_villages     | statut            | text      |                          | YES
+ foncier_villages     | superficie_totale | real      |                          | YES
+(15 rows)
+
+
+=== CONTRAINTES UNIQUE ===
+      table_name      |                 conname                 |      pg_get_constraintdef       
+----------------------+-----------------------------------------+---------------------------------
+ foncier_lotissements | foncier_lotissements_village_id_nom_key | UNIQUE (village_id, nom)
+ foncier_ilots        | foncier_ilots_lotissement_id_numero_key | UNIQUE (lotissement_id, numero)
+ foncier_lots         | foncier_lots_reference_key              | UNIQUE (reference)
+ foncier_attestations | foncier_attestations_reference_key      | UNIQUE (reference)
+(4 rows)
+
+
+=== FK AVEC DELETE RULE ===
+           source            |         column         |        target        | delete_rule 
+-----------------------------+------------------------+----------------------+-------------
+ foncier_attestation_temoins | attestation_id         | foncier_attestations | CASCADE
+ foncier_attestation_temoins | entity_id              | entities             | SET NULL
+ foncier_attestations        | lot_id                 | foncier_lots         | CASCADE
+ foncier_attestations        | proprietaire_client_id | parties              | SET NULL
+ foncier_ilots               | lotissement_id         | foncier_lotissements | RESTRICT
+ foncier_lotissements        | village_id             | foncier_villages     | RESTRICT
+ foncier_lots                | ilot_id                | foncier_ilots        | RESTRICT
+ foncier_lots                | proprietaire_client_id | parties              | SET NULL
+(8 rows)
+

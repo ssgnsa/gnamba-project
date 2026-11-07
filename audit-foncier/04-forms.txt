@@ -1,0 +1,43 @@
+=== SCHÉMAS ZOD (validation frontend) ===
+10:const requiredString = z.string().min(1, "Ce champ est requis");
+11:const optionalString = z.string().optional().nullable();
+116:const statutSchema = z.enum(["actif", "vendu", "litige", "reserve", "annule"]);
+152:    proprietaire_client_id: z.string().uuid().optional().nullable(),
+161:    date_cession: z.string().optional(),
+179:    notes: z.string().max(1000, "Maximum 1000 caractères").optional(),
+209:export const attestationFormSchema = z.object({
+223:  attestation_type: z.enum(["standard", "cession"]).default("standard"),
+263:      z.object({
+
+=== CHAMPS PAR FORMULAIRE (compte) ===
+--- src/components/foncier/parts/LotFormModal.tsx ---
+9
+--- src/components/foncier/parts/ConfigModal.tsx ---
+7
+--- src/components/foncier/parts/AttestationModal.tsx ---
+11
+--- src/components/foncier/VillageLogoUploader.tsx ---
+5
+
+=== PATTERN VALIDATION CODE ===
+28:    nom: str = Field(..., min_length=2, max_length=255)
+29:    code: str = Field(..., min_length=2, max_length=10, pattern=r"^[A-Z0-9]+$")
+50:    nom: Optional[str] = Field(None, min_length=2, max_length=255)
+51:    code: Optional[str] = Field(None, min_length=2, max_length=10, pattern=r"^[A-Z0-9]+$")
+101:    nom: str = Field(..., min_length=2, max_length=255)
+102:    code: Optional[str] = Field(None, max_length=20, pattern=r"^[A-Z0-9]+$")
+113:    nom: Optional[str] = Field(None, min_length=2, max_length=255)
+114:    code: Optional[str] = Field(None, max_length=20, pattern=r"^[A-Z0-9]+$")
+134:    numero: str = Field(..., min_length=1, max_length=50)
+142:    numero: Optional[str] = Field(None, min_length=1, max_length=50)
+159:    numero_lot: str = Field(..., min_length=1, max_length=50)
+202:    numero_lot: Optional[str] = Field(None, min_length=1, max_length=50)
+276:    reason: str = Field(default="archivage", max_length=255)
+290:    nom: str = Field(..., min_length=2, max_length=255)
+291:    prenom: str = Field(..., min_length=2, max_length=255)
+388:    agent_nom: str = Field(..., min_length=2, max_length=255)
+391:    chef_nom: str = Field(..., min_length=2, max_length=255)
+400:    reason: str = Field(..., min_length=1, max_length=2000)
+405:    raison: Optional[str] = Field(None, max_length=2000)
+410:    raison: Optional[str] = Field(None, max_length=2000)
+413:    signature: str = Field(..., min_length=32, max_length=8192)

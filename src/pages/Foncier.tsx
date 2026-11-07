@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import FoncierVillages from "./FoncierVillages";
 import {
   Settings2,
   History,
@@ -356,6 +357,7 @@ export default function Foncier() {
             <nav className="flex gap-1 pb-2" role="tablist">
               {[
                 { id: "lots", label: "Lots", icon: Files },
+                { id: "villages", label: "Villages", icon: Files },
                 { id: "attestations", label: "Attestations", icon: FileText },
                 { id: "workflow", label: "Validation", icon: CheckCircle },
                 { id: "config", label: "Configuration", icon: Settings2 },
@@ -452,6 +454,10 @@ export default function Foncier() {
             ilotOptions={ilotOptions}
           />
           </>
+        )}
+        {/* Tab: Villages */}
+        {activeTab === "villages" && (
+          <FoncierVillages />
         )}
         {/* Tab: Attestations */}
         {activeTab === "attestations" && (
@@ -641,6 +647,7 @@ export default function Foncier() {
           selectedVillage={selectedVillage || undefined}
           selectedLotissement={selectedLotissement || undefined}
           selectedIlot={selectedIlot || undefined}
+          onIlotCreated={() => { void loadLotHierarchy(); }}
         />
 
         {/* Attestation Modal */}

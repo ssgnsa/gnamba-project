@@ -1,0 +1,53 @@
+=== PERMISSIONS FONCIER ===
+14:from app.api.deps import get_current_user, require_permission
+40:    dependencies=[Depends(require_permission("foncier", "read"))],
+597:    dependencies=[Depends(require_permission("foncier", "validate"))],
+624:    dependencies=[Depends(require_permission("foncier", "archive"))],
+665:    dependencies=[Depends(require_permission("foncier", "deliver"))],
+696:    dependencies=[Depends(require_permission("foncier", "revoke"))],
+887:    access_level: str,
+898:    access = service.grant_access(user_id, village_id, access_level, user_id_from_token)
+
+=== ACCÈS PAR VILLAGE (backend) ===
+26:from app.models.foncier import FoncierVillage, FoncierLotissement, FoncierIlot, FoncierLot, FoncierAttestation, ActivityLog, UserVillageAccess
+398:        self.access_service = get_user_access_service(db)
+542:            if not village_id or not self.access_service.check_access(user_id, village_id, "validateur", user_role=user_role, exact=True):
+550:                if not village_id or not self.access_service.check_access(user_id, village_id, "validateur", user_role=user_role, exact=True):
+575:            if not village_id or not self.access_service.check_access(user_id, village_id, "agent", user_role=user_role):
+580:                if not village_id or not self.access_service.check_access(user_id, village_id, "agent", user_role=user_role):
+646:            if not village_id or not self.access_service.check_access(user_id, village_id, "gestionnaire", user_role=user_role):
+657:            if not village_id or not self.access_service.check_access(user_id, village_id, "gestionnaire", user_role=user_role):
+679:            if not village_id or not self.access_service.check_access(user_id, village_id, "validateur", user_role=user_role, exact=True):
+684:                if not village_id or not self.access_service.check_access(user_id, village_id, "validateur", user_role=user_role, exact=True):
+780:                     granted_by: UUID) -> UserVillageAccess:
+782:        existing = self.repo.db.query(UserVillageAccess).filter(
+783:            UserVillageAccess.user_id == user_id,
+784:            UserVillageAccess.village_id == village_id
+793:        access = UserVillageAccess(
+806:    def get_user_villages(self, user_id: UUID) -> List[UserVillageAccess]:
+809:    def get_village_users(self, village_id: UUID) -> List[UserVillageAccess]:
+812:    def check_access(
+821:        # sans inscription individuelle dans UserVillageAccess. Le rôle est vérifié côté serveur
+855:def get_user_access_service(db: Session) -> UserAccessService:
+
+=== ACCÈS PAR VILLAGE (frontend) ===
+src/pages/Foncier.tsx:33:  const accessLevel = resolveAccessLevel(profile?.role, profile?.access_level);
+src/pages/Foncier.tsx:34:  const canManage =
+src/pages/Foncier.tsx:35:    accessLevel === "admin" ||
+src/pages/Foncier.tsx:36:    accessLevel === "gestionnaire" ||
+src/pages/Foncier.tsx:37:    accessLevel === "gerant" ||
+src/pages/Foncier.tsx:38:    accessLevel === "secretaire";
+src/pages/Foncier.tsx:292:        if (canManage) void openAdd();
+src/pages/Foncier.tsx:301:  }, [canManage, openAdd, searchInputRef]);
+src/pages/Foncier.tsx:405:              disabled={!canManage || !isOnline || !selectedVillage}
+src/pages/Foncier.tsx:408:              title={!canManage ? "Droits insuffisants" : !isOnline ? "Hors ligne : création indisponible" : undefined}
+src/pages/Foncier.tsx:434:            canManage={canManage}
+src/pages/Foncier.tsx:436:            accessLevel={accessLevel}
+src/pages/Foncier.tsx:601:                  disabled={!canManage}
+src/pages/Foncier.tsx:668:          canManage={canManage}
+src/pages/Foncier.tsx:669:          _accessLevel={accessLevel}
+src/pages/Foncier.tsx:685:          _accessLevel={accessLevel}
+src/pages/Foncier.tsx:686:          canManage={canManage}
+src/pages/Foncier.tsx:698:          accessLevel={accessLevel}
+src/pages/Foncier.tsx:700:          canManage={canManage}
+src/pages/Foncier.tsx:737:          accessLevel={accessLevel}

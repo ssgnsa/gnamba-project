@@ -1,0 +1,27 @@
+=== STATUTS LOT (backend) ===
+backend/app/schemas/foncier.py:162:    statut: str = Field(default="actif", pattern=r"^(actif|vendu|litige|reserve|annule|archive)$")
+backend/app/schemas/foncier.py:205:    statut: Optional[str] = Field(None, pattern=r"^(actif|vendu|litige|reserve|annule|archive)$")
+backend/app/models/foncier.py:158:    statut = Column(String(20), nullable=False, default="actif")
+backend/app/models/foncier.py:213:        CheckConstraint("statut IN ('actif', 'vendu', 'litige', 'reserve', 'annule', 'archive')", name='ck_lot_statut'),
+backend/app/models/foncier.py:331:        CheckConstraint("statut IN ('brouillon', 'soumis', 'valide', 'archive', 'revoque', 'expire', 'annule')", name='ck_attestation_statut'),
+
+=== STATUTS ATTESTATION ===
+92:    nb_attestations_delivrees: int
+460:    delivre: bool = False
+461:    delivre_par: Optional[UUID] = None
+462:    delivre_le: Optional[datetime] = None
+
+=== WORKFLOW VALIDATION ===
+435:    validation_agent_id: Optional[UUID] = None
+436:    validation_agent_date: Optional[datetime] = None
+437:    validation_chef_id: Optional[UUID] = None
+438:    validation_chef_date: Optional[datetime] = None
+516:        validation_alias="log_metadata",
+
+=== STATUTS DISTINCTS EN BASE ===
+    type     |  statut   | count 
+-------------+-----------+-------
+ attestation | brouillon |     1
+ lot         | actif     |     1
+(2 rows)
+

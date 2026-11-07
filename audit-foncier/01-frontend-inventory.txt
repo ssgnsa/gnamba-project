@@ -1,0 +1,56 @@
+=== COMPOSANTS FONCIER ===
+src/components/FoncierAttestationGenerator.tsx
+src/components/FoncierAuditViewer.tsx
+src/components/FoncierContainer.test.tsx
+src/components/FoncierContainer.tsx
+src/components/FoncierLotList.tsx
+src/components/foncier/parts/AttestationHistoryModal.tsx
+src/components/foncier/parts/AttestationModal.tsx
+src/components/foncier/parts/AuditModal.tsx
+src/components/foncier/parts/ConfigModal.tsx
+src/components/foncier/parts/IlotFormModal.tsx
+src/components/foncier/parts/LotFormModal.tsx
+src/components/foncier/parts/LotissementFormModal.tsx
+src/components/foncier/parts/LotTable.tsx
+src/components/FoncierSyncManager.tsx
+src/components/foncier/VillageFormModal.tsx
+src/components/foncier/VillageLogoUploader.tsx
+src/components/foncier/WorkflowValidation.tsx
+src/pages/Foncier.test.tsx
+src/pages/Foncier.tsx
+src/pages/FoncierVillages.test.tsx
+src/pages/FoncierVillages.tsx
+src/pages/public/PublicFoncier.tsx
+
+=== PAGES FONCIER ===
+src/pages/CatalogueLots.tsx
+src/pages/Foncier.test.tsx
+src/pages/Foncier.tsx
+src/pages/Foncier.tsx.bak_precise
+src/pages/Foncier.tsx.bak_v2
+src/pages/Foncier.tsx.bak_villages
+src/pages/FoncierVillages.test.ts
+src/pages/FoncierVillages.test.tsx
+src/pages/FoncierVillages.tsx
+src/pages/public/PublicFoncier.tsx
+src/pages/public/PublicLotissement.tsx
+src/pages/public/PublicLots.tsx
+
+=== HOOKS FONCIER ===
+src/hooks/foncier/index.ts
+
+=== TAILLE DES FICHIERS FONCIER ===
+673 src/components/foncier/parts/LotFormModal.tsx
+515 src/components/foncier/parts/AttestationModal.tsx
+486 src/components/foncier/WorkflowValidation.tsx
+486 src/components/foncier/parts/LotTable.tsx
+305 src/components/foncier/parts/AttestationHistoryModal.tsx
+296 src/components/foncier/parts/ConfigModal.tsx
+250 src/components/foncier/parts/LotissementFormModal.tsx
+234 src/components/foncier/VillageFormModal.tsx
+223 src/components/foncier/parts/AuditModal.tsx
+212 src/components/foncier/VillageLogoUploader.tsx
+112 src/components/foncier/parts/IlotFormModal.tsx
+
+=== NOMBRE DE LIGNES TOTAL ===
+3792 lignes de .tsx

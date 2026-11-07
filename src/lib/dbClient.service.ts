@@ -296,6 +296,29 @@ export const foncierRepository = {
   },
 
   /**
+   * Crée un îlot dans un lotissement
+   */
+  async createIlot(data: {
+    lotissement_id: string;
+    numero: string;
+    description?: string;
+    superficie_totale?: number;
+  }): Promise<RepoResult<any>> {
+    const { lotissement_id, ...payload } = data;
+    const result = await apiClient.request(
+      `/foncier/lotissements/${lotissement_id}/ilots`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    );
+    if (result.error) {
+      return { data: null, error: result.error, count: null };
+    }
+    return { data: result.data, error: null, count: 1 };
+  },
+
+  /**
    * Check duplicate
    */
   async checkDuplicate(params: {

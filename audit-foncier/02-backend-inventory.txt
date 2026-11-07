@@ -1,0 +1,191 @@
+=== ROUTES FONCIER ===
+68:@router.post("/villages", response_model=VillageResponse, status_code=status.HTTP_201_CREATED)
+82:@router.get("/villages", response_model=List[VillageResponse])
+95:@router.get("/villages/with-stats", response_model=List[VillageWithStats])
+101:@router.get("/villages/{village_id:uuid}", response_model=VillageResponse)
+110:@router.get("/villages/{village_id}/with-stats", response_model=VillageWithStats)
+119:@router.patch("/villages/{village_id}", response_model=VillageResponse)
+136:@router.delete("/villages/{village_id}", status_code=status.HTTP_204_NO_CONTENT)
+151:@router.post("/villages/{village_id}/lotissements", response_model=LotissementResponse, status_code=status.HTTP_201_CREATED)
+166:@router.get("/villages/{village_id}/lotissements", response_model=List[LotissementResponse])
+180:@router.get("/lotissements/{lotissement_id}", response_model=LotissementResponse)
+189:@router.patch("/lotissements/{lotissement_id}", response_model=LotissementResponse)
+206:@router.delete("/lotissements/{lotissement_id}", status_code=status.HTTP_204_NO_CONTENT)
+221:@router.post("/lotissements/{lotissement_id}/ilots", response_model=IlotResponse, status_code=status.HTTP_201_CREATED)
+236:@router.get("/lotissements/{lotissement_id}/ilots", response_model=List[IlotResponse])
+242:@router.get("/ilots/{ilot_id}", response_model=IlotResponse)
+251:@router.patch("/ilots/{ilot_id}", response_model=IlotResponse)
+268:@router.delete("/ilots/{ilot_id}", status_code=status.HTTP_204_NO_CONTENT)
+283:@router.post("/ilots/{ilot_id}/lots", response_model=LotResponse, status_code=status.HTTP_201_CREATED)
+301:@router.get("/ilots/{ilot_id}/lots", response_model=PaginatedResponse)
+324:@router.get("/lots", response_model=PaginatedResponse)
+370:@router.get("/lots/{lot_id:uuid}", response_model=LotResponse)
+379:@router.patch("/lots/{lot_id}", response_model=LotResponse)
+399:@router.post("/lots/{lot_id}/archive", response_model=LotResponse)
+415:@router.post("/lots/{lot_id}/restore", response_model=LotResponse)
+428:@router.post("/lots/check-duplicate")
+439:@router.get("/lots/exists")
+467:@router.post("/ilots/{ilot_id}/lots/import")
+481:@router.post("/lots/export")
+495:@router.post("/lots/{lot_id}/attestations", response_model=AttestationResponse, status_code=status.HTTP_201_CREATED)
+513:@router.get("/lots/{lot_id}/attestations", response_model=List[AttestationResponse])
+519:@router.get("/attestations", response_model=PaginatedAttestationResponse)
+546:@router.get("/attestations/{attestation_id}", response_model=AttestationResponse)
+555:@router.patch("/attestations/{attestation_id}", response_model=AttestationResponse)
+572:@router.post("/attestations/{attestation_id}/submit", response_model=AttestationResponse)
+594:@router.post(
+621:@router.post(
+641:@router.post("/attestations/{attestation_id}/print")
+663:@router.post(
+693:@router.post(
+713:@router.post("/attestations/{attestation_id}/generate-pdf")
+723:@router.get("/attestations/{attestation_id:uuid}/pdf")
+811:@router.get("/audit/timeline/{entity_type}/{entity_id}", response_model=TimelineResponse)
+821:@router.get("/audit", response_model=PaginatedResponse)
+855:@router.post("/audit/export-pdf")
+867:@router.post("/audit/export-csv")
+883:@router.post("/access/{user_id}/villages/{village_id}")
+901:@router.delete("/access/{user_id}/villages/{village_id}")
+917:@router.get("/access/me/villages")
+927:@router.get("/villages/{village_id}/users")
+945:@router.get("/sync/status", response_model=SyncStatusResponse)
+959:@router.post("/sync/trigger")
+968:@router.get("/sync/queue", response_model=List[SyncQueueItem])
+977:@router.post("/sync/queue/{queue_item_id}/resolve")
+988:@router.post("/sync/cleanup")
+1001:@router.get("/dashboard/stats")
+1126:@router.get("/lotissements", response_model=List[LotissementResponse])
+1170:@router.get("/ilots", response_model=List[IlotResponse])
+1215:@router.get("/assembly")
+1274:@router.get("/villages/names")
+1293:@router.post("/attestations/{attestation_id}/sign")
+
+=== SERVICES FONCIER ===
+96:class VillageService:
+97:    def __init__(self, db: Session):
+101:    def create(self, data: VillageCreate, user_id: UUID) -> FoncierVillage:
+112:    def update(self, village_id: UUID, data: VillageUpdate, user_id: UUID) -> Optional[FoncierVillage]:
+127:    def delete(self, village_id: UUID, user_id: UUID) -> bool:
+138:    def get_with_stats(self, village_id: UUID) -> Optional[Dict]:
+141:    def get_all_with_stats(self) -> List[Dict]:
+144:    def search(self, params: LotSearchParams) -> Tuple[List[FoncierVillage], int]:
+152:class LotissementService:
+153:    def __init__(self, db: Session):
+158:    def create(self, village_id: UUID, data: LotissementCreate, user_id: UUID) -> FoncierLotissement:
+171:    def update(self, lotissement_id: UUID, data: LotissementUpdate, user_id: UUID) -> Optional[FoncierLotissement]:
+181:    def delete(self, lotissement_id: UUID) -> bool:
+184:    def get_by_village(self, village_id: UUID) -> List[FoncierLotissement]:
+187:    def search(self, village_id: UUID, params: LotSearchParams) -> Tuple[List[FoncierLotissement], int]:
+195:class IlotService:
+196:    def __init__(self, db: Session):
+201:    def create(self, lotissement_id: UUID, data: IlotCreate, user_id: UUID) -> FoncierIlot:
+213:    def update(self, ilot_id: UUID, data: IlotUpdate, user_id: UUID) -> Optional[FoncierIlot]:
+223:    def delete(self, ilot_id: UUID) -> bool:
+226:    def get_by_lotissement(self, lotissement_id: UUID) -> List[FoncierIlot]:
+229:    def search(self, lotissement_id: UUID, params: LotSearchParams) -> Tuple[List[FoncierIlot], int]:
+237:class LotService:
+238:    def __init__(self, db: Session):
+246:    def create(self, ilot_id: UUID, data: LotCreate, user_id: UUID, device_id: str = None) -> FoncierLot:
+288:    def update(self, lot_id: UUID, data: LotUpdate, user_id: UUID, device_id: str = None) -> Optional[FoncierLot]:
+324:    def archive(self, lot_id: UUID, reason: str, user_id: UUID) -> Optional[FoncierLot]:
+338:    def restore(self, lot_id: UUID, user_id: UUID) -> Optional[FoncierLot]:
+352:    def get_with_hierarchy(self, lot_id: UUID) -> Optional[Dict]:
+355:    def search(self, params: LotSearchParams) -> Tuple[List[FoncierLot], int]:
+358:    def check_duplicate(self, params: DuplicateCheckParams) -> List[FoncierLot]:
+364:    def _log_audit(self, entity_type: str, entity_id: UUID, entity_ref: str,
+389:class AttestationService:
+390:    def __init__(self, db: Session):
+400:    def create(self, lot_id: UUID, data: AttestationCreate, user_id: UUID, 
+482:    def update_draft(self, attestation_id: UUID, data: AttestationUpdate, user_id: UUID) -> Optional[FoncierAttestation]:
+503:    def sign(self, attestation_id: UUID, signature: str, user_id: UUID) -> Optional[FoncierAttestation]:
+515:    def submit(self, attestation_id: UUID, data: AttestationSubmitRequest, 
+531:    def validate(self, attestation_id: UUID, data: AttestationValidateRequest,
+564:    def scan(self, attestation_id: UUID, data: AttestationScanRequest,
+594:    def print(self, attestation_id: UUID, reason: Optional[str], user_id: UUID) -> Optional[FoncierAttestation]:
+618:    def deliver(self, attestation_id: UUID, reason: Optional[str], user_id: UUID,
+666:    def revoke(self, attestation_id: UUID, reason: str, user_id: UUID,
+702:    def verify(self, reference: str) -> Optional[Dict]:
+705:    def get_with_relations(self, attestation_id: UUID) -> Optional[Dict]:
+708:    def get_by_lot(self, lot_id: UUID) -> List[FoncierAttestation]:
+711:    def search(self, lot_id: Optional[UUID] = None, statut: Optional[str] = None,
+715:    def _log_audit(self, entity_type: str, entity_id: UUID, entity_ref: str,
+740:class AuditService:
+741:    def __init__(self, db: Session):
+745:    def get_timeline(self, entity_type: str, entity_id: UUID) -> TimelineResponse:
+766:    def search(self, params: AuditSearchParams) -> Tuple[List[ActivityLog], int]:
+774:class UserAccessService:
+775:    def __init__(self, db: Session):
+779:    def grant_access(self, user_id: UUID, village_id: UUID, access_level: str,
+803:    def revoke_access(self, user_id: UUID, village_id: UUID) -> bool:
+806:    def get_user_villages(self, user_id: UUID) -> List[UserVillageAccess]:
+809:    def get_village_users(self, village_id: UUID) -> List[UserVillageAccess]:
+812:    def check_access(
+
+=== SCHÉMAS PYDANTIC ===
+13:class FoncierBase(BaseModel):
+16:class PaginatedResponse(BaseModel):
+27:class VillageBase(FoncierBase):
+46:class VillageCreate(VillageBase):
+49:class VillageUpdate(BaseModel):
+68:class VillageResponse(VillageBase):
+75:class VillageWithStats(VillageResponse):
+78:class VillageStats(BaseModel):
+100:class LotissementBase(FoncierBase):
+109:class LotissementCreate(LotissementBase):
+112:class LotissementUpdate(BaseModel):
+121:class LotissementResponse(LotissementBase):
+133:class IlotBase(FoncierBase):
+138:class IlotCreate(IlotBase):
+141:class IlotUpdate(BaseModel):
+146:class IlotResponse(IlotBase):
+158:class LotBase(FoncierBase):
+198:class LotCreate(LotBase):
+201:class LotUpdate(BaseModel):
+229:class LotResponse(LotBase):
+250:class AttestationSummary(FoncierBase):
+261:class LotSearchParams(BaseModel):
+275:class LotArchiveRequest(BaseModel):
+278:class DuplicateCheckParams(BaseModel):
+289:class TemoinCreate(BaseModel):
+296:class TemoinResponse(BaseModel):
+309:class AttestationBase(FoncierBase):
+349:class AttestationCreate(AttestationBase):
+361:class AttestationUpdate(BaseModel):
+387:class AttestationSubmitRequest(BaseModel):
+390:class AttestationValidateRequest(BaseModel):
+395:class AttestationScanRequest(BaseModel):
+399:class AttestationRevokeRequest(BaseModel):
+403:class AttestationPrintRequest(BaseModel):
+408:class AttestationDeliverRequest(BaseModel):
+412:class AttestationSignRequest(BaseModel):
+415:class AttestationResponse(AttestationBase):
+475:class PaginatedAttestationResponse(BaseModel):
+482:class AttestationPdfResponse(BaseModel):
+487:class AttestationVerificationResponse(BaseModel):
+502:class ActivityLogBase(FoncierBase):
+520:class ActivityLogCreate(ActivityLogBase):
+526:class ActivityLogResponse(ActivityLogBase):
+530:class AuditSearchParams(BaseModel):
+540:class TimelineResponse(BaseModel):
+550:class SyncStatusResponse(BaseModel):
+556:class SyncQueueItem(BaseModel):
+565:class ConflictResolutionRequest(BaseModel):
+
+=== MODÈLES SQLALCHEMY ===
+15:class UUIDAsText(TypeDecorator):
+40:class FoncierVillage(Base):
+89:class FoncierLotissement(Base):
+120:class FoncierIlot(Base):
+146:class FoncierLot(Base):
+230:class FoncierAttestation(Base):
+348:class FoncierAttestationTemoin(Base):
+374:class UserVillageAccess(Base):
+396:class ActivityLog(Base):
+
+=== TAILLE FICHIERS ===
+  1305 backend/app/api/v1/foncier/router.py
+   856 backend/app/services/foncier.py
+   567 backend/app/schemas/foncier.py
+   424 backend/app/models/foncier.py
+   845 backend/app/repositories/foncier.py
+  3997 total

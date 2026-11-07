@@ -1,0 +1,41 @@
+=== ONGLETS DANS Foncier.tsx ===
+359:                { id: "lots", label: "Lots", icon: Files },
+360:                { id: "villages", label: "Villages", icon: Files },
+361:                { id: "attestations", label: "Attestations", icon: FileText },
+362:                { id: "workflow", label: "Validation", icon: CheckCircle },
+363:                { id: "config", label: "Configuration", icon: Settings2 },
+364:                { id: "audit", label: "Audit", icon: History },
+
+=== PAGES FONCIER DANS App.tsx ===
+38:const Foncier = lazy(() => import("./pages/Foncier"));
+51:const FoncierVillagesPage = lazy(() => import("./pages/FoncierVillages"));
+64:const PublicFoncier = lazy(() => import("./pages/public/PublicFoncier"));
+65:const PublicLotissement = lazy(
+66:  () => import("./pages/public/PublicLotissement"),
+116:  foncier: Foncier,
+132:  villages: FoncierVillagesPage,
+141:const PublicFoncierPage: ComponentType<{
+143:}> = (props) => <PublicFoncier onNavigate={props.onNavigate} />;
+144:const PublicLotissementPage: ComponentType<{
+146:}> = (props) => <PublicLotissement onNavigate={props.onNavigate} />;
+177:  foncier: PublicFoncierPage,
+178:  lotissement: PublicLotissementPage,
+354:    title: "GNAMBA SERVICES | Immobilier, Foncier & BTP en Côte d'Ivoire",
+361:    title: "À propos de GNAMBA SERVICES | Expert Foncier & Immobilier Sikensi",
+363:      "Fondée en 2021, GNAMBA SERVICES accompagne particuliers et entreprises en Côte d'Ivoire. Foncier, immobilier, BTP, lotissement. Transparence et expertise.",
+368:    title: "Services Foncier, Immobilier, Lotissement & BTP | GNAMBA SERVICES",
+389:    title: "Foncier | Sécurisation et suivi des dossiers | GNAMBA SERVICES",
+396:    title: "Lotissement | Parcelles et commercialisation | GNAMBA SERVICES",
+398:      "Lotissement, découpage et mise en marché de parcelles à vendre avec une présentation claire et commerciale.",
+412:      "Contact & Devis Gratuit — BTP, Immobilier, Foncier Sikensi | GNAMBA SERVICES",
+608:    const fallbackTitle = `${settings.app_company || OFFICIAL_CONTACT.companyName} - BTP, Immobilier & Foncier`;
+620:        foncier: "Dossiers Fonciers",
+644:        foncier: "Foncier",
+645:        lotissement: "Lotissement",
+1283:      foncier: "Foncier",
+
+=== ENTRÉES SIDEBAR FONCIER ===
+41:  | "foncier"
+80:  { id: "foncier", label: "Foncier", icon: Map },
+
+=== MODAUX UTILISÉS DANS FONCIER ===

@@ -1,6 +1,7 @@
 import { FC, useState, useEffect, useMemo, useCallback } from "react";
 import { z } from "zod";
 import { foncierRepository } from "@/data/foncier.repository";
+import { IlotFormModal } from "./IlotFormModal";
 import { foncierLotFormSchema, type FoncierLotFormInput, validateFoncierForm } from "@/lib/foncierValidation";
 
 interface LotFormModalProps {
@@ -18,6 +19,7 @@ interface LotFormModalProps {
   onVillageChange?: (id: string | null) => void;
   onLotissementChange?: (id: string | null) => void;
   onIlotChange?: (id: string | null) => void;
+  onIlotCreated?: (newIlotId: string) => void;
 }
 
 export const LotFormModal: FC<LotFormModalProps> = ({
@@ -35,6 +37,7 @@ export const LotFormModal: FC<LotFormModalProps> = ({
   onVillageChange,
   onLotissementChange,
   onIlotChange,
+  onIlotCreated,
 }) => {
   type FormState = z.input<typeof foncierLotFormSchema>;
 
@@ -154,6 +157,7 @@ export const LotFormModal: FC<LotFormModalProps> = ({
   const [selectedVillageId, setSelectedVillageId] = useState<string | undefined>(undefined);
   const [selectedLotissementId, setSelectedLotissementId] = useState<string | undefined>(undefined);
   const [selectedIlotId, setSelectedIlotId] = useState<string | undefined>(undefined);
+  const [ilotModalOpen, setIlotModalOpen] = useState(false);
 
   const filteredLotissements = useMemo(
     () => lotissements.filter((l) => !selectedVillageId || l.village_id === selectedVillageId),
@@ -322,33 +326,43 @@ export const LotFormModal: FC<LotFormModalProps> = ({
                   )}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Îlot *</label>
-                  <select
-                    value={selectedIlotId ?? ""}
-                    disabled={!selectedLotissementId}
-                    onChange={(e) => {
-                      const id = e.target.value || undefined;
-                      setSelectedIlotId(id);
-                      onIlotChange?.(id ?? null);
-                      const ilot = ilots.find((i) => i.id === id);
-                      handleChange("numero_ilot", ilot ? ilot.nom : "");
-                      handleChange("ilot_id", id ?? undefined);
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Sélectionner un lotissement d'abord</option>
-                    {filteredIlots.map((i) => (
-                      <option key={i.id} value={i.id}>
-                        {i.nom}
-                      </option>
-                    ))}
-                  </select>
-                  {!selectedLotissementId && filteredIlots.length === 0 && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Sélectionnez un lotissement pour voir les îlots.
-                    </p>
-                  )}
-                </div>
+  <div className="flex items-end gap-2">
+    <div className="flex-1">
+      <label className="block text-sm font-medium text-gray-700 mb-1">Îlot *</label>
+      <select
+        value={selectedIlotId ?? ""}
+        disabled={!selectedLotissementId}
+        onChange={(e) => {
+          const id = e.target.value || undefined;
+          setSelectedIlotId(id);
+          onIlotChange?.(id ?? null);
+          const ilot = ilots.find((i) => i.id === id);
+          handleChange("numero_ilot", ilot ? ilot.nom : "");
+        }}
+        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+      >
+        <option value="">Sélectionner un lotissement d'abord</option>
+        {filteredIlots.map((i) => (
+          <option key={i.id} value={i.id}>
+            {i.nom}
+          </option>
+        ))}
+      </select>
+    </div>
+    <button
+      type="button"
+      onClick={() => setIlotModalOpen(true)}
+      disabled={!selectedLotissementId}
+      className="rounded-md border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-40"
+      title={!selectedLotissementId ? "Sélectionnez d'abord un lotissement" : "Créer un nouvel îlot"}
+    >
+      + Îlot
+    </button>
+  </div>
+  {!selectedLotissementId && filteredIlots.length === 0 && (
+    <p className="text-xs text-gray-500 mt-1">Sélectionnez un lotissement pour voir les îlots.</p>
+  )}
+</div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Numéro de lot *</label>
                   <input
@@ -640,6 +654,20 @@ export const LotFormModal: FC<LotFormModalProps> = ({
           </form>
         </div>
       </div>
+      {selectedLotissementId && (
+        <IlotFormModal
+          isOpen={ilotModalOpen}
+          lotissementId={selectedLotissementId}
+          lotissementNom={lotissements.find((l) => l.id === selectedLotissementId)?.nom}
+          onClose={() => setIlotModalOpen(false)}
+          onSuccess={(newIlotId) => {
+            setIlotModalOpen(false);
+            setSelectedIlotId(newIlotId);
+            onIlotChange?.(newIlotId);
+            onIlotCreated?.(newIlotId);
+          }}
+        />
+      )}
     </div>
   );
 };
