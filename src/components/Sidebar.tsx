@@ -53,6 +53,7 @@ export type Page =
   | "media"
   | "registre"
   | "leads"
+  | "villages"
   | "codex-assistant";
 
 interface SidebarProps {
@@ -78,6 +79,7 @@ const navItems: {
   { id: "projets", label: "Projets BTP", icon: HardHat },
   { id: "immobilier", label: "Immobilier", icon: Building2 },
   { id: "foncier", label: "Foncier", icon: Map },
+  { id: "villages", label: "Villages", icon: Map },
   { id: "catalogue-lots", label: "Lots à vendre", icon: Tag },
   { id: "fournitures", label: "Fournitures", icon: Package },
   { id: "finances", label: "Finances", icon: DollarSign },
