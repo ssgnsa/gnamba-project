@@ -41,8 +41,8 @@ class FoncierVillage(Base):
     __tablename__ = "foncier_villages"
     
     id = Column(UUIDAsText(), primary_key=True, default=gen_uuid)
-    nom = Column(String(255), nullable=False, unique=True)
-    code = Column(String(10), nullable=False, unique=True)
+    nom = Column(String(255), nullable=False)
+    code = Column(String(10), nullable=False)
     region = Column(String(255))
     departement = Column(String(255))
     commune = Column(String(255))
@@ -68,7 +68,12 @@ class FoncierVillage(Base):
     config_jsonb = Column(JSON, default={})
     
     actif = Column(Boolean, default=True)
-    
+
+    __table_args__ = (
+        Index("uq_foncier_villages_nom_actif", "nom", unique=True, postgresql_where=text("actif = true")),
+        Index("uq_foncier_villages_code_actif", "code", unique=True, postgresql_where=text("actif = true")),
+    )
+
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     created_by = Column(UUIDAsText())
