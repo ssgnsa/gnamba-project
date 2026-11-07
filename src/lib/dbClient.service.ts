@@ -2,7 +2,7 @@
  * Database Client Service - Local API client with repository pattern
  * Provides typed access to all database operations via apiClient
  */
-import type { FoncierLot, FoncierAttestation, FoncierVillage, Finance, Product, UserProfile } from '../types';
+import type { FoncierLot, FoncierAttestation, FoncierVillage, Finance, Product, UserProfile, VillageWithStats } from '../types';
 import { apiClient } from '../api/client.ts';
 import tableClient from '../data/tableClient.ts';
 
@@ -195,6 +195,36 @@ export const foncierRepository = {
    */
   async getVillages(): Promise<RepoResult<FoncierVillage[]>> {
     return this.getVillagesList();
+  },
+
+  /**
+   * Récupère un village avec ses statistiques (nb_lotissements, nb_lots).
+   */
+  async getVillageWithStats(id: string): Promise<RepoResult<VillageWithStats>> {
+    const result = await apiClient.request<VillageWithStats>(
+      `/foncier/villages/${id}/with-stats`,
+    );
+    if (result.error) {
+      return { data: null, error: result.error, count: null };
+    }
+    return { data: result.data as VillageWithStats, error: null, count: 1 };
+  },
+
+  /**
+   * Liste tous les villages avec leurs statistiques (pour tableau CRUD).
+   */
+  async getAllVillagesWithStats(): Promise<RepoResult<VillageWithStats[]>> {
+    const result = await apiClient.request<VillageWithStats[]>(
+      '/foncier/villages/with-stats',
+    );
+    if (result.error) {
+      return { data: null, error: result.error, count: null };
+    }
+    return {
+      data: result.data as VillageWithStats[],
+      error: null,
+      count: result.data?.length || 0,
+    };
   },
 
   /**
