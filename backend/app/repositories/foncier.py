@@ -135,17 +135,9 @@ class VillageRepository(BaseRepository):
         return items, total
     
     def get_with_stats(self, village_id: UUID) -> Optional[Dict]:
-        """Récupère un village avec ses statistiques"""
-        village = self.get(village_id)
-        if not village:
-            return None
-        
-        stats = self.get_stats(village_id)
-        return {
-            "village": village,
-            "stats": stats
-        }
-    
+        """Récupère un village avec ses statistiques (format VillageWithStats)"""
+        return self.get_stats(village_id) or None
+
     def get_stats(self, village_id: UUID) -> Dict[str, Any]:
         # Agréger lots et attestations séparément afin que plusieurs
         # attestations ne multiplient pas les surfaces ou le nombre de lots.
@@ -181,20 +173,49 @@ class VillageRepository(BaseRepository):
                 WHERE v.id = :village_id AND v.actif = true
                 GROUP BY v.id
             )
-            SELECT v.id AS village_id, v.nom AS village_nom, v.code AS village_code,
+            SELECT v.id, v.nom, v.code, v.region, v.departement, v.commune, v.actif, v.created_at, v.updated_at,
                    ls.total_lots, ls.lots_actifs, ls.lots_vendus, ls.lots_litiges,
                    ls.lots_reserves, ls.lots_archives, ls.superficie_totale,
                    ls.superficie_vendue, ats.nb_attestations,
                    ats.nb_attestations_validees, ats.nb_attestations_delivrees,
                    ats.nb_attestations_revoquees, ls.ca_total
             FROM foncier_villages v
-            JOIN lot_stats ls ON ls.village_id = v.id
-            JOIN attestation_stats ats ON ats.village_id = v.id
+            LEFT JOIN lot_stats ls ON ls.village_id = v.id
+            LEFT JOIN attestation_stats ats ON ats.village_id = v.id
         """), {"village_id": str(village_id)}).fetchone()
         
         if result:
-            return dict(result._mapping)
-        return {}
+            m = result._mapping
+            return {
+                "id": str(m["id"]),
+                "nom": m["nom"],
+                "code": m["code"],
+                "region": m["region"],
+                "departement": m["departement"],
+                "commune": m["commune"],
+                "actif": m["actif"],
+                "created_at": m["created_at"].isoformat() if m["created_at"] else None,
+                "updated_at": m["updated_at"].isoformat() if m["updated_at"] else None,
+                "stats": {
+                    "village_id": str(m["id"]),
+                    "village_nom": m["nom"],
+                    "village_code": m["code"],
+                    "total_lots": int(m["total_lots"] or 0),
+                    "lots_actifs": int(m["lots_actifs"] or 0),
+                    "lots_vendus": int(m["lots_vendus"] or 0),
+                    "lots_litiges": int(m["lots_litiges"] or 0),
+                    "lots_reserves": int(m["lots_reserves"] or 0),
+                    "lots_archives": int(m["lots_archives"] or 0),
+                    "superficie_totale": float(m["superficie_totale"] or 0),
+                    "superficie_vendue": float(m["superficie_vendue"] or 0),
+                    "nb_attestations": int(m["nb_attestations"] or 0),
+                    "nb_attestations_validees": int(m["nb_attestations_validees"] or 0),
+                    "nb_attestations_delivrees": int(m["nb_attestations_delivrees"] or 0),
+                    "nb_attestations_revoquees": int(m["nb_attestations_revoquees"] or 0),
+                    "ca_total": float(m["ca_total"] or 0),
+                },
+            }
+        return {"stats": {}}
     
     def get_all_with_stats(self) -> List[Dict]:
         result = self.db.execute(text("""
@@ -229,20 +250,52 @@ class VillageRepository(BaseRepository):
                 WHERE v.actif = true
                 GROUP BY v.id
             )
-            SELECT v.id AS village_id, v.nom AS village_nom, v.code AS village_code,
+            SELECT v.id, v.nom, v.code, v.region, v.departement, v.commune,
+                   v.actif, v.created_at, v.updated_at,
                    ls.total_lots, ls.lots_actifs, ls.lots_vendus, ls.lots_litiges,
                    ls.lots_reserves, ls.lots_archives, ls.superficie_totale,
                    ls.superficie_vendue, ats.nb_attestations,
                    ats.nb_attestations_validees, ats.nb_attestations_delivrees,
                    ats.nb_attestations_revoquees, ls.ca_total
             FROM foncier_villages v
-            JOIN lot_stats ls ON ls.village_id = v.id
-            JOIN attestation_stats ats ON ats.village_id = v.id
-            WHERE v.actif = true
+            LEFT JOIN lot_stats ls ON ls.village_id = v.id
+            LEFT JOIN attestation_stats ats ON ats.village_id = v.id
             ORDER BY v.nom
         """)).fetchall()
         
-        return [dict(row._mapping) for row in result]
+        villages = []
+        for row in result:
+            m = row._mapping
+            villages.append({
+                "id": str(m["id"]),
+                "nom": m["nom"],
+                "code": m["code"],
+                "region": m["region"],
+                "departement": m["departement"],
+                "commune": m["commune"],
+                "actif": m["actif"],
+                "created_at": m["created_at"].isoformat() if m["created_at"] else None,
+                "updated_at": m["updated_at"].isoformat() if m["updated_at"] else None,
+                "stats": {
+                    "village_id": str(m["id"]),
+                    "village_nom": m["nom"],
+                    "village_code": m["code"],
+                    "total_lots": int(m["total_lots"] or 0),
+                    "lots_actifs": int(m["lots_actifs"] or 0),
+                    "lots_vendus": int(m["lots_vendus"] or 0),
+                    "lots_litiges": int(m["lots_litiges"] or 0),
+                    "lots_reserves": int(m["lots_reserves"] or 0),
+                    "lots_archives": int(m["lots_archives"] or 0),
+                    "superficie_totale": float(m["superficie_totale"] or 0),
+                    "superficie_vendue": float(m["superficie_vendue"] or 0),
+                    "nb_attestations": int(m["nb_attestations"] or 0),
+                    "nb_attestations_validees": int(m["nb_attestations_validees"] or 0),
+                    "nb_attestations_delivrees": int(m["nb_attestations_delivrees"] or 0),
+                    "nb_attestations_revoquees": int(m["nb_attestations_revoquees"] or 0),
+                    "ca_total": float(m["ca_total"] or 0),
+                },
+            })
+        return villages
 
 
 # ============================================
