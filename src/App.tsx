@@ -48,6 +48,7 @@ const Statistiques = lazy(() => import("./pages/Statistiques"));
 const Parametres = lazy(() => import("./pages/Parametres"));
 const CodexAssistant = lazy(() => import("./pages/CodexAssistant"));
 const SiteEditor = lazy(() => import("./pages/admin/SiteEditor"));
+const FoncierVillagesPage = lazy(() => import("./pages/FoncierVillages"));
 const Media = lazy(() => import("./pages/Media"));
 const AccueilEmploye = lazy(() => import("./pages/AccueilEmploye"));
 const RegistreVisiteur = lazy(() => import("./pages/RegistreVisiteur"));
@@ -128,6 +129,7 @@ const dashboardPages: Record<Page, PageComponent> = {
   media: Media,
   registre: RegistreVisiteur,
   leads: Leads,
+  villages: FoncierVillagesPage,
 };
 
 const PublicAboutPage: ComponentType<{
