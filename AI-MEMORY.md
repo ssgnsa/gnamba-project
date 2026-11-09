@@ -32,9 +32,9 @@
 
 ### Derniers commits
 ```
-a9fe65b7 docs(memory): AI-MEMORY.md + script auto-update
-31ac98ba docs(refonte-foncier): audit, architecture cible, plan migration
-49530945 wip(foncier): pack îlot + cascade (à refondre en audit)
+767eb800 fix(types+ui): corrections TS résiduelles post-Phase 1
+63e8f690 docs(audit): rapport d'audit 2026-11-09 (corrections TS, module Foncier, HOLD)
+8916d2c0 docs(memory): fusionner context.md dans AI-MEMORY.md
 ```
 
 ### Branches
@@ -68,6 +68,7 @@ a9fe65b7 docs(memory): AI-MEMORY.md + script auto-update
     refonte/clean-slate
   * refonte/foncier-v2
     wip/pack-ilot
+    wip/user-deactivation-guards
     remotes/origin/audit/fix-schema-site
     remotes/origin/codex/egs-host-09-main-review
     remotes/origin/codex/egs-host-09-sanitized
@@ -86,8 +87,8 @@ a9fe65b7 docs(memory): AI-MEMORY.md + script auto-update
     remotes/origin/refonte/foncier-v2
 <!-- /AUTO:git --><!-- AUTO:versions -->
 ### Versions
-- Node : v22.23.1
-- npm : 12.0.2
+- Node : v20.20.2
+- npm : 10.8.2
 - Vite : 8.0.2
 <!-- /AUTO:versions --><!-- AUTO:build -->
 Build & tests
@@ -103,7 +104,7 @@ docker compose ps → 5/5 healthy
 ### Tailles fichiers clés
 | Fichier | Lignes |
 |---|---|
-| src/pages/Foncier.tsx | 756 |
+| src/pages/Foncier.tsx | 760 |
 | src/components/foncier/parts/LotFormModal.tsx | 673 |
 | backend/app/api/v1/foncier/router.py | 1305 |
 <!-- /AUTO:sizes -->
