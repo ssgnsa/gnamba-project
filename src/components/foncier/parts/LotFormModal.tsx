@@ -19,7 +19,7 @@ interface LotFormModalProps {
   onVillageChange?: (id: string | null) => void;
   onLotissementChange?: (id: string | null) => void;
   onIlotChange?: (id: string | null) => void;
-  onIlotCreated?: (newIlotId: string) => void;
+  onIlotCreated?: (newIlotId: string) => void | Promise<void>;
 }
 
 export const LotFormModal: FC<LotFormModalProps> = ({
@@ -235,7 +235,7 @@ export const LotFormModal: FC<LotFormModalProps> = ({
       delete saveData.village;
       delete saveData.nom_lotissement;
 
-      const result = await foncierRepository.saveLot(saveData, false);
+      const result = await foncierRepository.saveLot(saveData as any, false);
       if (result.error) throw result.error;
 
       onSuccess();
@@ -660,11 +660,11 @@ export const LotFormModal: FC<LotFormModalProps> = ({
           lotissementId={selectedLotissementId}
           lotissementNom={lotissements.find((l) => l.id === selectedLotissementId)?.nom}
           onClose={() => setIlotModalOpen(false)}
-          onSuccess={(newIlotId) => {
+          onSuccess={async (newIlotId) => {
+            await onIlotCreated?.(newIlotId);
             setIlotModalOpen(false);
             setSelectedIlotId(newIlotId);
             onIlotChange?.(newIlotId);
-            onIlotCreated?.(newIlotId);
           }}
         />
       )}
