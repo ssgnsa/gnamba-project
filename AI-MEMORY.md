@@ -32,9 +32,9 @@
 
 ### Derniers commits
 ```
+30748580 chore: cleanup warning DataTable + mémoire Phase 1 terminée
 767eb800 fix(types+ui): corrections TS résiduelles post-Phase 1
 63e8f690 docs(audit): rapport d'audit 2026-11-09 (corrections TS, module Foncier, HOLD)
-8916d2c0 docs(memory): fusionner context.md dans AI-MEMORY.md
 ```
 
 ### Branches
@@ -138,6 +138,9 @@ NE JAMAIS coder sans que l'IA ait lu les 3 docs de référence
 TOUJOURS git branch --show-current avant de coder
 
 TOUJOURS vérifier le chunk hash (dist/assets/Foncier-*.js) après rebuild
+7. Cloudflared QUIC instable sur ce reseau -> protocol: http2 dans /etc/cloudflared/config.yml
+8. Nginx vhost API doit contenir proxy_http_version 1.1, Connection vide, read_timeout 300s, connect_timeout 75s
+9. Warning React unique key dans DataTable -> verifier key={String(col.key)} sur th et td
 
 apiClient.foncier typé any → méthodes fantômes → utiliser apiClient.request()
 
@@ -160,32 +163,54 @@ bash
 docker compose up -d --build egs-api egs-web
 docker logs egs-api --tail 50
 docker exec -i egs-postgres psql -X -U postgres -d egs_local -c "..."
-🚧 §5 PHASE EN COURS (CRITIQUE — lire avant de coder)
-Refonte Foncier — Phase 1 : Patterns communs
-Documents de référence (OBLIGATOIRES) :
+## 🚧 §5 PHASE EN COURS
 
-docs/refonte-foncier/AUDIT-FONCIER.md
+### ✅ Phase 1 — TERMINEE (2026-11-09)
 
-docs/refonte-foncier/TARGET-ARCHITECTURE.md
+Livré par Claude Code (5 commits) :
+- DataTable, FormModal, ConfirmDialog, StatusBadge, PageHeader, useCRUD
+- 6 fichiers de tests (38 tests passes)
+- Palette Tailwind primary (fix boutons invisibles)
+- FormModal recoit et rend children
+- Libelle ilots (numero au lieu de nom)
+- Refactor lotissements -> VillageSelect
+- Corrections TS residuelles (0 erreur tsc --noEmit)
 
-docs/refonte-foncier/MIGRATION-PLAN.md
+Commits sur refonte/foncier-v2 :
+  b763bea2 feat(ui): composants partages + tests
+  da53efee fix(ui): FormModal recoit children
+  a92ff605 fix(ui): palette primary Tailwind
+  3f99011e refactor(foncier): lotissements -> villagesSelect
+  ab3f139e fix(foncier): libelle des ilots + rechargement
 
-Fichiers à créer :
+### 🔜 Phase 2 — A DEMARRER (prochaine session)
 
-□ src/components/ui/StatusBadge.tsx + test
-□ src/components/ui/PageHeader.tsx + test
-□ src/components/ui/ConfirmDialog.tsx + test
-□ src/components/ui/FormModal.tsx + test
-□ src/components/ui/DataTable.tsx + test
-□ src/hooks/useCRUD.ts + test
-Critères de sortie :
+Objectif : Fusionner Villages dans Foncier (supprimer le doublon)
 
-□ 12 fichiers créés
-□ npx tsc --noEmit → 0 erreur
-□ npm run build → ✓
-□ npx vitest run → ✓
-□ 1 commit atomique
-Phases suivantes : 2-Fusion Villages, 3-Lotissements/Îlots, 4-Wizard LotFormModal, 5-Workflow, 6-DB, 7-Dashboard, 8-E2E
+Fichiers a modifier :
+- src/components/Sidebar.tsx : retirer villages du type Page + navItems
+- src/App.tsx : retirer villages: FoncierVillagesPage
+- src/pages/FoncierVillages.tsx : supprimer (fusionne dans Foncier)
+- src/pages/Foncier.tsx : onglet Villages utilise les nouveaux patterns
+
+Criteres de sortie Phase 2 :
+- [ ] 1 seul point d'entree Villages (onglet Foncier)
+- [ ] FoncierVillages.tsx supprime
+- [ ] Patterns utilises (DataTable + ConfirmDialog + PageHeader)
+- [ ] Tests verts, build vert
+- [ ] 1 commit atomique + ./scripts/update-memory.sh
+
+### 🔧 Infra prod — Reparee (2026-11-09)
+
+- Tunnel Cloudflare : protocol http2 (QUIC instable sur ce reseau)
+- Nginx vhost API : proxy_http_version 1.1, Connection vide, timeouts 300s/75s
+- Stabilite : 19/20 requetes api.gnambaservices.ci/api/v1/health -> 200
+- Bundle prod : git_commit a9fe65b7 (coherent avec local)
+
+### 🧹 Dette isolee
+
+- Branche wip/user-deactivation-guards : guards backend desactivation user
+  (auto-desactivation 409, dernier admin 409, audit) — a reviser en session dediee
 
 📅 §6 HISTORIQUE DES SESSIONS
 2026-11-07 (session actuelle)
