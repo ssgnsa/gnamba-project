@@ -175,7 +175,7 @@ export function useAttestations({ deviceId, profile }: UseAttestationsOptions): 
       });
 
       // Call RPC
-      const result = await foncierRepository.createAttestation(rpcParams as any);
+      const result = await foncierRepository.createAttestationAtomic(rpcParams as any);
       if (result.error) throw result.error;
 
       await logFoncierAudit(dbClient, {

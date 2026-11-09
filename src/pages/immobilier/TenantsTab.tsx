@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Plus,
   User,
@@ -10,7 +10,6 @@ import {
 import type { Tenant, LeaseContract, Client } from "../../types";
 import Modal from "../../components/ui/Modal";
 import Badge from "../../components/ui/Badge";
-import SelectWithCreate from "../../components/ui/SelectWithCreate";
 import { useSettings } from "../../context/SettingsContext";
 import { useAuth } from "../../context/AuthContext";
 import { useNotifications } from "../../context/NotificationContext";
@@ -85,13 +84,54 @@ export default function TenantsTab({
     profile,
   );
 
-  // Get clients from cache for tenant selection
-  const clients = useMemo(() => {
-    const cached = readManualCache<Client>(CLIENTS_CACHE_KEY);
-    return cached.sort((a, b) => 
-        `${a.nom} ${a.prenom}`.localeCompare(`${b.nom} ${b.prenom}`)
-      );
-  }, []);
+  // Charger les clients EGS à chaque ouverture du formulaire locataire.
+  const [clients, setClients] = useState<Client[]>([]);
+  const [clientsLoading, setClientsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!modalOpen) return;
+
+    let cancelled = false;
+
+    const loadClients = async () => {
+      setClientsLoading(true);
+
+      try {
+        const result = await clientsRepository.getAll();
+
+        if (result.error) {
+          throw new Error(String(result.error));
+        }
+
+        const freshClients = (result.data ?? []).sort((a, b) =>
+          `${a.nom} ${a.prenom}`.localeCompare(`${b.nom} ${b.prenom}`)
+        );
+
+        if (cancelled) return;
+
+        setClients(freshClients);
+        writeManualCache(CLIENTS_CACHE_KEY, freshClients);
+      } catch (error) {
+        if (cancelled) return;
+
+        console.error("Impossible de charger les clients depuis l'API :", error);
+
+        const cachedClients = readManualCache<Client>(CLIENTS_CACHE_KEY);
+        cachedClients.sort((a, b) =>
+          `${a.nom} ${a.prenom}`.localeCompare(`${b.nom} ${b.prenom}`)
+        );
+        setClients(cachedClients);
+      } finally {
+        if (!cancelled) setClientsLoading(false);
+      }
+    };
+
+    void loadClients();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [modalOpen]);
 
   const localTenants = useMemo(() => {
     return readManualCache<LocalTenant>(TENANTS_CACHE_KEY) || [];
@@ -439,61 +479,37 @@ export default function TenantsTab({
               Le contrat de bail sera stocké dans le filebrowser.
             </p>
             <div>
-              <SelectWithCreate
-                value={form.client_id}
-                onChange={(val) => handleClientChange(val)}
-                options={clients.map((client) => ({ value: client.id, label: `${client.prenom} ${client.nom} (${client.telephone})` }))}
-                placeholder="Sélectionner un client..."
-                label="Client *"
-                required
-                createModalTitle="Nouveau Client (Locataire)"
-                createFields={[
-                  { key: "prenom", label: "Prénom", type: "text", placeholder: "Prénom", required: true },
-                  { key: "nom", label: "Nom", type: "text", placeholder: "Nom", required: true },
-                  { key: "telephone", label: "Téléphone", type: "tel", placeholder: "+225 07 00 00 00", required: true },
-                  { key: "email", label: "Email", type: "email", placeholder: "email@exemple.com", required: false },
-                  { key: "adresse", label: "Adresse", type: "text", placeholder: "Adresse...", required: false },
-                  { key: "type_client", label: "Type de Client", type: "select", required: true, options: [
-                    { value: "particulier", label: "Particulier" },
-                    { value: "entreprise", label: "Entreprise" },
-                    { value: "promoteur_immobilier", label: "Promoteur Immobilier" },
-                    { value: "institution", label: "Institution" },
-                  ]},
-                  { key: "notes", label: "Notes", type: "textarea", placeholder: "Notes...", required: false },
-                ]}
-                validateCreateForm={(data) => {
-                  const errors: Record<string, string> = {};
-                  if (!data.prenom?.trim()) errors.prenom = "Le prénom est obligatoire";
-                  if (!data.nom?.trim()) errors.nom = "Le nom est obligatoire";
-                  if (!data.telephone?.trim()) errors.telephone = "Le téléphone est obligatoire";
-                  if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
-                    errors.email = "Format d'email invalide";
-                  }
-                  return Object.keys(errors).length > 0 ? errors : null;
-                }}
-                onCreate={async (data) => {
-                  const now = new Date().toISOString();
-                  const payload = {
-                    nom: data.nom,
-                    prenom: data.prenom,
-                    telephone: data.telephone,
-                    email: data.email || null,
-                    adresse: data.adresse || null,
-                    type_client: data.type_client || "particulier",
-                    notes: data.notes || null,
-                    updated_at: now,
-                  };
-                  const { data: newClient, error } = await clientsRepository.create(payload);
-                  if (error) throw new Error(error);
-                  // Refresh clients list from cache
-                  const cached = readManualCache<Client>(CLIENTS_CACHE_KEY);
-                  const updated = [...cached, newClient].sort((a, b) =>
-                    `${a.nom} ${a.prenom}`.localeCompare(`${b.nom} ${b.prenom}`)
-                  );
-                  writeManualCache(CLIENTS_CACHE_KEY, updated);
-                  return { value: newClient.id, label: `${data.prenom} ${data.nom} (${data.telephone})` };
-                }}
-              />
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Client *
+                </label>
+                <select
+                  value={form.client_id}
+                  onChange={(e) => handleClientChange(e.target.value)}
+                  className={inputClass}
+                  required
+                  disabled={clientsLoading}
+                >
+                  <option value="">
+                    {clientsLoading
+                      ? "Chargement des clients..."
+                      : clients.length === 0
+                        ? "Aucun client disponible"
+                        : "Sélectionner un client..."}
+                  </option>
+                  {clients.map((client) => (
+                    <option key={client.id} value={client.id}>
+                      {client.prenom} {client.nom}
+                      {client.telephone ? ` (${client.telephone})` : ""}
+                    </option>
+                  ))}
+                </select>
+                {!clientsLoading && clients.length === 0 && (
+                  <p className="mt-1 text-xs text-amber-600">
+                    Aucun client récupéré. Vérifiez la disponibilité de l'API ou la liste des clients.
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 

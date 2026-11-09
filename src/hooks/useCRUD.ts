@@ -6,7 +6,7 @@
  */
 import { useState, useEffect, useCallback } from "react";
 
-interface UseCRUDResult<T> {
+interface UseCRUDResult<T extends { id: number | string }> {
   items: T[];
   loading: boolean;
   error: string | null;
@@ -25,7 +25,7 @@ interface UseCRUDOptions<T> {
   autoLoad?: boolean;
 }
 
-export function useCRUD<T>(options: UseCRUDOptions<T> = {}): UseCRUDResult<T> {
+export function useCRUD<T extends { id: number | string }>(options: UseCRUDOptions<T> = {}): UseCRUDResult<T> {
   const [items, setItems] = useState<T[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

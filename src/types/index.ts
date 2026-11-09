@@ -382,6 +382,7 @@ export interface FoncierLot {
   proprietaire_cni_numero: string;
   proprietaire_cni_date: string;
   proprietaire_cni_lieu: string;
+  proprietaire_client_id?: string | null;
   proprietaire_profession: string;
   proprietaire_telephone: string;
   // Administratif

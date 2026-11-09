@@ -49,7 +49,6 @@ const emptyForm = {
 
 const PAYMENTS_CACHE_KEY = "egs.immobilier.payments.local_cache.v1";
 const CONTRACTS_CACHE_KEY = "egs.immobilier.contracts.local_cache.v1";
-const PROPERTIES_CACHE_KEY = "egs.immobilier.properties.local_cache.v1";
 const TENANTS_CACHE_KEY = "egs.immobilier.tenants.local_cache.v1";
 
 type LocalRentPayment = RentPayment & {
@@ -94,6 +93,7 @@ export default function PaymentsTab({
   payments: paymentsProp,
   contracts,
   tenants,
+  properties,
   search,
   onRefresh,
 }: Props) {
@@ -805,12 +805,14 @@ export default function PaymentsTab({
                 return { value: newContract.id, label: `${newContract.reference} — ${tenants.find(t => t.id === data.locataire_id)?.prenom || "Locataire"} (${data.loyer_mensuel} FCFA)` };
               }}
               fetchCreateData={async () => {
-                const cachedProps = readManualCache<any>(PROPERTIES_CACHE_KEY);
                 const cachedTenants = readManualCache<any>(TENANTS_CACHE_KEY);
                 return {
-                  property_id: cachedProps
-                    .filter((p: any) => p.statut === "disponible")
-                    .map((p: any) => ({ value: p.id, label: p.adresse })),
+                  property_id: properties
+                    .filter((p) => p.statut === "disponible")
+                    .map((p) => ({
+                      value: p.id,
+                      label: p.adresse,
+                    })),
                   locataire_id: cachedTenants
                     .filter((t: any) => t.statut === "actif")
                     .map((t: any) => ({ value: t.id, label: `${t.prenom} ${t.nom}` }))

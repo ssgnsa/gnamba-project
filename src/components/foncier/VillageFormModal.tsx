@@ -19,13 +19,12 @@ interface FormState {
   chef_telephone: string;
   arrete_prefectoral: string;
   arrete_date: string;
-  superficie_totale: string;
 }
 
 const empty: FormState = {
   nom: "", code: "", region: "", departement: "", commune: "",
   chef_nom: "", chef_telephone: "", arrete_prefectoral: "",
-  arrete_date: "", superficie_totale: "",
+  arrete_date: "",
 };
 
 export function VillageFormModal({ village, onClose, onSaved }: Props) {
@@ -42,7 +41,6 @@ export function VillageFormModal({ village, onClose, onSaved }: Props) {
           chef_telephone: village.chef_telephone ?? "",
           arrete_prefectoral: village.arrete_prefectoral ?? "",
           arrete_date: village.arrete_date ?? "",
-          superficie_totale: village.superficie_totale?.toString() ?? "",
         }
       : empty
   );
@@ -67,9 +65,6 @@ export function VillageFormModal({ village, onClose, onSaved }: Props) {
       chef_telephone: form.chef_telephone.trim() || undefined,
       arrete_prefectoral: form.arrete_prefectoral.trim() || undefined,
       arrete_date: form.arrete_date || undefined,
-      superficie_totale: form.superficie_totale
-        ? Number(form.superficie_totale)
-        : undefined,
     };
 
     const { error: err } = isEdit
@@ -79,10 +74,11 @@ export function VillageFormModal({ village, onClose, onSaved }: Props) {
     setSaving(false);
 
     if (err) {
+      const apiErr = err as { message?: string };
       setError(
-        err.message?.includes("duplicate") || err.message?.includes("unique")
+        apiErr.message?.includes("duplicate") || apiErr.message?.includes("unique")
           ? "Un village avec ce nom ou ce code existe déjà."
-          : err.message || "Erreur inconnue"
+          : apiErr.message || "Erreur inconnue"
       );
       return;
     }
@@ -196,17 +192,6 @@ export function VillageFormModal({ village, onClose, onSaved }: Props) {
                 type="date"
                 value={form.arrete_date}
                 onChange={(e) => setField("arrete_date", e.target.value)}
-                className="w-full rounded-xl border border-neutral-200 px-3 py-2"
-              />
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-medium">Superficie (ha)</label>
-              <input
-                type="number"
-                step="0.01"
-                value={form.superficie_totale}
-                onChange={(e) => setField("superficie_totale", e.target.value)}
                 className="w-full rounded-xl border border-neutral-200 px-3 py-2"
               />
             </div>

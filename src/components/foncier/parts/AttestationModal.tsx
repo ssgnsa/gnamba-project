@@ -218,7 +218,7 @@ export const AttestationModal: FC<AttestationModalProps> = ({
       });
 
       // Call RPC via repository
-      const result = await foncierRepository.createAttestation(rpcParams as any);
+      const result = await foncierRepository.createAttestationAtomic(rpcParams as any);
       if (result.error) throw result.error;
 
       await logFoncierAudit(dbClient, {

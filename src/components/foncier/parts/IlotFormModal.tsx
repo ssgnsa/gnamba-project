@@ -40,7 +40,7 @@ export const IlotFormModal: FC<IlotFormModalProps> = ({
     });
     setLoading(false);
     if (err || !data) {
-      setError(err?.message || "Erreur inconnue");
+      setError((err as { message?: string })?.message || "Erreur inconnue");
       return;
     }
     setNumero("");

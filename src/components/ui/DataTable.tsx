@@ -61,12 +61,6 @@ export const DataTable: FC<DataTableProps<any>> = ({
     page * pageSize,
   );
 
-  const sortedColumns = columns.map((col) => ({
-    ...col,
-    isSorted: false,
-    sortDir: "asc" as "asc" | "desc",
-  }));
-
   return (
     <div className="rounded-lg overflow-hidden shadow-sm border border-gray-200">
       <div className="bg-gray-50 py-3 px-4">
@@ -101,10 +95,8 @@ export const DataTable: FC<DataTableProps<any>> = ({
           <thead>
             <tr>
               {columns.map((col) => {
-                const sortClass = "";
                 return (
                   <th
-                    key={col.key}
                     className={`px-4 py-2 text-left text-xs font-medium text-gray-500 ${col.sortable ? "cursor-pointer" : ""}`}
                     onClick={() => col.sortable && console.log("Sort clicked")}
                   >
@@ -141,7 +133,7 @@ export const DataTable: FC<DataTableProps<any>> = ({
                       : String(row[col.key] ?? "").toString();
                     return (
                       <td
-                        key={col.key}
+                        key={String(col.key)}
                         className={`px-4 py-2 text-sm align-${col.align ?? "left"} ${col.mono ? "font-mono" : ""}`}
                       >
                         {cellContent}

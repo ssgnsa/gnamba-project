@@ -56,7 +56,15 @@ export const LotissementFormModal: FC<LotissementFormModalProps> = ({
     }
 
     try {
-      const res = await foncierApi.lotissements.create(selectedVillageId, {
+      // Sécurité : s'assurer que selectedVillageId est une chaîne valide
+      // pour éviter l'erreur "replace is not a fonction" si un objet est passé par erreur
+      const safeVillageId = typeof selectedVillageId === 'string' ? selectedVillageId : String(selectedVillageId || '');
+      if (!safeVillageId) {
+        setError("Un village doit être sélectionné");
+        setLoading(false);
+        return;
+      }
+      const res = await foncierApi.lotissements.create(safeVillageId, {
         nom: form.nom.trim(),
         code: form.code.trim() || undefined,
         description: form.description.trim() || undefined,
@@ -108,7 +116,7 @@ export const LotissementFormModal: FC<LotissementFormModalProps> = ({
                 </label>
                 <select
                   value={selectedVillageId ?? ""}
-                  onChange={(e) => setSelectedVillageId(e.target.value || null)}
+                  onChange={(e) => setSelectedVillageId(typeof e.target.value === 'string' ? e.target.value : null)}
                   disabled={isLoading}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
