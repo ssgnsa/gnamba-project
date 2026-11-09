@@ -32,9 +32,9 @@
 
 ### Derniers commits
 ```
+a9fe65b7 docs(memory): AI-MEMORY.md + script auto-update
 31ac98ba docs(refonte-foncier): audit, architecture cible, plan migration
 49530945 wip(foncier): pack îlot + cascade (à refondre en audit)
-8575bdde fix(foncier): aligner get_all_with_stats et get_with_stats sur VillageWithStats
 ```
 
 ### Branches
