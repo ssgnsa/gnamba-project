@@ -5,7 +5,7 @@
  * Gère loading (désactive submit) et error (bandeau rouge).
  * Form HTML natif avec onSubmit.
  */
-import { FC } from "react";
+import { FC, ReactNode } from "react";
 
 interface FormModalProps {
   isOpen: boolean;
@@ -15,6 +15,7 @@ interface FormModalProps {
   onClose: () => void;
   loading?: boolean;
   error?: string;
+  children?: ReactNode;
   submitLabel?: string;
   cancelLabel?: string;
 }
@@ -27,6 +28,7 @@ export const FormModal: FC<FormModalProps> = ({
   onClose,
   loading = false,
   error,
+  children,
   submitLabel = "Enregistrer",
   cancelLabel = "Annuler",
 }) => {
