@@ -117,7 +117,7 @@ export default function Foncier() {
   } = state;
 
   // Villages (objets) pour le select de création de lotissement (value = id, label = nom)
-  const [lotissements, setLotissements] = useState<{ id: string; nom: string; code?: string }[]>([]);
+  const [villagesSelect, setVillagesSelect] = useState<{ id: string; nom: string; code?: string }[]>([]);
   const [lotissementModalOpen, setLotissementModalOpen] = useState(false);
   const [loadingLotissements, setLoadingLotissements] = useState(false);
 
@@ -162,7 +162,7 @@ export default function Foncier() {
       setLotIlots(
         (ilotsResult.data ?? []).map((i) => ({
           id: i.id,
-          nom: i.nom,
+          nom: i.numero,
           lotissement_id: i.lotissement_id,
         })),
       );
@@ -214,11 +214,15 @@ export default function Foncier() {
     try {
       const result = await foncierRepository.getVillages();
       if (result.error) throw result.error;
-      setLotissements((result.data ?? []).map((v) => ({
-        id: v.id,
-        nom: v.nom,
-        code: v.code,
-      })));
+      // Validation: s'assurer que chaque village a la structure attendue
+      const validatedVillages = (result.data ?? [])
+        .filter((v: any) => v && typeof v.id === 'string' && typeof v.nom === 'string')
+        .map((v: any) => ({
+          id: String(v.id),
+          nom: String(v.nom),
+          code: v.code ? String(v.code) : undefined,
+        }));
+      setVillagesSelect(validatedVillages);
     } catch (err) {
       console.error("Error loading villages for lotissement modal:", err);
     } finally {
@@ -647,7 +651,7 @@ export default function Foncier() {
           selectedVillage={selectedVillage || undefined}
           selectedLotissement={selectedLotissement || undefined}
           selectedIlot={selectedIlot || undefined}
-          onIlotCreated={() => { void loadLotHierarchy(); }}
+          onIlotCreated={async () => { await loadLotHierarchy(); }}
         />
 
         {/* Attestation Modal */}
@@ -747,7 +751,7 @@ export default function Foncier() {
             setLotissementModalOpen(false);
             void fetchData();
           }}
-          villages={lotissements}
+          villages={villagesSelect}
           isLoading={loading || loadingLotissements}
         />
       </main>
