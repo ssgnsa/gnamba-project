@@ -123,3 +123,4 @@ review.sql
 VERSION.json
 *.bak
 *.bak.*
+.agents/

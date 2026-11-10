@@ -1,11 +1,11 @@
-import { FC, useState, useCallback } from "react";
+import { FC, useState, useCallback, useContext } from "react";
 import { foncierApi } from "@/api/foncier";
+import { useFoncier } from "@/contexts/FoncierContext";
 
 interface LotissementFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  villages: { id: string; nom: string; code?: string }[];
   isLoading?: boolean;
 }
 
@@ -23,9 +23,9 @@ export const LotissementFormModal: FC<LotissementFormModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
-  villages,
   isLoading = false,
 }) => {
+  const { villages, selectedVillage, setVillage, publishEvent } = useFoncier();
   const [form, setForm] = useState({ ...emptyForm });
   const [selectedVillageId, setSelectedVillageId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -78,6 +78,9 @@ export const LotissementFormModal: FC<LotissementFormModalProps> = ({
         arrete_date: form.arrete_date.trim() || undefined,
       });
       if (res.error) throw res.error;
+
+      // Événement : lotissement créé — les autres formulaires peuvent réagir
+      publishEvent("lotissement:created", { id: res.data?.id, nom: res.data?.nom });
 
       onSuccess();
       onClose();

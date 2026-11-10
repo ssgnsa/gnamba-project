@@ -1,8 +1,9 @@
-import { FC, useState, useEffect, useMemo, useCallback } from "react";
+import { FC, useState, useEffect, useMemo, useCallback, useRef, useContext } from "react";
 import { z } from "zod";
 import { foncierRepository } from "@/data/foncier.repository";
 import { IlotFormModal } from "./IlotFormModal";
 import { foncierLotFormSchema, type FoncierLotFormInput, validateFoncierForm } from "@/lib/foncierValidation";
+import { useFoncier } from "@/contexts/FoncierContext";
 
 interface LotFormModalProps {
   isOpen: boolean;
@@ -10,16 +11,6 @@ interface LotFormModalProps {
   onSuccess: () => void;
   initialData?: Partial<FoncierLotFormInput>;
   isLoading?: boolean;
-  villages?: { id: string; nom: string }[];
-  lotissements?: { id: string; nom: string; village_id: string }[];
-  ilots?: { id: string; nom: string; lotissement_id: string }[];
-  selectedVillage?: string | null;
-  selectedLotissement?: string | null;
-  selectedIlot?: string | null;
-  onVillageChange?: (id: string | null) => void;
-  onLotissementChange?: (id: string | null) => void;
-  onIlotChange?: (id: string | null) => void;
-  onIlotCreated?: (newIlotId: string) => void | Promise<void>;
 }
 
 export const LotFormModal: FC<LotFormModalProps> = ({
@@ -28,17 +19,19 @@ export const LotFormModal: FC<LotFormModalProps> = ({
   onSuccess,
   initialData,
   isLoading = false,
-  villages = [],
-  lotissements = [],
-  ilots = [],
-  selectedVillage = null,
-  selectedLotissement = null,
-  selectedIlot = null,
-  onVillageChange,
-  onLotissementChange,
-  onIlotChange,
-  onIlotCreated,
 }) => {
+  const {
+    villages,
+    lotissements,
+    ilots,
+    selectedVillage,
+    selectedLotissement,
+    selectedIlot,
+    publishEvent,
+    on,
+    loadingHierarchy,
+  } = useFoncier();
+
   type FormState = z.input<typeof foncierLotFormSchema>;
 
   const emptyFormState = useMemo<FormState>(() => ({
@@ -153,6 +146,9 @@ export const LotFormModal: FC<LotFormModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Référence pour dédupliquer les réponses réseau (éviter écrasement si village change entre-temps)
+  const fetchVillageReqIdRef = useRef(0);
+
   // Sélections en cascade (Village → Lotissement → Îlot)
   const [selectedVillageId, setSelectedVillageId] = useState<string | undefined>(undefined);
   const [selectedLotissementId, setSelectedLotissementId] = useState<string | undefined>(undefined);
@@ -191,15 +187,34 @@ export const LotFormModal: FC<LotFormModalProps> = ({
     setSelectedLotissementId(undefined);
     setSelectedIlotId(undefined);
     setFormData((prev) => ({ ...prev, nom_lotissement: "", numero_ilot: "", village: "", ilot_id: undefined }));
-    onLotissementChange?.(null);
-    onIlotChange?.(null);
-  }, [selectedVillageId, onLotissementChange, onIlotChange]);
+  }, [selectedVillageId]);
 
   useEffect(() => {
     setSelectedIlotId(undefined);
     setFormData((prev) => ({ ...prev, numero_ilot: "", ilot_id: undefined }));
-    onIlotChange?.(null);
-  }, [selectedLotissementId, onIlotChange]);
+  }, [selectedLotissementId]);
+
+  // Pré-remplir les champs village depuis le sélection depuis le contexte
+  useEffect(() => {
+    if (!isOpen || !selectedVillageId) return;
+    // En mode édition (initialData fourni), n'écraser rien
+    if (initialData) return;
+
+    // Le village sélectionné dans le contexte
+    const village = villages.find((v) => v.id === selectedVillageId);
+    if (!village) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      // Ne remplir que si vide (respecter une saisie manuelle déjà effectuée)
+      chef_village: prev.chef_village || village.chef_nom || "",
+      arrete_prefectoral: prev.arrete_prefectoral || village.arrete_prefectoral || "",
+      arrete_date: prev.arrete_date || toDateString(village.arrete_date) || undefined,
+      region: prev.region || village.region || "",
+      departement: prev.departement || village.departement || "",
+      commune: prev.commune || village.commune || "",
+    }));
+  }, [isOpen, selectedVillageId, villages]);
 
   const handleChange = <K extends keyof FormState>(field: K, value: FormState[K]) => {
     setFormData((prev: FormState) => ({
@@ -279,12 +294,23 @@ export const LotFormModal: FC<LotFormModalProps> = ({
                     onChange={(e) => {
                       const id = e.target.value || undefined;
                       setSelectedVillageId(id);
-                      onVillageChange?.(id ?? null);
+                      // Publier événement pour les autres formulaires
+                      publishEvent("village:select", id);
                       const village = villages.find((v) => v.id === id);
                       handleChange("village", village ? village.nom : "");
                       handleChange("nom_lotissement", "");
                       handleChange("numero_ilot", "");
                       handleChange("ilot_id", undefined);
+                      // Reset des champs dépendants du village (ne pas toucher numero_lot, superficie, proprietaire_*)
+                      setFormData((prev) => ({
+                        ...prev,
+                        chef_village: "",
+                        arrete_prefectoral: "",
+                        arrete_date: undefined,
+                        region: "",
+                        departement: "",
+                        commune: "",
+                      }));
                     }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
@@ -304,7 +330,8 @@ export const LotFormModal: FC<LotFormModalProps> = ({
                     onChange={(e) => {
                       const id = e.target.value || undefined;
                       setSelectedLotissementId(id);
-                      onLotissementChange?.(id ?? null);
+                      // Publier événement pour les autres formulaires
+                      publishEvent("lotissement:select", id);
                       const lotissement = lotissements.find((l) => l.id === id);
                       handleChange("nom_lotissement", lotissement ? lotissement.nom : "");
                       handleChange("numero_ilot", "");
@@ -335,7 +362,8 @@ export const LotFormModal: FC<LotFormModalProps> = ({
         onChange={(e) => {
           const id = e.target.value || undefined;
           setSelectedIlotId(id);
-          onIlotChange?.(id ?? null);
+          // Publier événement pour les autres formulaires
+          publishEvent("ilot:select", id);
           const ilot = ilots.find((i) => i.id === id);
           handleChange("numero_ilot", ilot ? ilot.nom : "");
         }}
@@ -507,9 +535,17 @@ export const LotFormModal: FC<LotFormModalProps> = ({
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="Ex: Nanan Koffi"
                     />
+                  {selectedVillageId && !formData.chef_village && (
+                    <p className="mt-1 text-xs text-amber-600">
+                      Non renseigné pour ce village
+                    </p>
+                  )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Arrêté préfectoral</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+  Arrêté préfectoral
+  <span className="ml-1 text-xs font-normal text-gray-500">(érection du village)</span>
+</label>
                     <input
                       type="text"
                       value={formData.arrete_prefectoral ?? ""}
@@ -614,18 +650,22 @@ export const LotFormModal: FC<LotFormModalProps> = ({
               {/* Miscellaneous */}
               <div className="mt-6">
                 <h4 className="font-medium text-gray-700 mb-2">Informations diverses</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Code barre</label>
-                    <input
-                      type="text"
-                      value={formData.code_barre ?? ""}
-                      onChange={(e) => handleChange("code_barre", e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="Ex: 1234567890123"
-                    />
-                  </div>
-                </div>
+                <div>
+  <label className="block text-sm font-medium text-gray-700 mb-1">
+    Code barre <span className="text-xs text-gray-500">(auto-généré)</span>
+  </label>
+  <input
+    type="text"
+    value={formData.code_barre ?? ""}
+    readOnly
+    disabled
+    placeholder="Généré automatiquement"
+    className="w-full px-3 py-2 border border-gray-200 rounded-md bg-gray-50 text-gray-500 cursor-not-allowed"
+  />
+  <p className="mt-1 text-xs text-gray-500">
+    Identifiant unique généré à la création, non modifiable
+  </p>
+</div>
                 <div className="mt-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
                   <textarea
@@ -661,10 +701,10 @@ export const LotFormModal: FC<LotFormModalProps> = ({
           lotissementNom={lotissements.find((l) => l.id === selectedLotissementId)?.nom}
           onClose={() => setIlotModalOpen(false)}
           onSuccess={async (newIlotId) => {
-            await onIlotCreated?.(newIlotId);
+            // Publier événement ilot créé vers le contexte (pour les autres formulaires)
+            publishEvent("ilot:created", newIlotId);
             setIlotModalOpen(false);
             setSelectedIlotId(newIlotId);
-            onIlotChange?.(newIlotId);
           }}
         />
       )}

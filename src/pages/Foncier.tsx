@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import FoncierVillages from "./FoncierVillages";
+import { FoncierProvider, useFoncier } from "@/contexts/FoncierContext";
 import {
   Settings2,
   History,
@@ -28,6 +29,14 @@ import {
 } from "../components/foncier/parts";
 import WorkflowValidation from "../components/foncier/WorkflowValidation";
 export default function Foncier() {
+  return (
+    <FoncierProvider>
+      <FoncierInner />
+    </FoncierProvider>
+  );
+}
+
+function FoncierInner() {
   const { settings } = useSettings();
   const { profile } = useAuth();
   const accessLevel = resolveAccessLevel(profile?.role, profile?.access_level);
@@ -62,8 +71,7 @@ export default function Foncier() {
     fetchData,
     loadCachedLots,
     refreshQueueCount,
-    selectedVillage,
-    setSelectedVillage,
+    // selectedVillage et setSelectedVillage retirés : gérés par useFoncier() (ligne ~135)
     villageOptionsLoading,
     config,
     configLoading,
@@ -122,8 +130,14 @@ export default function Foncier() {
   const [loadingLotissements, setLoadingLotissements] = useState(false);
 
   // Hiérarchie Village → Lotissement → Îlot → Lot
-  const [selectedLotissement, setSelectedLotissement] = useState<string | null>(null);
-  const [selectedIlot, setSelectedIlot] = useState<string | null>(null);
+  const {
+    selectedVillage,
+    setSelectedVillage,
+    selectedLotissement,
+    setSelectedLotissement,
+    selectedIlot,
+    setSelectedIlot,
+  } = useFoncier();
 
   // Données pour les selects en cascade du formulaire de création de lot
   const [lotVillages, setLotVillages] = useState<{ id: string; nom: string }[]>([]);
@@ -198,16 +212,6 @@ export default function Foncier() {
     });
     return Array.from(set).sort().map((numero) => ({ nom: `Îlot ${numero}`, id: numero }));
   }, [lots, selectedVillage, selectedLotissement]);
-
-  // Reset les enfants quand un parent change (cascade)
-  useEffect(() => {
-    setSelectedLotissement(null);
-    setSelectedIlot(null);
-  }, [selectedVillage]);
-
-  useEffect(() => {
-    setSelectedIlot(null);
-  }, [selectedLotissement]);
 
   const reloadVillages = async () => {
     setLoadingLotissements(true);
@@ -645,12 +649,6 @@ export default function Foncier() {
           onSuccess={fetchData}
           initialData={editingId ? form : undefined}
           isLoading={saving}
-          villages={lotVillages}
-          lotissements={lotLotissements}
-          ilots={lotIlots}
-          selectedVillage={selectedVillage || undefined}
-          selectedLotissement={selectedLotissement || undefined}
-          selectedIlot={selectedIlot || undefined}
           onIlotCreated={async () => { await loadLotHierarchy(); }}
         />
 
@@ -751,7 +749,6 @@ export default function Foncier() {
             setLotissementModalOpen(false);
             void fetchData();
           }}
-          villages={villagesSelect}
           isLoading={loading || loadingLotissements}
         />
       </main>

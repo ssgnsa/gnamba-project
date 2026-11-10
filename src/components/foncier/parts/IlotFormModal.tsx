@@ -1,5 +1,6 @@
-import { FC, useState } from "react";
+import { FC, useState, useContext } from "react";
 import { foncierRepository } from "@/data/foncier.repository";
+import { useFoncier } from "@/contexts/FoncierContext";
 
 interface IlotFormModalProps {
   isOpen: boolean;
@@ -16,6 +17,10 @@ export const IlotFormModal: FC<IlotFormModalProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const {
+    publishEvent,
+  } = useFoncier();
+
   const [numero, setNumero] = useState("");
   const [description, setDescription] = useState("");
   const [superficie, setSuperficie] = useState("");
@@ -46,6 +51,8 @@ export const IlotFormModal: FC<IlotFormModalProps> = ({
     setNumero("");
     setDescription("");
     setSuperficie("");
+    // Publier événement : îlot créé — les autres formulaires peuvent réagir
+    publishEvent("ilot:created", data.id);
     onSuccess(data.id);
   };
 
