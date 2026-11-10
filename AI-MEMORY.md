@@ -32,9 +32,9 @@
 
 ### Derniers commits
 ```
-30748580 chore: cleanup warning DataTable + mémoire Phase 1 terminée
-767eb800 fix(types+ui): corrections TS résiduelles post-Phase 1
-63e8f690 docs(audit): rapport d'audit 2026-11-09 (corrections TS, module Foncier, HOLD)
+bd1f0bd8 chore(immobilier): reformatage fetchData + Promise.allSettled
+d8360554 fix(foncier): sanitize qr_payload + code_barre = reference
+1297bb66 feat(foncier): FoncierProvider + migration 4 formulaires (Phase A+B)
 ```
 
 ### Branches
@@ -87,8 +87,8 @@
     remotes/origin/refonte/foncier-v2
 <!-- /AUTO:git --><!-- AUTO:versions -->
 ### Versions
-- Node : v20.20.2
-- npm : 10.8.2
+- Node : v22.23.1
+- npm : 12.0.2
 - Vite : 8.0.2
 <!-- /AUTO:versions --><!-- AUTO:build -->
 Build & tests
@@ -104,8 +104,8 @@ docker compose ps → 5/5 healthy
 ### Tailles fichiers clés
 | Fichier | Lignes |
 |---|---|
-| src/pages/Foncier.tsx | 760 |
-| src/components/foncier/parts/LotFormModal.tsx | 673 |
+| src/pages/Foncier.tsx | 757 |
+| src/components/foncier/parts/LotFormModal.tsx | 713 |
 | backend/app/api/v1/foncier/router.py | 1305 |
 <!-- /AUTO:sizes -->
 🏗️ §3 ARCHITECTURE & CONVENTIONS
