@@ -67,102 +67,101 @@ export default function Immobilier() {
     setLoading(true);
     setError(null);
     try {
+      // Read all four caches independently
       const cachedProperties = readManualCache<Property>(PROPERTIES_CACHE_KEY);
       const cachedTenants = readManualCache<Tenant>(TENANTS_CACHE_KEY);
-      const cachedContracts =
-        readManualCache<LeaseContract>(CONTRACTS_CACHE_KEY);
+      const cachedContracts = readManualCache<LeaseContract>(CONTRACTS_CACHE_KEY);
       const cachedPayments = readManualCache<RentPayment>(PAYMENTS_CACHE_KEY);
 
-      const hasLocalCache =
-        cachedProperties.length > 0 ||
-        cachedTenants.length > 0 ||
-        cachedContracts.length > 0 ||
-        cachedPayments.length > 0;
-
-      if (hasLocalCache) {
-        setProperties(cachedProperties);
-        setTenants(cachedTenants);
-        setContracts(cachedContracts);
-        setPayments(cachedPayments);
-        setTenantTableName("locataires");
-        setTenantIdColumn("locataire_id");
-        setLoading(false);
-        return;
-      }
-
-      const [propRes, tenantRes] = await Promise.all([
-        dbClient
-          .from("properties")
-          .select("*").order("created_at"),
+      // Fetch all four resources from the API independently.
+      // We use Promise.allSettled so that one failure does not prevent
+      // the other three from completing.
+      const results = await Promise.allSettled([
+        // Properties: use dbClient from supabase-like API
+        dbClient.from("properties").select("*").order("created_at"),
+        // Tenants: use tenantsRepository
         tenantsRepository.getAll({ limit: 1000 }),
-      ]);
-
-      const tenantsData: Tenant[] = tenantRes.data ?? [];
-
-      const [contractRes, payRes] = await Promise.all([
-        dbClient
-          .from("lease_contracts")
-          .select("*").order("created_at"),
+        // Contracts: use dbClient
+        dbClient.from("lease_contracts").select("*").order("created_at"),
+        // Payments: use dbClient
         dbClient
           .from("rent_payments")
           .select("*")
           .order("date_paiement", { ascending: false }),
       ]);
 
+      // Helper: extract data/error from a Promise.allSettled result
+      const getResult = (p: PromiseSettledResult<any>) => {
+        if (p.status === "fulfilled") {
+          return { data: p.value.data, error: p.value.error, success: true };
+        }
+        return { data: null, error: p.reason?.message || "Unknown error", success: false };
+      };
+
+      const propResult = getResult(results[0]);
+      const tenantResult = getResult(results[1]);
+      const contractResult = getResult(results[2]);
+      const paymentResult = getResult(results[3]);
+
+      // ---- Properties ----
+      let properties: Property[] = [];
+      if (propResult.success && propResult.data !== null) {
+        const propData = propResult.data as any[];
+        properties = ((propData || []) as any[]).map(
+          (property) => ({
+            ...property,
+            proprietaire_id: property.proprietaire_id ?? property.proprietaire_entity_id ?? null,
+          }),
+        ) as Property[];
+        writeManualCache(PROPERTIES_CACHE_KEY, properties);
+      } else if (cachedProperties.length > 0) {
+        // Keep existing cache if API fails and we have cached data
+        properties = cachedProperties;
+      }
+      const propertiesById = new Map(
+        properties.map((property) => [property.id, property]),
+      );
+
+      // ---- Tenants ----
+      let tenantsData: Tenant[] = [];
+      if (tenantResult.success && tenantResult.data !== null) {
+        tenantsData = (tenantResult.data as any[]) || [];
+        writeManualCache(TENANTS_CACHE_KEY, tenantsData);
+      } else if (cachedTenants.length > 0) {
+        tenantsData = cachedTenants;
+      }
+
+      // Determine which tenant ID field to use (tenant_id vs locataire_id)
       const legacyTenantIdField =
-        ((contractRes.data as any[]) || []).some(
+        ((contractResult.data as any[]) || []).some(
           (c) => c.tenant_id && !c.locataire_id,
         ) ||
-        ((payRes.data as any[]) || []).some(
+        ((paymentResult.data as any[]) || []).some(
           (p) => p.tenant_id && !p.locataire_id,
         );
 
-      setTenantTableName("locataires");
-      setTenantIdColumn(legacyTenantIdField ? "tenant_id" : "locataire_id");
+      const tenantIdColumn: "locataire_id" | "tenant_id" =
+        legacyTenantIdField ? "tenant_id" : "locataire_id";
 
-      if (propRes.error) {
-        setError(`Erreur propriétés: ${propRes.error.message}`);
-      }
-      if (contractRes.error) {
-        setError(`Erreur contrats: ${contractRes.error.message}`);
-      }
-      if (payRes.error) {
-        setError(`Erreur paiements: ${payRes.error.message}`);
-      }
-
-      const normalizedContracts = ((contractRes.data as any[]) || []).map(
-        (contract) => ({
-          ...contract,
-          locataire_id: contract.locataire_id ?? contract.tenant_id ?? "",
-        }),
-      ) as LeaseContract[];
-
-      const normalizedPayments = ((payRes.data as any[]) || []).map(
-        (payment) => ({
-          ...payment,
-          locataire_id: payment.locataire_id ?? payment.tenant_id ?? null,
-        }),
-      ) as RentPayment[];
-
-      const normalizedProperties = ((propRes.data || []) as any[]).map(
-        (property) => ({
-          ...property,
-          proprietaire_id: property.proprietaire_id ?? property.proprietaire_entity_id ?? null,
-        }),
-      ) as Property[];
-      const propertiesById = new Map(
-        normalizedProperties.map((property) => [property.id, property]),
-      );
       const tenantsById = new Map(
         (tenantsData || []).map((tenant) => [tenant.id, tenant]),
       );
-      const contractsById = new Map(
-        normalizedContracts.map((contract) => [contract.id, contract]),
-      );
 
-      const enrichedContracts = normalizedContracts.map((contract) => ({
-        ...contract,
-        properties: propertiesById.get(contract.property_id)
+      // ---- Contracts ----
+      let enrichedContracts: LeaseContract[] = [];
+      if (contractResult.success && contractResult.data !== null) {
+        const contractData = contractResult.data as any[];
+        const normalizedContracts = ((contractData || []) as any[]).map(
+          (contract) => ({
+            ...contract,
+            locataire_id: contract.locataire_id ?? contract.tenant_id ?? "",
+          }),
+        ) as LeaseContract[];
+
+        // Enrich contracts with property and tenant info
+        enrichedContracts = normalizedContracts.map((contract) => ({
+          ...contract,
+          properties: propertiesById.get(contract.property_id)
           ? {
               adresse: propertiesById.get(contract.property_id)!.adresse,
               type_bien: propertiesById.get(contract.property_id)!.type_bien,
@@ -175,36 +174,81 @@ export default function Immobilier() {
               telephone: tenantsById.get(contract.locataire_id)!.telephone,
             }
           : undefined,
-      })) as LeaseContract[];
+        })) as LeaseContract[];
 
-      const enrichedPayments = normalizedPayments.map((payment) => ({
-        ...payment,
-        properties:
-          payment.property_id && propertiesById.get(payment.property_id)
-            ? { adresse: propertiesById.get(payment.property_id)!.adresse }
-            : undefined,
-        locataires:
-          payment.locataire_id && tenantsById.get(payment.locataire_id)
-            ? {
-                nom: tenantsById.get(payment.locataire_id)!.nom,
-                prenom: tenantsById.get(payment.locataire_id)!.prenom,
-              }
-            : undefined,
-        lease_contracts:
-          payment.contract_id && contractsById.get(payment.contract_id)
-            ? { reference: contractsById.get(payment.contract_id)!.reference }
-            : undefined,
-      })) as RentPayment[];
+        writeManualCache(CONTRACTS_CACHE_KEY, enrichedContracts);
+      } else if (cachedContracts.length > 0) {
+        // Keep existing cache if API fails
+        // Re-normalize based on current tenantIdColumn
+        const normalized = ((cachedContracts.data as any[]) || []).map(
+          (contract) => ({
+            ...contract,
+            locataire_id: contract.locataire_id ?? contract.tenant_id ?? "",
+          }),
+        ) as LeaseContract[];
+        enrichedContracts = normalizedContracts.map((contract) => ({
+          ...contract,
+          properties: propertiesById.get(contract.property_id)
+          ? {
+              adresse: propertiesById.get(contract.property_id)!.adresse,
+              type_bien: propertiesById.get(contract.property_id)!.type_bien,
+            }
+          : undefined,
+        locataires: tenantsById.get(contract.locataire_id)
+          ? {
+              nom: tenantsById.get(contract.locataire_id)!.nom,
+              prenom: tenantsById.get(contract.locataire_id)!.prenom,
+              telephone: tenantsById.get(contract.locataire_id)!.telephone,
+            }
+          : undefined,
+        })) as LeaseContract[];
+      }
 
-      setProperties(normalizedProperties);
+      // ---- Payments ----
+      let enrichedPayments: RentPayment[] = [];
+      if (paymentResult.success && paymentResult.data !== null) {
+        const payData = paymentResult.data as any[];
+        const normalizedPayments = ((payData || []) as any[]).map(
+          (payment) => ({
+            ...payment,
+            locataire_id: payment.locataire_id ?? payment.tenant_id ?? null,
+          }),
+        ) as RentPayment[];
+
+        // Enrich payments with property and tenant info
+        enrichedPayments = normalizedPayments.map((payment) => ({
+          ...payment,
+          properties:
+            payment.property_id && propertiesById.get(payment.property_id)
+              ? { adresse: propertiesById.get(payment.property_id)!.adresse }
+              : undefined,
+          locataires:
+            payment.locataire_id && tenantsById.get(payment.locataire_id)
+              ? {
+                  nom: tenantsById.get(payment.locataire_id)!.nom,
+                  prenom: tenantsById.get(payment.locataire_id)!.prenom,
+                }
+              : undefined,
+          lease_contracts:
+            payment.contract_id && enrichedContracts.some((c) => c.id)
+              ? { reference: enrichedContracts.find((c) => c.id === payment.contract_id)!.reference }
+              : undefined,
+        })) as RentPayment[];
+
+        writeManualCache(PAYMENTS_CACHE_KEY, enrichedPayments);
+      } else if (cachedPayments.length > 0) {
+        // Keep existing cache if API fails
+        enrichedPayments = cachedPayments;
+      }
+
+      setProperties(properties);
       setTenants(tenantsData || []);
       setContracts(enrichedContracts);
       setPayments(enrichedPayments);
-      writeManualCache(PROPERTIES_CACHE_KEY, normalizedProperties);
-      writeManualCache(TENANTS_CACHE_KEY, tenantsData || []);
-      writeManualCache(CONTRACTS_CACHE_KEY, enrichedContracts);
-      writeManualCache(PAYMENTS_CACHE_KEY, enrichedPayments);
-    } catch {
+      setTenantTableName("locataires");
+      setTenantIdColumn(tenantIdColumn);
+    } catch (err) {
+      // Global fallback: if absolutely everything fails, keep local caches as-is
       setError("Une erreur est survenue lors du chargement des données.");
     } finally {
       setLoading(false);
