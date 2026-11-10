@@ -58,28 +58,25 @@ def calculate_hash(data: dict) -> str:
     return hashlib.sha256(json_str.encode('utf-8')).hexdigest()
 
 def get_qr_payload(attestation: FoncierAttestation, lot, village, proprietor) -> str:
-    """Génère le payload QR pour une attestation"""
+    """Génère le payload QR pour une attestation.
+
+    Aucune donnée personnelle (nom, prénom, CNI, téléphone) — le QR
+    encode uniquement des identifiants pour la vérification publique.
+    """
     data = {
         "attestation": {
             "reference": attestation.reference,
             "type": attestation.type,
             "statut": attestation.statut,
             "date_etablissement": str(attestation.date_etablissement) if attestation.date_etablissement else None,
-            "date_expiration": str(attestation.date_expiration) if attestation.date_expiration else None,
         },
         "lot": {
             "reference": lot.reference,
             "numero": lot.numero_lot,
-            "superficie": float(lot.superficie) if lot.superficie else None,
         },
         "village": {
-            "nom": village.nom,
             "code": village.code,
         },
-        "proprietaire": {
-            "nom": proprietor.get("nom"),
-            "prenom": proprietor.get("prenom"),
-        } if proprietor else None,
         "verifie_le": datetime.utcnow().isoformat(),
     }
     return json.dumps(data, ensure_ascii=False, separators=(',', ':'))
@@ -268,8 +265,12 @@ class LotService:
             lot_data = data.model_dump()
             lot_data["ilot_id"] = ilot_id
             lot_data["reference"] = reference
-            import uuid
-            lot_data["code_barre"] = f"BC-{uuid.uuid4().hex[:12].upper()}"
+            # Conserver le code_barre fourni s'il est présent, sinon utiliser la reference (unique NOT NULL)
+            provided_code = (lot_data.get("code_barre") or "").strip()
+            if provided_code:
+                lot_data["code_barre"] = provided_code[:64]
+            else:
+                lot_data["code_barre"] = reference[:64]
             lot_data["created_by"] = user_id
             lot_data["updated_by"] = user_id
             lot_data["client_updated_at"] = datetime.utcnow()
